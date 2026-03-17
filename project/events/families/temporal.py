@@ -146,6 +146,7 @@ class SpreadRegimeWideningDetector(ThresholdDetector):
     def compute_raw_mask(self, df: pd.DataFrame, *, features: dict[str, pd.Series], **params: Any) -> pd.Series:
         return (
             (features['spread_avg'] >= features['spread_q85']).fillna(False)
+            & (features['accel'] > 0).fillna(False)
             & (features['accel'] >= features['accel_q75']).fillna(False)
         ).fillna(False)
 
