@@ -54,6 +54,21 @@ Each dataset also writes:
 - `synthetic/<run_id>/synthetic_regime_segments.json`
 - run-scoped lake partitions under `data/lake/runs/<run_id>/...`
 
+## Golden Validation Workflows
+
+Run the maintained synthetic smoke workflow:
+
+```bash
+python3 -m project.scripts.run_golden_synthetic_discovery
+```
+
+Validate detector truth on a generated run:
+
+```bash
+python3 -m project.scripts.validate_synthetic_detector_truth \
+  --run_id golden_synthetic_discovery
+```
+
 ## Recommended Agent Workflow
 
 1. Pick one profile matching the research question.
@@ -96,3 +111,4 @@ Always validate a hypothesis against at least two distinct profiles (e.g., `defa
 - Do not keep redesigning features against one synthetic profile.
 - Prefer cross-profile survival to single-profile peak performance.
 - Keep truth validation artifacts with the run.
+- Separate detector recovery claims from profitability claims.

@@ -19,6 +19,7 @@ The agent should communicate:
 - why the next experiment is justified
 
 The agent should not hide uncertainty. If a run is partial, replayed, or manually reconciled, say so explicitly.
+- If generated diagnostics disagree with authored docs or manifests, say so explicitly and treat it as a finding.
 
 ## Default Interaction Pattern
 

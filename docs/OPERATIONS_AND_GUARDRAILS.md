@@ -23,6 +23,7 @@ The agent should optimize for:
 - Use narrow search specs for isolated hypothesis testing.
 - Use full runs only after recent path stability is confirmed.
 - After detector or synthetic-generator edits, rerun synthetic truth validation before trusting full-spec synthetic results.
+- Treat generated diagnostics as part of the operational checklist, not an optional afterthought.
 
 ## Logging Discipline
 

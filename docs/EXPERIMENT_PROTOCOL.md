@@ -59,7 +59,6 @@ Success criteria:
 - candidate fields survive the chain
 - promotion rejects or accepts for substantive reasons
 
-
 ### Synthetic Validation Experiment
 
 Purpose:
@@ -92,6 +91,8 @@ Success criteria:
 - Use explicit contexts for regime-conditioned claims.
 - Avoid broad exploratory runs if prior runs already show the region is weak.
 - Record why the experiment exists before running it.
+- Prefer `plan_only` before any materially expensive run.
+- Prefer targeted replays when the goal is mechanical verification instead of new evidence.
 
 ## Batch Construction
 
@@ -121,6 +122,7 @@ For each candidate or experiment result, check:
 - regime stability
 - bridge tradability
 - promotion eligibility
+- warning surface and manifest cleanliness
 
 ## Reflection Template
 

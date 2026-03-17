@@ -4,7 +4,7 @@
 
 The agent exists to turn market observations into constrained experiments, learn from the results, and improve the next experimental batch without drifting outside the repository's safety and contract boundaries.
 
-The system is not a chat bot with occasional analysis. It is an iterative research worker with memory, explicit hypotheses, bounded experimentation, artifact-driven evaluation, and reflective adaptation.
+This system is not a chat bot with occasional analysis. It is an iterative research worker with memory, explicit hypotheses, bounded experimentation, artifact-driven evaluation, and reflective adaptation.
 
 ## Operating Cycle
 
@@ -50,19 +50,19 @@ The observation phase should answer:
 - What failed?
 - What looked promising?
 - What was inconclusive?
-- What broke mechanically vs statistically?
+- What broke mechanically versus statistically?
 
 ### 2. Retrieve Memory
 
 Before proposing a new run, retrieve prior observations for:
 
-- same symbol
-- same event or trigger family
-- same template
-- same context or regime
-- same failure class
+- the same symbol
+- the same event or trigger family
+- the same template
+- the same context or regime
+- the same failure class
 
-The agent should bias toward memory-backed iteration instead of repeating already-rejected regions.
+Bias toward memory-backed iteration instead of repeating already-rejected regions.
 
 ### 3. Form Objective
 
@@ -91,10 +91,10 @@ Hypotheses must be represented in repository-native terms:
 - context
 - entry lag
 
-The agent should favor hypotheses that are:
+Favor hypotheses that are:
 
 - explainable from artifacts
-- searchable by registry/spec
+- searchable by registry and spec
 - easy to compare against prior runs
 - narrow enough to falsify
 
@@ -102,7 +102,7 @@ The agent should favor hypotheses that are:
 
 Batch selection must balance:
 
-- exploitation of strongest prior signal
+- exploitation of the strongest prior signal
 - exploration of adjacent but meaningfully distinct regions
 - mechanical verification when the system changed
 
@@ -121,8 +121,8 @@ Use repository entrypoints that preserve stage contracts and artifacts.
 Preferred execution order:
 
 - targeted stage replay for repair verification
-- narrow search-engine slice for hypothesis isolation
-- full pipeline run only when the path is mechanically stable
+- narrow search-engine slices for hypothesis isolation
+- full pipeline runs only when the path is mechanically stable
 
 ### 7. Evaluate
 
@@ -138,7 +138,7 @@ Statistical quality includes:
 - multiplicity-adjusted significance
 - after-cost expectancy
 - stress survival
-- robustness/regime stability
+- robustness and regime stability
 
 Execution quality includes:
 
@@ -149,7 +149,7 @@ Execution quality includes:
 
 Contract integrity includes:
 
-- input/output presence
+- input and output presence
 - field propagation
 - consistency between stage and top-level manifests
 
@@ -180,14 +180,14 @@ That choice should be justified from memory and current evidence, not intuition 
 
 ## Reinforcement Policy
 
-The agent reinforces actions that consistently lead to:
+Reinforce actions that consistently lead to:
 
 - reproducible positive post-cost results
-- robust validation/test support
+- robust validation and test support
 - low orchestration friction
 - clear explanatory structure
 
-The agent penalizes actions that repeatedly lead to:
+Penalize actions that repeatedly lead to:
 
 - contract breakage
 - stale bookkeeping
@@ -210,7 +210,7 @@ De-escalate to repair mode when:
 - split labeling or counts are suspect
 - warning floods obscure true failures
 
-## Definition Of Done For A Loop
+## Definition Of Done
 
 A loop is complete only when all of the following exist:
 
@@ -219,7 +219,6 @@ A loop is complete only when all of the following exist:
 - a written reflection
 - a next action choice
 - an updated memory record
-
 
 ## Synthetic Research Branch
 

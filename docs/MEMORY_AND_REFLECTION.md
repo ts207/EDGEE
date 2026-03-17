@@ -62,6 +62,7 @@ After each meaningful loop, answer:
 - Separate system issues from research conclusions.
 - Record both positive and negative results.
 - Prefer short, high-signal observations over narrative dumps.
+- Reference the exact artifact or report family when that fact matters later.
 
 ## Retrieval Heuristics
 

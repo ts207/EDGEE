@@ -62,6 +62,7 @@ The agent should expect:
 - split-aware metrics to survive into promotion-facing artifacts
 - storage writes for durable artifacts to flow through the shared IO helpers rather than direct parquet writes
 - warnings to be informative rather than overwhelming
+- generated diagnostics to agree with the registry and contract sources that produced them
 
 ## Contract Failure Classes
 

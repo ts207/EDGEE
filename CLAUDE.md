@@ -8,7 +8,7 @@ Use the repository to run narrow, attributable, replayable research loops:
 
 `observe -> retrieve memory -> propose -> validate plan -> execute -> evaluate -> reflect -> update memory`
 
-The agent should optimize for:
+Optimize for:
 
 1. post-cost robustness
 2. reproducibility
@@ -31,11 +31,11 @@ Avoid:
 - broad search over many unrelated triggers in one run
 - repeated proposal churn after inspecting outcomes
 - using synthetic wins as direct evidence of live profitability
-- bypassing memory because a run “looks different” without concrete differences
+- bypassing memory because a run "looks different" without concrete differences
 
-## Canonical Query / Proposal Flow
+## Canonical Query And Proposal Flow
 
-Read knobs and memory first:
+Inspect knobs and prior memory first:
 
 ```bash
 .venv/bin/python -m project.research.knowledge.query knobs
@@ -64,7 +64,7 @@ Execute conservatively:
   --plan_only 1
 ```
 
-Use the higher-level issuer when memory bookkeeping is desired:
+Use the higher-level issuer when memory bookkeeping is required:
 
 ```bash
 .venv/bin/python -m project.research.agent_io.issue_proposal \
@@ -110,14 +110,17 @@ When using synthetic datasets:
 - freeze the generator profile before evaluating outcomes
 - keep the truth map and manifest with the run
 - rerun truth validation after detector or generator edits
-- prefer validation across multiple seeds or profiles rather than one “hero” run
+- prefer validation across multiple seeds or profiles rather than one hero run
 
 Recommended commands:
 
 ```bash
-python3 -m project.scripts.generate_synthetic_crypto_regimes --suite_config project/configs/synthetic_dataset_suite.yaml --run_id synthetic_suite
+python3 -m project.scripts.generate_synthetic_crypto_regimes \
+  --suite_config project/configs/synthetic_dataset_suite.yaml \
+  --run_id synthetic_suite
 python3 -m project.scripts.run_golden_synthetic_discovery
-python3 -m project.scripts.validate_synthetic_detector_truth --run_id golden_synthetic_discovery
+python3 -m project.scripts.validate_synthetic_detector_truth \
+  --run_id golden_synthetic_discovery
 ```
 
 Useful built-in synthetic profiles:
@@ -163,12 +166,21 @@ The next action must be explicit:
 - hold
 - stop
 
+## Generated Diagnostics
+
+The files under `docs/generated/` are machine-owned diagnostics, not policy docs.
+
+- regenerate them with `scripts/regenerate_artifacts.sh`
+- recheck `docs/generated/detector_coverage.*` after detector inventory changes
+- recheck `docs/generated/system_map.*` after stage-family, service-boundary, or contract-surface changes
+
 ## Repository Landmarks
 
 - `project/pipelines/run_all.py`: orchestrator
-- `project/contracts/pipeline_registry.py`: contract source
-- `project/research/knowledge/`: static knowledge, memory, reflection surfaces
-- `project/research/agent_io/`: proposal validation, translation, execution
+- `project/contracts/pipeline_registry.py`: stage and artifact contract source
+- `project/research/knowledge/`: static knowledge, memory, and reflection surfaces
+- `project/research/agent_io/`: proposal validation, translation, and execution
+- `project/research/services/`: canonical discovery, promotion, reporting, and comparison services
 - `project/events/detectors/catalog.py`: detector loading surface
 - `project/configs/registries/`: authoritative registry content
 - `docs/SYNTHETIC_DATASETS.md`: synthetic dataset guidance

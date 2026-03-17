@@ -418,6 +418,22 @@
       ]
     },
     {
+      "class_name": "LiquidationExhaustionReversalDetector",
+      "event_type": "LIQUIDATION_EXHAUSTION_REVERSAL",
+      "family": "legacy_aliases",
+      "maturity_tier": "standard",
+      "module": "project.events.detectors.legacy_aliases",
+      "path": "project/events/detectors/legacy_aliases.py",
+      "registered": true,
+      "required_columns": [
+        "timestamp",
+        "close",
+        "rv_96",
+        "oi_delta_1h",
+        "liquidation_notional"
+      ]
+    },
+    {
       "class_name": "LiquidityGapDetector",
       "event_type": "LIQUIDITY_GAP_PRINT",
       "family": "liquidity",
@@ -965,12 +981,6 @@
     },
     {
       "check_id": "detector_untracked",
-      "message": "Registered detector has no active event spec: LIQUIDATION_EXHAUSTION_REVERSAL",
-      "path": "project/events/detectors/legacy_aliases.py",
-      "severity": "warning"
-    },
-    {
-      "check_id": "detector_untracked",
       "message": "Registered detector has no active event spec: OI_VOL_COMPRESSION_BUILDUP",
       "path": "project/events/detectors/legacy_aliases.py",
       "severity": "warning"
@@ -1016,20 +1026,26 @@
       "message": "Registered detector has no active event spec: VOL_COMPRESSION_BREAKOUT",
       "path": "project/events/detectors/legacy_aliases.py",
       "severity": "warning"
+    },
+    {
+      "check_id": "detector_hardcoded_params",
+      "message": "Detector implementation has hardcoded numerical thresholds: TREND_EXHAUSTION_TRIGGER",
+      "path": "project/events/detectors/exhaustion.py",
+      "severity": "warning"
     }
   ],
   "summary": {
-    "active_event_count": 65,
+    "active_event_count": 66,
     "error_count": 0,
     "issue_count": 15,
     "maturity_counts": {
       "production": 6,
       "proxy": 11,
       "specialized": 3,
-      "standard": 45
+      "standard": 46
     },
     "registered_detector_entry_count": 81,
-    "registered_event_count": 65,
+    "registered_event_count": 66,
     "schema_version": "detector_coverage_audit_v2",
     "status": "passed",
     "warning_count": 15

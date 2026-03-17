@@ -40,7 +40,7 @@ This note records the current package-surface decision for the research platform
 
 - `project.strategies`
   This is still heavily used by runtime internals and tests. Treat it as an internal implementation package for now rather than a preferred public import surface.
-  Current importer count: 17 files.
+  Current importer count: 16 files.
   Target disposition: keep stable internally while converging public callers on `project.strategy.runtime`.
 
 ## Current Policy

@@ -1,8 +1,8 @@
 # Detector Coverage Audit
 
 - Status: `passed`
-- Active event specs: `65`
-- Registered detectors: `65`
+- Active event specs: `66`
+- Registered detectors: `66`
 - Raw registered detector entries: `81`
 - Issues: `15`
 
@@ -11,7 +11,7 @@
 - `production`: 6
 - `proxy`: 11
 - `specialized`: 3
-- `standard`: 45
+- `standard`: 46
 
 ## Issues
 
@@ -21,7 +21,6 @@
 - [warning] Registered detector has no active event spec: FUNDING_EXTREME_BREAKOUT (project/events/detectors/legacy_aliases.py)
 - [warning] Registered detector has no active event spec: FUNDING_EXTREME_STAGNATION (project/events/detectors/legacy_aliases.py)
 - [warning] Registered detector has no active event spec: IMBALANCE_ABSORPTION_REVERSAL (project/events/detectors/legacy_aliases.py)
-- [warning] Registered detector has no active event spec: LIQUIDATION_EXHAUSTION_REVERSAL (project/events/detectors/legacy_aliases.py)
 - [warning] Registered detector has no active event spec: OI_VOL_COMPRESSION_BUILDUP (project/events/detectors/legacy_aliases.py)
 - [warning] Registered detector has no active event spec: OI_VOL_DIVERGENCE (project/events/detectors/legacy_aliases.py)
 - [warning] Registered detector has no active event spec: SEQ_FND_EXTREME_THEN_BREAKOUT (project/events/detectors/legacy_aliases.py)
@@ -30,6 +29,7 @@
 - [warning] Registered detector has no active event spec: SEQ_OI_SPIKEPOS_THEN_VOL_SPIKE (project/events/detectors/legacy_aliases.py)
 - [warning] Registered detector has no active event spec: SEQ_VOL_COMP_THEN_BREAKOUT (project/events/detectors/legacy_aliases.py)
 - [warning] Registered detector has no active event spec: VOL_COMPRESSION_BREAKOUT (project/events/detectors/legacy_aliases.py)
+- [warning] Detector implementation has hardcoded numerical thresholds: TREND_EXHAUSTION_TRIGGER (project/events/detectors/exhaustion.py)
 
 ## Detector Inventory
 
@@ -62,6 +62,7 @@
 - `INDEX_COMPONENT_DIVERGENCE`: `standard` via `IndexComponentDivergenceDetector`
 - `LEAD_LAG_BREAK`: `standard` via `LeadLagBreakDetector`
 - `LIQUIDATION_CASCADE`: `specialized` via `LiquidationCascadeDetector`
+- `LIQUIDATION_EXHAUSTION_REVERSAL`: `standard` via `LiquidationExhaustionReversalDetector`
 - `LIQUIDITY_GAP_PRINT`: `standard` via `LiquidityGapDetector`
 - `LIQUIDITY_SHOCK`: `production` via `LiquidityStressDetector`
 - `LIQUIDITY_STRESS_DIRECT`: `production` via `DirectLiquidityStressDetector`

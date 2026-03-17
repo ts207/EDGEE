@@ -195,6 +195,6 @@ Direction policy is now explicit for registry-style event discovery:
 
 Retune these defaults only after reviewing at least a few baseline-vs-candidate comparisons from real runs. If you change them:
 
-1. Update the constants in [`project/research/services/run_comparison_service.py`](/home/tstuv/workspace/trading/EDGEE/project/research/services/run_comparison_service.py) and [`project/research/services/candidate_discovery_service.py`](/home/tstuv/workspace/trading/EDGEE/project/research/services/candidate_discovery_service.py).
-2. Keep the parser defaults in [`project/pipelines/pipeline_planning.py`](/home/tstuv/workspace/trading/EDGEE/project/pipelines/pipeline_planning.py) in sync.
+1. Update the constants in `project/research/services/run_comparison_service.py` and `project/research/services/candidate_discovery_service.py`.
+2. Keep the parser defaults in `project/pipelines/pipeline_planning.py` in sync.
 3. Refresh the tests that pin the default calibration behavior.
