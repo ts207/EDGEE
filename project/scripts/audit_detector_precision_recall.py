@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -32,7 +33,6 @@ from project.scripts.detector_audit_module import (
 
 def _print_table(all_metrics: list) -> None:
     """Print a human-readable classification table to stdout."""
-    from collections import defaultdict
     by_class: dict = defaultdict(list)
     for m in all_metrics:
         by_class[m["classification"]].append(m)
@@ -62,7 +62,7 @@ def _print_table(all_metrics: list) -> None:
     total = len(all_metrics)
     stable = len(by_class.get("stable", []))
     broken = len(by_class.get("broken", [])) + len(by_class.get("noisy", [])) + len(by_class.get("silent", []))
-    print(f"TOTAL: {total}  STABLE: {stable}  NEED WORK: {broken}  UNCOVERED: {len(by_class.get('uncovered', []))}")
+    print(f"TOTAL: {total}  STABLE: {stable}  NEED WORK: {broken}  ERROR: {len(by_class.get('error', []))}  UNCOVERED: {len(by_class.get('uncovered', []))}")
 
 
 def main(argv: list[str] | None = None) -> int:
