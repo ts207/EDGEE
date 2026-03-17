@@ -177,3 +177,10 @@ def test_enrich_df_does_not_overwrite_existing():
     })
     result = _enrich_df(df)
     assert (result["rv_96"] == 99.0).all()   # must not overwrite
+
+
+def test_audit_script_is_importable():
+    """Verify the audit CLI script can be imported without errors."""
+    import importlib
+    mod = importlib.import_module("project.scripts.audit_detector_precision_recall")
+    assert hasattr(mod, "main")
