@@ -16,7 +16,7 @@ class BasisDislocationDetector(DislocationDetector):
     event_type = 'BASIS_DISLOC'
     required_columns = ('timestamp', 'close_perp', 'close_spot')
     signal_column = 'basis_zscore'
-    threshold = 3.0
+    threshold = 3.5
     min_spacing = 24
     timeframe_minutes = 5
     default_severity = 'moderate'

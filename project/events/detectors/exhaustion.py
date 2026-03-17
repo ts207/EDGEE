@@ -556,24 +556,22 @@ class ClimaxVolumeDetector(ThresholdDetector):
         window = int(params.get("threshold_window", 2880))
         vol_q97 = past_quantile(vol, float(params.get("vol_quantile", 0.97)), window=window)
         ret_q97 = past_quantile(ret_abs, float(params.get("ret_quantile", 0.97)), window=window)
-        range_q97 = past_quantile(bar_range, float(params.get("range_quantile", 0.97)), window=window)
+        range_q95 = past_quantile(bar_range, float(params.get("range_quantile", 0.95)), window=window)
         return {
             "vol": vol,
             "ret_abs": ret_abs,
             "bar_range": bar_range,
             "vol_q97": vol_q97,
             "ret_q97": ret_q97,
-            "range_q97": range_q97,
+            "range_q95": range_q95,
         }
 
     def compute_raw_mask(self, df: pd.DataFrame, *, features: dict[str, pd.Series], **params: Any) -> pd.Series:
         del df, params
         return (
             (features["vol"] >= features["vol_q97"]).fillna(False)
-            & (
-                (features["ret_abs"] >= features["ret_q97"]).fillna(False)
-                | (features["bar_range"] >= features["range_q97"]).fillna(False)
-            )
+            & (features["ret_abs"] >= features["ret_q97"]).fillna(False)
+            & (features["bar_range"] >= features["range_q95"]).fillna(False)
         ).fillna(False)
 
     def compute_intensity(self, df: pd.DataFrame, *, features: dict[str, pd.Series], **params: Any) -> pd.Series:
@@ -613,8 +611,8 @@ class FailedContinuationDetector(ThresholdDetector):
         reentry_dn = (close > prior_low).fillna(False)
         reversal_fast = close.pct_change(max(1, reversal_window // 2))
         
-        breakout_strength_min = float(params.get("breakout_strength_min", 0.0010))
-        reentry_min = float(params.get("reentry_min", 0.0010))
+        breakout_strength_min = float(params.get("breakout_strength_min", 0.0020))
+        reentry_min = float(params.get("reentry_min", 0.0030))
         reversal_return_min = float(params.get("reversal_return_min", 0.0010))
 
         failed_up = (
@@ -634,7 +632,7 @@ class FailedContinuationDetector(ThresholdDetector):
         
         ret_abs = close.pct_change(1).abs()
         threshold_window = int(params.get("threshold_window", 2880))
-        reversal_quantile = float(params.get("reversal_quantile", 0.40))
+        reversal_quantile = float(params.get("reversal_quantile", 0.60))
         ret_q60 = past_quantile(ret_abs, reversal_quantile, window=threshold_window)
         
         range_width = (prior_high - prior_low).replace(0.0, np.nan)

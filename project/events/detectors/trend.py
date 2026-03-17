@@ -144,7 +144,8 @@ class FalseBreakoutDetector(TrendBase):
 
     def compute_raw_mask(self, df: pd.DataFrame, *, features: dict[str, pd.Series], **params: Any) -> pd.Series:
         del df
-        min_break_dist = float(params.get("min_breakout_distance", 0.0025))
+        min_break_dist = float(params.get("min_breakout_distance", 0.0030))
+        return_buffer = float(params.get("return_buffer", 0.0020))
         # Detect breakout at t-1 that fails (returns inside range) at t
         breakout_up_prev = (
             (features["close"].shift(1) - features["rolling_max"].shift(1))
@@ -157,10 +158,11 @@ class FalseBreakoutDetector(TrendBase):
 
         was_break_up = (breakout_up_prev >= min_break_dist).fillna(False)
         was_break_dn = (breakout_dn_prev >= min_break_dist).fillna(False)
-        
-        is_back_in_up = (features["close"] <= features["rolling_max"]).fillna(False)
-        is_back_in_dn = (features["close"] >= features["rolling_min"]).fillna(False)
-        
+
+        # Require a meaningful return inside the range (not just barely crossing the boundary)
+        is_back_in_up = (features["close"] <= features["rolling_max"] * (1 - return_buffer)).fillna(False)
+        is_back_in_dn = (features["close"] >= features["rolling_min"] * (1 + return_buffer)).fillna(False)
+
         return ((was_break_up & is_back_in_up) | (was_break_dn & is_back_in_dn)).fillna(False)
 
 
