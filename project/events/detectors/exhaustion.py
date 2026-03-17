@@ -403,8 +403,8 @@ class TrendExhaustionDetector(CompositeDetector):
     def compute_raw_mask(self, df: pd.DataFrame, *, features: dict[str, pd.Series], **params: Any) -> pd.Series:
         del df
         # 1. Structural Signal: Trend must be at a historical extreme
-        trend_peak_multiplier = float(params.get("trend_peak_multiplier", 1.10))
-        trend_strength_ratio = float(params.get("trend_strength_ratio", 2.2))
+        trend_peak_multiplier = float(params.get("trend_peak_multiplier", 1.30))
+        trend_strength_ratio = float(params.get("trend_strength_ratio", 3.0))
         
         trend_peak = (
             (features["trend_abs"] >= features["trend_q_extreme"] * trend_peak_multiplier).fillna(False)
