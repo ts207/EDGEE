@@ -141,7 +141,7 @@ class FndDislocDetector(BasisDislocationDetector):
         funding_q95 = dynamic_quantile_floor(
             funding_abs,
             window=2880,
-            quantile=float(params.get('funding_quantile', 0.95)),
+            quantile=float(params.get('funding_quantile', 0.90)),
             floor=threshold_bps / 10_000.0,
         )
         features.update(
@@ -159,7 +159,7 @@ class FndDislocDetector(BasisDislocationDetector):
         funding_extreme = (features['funding_abs'] >= features['funding_q95']).fillna(False)
         
         # Allow alignment within a window (e.g. 3 bars) to improve recall
-        alignment_window = int(params.get('alignment_window', 3))
+        alignment_window = int(params.get('alignment_window', 5))
         basis_active = basis_mask.rolling(window=alignment_window, min_periods=1).max().astype(bool)
         
         sign_align = (
