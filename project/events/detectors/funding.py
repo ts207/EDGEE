@@ -187,7 +187,7 @@ class FundingDetector(BaseFundingDetector):
 class FundingFlipDetector(ThresholdDetector):
     event_type = "FUNDING_FLIP"
     required_columns = ("timestamp", "funding_rate_scaled")
-    min_magnitude_quantile: float = 0.50
+    min_magnitude_quantile: float = 0.75
 
     def prepare_features(self, df: pd.DataFrame, **params: Any) -> dict[str, pd.Series]:
         funding = pd.to_numeric(df["funding_rate_scaled"], errors="coerce").astype(float)
