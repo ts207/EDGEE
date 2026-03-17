@@ -144,8 +144,9 @@ def build_symbol_df(symbol_entry: Dict[str, Any]) -> pd.DataFrame:
         ).reset_index(drop=True)
 
     # --- funding: forward-fill to bar frequency ---
+    # Skip if already present in the cleaned perp parquet (avoids merge_asof column suffix collision)
     funding_path = paths.get("funding")
-    if funding_path and Path(funding_path).exists():
+    if "funding_rate_scaled" not in perp.columns and funding_path and Path(funding_path).exists():
         funding = pd.read_parquet(funding_path)
         funding["timestamp"] = pd.to_datetime(funding["timestamp"], utc=True, errors="coerce")
         if "funding_rate_scaled" in funding.columns:
