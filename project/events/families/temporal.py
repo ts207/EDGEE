@@ -124,7 +124,8 @@ class ScheduledNewsDetector(ThresholdDetector):
 class SpreadRegimeWideningDetector(ThresholdDetector):
     """Detects sustained spread widening with positive regime acceleration."""
     event_type = 'SPREAD_REGIME_WIDENING_EVENT'
-    required_columns = ('timestamp',)
+    required_columns = ('timestamp', 'volume')
+    min_spacing = 48
 
     def prepare_features(self, df: pd.DataFrame, **params: Any) -> dict[str, pd.Series]:
         if 'spread_zscore' in df.columns:
@@ -133,21 +134,37 @@ class SpreadRegimeWideningDetector(ThresholdDetector):
             spread = pd.to_numeric(df['spread_bps'], errors='coerce').abs().astype(float)
         else:
             spread = pd.Series(0.0, index=df.index)
+        volume = pd.to_numeric(df['volume'], errors='coerce').astype(float)
         trend_window = int(params.get('trend_window', 24))
         lookback_window = int(params.get('lookback_window', 2880))
         min_periods = int(params.get('min_periods', 288))
+        low_volume_quantile = float(params.get('low_volume_quantile', 0.25))
         
         spread_avg = spread.rolling(trend_window, min_periods=max(4, trend_window // 4)).mean()
         spread_q85 = spread.rolling(lookback_window, min_periods=min_periods).quantile(0.85).shift(1)
         accel = spread_avg - spread_avg.shift(trend_window // 2 or 1)
         accel_q75 = accel.abs().rolling(lookback_window, min_periods=min_periods).quantile(0.75).shift(1)
-        return {'spread': spread, 'spread_avg': spread_avg, 'spread_q85': spread_q85, 'accel': accel, 'accel_q75': accel_q75}
+        volume_low_q = volume.rolling(lookback_window, min_periods=min_periods).quantile(low_volume_quantile).shift(1)
+        history_ready = spread_q85.notna() & accel_q75.notna() & volume_low_q.notna()
+        return {
+            'spread': spread,
+            'spread_avg': spread_avg,
+            'spread_q85': spread_q85,
+            'accel': accel,
+            'accel_q75': accel_q75,
+            'volume': volume,
+            'volume_low_q': volume_low_q,
+            'history_ready': history_ready,
+        }
 
     def compute_raw_mask(self, df: pd.DataFrame, *, features: dict[str, pd.Series], **params: Any) -> pd.Series:
+        del df, params
         return (
-            (features['spread_avg'] >= features['spread_q85']).fillna(False)
+            features['history_ready']
+            & (features['spread_avg'] >= features['spread_q85']).fillna(False)
             & (features['accel'] > 0).fillna(False)
             & (features['accel'] >= features['accel_q75']).fillna(False)
+            & (features['volume'] <= features['volume_low_q']).fillna(False)
         ).fillna(False)
 
     def compute_intensity(self, df: pd.DataFrame, *, features: dict[str, pd.Series], **params: Any) -> pd.Series:

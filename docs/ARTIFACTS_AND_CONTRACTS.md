@@ -2,9 +2,12 @@
 
 ## Principle
 
-The agent must treat repository artifacts as durable contracts, not incidental files.
+Artifacts are contracts, not incidental files.
 
-## Primary Artifact Layers
+Do not trust a run because the command exited successfully.
+Trust it only when the expected artifacts exist and reconcile.
+
+## Artifact Layers
 
 ### Run Layer
 
@@ -12,7 +15,7 @@ Located under `data/runs/<run_id>/`.
 
 Use for:
 
-- run status
+- overall run status
 - planned stage list
 - stage manifests
 - stage logs
@@ -24,7 +27,7 @@ Located under `data/reports/`.
 
 Use for:
 
-- phase 2 candidate outputs
+- phase-2 candidate outputs
 - discovery summaries
 - edge candidate exports
 - promotion audits
@@ -49,22 +52,21 @@ Use for:
 - cleaned bars
 - feature tables
 - context features
-- market context
+- market-state features
 
 ## Contract Expectations
 
-The agent should expect:
+The normal expectation is:
 
-- manifests to match actual terminal stage status
-- zero-candidate bridge stages to finalize as successful no-op stages rather than runner failures
-- exported candidates to include downstream-required fields
-- promotion fallbacks to emit the same normalized candidate contract as the canonical export path
-- split-aware metrics to survive into promotion-facing artifacts
-- storage writes for durable artifacts to flow through the shared IO helpers rather than direct parquet writes
-- warnings to be informative rather than overwhelming
-- generated diagnostics to agree with the registry and contract sources that produced them
+- manifests match actual stage terminal status
+- zero-candidate bridge stages end as successful no-op stages, not runner failures
+- exported candidates carry required downstream fields
+- promotion fallbacks emit the same normalized candidate contract as the canonical export path
+- split-aware metrics survive into promotion-facing artifacts
+- durable writes go through shared IO helpers instead of ad hoc parquet writes
+- generated diagnostics agree with the registry and contract sources that produced them
 
-## Contract Failure Classes
+## Failure Classes
 
 ### Mechanical Contract Failure
 
@@ -74,41 +76,53 @@ Examples:
 - stale manifest after replay
 - stage success with no outputs
 - logs disagree with manifests
-- detector registry metadata disagrees with the runnable detector inventory
+- detector registry metadata disagrees with runnable detector inventory
 
 ### Semantic Contract Failure
 
 Examples:
 
-- field exists but carries wrong meaning
-- parameter units drift from their canonical meaning, for example bps floors being compared against decimal funding rates
-- train metric computed on all rows
-- regime-conditioned run contains unconditional duplicates
+- field exists but means the wrong thing
+- units drift from their canonical meaning
+- train metrics are computed on all rows
+- regime-conditioned outputs duplicate unconditional rows
 
 ### Statistical Contract Failure
 
 Examples:
 
-- zero validation/test support
+- zero validation or test support
 - invalid multiplicity interpretation
 - no cost-surviving expectancy
+
+## Trust Order
+
+When investigating a run, inspect in this order:
+
+1. top-level run manifest
+2. stage manifests
+3. stage logs
+4. report artifacts
+5. generated diagnostics
+
+If those disagree, the disagreement is a first-class finding.
 
 ## Required Checks Before Trusting A Run
 
 - top-level run status matches stage outcomes
-- candidate counts reconcile across summary/export/promotion
-- feature-stage declared inputs match the raw artifacts the implementation can actually read
-- split counts are present where required
+- candidate counts reconcile across summary, export, and promotion
+- feature-stage declared inputs match what the implementation actually reads
+- split counts exist where required
 - artifacts exist where manifests say they do
 - detector ownership, registry, and generated coverage diagnostics agree
-- warnings do not conceal unexpected runtime faults
+- warning noise does not hide runtime faults
 
-## Agent Response To Contract Breakage
+## Response To Contract Breakage
 
 When contracts break:
 
 1. stop broad experimentation
-2. isolate the failure path
+2. isolate the broken path
 3. repair propagation or bookkeeping
 4. replay the smallest affected chain
-5. only then resume research interpretation
+5. resume research interpretation only after reconciliation

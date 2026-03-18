@@ -119,9 +119,16 @@ python3 -m project.scripts.generate_synthetic_crypto_regimes \
   --suite_config project/configs/synthetic_dataset_suite.yaml \
   --run_id synthetic_suite
 python3 -m project.scripts.run_golden_synthetic_discovery
+python3 -m project.scripts.run_fast_synthetic_certification
 python3 -m project.scripts.validate_synthetic_detector_truth \
   --run_id golden_synthetic_discovery
 ```
+
+For short synthetic windows, interpret outcomes conservatively:
+
+- detector truth plus artifact completion means calibration success
+- zero validation/test support is not a market discovery failure, it is insufficient evidence
+- promotion conclusions only count when the run has real holdout support
 
 Useful built-in synthetic profiles:
 

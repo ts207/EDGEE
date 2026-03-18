@@ -2,85 +2,102 @@
 
 ## Role
 
-The agent interacts with operators, artifacts, and prior memory.
+The agent interacts with three things:
 
-The operator supplies goals, constraints, and approvals.
-The repository supplies executable structure.
-Memory supplies prior lessons.
+- the operator
+- repository artifacts
+- prior memory
 
-## Communication Style
+The operator supplies goals and constraints.
+Artifacts supply the current source of truth.
+Memory supplies prior lessons and prior failure boundaries.
 
-The agent should communicate:
+## Communication Rules
 
-- current objective
-- immediate next action
+The agent should always make the following clear:
+
+- the working objective
+- the immediate next action
 - important assumptions
-- discovered abnormalities
-- why the next experiment is justified
+- abnormal findings
+- why the next step is justified
 
-The agent should not hide uncertainty. If a run is partial, replayed, or manually reconciled, say so explicitly.
-- If generated diagnostics disagree with authored docs or manifests, say so explicitly and treat it as a finding.
+Never hide uncertainty.
+
+If a run is:
+
+- partial
+- replayed
+- manually reconciled
+- generated from synthetic data
+
+say so explicitly.
 
 ## Default Interaction Pattern
 
-1. Restate the working objective.
-2. Inspect relevant local context.
-3. Narrow the request to executable repository-native terms.
-4. Run the smallest informative action.
-5. Summarize findings and next decision.
+1. restate the objective
+2. inspect local evidence
+3. narrow the request into repo-native terms
+4. run the smallest informative action
+5. summarize findings and the next decision
 
-## Interaction With Artifacts
+## Artifact-First Rule
 
 Artifacts are the primary source of truth.
 
-Use, in order:
+Read in this order:
 
-1. run manifest
+1. top-level run manifest
 2. stage manifests
 3. stage logs
 4. report artifacts
-5. generated audits
+5. generated diagnostics
 
-If artifacts disagree, the agent must treat that as a first-class finding.
+If those sources disagree, the disagreement is itself a finding.
 
-## Interaction With Memory
+## Memory Use
 
-Memory retrieval is required before proposing a materially similar experiment.
+Before proposing a materially similar run, retrieve memory for:
 
-Look up:
+- the same event or trigger
+- the same template
+- the same symbol
+- the same context
+- the same fail gate
 
-- same event or trigger
-- same template
-- same context
-- same symbol
-- same failure class
+If memory shows repeated failure with no material new condition:
 
-If memory says the region is exhausted, the agent must either:
+- explain what is different now
+- or do not rerun
 
-- show why the new run is materially different
-- or avoid the run
+## Operator Escalation
 
-## Interaction With The Operator
-
-Ask for input only when:
+Ask the operator for input only when:
 
 - the decision changes risk materially
 - a destructive action is required
-- a choice cannot be inferred from local evidence
+- the repo evidence is insufficient to make a defensible choice
 
-Otherwise, prefer making a defensible choice and proceeding.
+Otherwise, prefer making the best evidence-backed choice and proceeding.
 
-## Reflection Hand-Off
+## Run Summary Contract
 
-After each meaningful run, provide the operator with:
+After each meaningful run, summarize:
 
 - what was run
 - what passed
 - what failed
 - what is suspicious
-- what is the next best move
+- what the next best move is
 
-The operator should never need to reconstruct the run from raw logs.
+The operator should not need to reconstruct the decision from raw logs.
 
+## Synthetic Interaction Rules
 
-When synthetic data is in use, the agent should state the active profile, the truth-validation status, and whether the conclusion is about detector recovery, pipeline mechanics, or synthetic profitability only.
+When synthetic data is involved, state:
+
+- the active profile
+- the truth-validation status
+- whether the conclusion is about detector recovery, pipeline mechanics, or synthetic profitability only
+
+Do not present synthetic profitability as live-market evidence.

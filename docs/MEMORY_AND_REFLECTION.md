@@ -2,9 +2,13 @@
 
 ## Purpose
 
-Memory prevents the agent from repeating bad experiments, forgetting fragile system facts, or overstating weak evidence.
+Memory stops the agent from:
 
-Reflection converts run outcomes into reusable knowledge.
+- repeating failed slices
+- forgetting fragile system facts
+- overstating weak evidence
+
+Reflection converts one run into reusable decision support for the next run.
 
 ## Memory Classes
 
@@ -14,8 +18,8 @@ Facts about how the repository behaves.
 
 Examples:
 
-- export requires normalized edge candidate artifacts
-- explicit contexts should not generate unconditional duplicates
+- export requires normalized edge-candidate artifacts
+- explicit contexts should not create unconditional duplicates
 - top-level manifests may need reconciliation after manual tail replay
 
 ### Experimental Memory
@@ -24,7 +28,7 @@ Facts about what was tested and what happened.
 
 Examples:
 
-- low-liquidity basis continuation on BTC 15m survived cost in the Jan 2026 slice
+- low-liquidity basis continuation on BTC 15m survived cost in one January slice
 - search-engine candidates were once orphaned from promotion
 
 ### Negative Memory
@@ -33,8 +37,8 @@ Facts about what should be avoided.
 
 Examples:
 
-- broad noisy runs with stale manifests create low-trust outputs
-- a region consistently fails retail net expectancy despite good raw q-values
+- broad noisy runs with stale manifests are low-trust
+- a region repeatedly fails retail net expectancy despite acceptable raw `q_value`
 
 ### Action Memory
 
@@ -42,46 +46,46 @@ Facts about what to do next.
 
 Examples:
 
-- rerun narrow slice after generator contract change
-- escalate only after validation/test counts survive export
+- rerun a narrow slice after a generator contract change
+- escalate only after validation and test counts survive export
 
 ## Reflection Questions
 
-After each meaningful loop, answer:
+After each meaningful run, answer:
 
-1. What prior belief did this test?
-2. What evidence increased or decreased that belief?
-3. Was the outcome market-driven or system-driven?
-4. What should be remembered as a reusable rule?
-5. What exact next experiment is justified?
+1. what prior belief did this test
+2. what evidence increased or decreased that belief
+3. was the outcome market-driven or system-driven
+4. what reusable rule should be remembered
+5. what exact next experiment is justified
 
-## Memory Write Rules
+## Write Rules
 
-- Store concrete facts, not vague impressions.
-- Include run ids, scopes, and failure classes.
-- Separate system issues from research conclusions.
-- Record both positive and negative results.
-- Prefer short, high-signal observations over narrative dumps.
-- Reference the exact artifact or report family when that fact matters later.
+- store facts, not impressions
+- include run ids, scope, and failure class
+- separate system issues from market conclusions
+- record both positive and negative results
+- prefer short, high-signal entries over narrative dumps
+- reference exact artifact families when that fact will matter later
 
 ## Retrieval Heuristics
 
 Before any new experiment, retrieve memory for:
 
-- same trigger or event family
-- same template
-- same symbol and timeframe
-- same context
-- same primary fail gate
+- the same trigger or event family
+- the same template
+- the same symbol and timeframe
+- the same context
+- the same fail gate
 
-If prior memory shows repeated failure with no material new condition, avoid rerunning.
+If prior memory shows repeated failure with no material new condition, do not rerun by default.
 
-## Reinforcement Heuristics
+## Reinforcement Rules
 
 Increase priority for experiments that:
 
-- address a previously unresolved ambiguity
-- build on positive, cost-surviving evidence
+- resolve a known ambiguity
+- build on positive post-cost evidence
 - reduce uncertainty with a small run
 - validate a recent code-path fix
 
@@ -90,11 +94,11 @@ Decrease priority for experiments that:
 - duplicate prior unsuccessful slices
 - broaden scope without adding information
 - depend on known-broken contracts
-- produce noisy logs without decision value
+- create warning-heavy output without changing the decision
 
-## Reflection Output Schema
+## Reflection Schema
 
-Each reflection should minimally capture:
+Each reflection should minimally include:
 
 - `objective`
 - `run_scope`
@@ -107,22 +111,22 @@ Each reflection should minimally capture:
 
 ## Memory Hygiene
 
-Prune or downgrade memories that are:
+Downgrade or supersede memories that are:
 
 - invalidated by code changes
-- contradicted by cleaner re-runs
+- contradicted by cleaner reruns
 - too vague to guide future selection
 
-Do not delete history silently. Mark it as superseded when possible.
-
+Do not silently delete history when a superseded record would be more informative.
 
 ## Synthetic Memory
 
-Synthetic runs should additionally store:
+Synthetic runs should also store:
 
 - generator profile
 - noise scale
 - truth-map path
-- whether the finding survived another profile or only one world
+- whether the result survived another profile or only one world
 
-A synthetic result that fails to survive a profile change should be stored as a simulator-specific finding, not a general market belief.
+If a synthetic result fails to survive a profile change, store it as simulator-specific rather than as a general
+market belief.

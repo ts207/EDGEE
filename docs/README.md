@@ -1,35 +1,50 @@
 # Agent Research Docs
 
-This documentation set is for an autonomous research agent operating inside this repository.
+This doc set is the operating manual for repository-native research work.
 
 The intended loop is:
 
-`observe -> propose -> run -> evaluate -> reflect -> store memory -> adapt next run`
+`observe -> retrieve memory -> propose -> run -> evaluate -> reflect -> adapt`
 
-## Start Here
+Read `../CLAUDE.md` first when the controlling agent is Claude Code. It defines the current query, proposal,
+and execution entrypoints plus the default conservative operating policy.
 
-Read in this order:
+## Core Reading Path
 
-1. [Claude Code Guide](../CLAUDE.md)
-2. [Autonomous Research Loop](./AUTONOMOUS_RESEARCH_LOOP.md)
-3. [Interaction Protocol](./INTERACTION_PROTOCOL.md)
-4. [Experiment Protocol](./EXPERIMENT_PROTOCOL.md)
-5. [Memory And Reflection](./MEMORY_AND_REFLECTION.md)
-6. [Synthetic Datasets](./SYNTHETIC_DATASETS.md)
-7. [Artifacts And Contracts](./ARTIFACTS_AND_CONTRACTS.md)
-8. [Operations And Guardrails](./OPERATIONS_AND_GUARDRAILS.md)
+Read these in order when starting new research work:
 
-If the controlling agent is Claude Code, start with `../CLAUDE.md` first. It points at the current proposal, query, and execution entrypoints and the default safe operating policy.
+1. [Autonomous Research Loop](./AUTONOMOUS_RESEARCH_LOOP.md)
+2. [Interaction Protocol](./INTERACTION_PROTOCOL.md)
+3. [Experiment Protocol](./EXPERIMENT_PROTOCOL.md)
+4. [Artifacts And Contracts](./ARTIFACTS_AND_CONTRACTS.md)
+5. [Operations And Guardrails](./OPERATIONS_AND_GUARDRAILS.md)
+6. [Memory And Reflection](./MEMORY_AND_REFLECTION.md)
+7. [Synthetic Datasets](./SYNTHETIC_DATASETS.md)
+8. [Event Families, Templates, Contexts, And Regimes](./FAMILIES_TEMPLATES_AND_REGIMES.md)
 
-## Architecture And Maintenance Docs
+## Read By Question
 
-Use these when the work touches package surfaces, contract ownership, or drift policy:
+Use these shortcuts when the task is already scoped.
 
-- [Architecture Surface Inventory](./ARCHITECTURE_SURFACE_INVENTORY.md)
+- "What should I do next in a run?" -> [Autonomous Research Loop](./AUTONOMOUS_RESEARCH_LOOP.md)
+- "How should I talk to the operator or summarize results?" -> [Interaction Protocol](./INTERACTION_PROTOCOL.md)
+- "How should I design or batch an experiment?" -> [Experiment Protocol](./EXPERIMENT_PROTOCOL.md)
+- "Which artifacts matter and what can I trust?" -> [Artifacts And Contracts](./ARTIFACTS_AND_CONTRACTS.md)
+- "What should stop or gate a run?" -> [Operations And Guardrails](./OPERATIONS_AND_GUARDRAILS.md)
+- "What should be remembered or reflected?" -> [Memory And Reflection](./MEMORY_AND_REFLECTION.md)
+- "How should synthetic data be used?" -> [Synthetic Datasets](./SYNTHETIC_DATASETS.md)
+- "How do families, templates, contexts, and regimes fit together?" -> [Event Families, Templates, Contexts, And Regimes](./FAMILIES_TEMPLATES_AND_REGIMES.md)
+
+## Calibration And Maintenance
+
+Use these when the work touches policy defaults, package surfaces, or detector quality history:
+
 - [Research Calibration Baseline](./RESEARCH_CALIBRATION_BASELINE.md)
+- [Architecture Surface Inventory](./ARCHITECTURE_SURFACE_INVENTORY.md)
 - [Architecture Maintenance Checklist](./ARCHITECTURE_MAINTENANCE_CHECKLIST.md)
+- [Detector Defect Ledger](./defect_ledger.md)
 
-Relevant layer READMEs also live alongside the code:
+Relevant layer READMEs also live with the code:
 
 - `project/pipelines/README.md`
 - `project/research/README.md`
@@ -39,17 +54,15 @@ Relevant layer READMEs also live alongside the code:
 
 ## Generated Diagnostics
 
-The files under `docs/generated/` are machine-owned diagnostics, not policy documents.
+The files under `docs/generated/` are machine-owned diagnostics, not authored policy.
 
-Current generated artifacts worth checking after infrastructure edits:
+Check them after infrastructure edits:
 
-1. `docs/generated/detector_coverage.*` after detector registry or ownership changes
-2. `docs/generated/system_map.*` after stage, service, or contract-surface changes
+1. `docs/generated/detector_coverage.*` after detector inventory or registry changes
+2. `docs/generated/system_map.*` after stage-family, service-boundary, or contract-surface changes
 
 Regenerate them with:
 
 ```bash
 scripts/regenerate_artifacts.sh
 ```
-
-Agent-driven synthetic research should read `SYNTHETIC_DATASETS.md` before running discovery on generated data.

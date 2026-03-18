@@ -157,10 +157,35 @@ def test_enrich_df_computes_range_columns():
     })
     result = _enrich_df(df)
     assert "rv_96" in result.columns
+    assert "spread_zscore" not in result.columns
     assert "range_96" in result.columns
     assert "range_med_2880" in result.columns
     # must not mutate original
     assert "rv_96" not in df.columns
+
+
+def test_enrich_df_computes_spread_zscore_and_imbalance_when_available():
+    from project.scripts.detector_audit_module import _enrich_df
+    import numpy as np
+
+    n = 300
+    ts = pd.date_range("2023-01-01", periods=n, freq="5min", tz="UTC")
+    close = pd.Series(30000.0 + np.arange(n, dtype=float), name="close")
+    df = pd.DataFrame({
+        "timestamp": ts,
+        "open": close,
+        "high": close * 1.001,
+        "low": close * 0.999,
+        "close": close,
+        "spread_bps": np.linspace(2.0, 5.0, n),
+        "bid_depth_usd": np.linspace(1_200_000.0, 1_400_000.0, n),
+        "ask_depth_usd": np.linspace(800_000.0, 600_000.0, n),
+    })
+    result = _enrich_df(df)
+    assert "spread_zscore" in result.columns
+    assert "imbalance" in result.columns
+    assert result["spread_zscore"].notna().sum() > 0
+    assert result["imbalance"].abs().max() <= 1.0
 
 
 def test_enrich_df_does_not_overwrite_existing():
@@ -184,3 +209,25 @@ def test_audit_script_is_importable():
     import importlib
     mod = importlib.import_module("project.scripts.audit_detector_precision_recall")
     assert hasattr(mod, "main")
+
+
+@pytest.mark.parametrize("event_type", ["ABSORPTION_PROXY", "DEPTH_STRESS_PROXY"])
+def test_measure_detector_proxy_runs_on_spread_bps_only(event_type: str):
+    from project.events.detectors.registry import load_all_detectors, get_detector
+    from project.scripts.detector_audit_module import measure_detector
+
+    load_all_detectors()
+    detector = get_detector(event_type)
+    assert detector is not None
+
+    df = _make_df()
+    # The audit path should derive spread_zscore from spread_bps instead of erroring on missing column.
+    df = df.drop(columns=["depth_usd"]).assign(
+        bid_depth_usd=3_000_000.0,
+        ask_depth_usd=2_000_000.0,
+    )
+    segments = []
+
+    metrics = measure_detector(detector, df, "BTCUSDT", segments, "test_run")
+    assert metrics["classification"] == "uncovered"
+    assert metrics["error"] is None

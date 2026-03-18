@@ -2,106 +2,122 @@
 
 ## Goal
 
-Experiments convert a research question into a bounded, replayable, and comparable repository run.
+An experiment converts a research question into a bounded, replayable, and comparable run.
 
-## Experiment Unit
+If a run cannot be explained as one experiment or one small batch of related experiments, it is too broad.
 
-A single experiment should be describable as:
+## Experiment Card
 
-- symbol set
+Every experiment should be describable with:
+
+- objective
+- symbols
 - time range
 - trigger or event
 - context or regime
 - template
-- direction set
-- horizon set
-- entry lag set
-- objective
+- directions
+- horizons
+- entry lags
 
-If an experiment cannot be summarized this way, it is too vague.
+That is the minimal unit of attribution.
 
 ## Experiment Types
 
-### Repair Experiment
+### Repair
+
+Use when the question is mechanical.
 
 Purpose:
 
-- verify a code or contract fix
-- ensure prior failure mode is gone
+- verify a code fix
+- verify a contract repair
+- prove a prior failure path is gone
 
-Success criteria:
+Success looks like:
 
 - expected artifacts exist
-- failure no longer reproduces
-- no new contract breakage
+- the prior failure no longer reproduces
+- no new contract breakage appears
 
-### Narrow Discovery Experiment
+### Narrow Discovery
+
+Use when the question is statistical or structural but still small.
 
 Purpose:
 
-- isolate a specific signal region
-- compare conditioned vs unconditioned behavior
+- isolate one signal region
+- compare conditioned versus unconditioned behavior
+- test a small number of related hypotheses
 
-Success criteria:
+Success looks like:
 
-- enough samples by split
+- enough split support to interpret the result
 - coherent metrics
-- interpretable outcome
+- an interpretable next action
 
-### Promotion-Path Experiment
+### Promotion-Path Verification
+
+Use when the question is whether candidates survive downstream handling.
 
 Purpose:
 
-- verify candidate propagation into export, promotion, and registry update
+- verify export
+- verify promotion logic
+- verify registry and memory updates
 
-Success criteria:
+Success looks like:
 
-- candidate fields survive the chain
+- fields survive the chain
 - promotion rejects or accepts for substantive reasons
 
-### Synthetic Validation Experiment
+### Synthetic Validation
+
+Use when the question is about mechanism recovery or synthetic guardrails.
 
 Purpose:
 
-- verify detector recovery against known planted regimes
-- verify promotion and guardrail behavior across controlled worlds
+- verify detector recovery against planted regimes
+- verify discovery and promotion behavior under controlled worlds
 
-Success criteria:
+Success looks like:
 
-- synthetic truth validation passes or expected misses are explained
-- promotion outcomes are consistent with the planted mechanism and cost assumptions
-- results survive at least one additional profile or seed when the hypothesis is strengthened
+- truth validation passes or misses are explainable
+- promotion behavior matches the planted mechanism and cost assumptions
+- the result survives at least one additional profile when belief is strengthened
 
-### Full Loop Experiment
+### Full Loop
+
+Use only when the local path is already stable.
 
 Purpose:
 
-- validate end-to-end stability when the local path is ready
+- validate end-to-end behavior through the intended DAG path
 
-Success criteria:
+Success looks like:
 
-- all planned stages terminate cleanly
+- planned stages complete
 - manifests reconcile
 - outputs are explainable
 
-## Experiment Design Rules
+## Design Rules
 
-- Change one important variable at a time when debugging.
-- Keep symbol/time scope narrow during repair.
-- Use explicit contexts for regime-conditioned claims.
-- Avoid broad exploratory runs if prior runs already show the region is weak.
-- Record why the experiment exists before running it.
-- Prefer `plan_only` before any materially expensive run.
-- Prefer targeted replays when the goal is mechanical verification instead of new evidence.
+- change one important variable at a time when debugging
+- keep symbol and time scope narrow during repair
+- use explicit contexts for regime-conditioned claims
+- avoid broad exploratory runs if prior memory already says the region is weak
+- record why the run exists before executing it
+- prefer `plan_only` before materially expensive runs
+- prefer targeted replay when the goal is verification, not new evidence
 
-## Batch Construction
+## Batch Rules
 
-Every batch should include:
+Every batch should specify:
 
-- primary hypothesis
-- reason for inclusion
-- prior memory reference
-- stop condition
+- the primary hypothesis
+- the reason for inclusion
+- the prior memory reference
+- the stop condition
 
 Recommended sequence:
 
@@ -118,15 +134,16 @@ For each candidate or experiment result, check:
 - `test_n_obs`
 - `q_value`
 - post-cost expectancy
-- stressed post-cost expectancy
+- stressed expectancy
 - regime stability
 - bridge tradability
 - promotion eligibility
-- warning surface and manifest cleanliness
+- warning surface
+- manifest cleanliness
 
-## Reflection Template
+## Reflection Record
 
-For each completed experiment, write:
+For each completed experiment, record:
 
 - objective
 - actual executed slice
@@ -135,21 +152,24 @@ For each completed experiment, write:
 - belief update
 - next action
 
-## Stop Conditions
+## Stop Rules
 
 Stop a line of inquiry when:
 
 - repeated runs fail for the same substantive statistical reason
-- the region shows no post-cost viability
-- support exists only in train and not in validation/test
+- the region does not survive costs
+- support exists only in train and not in validation or test
 - the implementation path is still mechanically unstable
 
 ## Promotion Discipline
 
-Do not over-interpret discovery outputs.
+Keep the boundary clear:
 
-A discovery is not a promoted edge.
-A promoted edge is not a production strategy.
-A full-loop agent must maintain those boundaries.
+- a discovery is not a promoted edge
+- a promoted edge is not a production strategy
 
-Synthetic experiments should record the generator profile and truth-map path in the reflection.
+Synthetic experiments should also record:
+
+- generator profile
+- truth-map path
+- whether the result survived another profile or only one world

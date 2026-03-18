@@ -2,7 +2,7 @@
 
 ## Operating Priorities
 
-The agent should optimize for:
+Optimize in this order:
 
 1. correctness
 2. comparability
@@ -10,54 +10,53 @@ The agent should optimize for:
 4. operational cleanliness
 5. iteration speed
 
+## Scope Rules
+
+- use targeted stage execution for repair verification
+- use narrow search specs for isolated hypothesis testing
+- use full runs only after recent path stability is confirmed
+- do not broaden immediately after a mechanical fix
+
 ## Safety Rules
 
-- Do not overwrite broad production artifacts when a narrow output path will do.
-- Do not interpret a repaired tail replay as identical to the original full DAG run.
-- Do not treat warning-heavy output as clean output without inspection.
-- Do not broaden scope immediately after a mechanical fix.
+- do not overwrite broad production artifacts when a narrow output path will do
+- do not treat a repaired tail replay as equivalent to the original full DAG run
+- do not call warning-heavy output clean without inspection
+- do not interpret synthetic profitability as live-market proof
 
-## Run Selection Rules
-
-- Use targeted stage execution for repair verification.
-- Use narrow search specs for isolated hypothesis testing.
-- Use full runs only after recent path stability is confirmed.
-- After detector or synthetic-generator edits, rerun synthetic truth validation before trusting full-spec synthetic results.
-- Treat generated diagnostics as part of the operational checklist, not an optional afterthought.
-
-## Logging Discipline
+## Logging Rules
 
 Warnings should help triage, not flood the operator.
 
 The agent should:
 
 - suppress low-signal coercion noise where safe
-- preserve warnings that indicate real data quality or contract issues
+- preserve warnings that indicate real contract or data issues
 - call out stale or contradictory logs explicitly
 
 ## Promotion Guardrails
 
 Promotion is conservative by design.
 
-The agent must not bypass:
+Do not bypass:
 
 - multiplicity controls
 - cost-survival checks
-- validation/test sample requirements
+- validation and test sample requirements
 - confirmatory locking rules
 - retail and capital viability filters
 
 ## Memory Guardrails
 
-Memory should inform action, not hard-code bias.
+Memory should guide action without hard-coding bias.
 
-The agent must still permit:
+Still allow:
 
 - materially different contexts
 - repaired code paths
-- cleaner reruns that can invalidate old conclusions
+- cleaner reruns that invalidate old conclusions
 
-## Review Discipline
+## Review Checklist
 
 When a run looks abnormal, inspect:
 
@@ -67,20 +66,21 @@ When a run looks abnormal, inspect:
 - duplicate hypotheses
 - stale replay traces
 - missing split metadata
+- generated diagnostics when the issue may be architectural
 
-## Required End State
+## Operationally Clean End State
 
-A run is considered operationally clean when:
+A run is operationally clean when:
 
 - stage and top-level manifests agree
 - downstream artifacts are populated as expected
 - warning noise is controlled
 - the next action is obvious from the evidence
 
+## Synthetic Guardrails
 
-## Synthetic Generator Guardrails
-
-- Freeze `volatility_profile`, symbol set, and time window before reviewing outcomes.
-- Prefer cross-profile survival over single-profile maximization.
-- Treat generator edits like data-source edits: rerun truth validation and narrow repair slices first.
-- Do not use repeated agent proposal cycles to tune directly against one synthetic world.
+- freeze `volatility_profile`, symbol set, and time window before review
+- prefer cross-profile survival over single-profile maximization
+- rerun truth validation after detector or generator edits
+- treat short certification windows as detector-and-pipeline calibration unless holdout support exists
+- do not keep tuning directly against one synthetic world

@@ -119,6 +119,7 @@ def build_search_engine_diagnostics(
     multiplicity_discoveries: int,
     min_t_stat: float,
     min_n: int,
+    search_budget: int | None,
 ) -> Dict[str, Any]:
     return _jsonify_mapping(
         {
@@ -145,5 +146,6 @@ def build_search_engine_diagnostics(
             "multiplicity_discoveries": int(multiplicity_discoveries),
             "min_t_stat": float(min_t_stat),
             "min_n": int(min_n),
+            "search_budget": int(search_budget) if search_budget is not None else None,
         }
     )

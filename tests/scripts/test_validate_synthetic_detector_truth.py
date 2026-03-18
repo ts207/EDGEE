@@ -138,3 +138,188 @@ def test_validate_synthetic_detector_truth_fails_when_expected_detector_misses(t
     assert result["event_reports"][0]["per_symbol"][0]["windows_hit"] == 0
     assert result["event_reports"][0]["per_symbol"][0]["passed_hit_requirement"] is False
 
+
+def test_validate_synthetic_detector_truth_can_scope_to_selected_events(tmp_path):
+    run_id = "truth_subset"
+    truth_dir = tmp_path / "synthetic" / run_id
+    ensure_dir(truth_dir)
+    truth_path = truth_dir / "synthetic_regime_segments.json"
+    truth_payload = {
+        "run_id": run_id,
+        "segments": [
+            {
+                "regime_type": "funding_dislocation",
+                "symbol": "BTCUSDT",
+                "start_ts": "2026-01-02T00:00:00Z",
+                "end_ts": "2026-01-02T02:00:00Z",
+                "expected_event_types": ["FND_DISLOC"],
+            },
+            {
+                "regime_type": "deleveraging_burst",
+                "symbol": "BTCUSDT",
+                "start_ts": "2026-01-04T00:00:00Z",
+                "end_ts": "2026-01-04T01:00:00Z",
+                "expected_event_types": ["DELEVERAGING_WAVE"],
+            },
+        ],
+    }
+    truth_path.write_text(json.dumps(truth_payload, indent=2), encoding="utf-8")
+
+    _write_event_report(
+        tmp_path,
+        run_id,
+        "funding_dislocation",
+        "funding_dislocation_events.parquet",
+        [{"symbol": "BTCUSDT", "event_type": "FND_DISLOC", "enter_ts": "2026-01-02T00:30:00Z"}],
+    )
+
+    result = validate_detector_truth(
+        data_root=tmp_path,
+        run_id=run_id,
+        truth_map_path=truth_path,
+        event_types=["FND_DISLOC"],
+    )
+
+    assert result["passed"] is True
+    assert result["selected_event_types"] == ["FND_DISLOC"]
+    assert [report["event_type"] for report in result["event_reports"]] == ["FND_DISLOC"]
+
+
+def test_validate_synthetic_detector_truth_ignores_supporting_events_by_default(tmp_path):
+    run_id = "truth_supporting_only"
+    truth_dir = tmp_path / "synthetic" / run_id
+    ensure_dir(truth_dir)
+    truth_path = truth_dir / "synthetic_regime_segments.json"
+    truth_payload = {
+        "run_id": run_id,
+        "segments": [
+            {
+                "regime_type": "liquidity_stress",
+                "symbol": "BTCUSDT",
+                "start_ts": "2026-01-02T00:00:00Z",
+                "end_ts": "2026-01-02T02:00:00Z",
+                "expected_event_types": ["LIQUIDITY_STRESS_DIRECT"],
+                "supporting_event_types": ["PRICE_VOL_IMBALANCE_PROXY"],
+            },
+        ],
+    }
+    truth_path.write_text(json.dumps(truth_payload, indent=2), encoding="utf-8")
+
+    _write_event_report(
+        tmp_path,
+        run_id,
+        "liquidity_dislocation",
+        "liquidity_dislocation_events.parquet",
+        [{"symbol": "BTCUSDT", "event_type": "PRICE_VOL_IMBALANCE_PROXY", "enter_ts": "2026-01-02T00:30:00Z"}],
+    )
+
+    result = validate_detector_truth(
+        data_root=tmp_path,
+        run_id=run_id,
+        truth_map_path=truth_path,
+    )
+
+    assert [report["event_type"] for report in result["event_reports"]] == ["LIQUIDITY_STRESS_DIRECT"]
+    assert result["supporting_event_reports"] == []
+
+
+def test_validate_synthetic_detector_truth_can_report_supporting_events(tmp_path):
+    run_id = "truth_supporting_report"
+    truth_dir = tmp_path / "synthetic" / run_id
+    ensure_dir(truth_dir)
+    truth_path = truth_dir / "synthetic_regime_segments.json"
+    truth_payload = {
+        "run_id": run_id,
+        "segments": [
+            {
+                "regime_type": "liquidity_stress",
+                "symbol": "BTCUSDT",
+                "start_ts": "2026-01-02T00:00:00Z",
+                "end_ts": "2026-01-02T02:00:00Z",
+                "expected_event_types": ["LIQUIDITY_STRESS_DIRECT"],
+                "supporting_event_types": ["ABSORPTION_PROXY", "DEPTH_STRESS_PROXY"],
+            },
+        ],
+    }
+    truth_path.write_text(json.dumps(truth_payload, indent=2), encoding="utf-8")
+
+    _write_event_report(
+        tmp_path,
+        run_id,
+        "liquidity_dislocation",
+        "liquidity_dislocation_events.parquet",
+        [
+            {"symbol": "BTCUSDT", "event_type": "ABSORPTION_PROXY", "enter_ts": "2026-01-02T00:30:00Z"},
+            {"symbol": "BTCUSDT", "event_type": "DEPTH_STRESS_PROXY", "enter_ts": "2026-01-02T01:00:00Z"},
+        ],
+    )
+
+    result = validate_detector_truth(
+        data_root=tmp_path,
+        run_id=run_id,
+        truth_map_path=truth_path,
+        include_supporting_events=True,
+    )
+
+    assert result["passed"] is False
+    assert [report["event_type"] for report in result["event_reports"]] == ["LIQUIDITY_STRESS_DIRECT"]
+    assert [report["event_type"] for report in result["supporting_event_reports"]] == [
+        "ABSORPTION_PROXY",
+        "DEPTH_STRESS_PROXY",
+    ]
+    assert all(report["truth_role"] == "supporting" for report in result["supporting_event_reports"])
+    assert result["supporting_event_reports"][0]["per_symbol"][0]["windows_hit"] == 1
+    assert result["supporting_event_reports"][1]["per_symbol"][0]["windows_hit"] == 1
+
+
+def test_validate_synthetic_detector_truth_prefers_event_specific_truth_windows(tmp_path):
+    run_id = "truth_event_specific_windows"
+    truth_dir = tmp_path / "synthetic" / run_id
+    ensure_dir(truth_dir)
+    truth_path = truth_dir / "synthetic_regime_segments.json"
+    truth_payload = {
+        "run_id": run_id,
+        "segments": [
+            {
+                "regime_type": "liquidity_stress",
+                "symbol": "BTCUSDT",
+                "start_ts": "2026-01-02T00:00:00Z",
+                "end_ts": "2026-01-02T08:00:00Z",
+                "supporting_event_types": ["ABSORPTION_PROXY"],
+                "event_truth_windows": {
+                    "ABSORPTION_PROXY": [
+                        {
+                            "start_ts": "2026-01-02T05:00:00Z",
+                            "end_ts": "2026-01-02T08:00:00Z",
+                        }
+                    ]
+                },
+            },
+        ],
+    }
+    truth_path.write_text(json.dumps(truth_payload, indent=2), encoding="utf-8")
+
+    _write_event_report(
+        tmp_path,
+        run_id,
+        "liquidity_dislocation",
+        "liquidity_dislocation_events.parquet",
+        [
+            {"symbol": "BTCUSDT", "event_type": "ABSORPTION_PROXY", "enter_ts": "2026-01-02T01:00:00Z"},
+            {"symbol": "BTCUSDT", "event_type": "ABSORPTION_PROXY", "enter_ts": "2026-01-02T06:00:00Z"},
+        ],
+    )
+
+    result = validate_detector_truth(
+        data_root=tmp_path,
+        run_id=run_id,
+        truth_map_path=truth_path,
+        include_supporting_events=True,
+        tolerance_minutes=0,
+    )
+
+    report = result["supporting_event_reports"][0]
+    assert report["event_type"] == "ABSORPTION_PROXY"
+    assert report["per_symbol"][0]["windows_hit"] == 1
+    assert report["per_symbol"][0]["in_window_events"] == 1
+    assert report["per_symbol"][0]["off_regime_events"] == 1

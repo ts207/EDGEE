@@ -123,6 +123,7 @@ def run(
     chunk_size: int = 500,
     min_t_stat: float = 1.5,
     min_n: int = 30,
+    search_budget: Optional[int] = None,
     experiment_config: Optional[str] = None,
     registry_root: str | Path = "project/configs/registries",
 ) -> int:
@@ -231,6 +232,7 @@ def run(
             log.info("Generating hypotheses from spec for %s: %s", symbol, resolved_search_spec)
             hypotheses, generation_audit = generate_hypotheses_with_audit(
                 resolved_search_spec,
+                max_hypotheses=int(search_budget) if search_budget is not None else None,
                 features=features,
             )
             _write_hypothesis_audit_artifacts(out_dir, symbol, generation_audit)
@@ -270,6 +272,7 @@ def run(
                     multiplicity_discoveries=0,
                     min_t_stat=resolved_min_t_stat,
                     min_n=resolved_min_n,
+                    search_budget=search_budget,
                 )
             )
             continue
@@ -311,6 +314,7 @@ def run(
                     multiplicity_discoveries=0,
                     min_t_stat=resolved_min_t_stat,
                     min_n=resolved_min_n,
+                    search_budget=search_budget,
                 )
             )
             continue
@@ -373,6 +377,7 @@ def run(
                 multiplicity_discoveries=0, # Computed globally
                 min_t_stat=resolved_min_t_stat,
                 min_n=resolved_min_n,
+                search_budget=search_budget,
             )
         )
 
@@ -421,6 +426,7 @@ def run(
         multiplicity_discoveries=0,
         min_t_stat=resolved_min_t_stat,
         min_n=resolved_min_n,
+        search_budget=search_budget,
     )
     if symbol_diagnostics:
         main_diag["symbol_diagnostics"] = symbol_diagnostics
@@ -451,6 +457,7 @@ def main(argv=None) -> int:
     parser.add_argument("--chunk_size", type=int, default=500)
     parser.add_argument("--min_t_stat", type=float, default=1.5)
     parser.add_argument("--min_n", type=int, default=30)
+    parser.add_argument("--search_budget", type=int, default=None)
     parser.add_argument("--experiment_config", default=None, help="Path to experiment config for tracking.")
     parser.add_argument("--program_id", default=None, help="Program ID for experiment tracking.")
     parser.add_argument("--registry_root", default="project/configs/registries", help="Root for event registries.")
@@ -478,6 +485,7 @@ def main(argv=None) -> int:
         chunk_size=args.chunk_size,
         min_t_stat=args.min_t_stat,
         min_n=args.min_n,
+        search_budget=args.search_budget,
         experiment_config=args.experiment_config,
         registry_root=args.registry_root,
     )

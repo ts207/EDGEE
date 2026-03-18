@@ -35,6 +35,10 @@ AUDIT_RUN_IDS: Dict[str, str] = {
     "golden": "golden_synthetic_discovery",
 }
 KNOWN_RUN_IDS = set(AUDIT_RUN_IDS.values())
+SYNTHETIC_LIVE_ONLY_EVENT_TYPES = {
+    "ABSORPTION_PROXY",
+    "DEPTH_STRESS_PROXY",
+}
 
 
 # ---------------------------------------------------------------------------
@@ -227,6 +231,33 @@ def _enrich_df(df: pd.DataFrame) -> pd.DataFrame:
     if "rv_96" not in df.columns and "close" in df.columns:
         log_ret = np.log(df["close"] / df["close"].shift(1))
         df["rv_96"] = log_ret.rolling(96, min_periods=12).std()
+
+    # spread_zscore: mimic the canonical feature builder when spread_bps is available
+    if "spread_zscore" not in df.columns and "spread_bps" in df.columns:
+        spread = pd.to_numeric(df["spread_bps"], errors="coerce")
+        roll_mean = spread.rolling(96, min_periods=12).mean()
+        roll_std = spread.rolling(96, min_periods=12).std()
+        df["spread_zscore"] = (spread - roll_mean) / roll_std.replace(0.0, np.nan)
+
+    # Depth imbalance is a common synthetic microstructure proxy. Preserve or derive it when possible.
+    if "imbalance" not in df.columns and {"bid_depth_usd", "ask_depth_usd"}.issubset(df.columns):
+        bid_depth = pd.to_numeric(df["bid_depth_usd"], errors="coerce")
+        ask_depth = pd.to_numeric(df["ask_depth_usd"], errors="coerce")
+        total_depth = (bid_depth + ask_depth).replace(0.0, np.nan)
+        df["imbalance"] = ((bid_depth - ask_depth) / total_depth).fillna(0.0)
+
+    if "micro_depth_depletion" not in df.columns:
+        if "depth_usd" in df.columns:
+            depth = pd.to_numeric(df["depth_usd"], errors="coerce")
+        elif {"bid_depth_usd", "ask_depth_usd"}.issubset(df.columns):
+            depth = pd.to_numeric(df["bid_depth_usd"], errors="coerce") + pd.to_numeric(
+                df["ask_depth_usd"], errors="coerce"
+            )
+        else:
+            depth = None
+        if depth is not None:
+            baseline = depth.rolling(24, min_periods=1).mean().shift(1).fillna(depth)
+            df["micro_depth_depletion"] = (1.0 - (depth / baseline.replace(0.0, np.nan))).fillna(0.0)
 
     # range_96: high/low ratio over 96 bars (lagged 1)
     if "range_96" not in df.columns and "high" in df.columns and "low" in df.columns:

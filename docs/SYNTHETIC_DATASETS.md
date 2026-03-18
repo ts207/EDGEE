@@ -1,30 +1,51 @@
 # Synthetic Datasets
 
-This repository includes a deterministic synthetic regime generator for agent-driven research.
-
 ## Purpose
 
-Synthetic datasets should be used to validate:
+Synthetic datasets are for controlled research, not direct evidence of live profitability.
+
+Use them to validate:
 
 - detector truth recovery
 - artifact and contract plumbing
-- promotion and gate behavior
-- robustness to regime variation
+- search and promotion behavior under controlled regimes
 - falsification on negative controls
+- robustness across different synthetic worlds
 
-They should not be treated as direct evidence of live-market profitability.
+Do not use them as standalone proof of market edge.
 
-## Available Profiles
+## Built-In Profiles
 
-The generator supports these built-in profiles:
+The generator supports these maintained profiles:
 
 - `default`: balanced baseline with recurring event regimes
-- `2021_bull`: higher drift, higher turnover, faster cycle cadence
-- `range_chop`: low-drift, tighter regime amplitudes, more frequent resets
+- `2021_bull`: stronger drift, faster cycle cadence, more crowding-like behavior
+- `range_chop`: lower drift, tighter amplitudes, more resets
 - `stress_crash`: wider spreads, higher noise, stronger stress episodes
-- `alt_rotation`: higher altcoin-style participation and stronger rotations
+- `alt_rotation`: stronger cross-sectional and alt-style rotation behavior
 
-## Generate One Dataset
+## Outputs
+
+Each generated run writes:
+
+- `synthetic/<run_id>/synthetic_generation_manifest.json`
+- `synthetic/<run_id>/synthetic_regime_segments.json`
+- run-scoped partitions under `data/lake/runs/<run_id>/...`
+
+Synthetic cleaned bars include a minimal microstructure contract:
+
+- `spread_bps`
+- `depth_usd`
+- `bid_depth_usd`
+- `ask_depth_usd`
+- `imbalance`
+
+The normal feature and audit paths derive `spread_zscore` from `spread_bps`, so synthetic spread-sensitive
+proxies can run through the ordinary pipeline path.
+
+## Generate Data
+
+Generate one dataset:
 
 ```bash
 python3 -m project.scripts.generate_synthetic_crypto_regimes \
@@ -36,7 +57,7 @@ python3 -m project.scripts.generate_synthetic_crypto_regimes \
   --noise_scale 0.9
 ```
 
-## Generate A Curated Suite
+Generate the curated suite:
 
 ```bash
 python3 -m project.scripts.generate_synthetic_crypto_regimes \
@@ -44,40 +65,69 @@ python3 -m project.scripts.generate_synthetic_crypto_regimes \
   --run_id synthetic_suite
 ```
 
-The suite manifest is written to:
+## Validation Modes
 
-- `data/synthetic/<suite_name>/synthetic_dataset_suite_manifest.json`
+### Broad Maintained Workflow
 
-Each dataset also writes:
-
-- `synthetic/<run_id>/synthetic_generation_manifest.json`
-- `synthetic/<run_id>/synthetic_regime_segments.json`
-- run-scoped lake partitions under `data/lake/runs/<run_id>/...`
-
-## Golden Validation Workflows
-
-Run the maintained synthetic smoke workflow:
+Use the maintained broad workflow when the goal is detector truth and broad synthetic discovery behavior:
 
 ```bash
 python3 -m project.scripts.run_golden_synthetic_discovery
 ```
 
-Validate detector truth on a generated run:
+### Fast Certification Workflow
+
+Use the fast workflow when the goal is a narrow detector-and-plumbing check:
+
+```bash
+python3 -m project.scripts.run_fast_synthetic_certification
+```
+
+That path is intentionally narrow in:
+
+- symbols
+- date range
+- event fanout
+- templates
+- search budget
+
+Interpret it accordingly:
+
+- detector truth can pass
+- artifact and pipeline plumbing can pass
+- discovery and promotion can still produce zero viable candidates because the slice is too small for holdout evidence
+
+## Truth Validation
+
+Validate a synthetic run with:
 
 ```bash
 python3 -m project.scripts.validate_synthetic_detector_truth \
   --run_id golden_synthetic_discovery
 ```
 
-## Recommended Agent Workflow
+Important distinction:
 
-1. Pick one profile matching the research question.
-2. Generate the dataset.
-3. Run the narrowest detector or discovery slice that answers the question.
-4. Validate detector truth before interpreting misses.
-5. Compare across at least one additional profile before strengthening belief.
+- `expected_event_types` are the hard pass/fail truth contract
+- `supporting_event_types` are informational supporting signals
 
-## Dataset Selection Heuristics
+To include supporting-signal reporting without changing the main pass/fail result:
+
+```bash
+python3 -m project.scripts.validate_synthetic_detector_truth \
+  --run_id my_run \
+  --include_supporting_events 1
+```
+
+## Recommended Workflow
+
+1. choose the profile that matches the question
+2. freeze the profile and slice before reviewing outcomes
+3. run the narrowest detector or discovery path that answers the question
+4. validate truth before interpreting misses
+5. compare against at least one additional profile before strengthening belief
+
+## Selection Heuristics
 
 Use:
 
@@ -85,30 +135,28 @@ Use:
 - `2021_bull` for strong-trend and crowding-sensitive templates
 - `range_chop` for false-breakout and mean-reversion stress
 - `stress_crash` for liquidity, deleveraging, and spread-sensitive logic
-- `alt_rotation` for multi-symbol rotation and cross-sectional tests
+- `alt_rotation` for multi-symbol rotation and cross-sectional behavior
 
-## Verification Workflows
+## Current Limitations
 
-### 1. Detector Truth Validation
-Use the `project.scripts.validate_synthetic_detector_truth` script to compare detector hits against the generation manifest.
-- **Pass Requirement**: Usually > 70% hit rate with < 10% off-regime noise.
-- **Example**:
-  ```bash
-  python3 -m project.scripts.validate_synthetic_detector_truth --run_id my_run --truth_map_path data/synthetic/my_run/synthetic_regime_segments.json
-  ```
+`ABSORPTION_PROXY` and `DEPTH_STRESS_PROXY` are currently:
 
-### 2. Cross-Profile Validation
-Always validate a hypothesis against at least two distinct profiles (e.g., `default` and `stress_crash`).
-- Use the `synthetic` gate profile in `run_all` to allow low-sample-size validation without failing the research pipeline.
-- **Set**: `--phase2_gate_profile synthetic --discovery_profile synthetic`.
+- measurable on synthetic data
+- supporting-only in synthetic reporting
+- treated as live-data diagnostics by default
+
+They are not reliable hard synthetic truth targets under the current `liquidity_stress` generator family.
+
+Because of that:
+
+- the default synthetic detector audit skips them
+- opt in explicitly with `python3 -m project.scripts.audit_detector_precision_recall --include_live_only_synthetic 1` if you want an informational measurement
 
 ## Guardrails
 
-- **Standardized Event Names**: Ensure event types match the authoritative registry (e.g., use `LIQUIDATION_EXHAUSTION_REVERSAL` instead of legacy aliases).
-- **Data Path Alignment**: Synthetic OI data must be written to `raw/binance/perp/<symbol>/open_interest/5m/` for correct pipeline ingestion.
-- **Sizing Discipline**: Portfolios built from synthetic edges should maintain gross leverage limits even when expectancy is artificially high.
-- **Freeze the profile** before reviewing outcomes.
-- Do not keep redesigning features against one synthetic profile.
-- Prefer cross-profile survival to single-profile peak performance.
-- Keep truth validation artifacts with the run.
-- Separate detector recovery claims from profitability claims.
+- keep truth validation artifacts with the run
+- separate detector recovery claims from profitability claims
+- prefer cross-profile survival over single-profile peak performance
+- do not redesign directly against one synthetic world
+- rerun truth validation after detector or generator changes
+- treat short certification windows as calibration unless real holdout support exists

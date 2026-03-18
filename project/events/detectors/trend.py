@@ -40,6 +40,7 @@ class TrendBase(ThresholdDetector):
 
 class TrendAccelerationDetector(TrendBase):
     event_type = "TREND_ACCELERATION"
+    min_spacing = 192
     threshold_quantile: float = 0.98
     min_trend_extension_quantile: float = 0.92
 

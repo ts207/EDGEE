@@ -7,7 +7,7 @@ from typing import Dict, List, Tuple
 import numpy as np
 import pandas as pd
 
-from project.compilers.executable_strategy_spec import ExecutableStrategySpec
+from project.compilers import ExecutableStrategySpec
 
 try:
     from numba import njit

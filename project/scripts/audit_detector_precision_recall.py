@@ -24,6 +24,7 @@ from project.events.detectors.registry import (
 )
 from project.scripts.detector_audit_module import (
     KNOWN_RUN_IDS,
+    SYNTHETIC_LIVE_ONLY_EVENT_TYPES,
     build_symbol_df,
     load_manifest,
     load_truth_segments,
@@ -31,7 +32,26 @@ from project.scripts.detector_audit_module import (
 )
 
 
-def _print_table(all_metrics: list) -> None:
+def _select_event_types(
+    all_event_types: list[str],
+    *,
+    requested_event_type: str | None,
+    include_live_only_synthetic: bool,
+) -> tuple[list[str], list[str]]:
+    if requested_event_type:
+        selected = [et for et in all_event_types if et == requested_event_type.upper()]
+        return selected, []
+    skipped = []
+    selected = []
+    for event_type in all_event_types:
+        if not include_live_only_synthetic and event_type in SYNTHETIC_LIVE_ONLY_EVENT_TYPES:
+            skipped.append(event_type)
+            continue
+        selected.append(event_type)
+    return selected, skipped
+
+
+def _print_table(all_metrics: list, *, skipped_event_types: list[str] | None = None) -> None:
     """Print a human-readable classification table to stdout."""
     by_class: dict = defaultdict(list)
     for m in all_metrics:
@@ -63,12 +83,20 @@ def _print_table(all_metrics: list) -> None:
     stable = len(by_class.get("stable", []))
     broken = len(by_class.get("broken", [])) + len(by_class.get("noisy", [])) + len(by_class.get("silent", []))
     print(f"TOTAL: {total}  STABLE: {stable}  NEED WORK: {broken}  ERROR: {len(by_class.get('error', []))}  UNCOVERED: {len(by_class.get('uncovered', []))}")
+    if skipped_event_types:
+        print(f"SKIPPED LIVE-ONLY SYNTHETIC EVENTS: {', '.join(sorted(skipped_event_types))}")
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Audit detector precision/recall across synthetic datasets.")
     parser.add_argument("--run_id", default=None, help="Run a single run_id (e.g. synthetic_2021_bull)")
     parser.add_argument("--event_type", default=None, help="Audit only this event type")
+    parser.add_argument(
+        "--include_live_only_synthetic",
+        type=int,
+        default=0,
+        help="Include detectors that are currently treated as live-data diagnostics rather than synthetic calibration targets.",
+    )
     parser.add_argument("--out_dir", default=None, help="Output directory for JSON report")
     args = parser.parse_args(argv)
 
@@ -76,12 +104,15 @@ def main(argv: list[str] | None = None) -> int:
 
     load_all_detectors()
     all_event_types = list_registered_event_types()
-
-    if args.event_type:
-        all_event_types = [et for et in all_event_types if et == args.event_type.upper()]
-        if not all_event_types:
-            print(f"ERROR: event_type {args.event_type!r} not registered.")
-            return 1
+    skipped_event_types: list[str] = []
+    all_event_types, skipped_event_types = _select_event_types(
+        all_event_types,
+        requested_event_type=args.event_type,
+        include_live_only_synthetic=bool(args.include_live_only_synthetic),
+    )
+    if args.event_type and not all_event_types:
+        print(f"ERROR: event_type {args.event_type!r} not registered.")
+        return 1
 
     run_ids = [args.run_id] if args.run_id else sorted(KNOWN_RUN_IDS)
     # Validate requested run_id exists on disk
@@ -111,7 +142,7 @@ def main(argv: list[str] | None = None) -> int:
                 all_metrics.append(metrics.to_dict())
 
     # --- Output ---
-    _print_table(all_metrics)
+    _print_table(all_metrics, skipped_event_types=skipped_event_types)
 
     timestamp = datetime.now(tz=timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     if args.out_dir:

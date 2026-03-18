@@ -346,7 +346,7 @@ class PostDeleveragingReboundDetector(CompositeDetector):
 class TrendExhaustionDetector(CompositeDetector):
     event_type = "TREND_EXHAUSTION_TRIGGER"
     required_columns = ("timestamp", "close", "rv_96")
-    min_spacing = 48
+    min_spacing = 96
 
     def prepare_features(self, df: pd.DataFrame, **params: Any) -> dict[str, pd.Series]:
         close = pd.to_numeric(df["close"], errors="coerce").astype(float)
@@ -355,6 +355,10 @@ class TrendExhaustionDetector(CompositeDetector):
         trend_window = int(params.get("trend_window", 96))
         trend = close.pct_change(trend_window)
         trend_abs = trend.abs()
+        trend_sign = np.sign(trend).fillna(0.0)
+        trend_group = trend_sign.ne(trend_sign.shift(1)) | trend_sign.eq(0.0)
+        trend_streak = trend_sign.groupby(trend_group.cumsum()).cumcount() + 1
+        trend_streak = trend_streak.where(trend_sign != 0.0, 0).astype(float)
         
         vol_window = int(params.get("vol_window", 288))
         rv_z = rolling_mean_std_zscore(rv_96, window=vol_window)
@@ -385,6 +389,7 @@ class TrendExhaustionDetector(CompositeDetector):
         return {
             "trend": trend,
             "trend_abs": trend_abs,
+            "trend_streak": trend_streak,
             "rv_z": rv_z,
             "rv_96": rv_96,
             "rv_median": rv_median,
@@ -405,11 +410,13 @@ class TrendExhaustionDetector(CompositeDetector):
         # 1. Structural Signal: Trend must be at a historical extreme
         trend_peak_multiplier = float(params.get("trend_peak_multiplier", 1.30))
         trend_strength_ratio = float(params.get("trend_strength_ratio", 3.0))
+        min_trend_duration_bars = int(params.get("min_trend_duration_bars", 72))
         
         trend_peak = (
             (features["trend_abs"] >= features["trend_q_extreme"] * trend_peak_multiplier).fillna(False)
             | (features["trend_abs"] >= features["trend_median"] * trend_strength_ratio).fillna(False)
         )
+        sustained_trend = (features["trend_streak"] >= min_trend_duration_bars).fillna(False)
         
         # 2. Cooldown Guard: Volatility must be decelerating or low
         cooldown_ratio = float(params.get("cooldown_ratio", 0.90))
@@ -442,7 +449,7 @@ class TrendExhaustionDetector(CompositeDetector):
         any_reversal = (weakening_up | weakening_down | slope_cross | reversal_confirmed).fillna(False)
         any_reversal_flex = any_reversal.rolling(window=reversal_window, min_periods=1).max().astype(bool)
         
-        return (trend_peak & cooldown & any_reversal_flex).fillna(False)
+        return (trend_peak & sustained_trend & cooldown & any_reversal_flex).fillna(False)
 
     def compute_intensity(self, df: pd.DataFrame, *, features: dict[str, pd.Series], **params: Any) -> pd.Series:
         del df, params
@@ -465,7 +472,7 @@ class TrendExhaustionDetector(CompositeDetector):
 class MomentumDivergenceDetector(ThresholdDetector):
     event_type = "MOMENTUM_DIVERGENCE_TRIGGER"
     required_columns = ("timestamp", "close")
-    min_spacing = 48
+    min_spacing = 96
     min_trend_extension_quantile: float = 0.90
 
     def prepare_features(self, df: pd.DataFrame, **params: Any) -> dict[str, pd.Series]:
@@ -475,7 +482,12 @@ class MomentumDivergenceDetector(ThresholdDetector):
         slow_window = int(params.get("slow_window", 96))
         mom_fast = close.pct_change(fast_window)
         mom_slow = close.pct_change(slow_window)
+        mom_slow_abs = mom_slow.abs()
         accel = mom_fast - mom_slow
+        slow_sign = np.sign(mom_slow).fillna(0.0)
+        trend_group = slow_sign.ne(slow_sign.shift(1)) | slow_sign.eq(0.0)
+        trend_streak = slow_sign.groupby(trend_group.cumsum()).cumcount() + 1
+        trend_streak = trend_streak.where(slow_sign != 0.0, 0).astype(float)
         
         ext_window = int(params.get("extension_window", 96))
         rolling_high = close.rolling(ext_window, min_periods=12).max().shift(1)
@@ -496,6 +508,7 @@ class MomentumDivergenceDetector(ThresholdDetector):
         accel_q_threshold = past_quantile(accel_abs, float(params.get("accel_quantile", 0.90)), window=threshold_window)
         ext_q = float(params.get("min_trend_extension_quantile", self.min_trend_extension_quantile))
         extension_q_threshold = past_quantile(extension_max, ext_q, window=threshold_window)
+        slow_trend_q = past_quantile(mom_slow_abs, float(params.get("slow_trend_quantile", 0.70)), window=threshold_window)
         
         reversal_q70 = past_quantile(reversal_impulse, float(params.get("reversal_quantile", 0.70)), window=threshold_window)
         divergence_turn = (mom_fast.shift(1) * mom_fast <= 0).fillna(False)
@@ -503,25 +516,34 @@ class MomentumDivergenceDetector(ThresholdDetector):
         return {
             "mom_fast": mom_fast,
             "mom_slow": mom_slow,
+            "mom_slow_abs": mom_slow_abs,
             "divergence": divergence,
             "reversal_impulse": reversal_impulse,
             "accel_abs": accel_abs,
             "extension_max": extension_max,
             "accel_q_threshold": accel_q_threshold,
             "extension_q_threshold": extension_q_threshold,
+            "slow_trend_q": slow_trend_q,
+            "trend_streak": trend_streak,
             "reversal_q70": reversal_q70,
             "divergence_turn": divergence_turn,
         }
 
     def compute_raw_mask(self, df: pd.DataFrame, *, features: dict[str, pd.Series], **params: Any) -> pd.Series:
-        del df, params
+        del df
         # Must be extended relative to history to fire divergence
         is_extended = (features["extension_max"] >= features["extension_q_threshold"]).fillna(False)
+        max_trend_persistence_bars = int(params.get("max_trend_persistence_bars", 72))
+        weak_or_choppy_regime = (
+            (features["mom_slow_abs"] <= features["slow_trend_q"]).fillna(False)
+            | (features["trend_streak"] <= max_trend_persistence_bars).fillna(False)
+        )
         
         return (
             features["divergence"]
             & features["divergence_turn"]
             & is_extended
+            & weak_or_choppy_regime
             & (
                 (features["accel_abs"] >= features["accel_q_threshold"]).fillna(False)
                 | (features["reversal_impulse"] >= features["reversal_q70"]).fillna(False)

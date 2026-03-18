@@ -45,6 +45,8 @@ REGIME_EXPECTATIONS: Dict[str, Dict[str, Any]] = {
         "intended_effect_direction": "funding_extreme_signaled",
         "expected_event_types": [
             "FND_DISLOC",
+        ],
+        "supporting_event_types": [
             "FUNDING_FLIP",
         ],
         "expected_detector_families": [
@@ -56,6 +58,8 @@ REGIME_EXPECTATIONS: Dict[str, Dict[str, Any]] = {
         "intended_effect_direction": "trend_then_reversal",
         "expected_event_types": [
             "TREND_ACCELERATION",
+        ],
+        "supporting_event_types": [
             "TREND_EXHAUSTION_TRIGGER",
             "MOMENTUM_DIVERGENCE_TRIGGER",
         ],
@@ -82,6 +86,10 @@ REGIME_EXPECTATIONS: Dict[str, Dict[str, Any]] = {
         "expected_event_types": [
             "LIQUIDITY_STRESS_DIRECT",
             "LIQUIDITY_STRESS_PROXY",
+        ],
+        "supporting_event_types": [
+            "ABSORPTION_PROXY",
+            "DEPTH_STRESS_PROXY",
             "PRICE_VOL_IMBALANCE_PROXY",
             "SPREAD_REGIME_WIDENING_EVENT",
         ],
@@ -193,9 +201,33 @@ class RegimeSegment:
     sign: int
     amplitude: float
 
+    def _event_truth_windows(self) -> Dict[str, list[Dict[str, str]]]:
+        if self.regime_type != "liquidity_stress":
+            return {}
+        duration = self.end_ts - self.start_ts
+        shock_end = self.start_ts + (duration * 0.18)
+        stress_end = shock_end + (duration * 0.32)
+        late_stress_start = shock_end + ((stress_end - shock_end) * 0.50)
+        early_stress_end = shock_end + ((stress_end - shock_end) * 0.30)
+        windows = {
+            "DEPTH_STRESS_PROXY": [
+                {"start_ts": self.start_ts.isoformat(), "end_ts": stress_end.isoformat()},
+            ],
+            "SPREAD_REGIME_WIDENING_EVENT": [
+                {"start_ts": self.start_ts.isoformat(), "end_ts": stress_end.isoformat()},
+            ],
+            "PRICE_VOL_IMBALANCE_PROXY": [
+                {"start_ts": self.start_ts.isoformat(), "end_ts": early_stress_end.isoformat()},
+            ],
+            "ABSORPTION_PROXY": [
+                {"start_ts": late_stress_start.isoformat(), "end_ts": self.end_ts.isoformat()},
+            ],
+        }
+        return windows
+
     def to_record(self) -> Dict[str, Any]:
         expectations = REGIME_EXPECTATIONS.get(self.regime_type, {})
-        return {
+        record = {
             "regime_type": self.regime_type,
             "symbol": self.symbol,
             "start_ts": self.start_ts.isoformat(),
@@ -204,8 +236,13 @@ class RegimeSegment:
             "amplitude": float(self.amplitude),
             "intended_effect_direction": expectations.get("intended_effect_direction"),
             "expected_event_types": list(expectations.get("expected_event_types", [])),
+            "supporting_event_types": list(expectations.get("supporting_event_types", [])),
             "expected_detector_families": list(expectations.get("expected_detector_families", [])),
         }
+        event_truth_windows = self._event_truth_windows()
+        if event_truth_windows:
+            record["event_truth_windows"] = event_truth_windows
+        return record
 
 
 def _normalize_bounds(start_date: str, end_date: str) -> tuple[pd.Timestamp, pd.Timestamp]:
@@ -351,9 +388,16 @@ def generate_symbol_frames(
     spread_bps = np.full(n, (2.8 if symbol.upper() == "BTCUSDT" else 3.6) * float(settings.get("spread_mult", 1.0)), dtype=float)
     if symbol.upper() == "SOLUSDT":
         spread_bps = np.full(n, 5.5 * float(settings.get("spread_mult", 1.0)), dtype=float)
+    spread_bps += (
+        0.45 * np.abs(np.sin(np.linspace(0.0, 8.0 * np.pi, n)))
+        + np.abs(rng.normal(0.0, 0.12 * eff_noise, n))
+    )
+    spread_bps = np.clip(spread_bps, 0.6, None)
     
     volume_mult = np.ones(n, dtype=float) * float(settings.get("volume_mult", 1.0))
     wick_mult = np.ones(n, dtype=float)
+    depth_mult = np.ones(n, dtype=float)
+    orderflow_bias = np.zeros(n, dtype=float)
     base_oi = base_oi * float(settings.get("oi_mult", 1.0))
     oi = base_oi + np.cumsum(rng.normal(0.0, base_oi * 0.000015 * eff_noise, n))
     liquidation_notional = np.zeros(n, dtype=float)
@@ -375,6 +419,7 @@ def generate_symbol_frames(
             funding_rate[fmask] += segment.sign * 0.00035 * segment.amplitude
             basis_bps[mask] += segment.sign * 18.0
             volume_mult[mask] *= 1.15
+            orderflow_bias[mask] += segment.sign * 0.03
         elif segment.regime_type == "trend_acceleration_exhaustion":
             accel = int(max(2, window_len * 0.65))
             local = np.zeros(window_len)
@@ -383,6 +428,12 @@ def generate_symbol_frames(
             returns[mask] += local
             volume_mult[mask] *= 1.25
             wick_mult[mask] *= 1.15
+            orderflow_bias[mask] += segment.sign * np.concatenate(
+                [
+                    np.full(accel, 0.08 * segment.amplitude),
+                    np.linspace(0.06 * segment.amplitude, -0.10 * segment.amplitude, window_len - accel),
+                ]
+            )[:window_len]
         elif segment.regime_type == "breakout_failure":
             compression_len = int(max(24, np.floor(window_len * 0.60)))
             breakout_len = int(max(2, np.ceil(window_len * 0.15)))
@@ -409,11 +460,68 @@ def generate_symbol_frames(
                     np.full(max(0, window_len - reversal_start), 4.2),
                 ]
             )[:window_len]
+            orderflow_bias[mask] += np.concatenate(
+                [
+                    np.full(compression_len, 0.02 * segment.sign),
+                    np.full(max(0, reversal_start - compression_len), 0.14 * segment.sign),
+                    np.full(max(0, window_len - reversal_start), -0.16 * segment.sign),
+                ]
+            )[:window_len]
         elif segment.regime_type == "liquidity_stress":
-            spread_bps[mask] += 12.0 * segment.amplitude
-            wick_mult[mask] *= 2.2
-            volume_mult[mask] *= 0.22
-            basis_bps[mask] += segment.sign * 10.0
+            shock_len = int(max(6, np.ceil(window_len * 0.18)))
+            stress_len = int(max(6, np.ceil(window_len * 0.32)))
+            absorption_len = max(1, window_len - shock_len - stress_len)
+
+            shock_wave = np.sin(np.linspace(0.0, 3.0 * np.pi, shock_len, endpoint=False))
+            shock_returns = 0.0029 * segment.amplitude * shock_wave
+            stress_returns = rng.normal(0.0, 0.00135 * segment.amplitude, stress_len)
+            absorption_returns = rng.normal(
+                0.0,
+                0.00006 * segment.amplitude,
+                absorption_len,
+            )
+            local = np.concatenate([shock_returns, stress_returns, absorption_returns])[:window_len]
+            returns[mask] += local
+
+            shock_spread = 24.0 + 20.0 * np.abs(np.sin(np.linspace(0.0, 2.5 * np.pi, shock_len, endpoint=False)))
+            stress_spread = 20.0 + 10.0 * np.abs(np.sin(np.linspace(0.0, 2.0 * np.pi, stress_len, endpoint=False)))
+            absorption_spread = 16.0 + 5.0 * np.abs(np.sin(np.linspace(0.0, 1.5 * np.pi, absorption_len, endpoint=False)))
+            spread_profile = np.concatenate([shock_spread, stress_spread, absorption_spread])[:window_len]
+            spread_bps[mask] += spread_profile * segment.amplitude
+
+            shock_wick = np.full(shock_len, 3.3)
+            stress_wick = np.linspace(2.6, 1.8, stress_len, endpoint=False)
+            absorption_wick = np.linspace(1.25, 0.95, absorption_len)
+            wick_profile = np.concatenate([shock_wick, stress_wick, absorption_wick])[:window_len]
+            wick_mult[mask] *= wick_profile
+
+            shock_volume = np.full(shock_len, 0.10)
+            stress_volume = np.linspace(0.12, 0.18, stress_len, endpoint=False)
+            absorption_volume = np.linspace(0.16, 0.22, absorption_len)
+            volume_profile = np.concatenate([shock_volume, stress_volume, absorption_volume])[:window_len]
+            volume_mult[mask] *= volume_profile
+
+            shock_depth = np.full(shock_len, 0.025)
+            stress_depth = np.linspace(0.04, 0.07, stress_len, endpoint=False)
+            absorption_depth = np.linspace(0.18, 0.30, absorption_len)
+            depth_profile = np.concatenate([shock_depth, stress_depth, absorption_depth])[:window_len]
+            depth_mult[mask] *= depth_profile
+
+            basis_bps[mask] += segment.sign * np.concatenate(
+                [
+                    np.full(shock_len, 14.0 * segment.amplitude),
+                    np.full(stress_len, 10.0 * segment.amplitude),
+                    np.full(absorption_len, 6.0 * segment.amplitude),
+                ]
+            )[:window_len]
+            absorption_bias = 0.015 * np.sin(np.linspace(0.0, 3.0 * np.pi, absorption_len, endpoint=False))
+            orderflow_bias[mask] += np.concatenate(
+                [
+                    np.full(shock_len, segment.sign * 0.32 * segment.amplitude),
+                    np.full(stress_len, segment.sign * 0.18 * segment.amplitude),
+                    absorption_bias,
+                ]
+            )[:window_len]
         elif segment.regime_type == "deleveraging_burst":
             shock_len = int(max(2, np.ceil(window_len * 0.70)))
             relief_len = max(1, window_len - shock_len)
@@ -451,6 +559,7 @@ def generate_symbol_frames(
             liquidation_notional[mask] += liq_profile[:window_len]
             volume_mult[mask] *= vol_profile[:window_len]
             wick_mult[mask] *= wick_profile[:window_len]
+            orderflow_bias[mask] -= 0.12 * segment.amplitude
         elif segment.regime_type == "post_deleveraging_rebound":
             # Rebound after deleveraging: positive returns, declining volume, elevated wicks
             rebound_len = int(max(2, np.ceil(window_len * 0.60)))
@@ -474,6 +583,7 @@ def generate_symbol_frames(
             )
             volume_mult[mask] *= vol_profile[:window_len]
             wick_mult[mask] *= wick_profile[:window_len]
+            orderflow_bias[mask] += 0.10 * segment.sign * segment.amplitude
 
     close = base_price * np.exp(np.cumsum(returns))
     open_ = np.concatenate(([close[0]], close[:-1]))
@@ -483,7 +593,14 @@ def generate_symbol_frames(
     volume = np.clip(base_volume * volume_mult * (1.0 + rng.normal(0.0, 0.22 * eff_noise, n)), 1.0, None)
     trade_count = np.clip(base_trade_count * volume_mult * (1.0 + rng.normal(0.0, 0.18 * eff_noise, n)), 10.0, None).astype(int)
     quote_volume = volume * close
-    taker_ratio = np.clip(0.52 + 0.08 * np.sign(np.nan_to_num(returns)) + rng.normal(0.0, 0.03 * eff_noise, n), 0.15, 0.9)
+    taker_ratio = np.clip(
+        0.52
+        + 0.08 * np.sign(np.nan_to_num(returns))
+        + orderflow_bias
+        + rng.normal(0.0, 0.03 * eff_noise, n),
+        0.15,
+        0.9,
+    )
     taker_buy_volume = volume * taker_ratio
     taker_buy_quote_volume = quote_volume * taker_ratio
     spot_close = close / (1.0 + basis_bps / 10_000.0)
@@ -492,7 +609,15 @@ def generate_symbol_frames(
     spot_low = np.minimum(spot_open, spot_close) * (1.0 - intrabar_noise * 0.82)
 
     depth_base = quote_volume * 5.0
-    depth_usd = depth_base / np.maximum(1.0, 10000.0 * intrabar_noise)
+    depth_usd = (depth_base / np.maximum(1.0, 10000.0 * intrabar_noise)) * depth_mult
+    imbalance = np.clip((taker_ratio - 0.5) * 2.0, -0.95, 0.95)
+    bid_depth_share = np.clip(
+        0.5 + (0.35 * imbalance) + rng.normal(0.0, 0.02 * eff_noise, n),
+        0.05,
+        0.95,
+    )
+    bid_depth_usd = depth_usd * bid_depth_share
+    ask_depth_usd = depth_usd - bid_depth_usd
     
     depth_ser = pd.Series(depth_usd)
     spread_ser = pd.Series(spread_bps)
@@ -511,6 +636,9 @@ def generate_symbol_frames(
             "taker_buy_quote_volume": taker_buy_quote_volume,
             "spread_bps": spread_bps,
             "depth_usd": depth_usd,
+            "bid_depth_usd": bid_depth_usd,
+            "ask_depth_usd": ask_depth_usd,
+            "imbalance": imbalance,
             "micro_depth_depletion": 1.0 - (depth_ser / (depth_ser.rolling(24).mean().shift(1).fillna(depth_ser))),
             "micro_spread_stress": spread_ser / (spread_ser.rolling(288).median().shift(1).fillna(spread_ser)),
             "is_synthetic": True,
@@ -532,6 +660,9 @@ def generate_symbol_frames(
             "taker_buy_quote_volume": taker_buy_quote_volume * 0.9,
             "spread_bps": np.maximum(0.8, spread_bps * 0.65),
             "depth_usd": depth_usd * 0.8,
+            "bid_depth_usd": bid_depth_usd * 0.8,
+            "ask_depth_usd": ask_depth_usd * 0.8,
+            "imbalance": imbalance,
             "is_synthetic": True,
             "symbol": symbol,
         }

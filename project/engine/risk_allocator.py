@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 
 from project.core.constants import BARS_PER_YEAR_BY_TIMEFRAME
-from project.portfolio.allocation_spec import AllocationSpec
+from project.portfolio import AllocationSpec
 
 
 ALLOCATION_CONTRACT_SCHEMA_VERSION = "allocation_contract_v1"
