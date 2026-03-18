@@ -140,6 +140,7 @@ def run_golden_synthetic_discovery(
         "--phase2_gate_profile", phase2_gate_profile,
         "--search_spec", search_spec,
         "--search_min_n", str(search_min_n),
+        "--feature_schema_version", "v2",
         "--config", "project/configs/pipeline.yaml",
     ]
     if events:

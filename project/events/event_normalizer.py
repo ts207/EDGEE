@@ -168,7 +168,7 @@ def normalize_phase1_events(
             out[col] = _DIRECTION_DEFAULT if col == "direction" else np.nan
         if col == "direction":
             out[col] = out[col].fillna(_DIRECTION_DEFAULT).astype(str).str.lower().str.strip()
-            out[col] = out[col].replace({"1": "long", "1.0": "long", "-1": "short", "-1.0": "short", "0": "neutral", "0.0": "neutral", "nan": _DIRECTION_DEFAULT})
+            out[col] = out[col].replace({"1": "long", "1.0": "long", "-1": "short", "-1.0": "short", "0": "neutral", "0.0": "neutral", "up": "long", "down": "short", "nan": _DIRECTION_DEFAULT})
             invalid = ~out[col].isin(VALID_DIRECTIONS)
             if invalid.any():
                 bad_vals = out.loc[invalid, col].unique()[:5]

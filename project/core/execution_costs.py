@@ -25,7 +25,10 @@ def _sha256_text(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 def _default_config_paths(project_root: Path) -> List[Path]:
-    return [project_root / "configs" / "pipeline.yaml", project_root / "configs" / "fees.yaml"]
+    cfg = project_root / "project" / "configs"
+    if not cfg.exists():
+        cfg = project_root / "configs"
+    return [cfg / "pipeline.yaml", cfg / "fees.yaml"]
 
 def _resolve_config_paths(project_root: Path, config_paths: Sequence[str] | None) -> List[Path]:
     paths = _default_config_paths(project_root)

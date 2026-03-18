@@ -312,6 +312,22 @@ def prepare_trend_exhaustion_features(
     reversal_impulse = close.pct_change(periods=reversal_window).abs()
     reversal_q65 = lagged_rolling_quantile(reversal_impulse, window=threshold_window, quantile=float(params.get("reversal_quantile", defaults.get("reversal_quantile", 0.65))), min_periods=min_periods)
     
+    reversal_alignment_window = int(params.get("reversal_alignment_window", defaults.get("reversal_alignment_window", 3)))
+    reversal_confirmed = (
+        (reversal_impulse >= reversal_q65).fillna(False)
+        | (
+            (pullback_up >= pullback_q70).fillna(False)
+            | (pullback_down >= pullback_q70).fillna(False)
+        )
+    )
+    any_reversal = (
+        ((trend.shift(1) > 0).fillna(False) & ((slope_fast <= 0).fillna(False) | (pullback_up >= pullback_q70).fillna(False)))
+        | ((trend.shift(1) < 0).fillna(False) & ((slope_fast >= 0).fillna(False) | (pullback_down >= pullback_q70).fillna(False)))
+        | ((slope_fast * slope_slow) <= 0).fillna(False)
+        | reversal_confirmed
+    ).fillna(False)
+    any_reversal_flex = any_reversal.rolling(window=reversal_alignment_window, min_periods=1).max().astype(bool)
+
     return {
         "trend": trend,
         "trend_abs": trend_abs,
@@ -331,6 +347,7 @@ def prepare_trend_exhaustion_features(
         "reversal_q65": reversal_q65,
         "canonical_trend_state": canonical_trend_state,
         "canonical_trend_present": raw_canonical_trend_state.notna(),
+        "any_reversal_flex": any_reversal_flex,
     }
 
 def compute_trend_exhaustion_mask(
@@ -367,28 +384,4 @@ def compute_trend_exhaustion_mask(
         | (features["rv_96"] <= features["rv_median"] * cooldown_ratio).fillna(False)
     )
     
-    # 3. Reversal Guard: Look for immediate counter-trend impulse or weakening
-    reversal_window = int(params.get("reversal_alignment_window", defaults.get("reversal_alignment_window", 3)))
-    
-    weakening_up = (features["trend"].shift(1) > 0).fillna(False) & (
-        (features["slope_fast"] <= 0).fillna(False)
-        | (features["pullback_up"] >= features["pullback_q70"]).fillna(False)
-    )
-    weakening_down = (features["trend"].shift(1) < 0).fillna(False) & (
-        (features["slope_fast"] >= 0).fillna(False)
-        | (features["pullback_down"] >= features["pullback_q70"]).fillna(False)
-    )
-    slope_cross = ((features["slope_fast"] * features["slope_slow"]) <= 0).fillna(False)
-    
-    reversal_confirmed = (
-        (features["reversal_impulse"] >= features["reversal_q65"]).fillna(False)
-        | (
-            (features["pullback_up"] >= features["pullback_q70"]).fillna(False)
-            | (features["pullback_down"] >= features["pullback_q70"]).fillna(False)
-        )
-    )
-    
-    any_reversal = (weakening_up | weakening_down | slope_cross | reversal_confirmed).fillna(False)
-    any_reversal_flex = any_reversal.rolling(window=reversal_window, min_periods=1).max().astype(bool)
-    
-    return (trend_peak & sustained_trend & canonical_trend_active & cooldown & any_reversal_flex).fillna(False)
+    return (trend_peak & sustained_trend & canonical_trend_active & cooldown & features["any_reversal_flex"]).fillna(False)
