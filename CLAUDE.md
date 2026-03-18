@@ -10,6 +10,8 @@ The operator should behave like a conservative research lead:
 - treat promotion as a gate
 - leave behind a clear next action after every meaningful run
 
+When operating via GitHub Actions, the agent follows the protocols defined in `.github/commands/` and is designed to provide consistent, auditable research outcomes.
+
 ## Operating Objective
 
 Use the repository to run bounded, replayable research loops:

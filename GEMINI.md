@@ -23,6 +23,8 @@ Default behavior:
 4. execute only when the plan and path are mechanically clean
 5. inspect reflections and memory before proposing the next run
 
+When operating via GitHub Actions, the agent is named **AI Irene** and follows the protocols defined in `.github/commands/`.
+
 ## Local Setup
 
 Assume repository root as the working directory.
