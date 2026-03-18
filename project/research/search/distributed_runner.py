@@ -19,12 +19,17 @@ from project.research.search.evaluator import evaluate_hypothesis_batch, METRICS
 log = logging.getLogger(__name__)
 
 
-def _evaluate_chunk(args: Tuple[Sequence[HypothesisSpec], pd.DataFrame, int]) -> pd.DataFrame:
+def _evaluate_chunk(args: Tuple[Sequence[HypothesisSpec], pd.DataFrame, int, bool]) -> pd.DataFrame:
     """Worker function: unpack and evaluate a chunk of hypotheses."""
-    chunk, features, min_sample_size = args
+    chunk, features, min_sample_size, use_context_quality = args
     if features.empty:
         return pd.DataFrame(columns=METRICS_COLUMNS)
-    return evaluate_hypothesis_batch(list(chunk), features, min_sample_size=min_sample_size)
+    return evaluate_hypothesis_batch(
+        list(chunk),
+        features,
+        min_sample_size=min_sample_size,
+        use_context_quality=use_context_quality,
+    )
 
 
 def run_distributed_search(
@@ -34,6 +39,7 @@ def run_distributed_search(
     n_workers: Optional[int] = None,
     chunk_size: int = 256,
     min_sample_size: int = 20,
+    use_context_quality: bool = True,
 ) -> pd.DataFrame:
     """
     Evaluate hypotheses against features, optionally in parallel.
@@ -59,7 +65,12 @@ def run_distributed_search(
 
     if effective_workers == 1 or len(chunks) == 1:
         parts = [
-            evaluate_hypothesis_batch(chunk, features, min_sample_size=min_sample_size)
+            evaluate_hypothesis_batch(
+                chunk,
+                features,
+                min_sample_size=min_sample_size,
+                use_context_quality=use_context_quality,
+            )
             for chunk in chunks
         ]
     else:
@@ -70,7 +81,7 @@ def run_distributed_search(
             with multiprocessing.Pool(effective_workers) as pool:
                 parts = pool.map(
                     _evaluate_chunk,
-                    [(chunk, features, min_sample_size) for chunk in chunks],
+                    [(chunk, features, min_sample_size, use_context_quality) for chunk in chunks],
                 )
         except Exception as exc:
             log.warning(
@@ -83,7 +94,10 @@ def run_distributed_search(
             )
             parts = [
                 evaluate_hypothesis_batch(
-                    chunk, features, min_sample_size=min_sample_size
+                    chunk,
+                    features,
+                    min_sample_size=min_sample_size,
+                    use_context_quality=use_context_quality,
                 )
                 for chunk in chunks
             ]

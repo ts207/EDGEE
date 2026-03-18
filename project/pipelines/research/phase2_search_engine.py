@@ -126,6 +126,7 @@ def run(
     search_budget: Optional[int] = None,
     experiment_config: Optional[str] = None,
     registry_root: str | Path = "project/configs/registries",
+    use_context_quality: bool = True,
 ) -> int:
     """
     Core logic. Returns exit code (0=success, 1=failure).
@@ -273,6 +274,7 @@ def run(
                     min_t_stat=resolved_min_t_stat,
                     min_n=resolved_min_n,
                     search_budget=search_budget,
+                    use_context_quality=use_context_quality,
                 )
             )
             continue
@@ -283,7 +285,8 @@ def run(
             hypotheses, 
             features, 
             chunk_size=chunk_size,
-            min_sample_size=resolved_min_n
+            min_sample_size=resolved_min_n,
+            use_context_quality=use_context_quality,
         )
         
         if metrics.empty:
@@ -315,6 +318,7 @@ def run(
                     min_t_stat=resolved_min_t_stat,
                     min_n=resolved_min_n,
                     search_budget=search_budget,
+                    use_context_quality=use_context_quality,
                 )
             )
             continue
@@ -378,6 +382,7 @@ def run(
                 min_t_stat=resolved_min_t_stat,
                 min_n=resolved_min_n,
                 search_budget=search_budget,
+                use_context_quality=use_context_quality,
             )
         )
 
@@ -427,6 +432,7 @@ def run(
         min_t_stat=resolved_min_t_stat,
         min_n=resolved_min_n,
         search_budget=search_budget,
+        use_context_quality=use_context_quality,
     )
     if symbol_diagnostics:
         main_diag["symbol_diagnostics"] = symbol_diagnostics
@@ -458,6 +464,7 @@ def main(argv=None) -> int:
     parser.add_argument("--min_t_stat", type=float, default=1.5)
     parser.add_argument("--min_n", type=int, default=30)
     parser.add_argument("--search_budget", type=int, default=None)
+    parser.add_argument("--use_context_quality", type=int, default=1)
     parser.add_argument("--experiment_config", default=None, help="Path to experiment config for tracking.")
     parser.add_argument("--program_id", default=None, help="Program ID for experiment tracking.")
     parser.add_argument("--registry_root", default="project/configs/registries", help="Root for event registries.")
@@ -486,6 +493,7 @@ def main(argv=None) -> int:
         min_t_stat=args.min_t_stat,
         min_n=args.min_n,
         search_budget=args.search_budget,
+        use_context_quality=bool(int(args.use_context_quality)),
         experiment_config=args.experiment_config,
         registry_root=args.registry_root,
     )
