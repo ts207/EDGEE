@@ -22,10 +22,6 @@ def signal_mask(signal: str, frame: pd.DataFrame, blueprint: Blueprint) -> pd.Se
     """
     Evaluates a specific named signal against the current context.
     """
-    if signal == "event_detected":
-        return pd.Series(True, index=frame.index, dtype=bool)
-    if signal == "oos_validation_pass":
-        return pd.Series(True, index=frame.index, dtype=bool)
     if signal in REGISTRY_SIGNAL_COLUMNS:
         if signal not in frame.columns:
             raise ValueError(
