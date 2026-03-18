@@ -21,6 +21,11 @@ from project.research.services.benchmark_review_service import (
     build_benchmark_review,
     write_benchmark_review,
 )
+from project.research.services.benchmark_governance_service import (
+    certify_benchmark_review,
+    load_acceptance_thresholds,
+    write_certification_report,
+)
 from project.research.services.context_mode_comparison_service import (
     build_context_mode_comparison_payload,
     write_context_mode_comparison_report,
@@ -160,6 +165,11 @@ def main() -> int:
         help="Python executable for run_all invocations.",
     )
     parser.add_argument(
+        "--priors",
+        nargs="*",
+        help="List of paths to prior benchmark_review.json files.",
+    )
+    parser.add_argument(
         "--out_dir",
         default=None,
         help="Output directory. Defaults to data/reports/perf_benchmarks/<matrix_id>_<timestamp>.",
@@ -253,19 +263,58 @@ def main() -> int:
     summary_paths = write_benchmark_summary(out_dir=out_dir, summary=summary)
     review = build_benchmark_review(summary=summary)
     review_paths = write_benchmark_review(out_dir=out_dir, review=review)
+
+    # Certification
+    prior_review = None
+    if args.priors:
+        prior_review = []
+        for p in args.priors:
+            ppath = Path(p).resolve()
+            if ppath.exists():
+                try:
+                    prior_review.append(json.loads(ppath.read_text(encoding="utf-8")))
+                except Exception:
+                    pass
+    else:
+        prior_path = Path(matrix.get("prior_baseline", "")).resolve() if matrix.get("prior_baseline") else None
+        if prior_path and prior_path.exists():
+            try:
+                prior_review = json.loads(prior_path.read_text(encoding="utf-8"))
+            except Exception:
+                pass
+    
+    thresholds_path = REPO_ROOT / "spec" / "benchmarks" / "benchmark_acceptance_thresholds.yaml"
+    thresholds = load_acceptance_thresholds(thresholds_path)
+    
+    cert = certify_benchmark_review(
+        current_review=review,
+        prior_review=prior_review,
+        acceptance_thresholds=thresholds,
+    )
+    cert_paths = write_certification_report(out_dir=out_dir, cert=cert)
+
     manifest["benchmark_summary_json"] = str(summary_paths["json"])
     manifest["benchmark_summary_markdown"] = str(summary_paths["markdown"])
     manifest["benchmark_review_json"] = str(review_paths["json"])
     manifest["benchmark_review_markdown"] = str(review_paths["markdown"])
+    manifest["benchmark_certification_json"] = str(cert_paths["json"])
+    manifest["benchmark_certification_markdown"] = str(cert_paths["markdown"])
+    manifest["certification_passed"] = bool(cert["passed"])
+
     manifest_path = out_dir / "matrix_manifest.json"
     manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8")
     print(f"[matrix] wrote manifest: {manifest_path}")
     print(f"[matrix] wrote summary: {summary_paths['json']}")
     print(f"[matrix] wrote review: {review_paths['json']}")
+    print(f"[matrix] wrote certification: {cert_paths['json']}")
+    
+    if not cert["passed"]:
+        print(f"[matrix] WARNING: Benchmark certification FAILED with {cert['issue_count']} issues.")
+
     if not execute:
         print("[matrix] dry-run only. Re-run with --execute 1 to run commands.")
 
-    return 1 if failures > 0 else 0
+    return 1 if (failures > 0 or not cert["passed"]) else 0
 
 if __name__ == "__main__":
     raise SystemExit(main())
