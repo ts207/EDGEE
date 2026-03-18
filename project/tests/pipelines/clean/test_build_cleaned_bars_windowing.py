@@ -8,6 +8,7 @@ import pandas as pd
 
 import project.pipelines.clean.build_cleaned_bars as build_cleaned_bars
 
+
 def _raw_frame() -> pd.DataFrame:
     return pd.DataFrame(
         {
@@ -28,6 +29,7 @@ def _raw_frame() -> pd.DataFrame:
         }
     )
 
+
 def _funding_frame() -> pd.DataFrame:
     return pd.DataFrame(
         {
@@ -36,6 +38,7 @@ def _funding_frame() -> pd.DataFrame:
             "source": ["unknown"],
         }
     )
+
 
 def test_build_cleaned_respects_requested_start_end_window(monkeypatch, tmp_path):
     read_calls = {"i": 0}
@@ -49,7 +52,13 @@ def test_build_cleaned_respects_requested_start_end_window(monkeypatch, tmp_path
         return _raw_frame() if read_calls["i"] == 1 else _funding_frame()
 
     def fake_start_manifest(stage_name, run_id, params, inputs, outputs):
-        return {"stage": stage_name, "run_id": run_id, "params": params, "inputs": inputs, "outputs": outputs}
+        return {
+            "stage": stage_name,
+            "run_id": run_id,
+            "params": params,
+            "inputs": inputs,
+            "outputs": outputs,
+        }
 
     def fake_finalize_manifest(manifest, status, error=None, stats=None):
         return manifest
@@ -114,7 +123,13 @@ def test_build_cleaned_warns_when_funding_window_does_not_overlap(monkeypatch, t
         )
 
     def fake_start_manifest(stage_name, run_id, params, inputs, outputs):
-        return {"stage": stage_name, "run_id": run_id, "params": params, "inputs": inputs, "outputs": outputs}
+        return {
+            "stage": stage_name,
+            "run_id": run_id,
+            "params": params,
+            "inputs": inputs,
+            "outputs": outputs,
+        }
 
     def fake_finalize_manifest(manifest, status, error=None, stats=None):
         return manifest
@@ -170,7 +185,13 @@ def test_build_cleaned_writes_data_quality_report(monkeypatch, tmp_path):
         return _raw_frame() if read_calls["i"] == 1 else _funding_frame()
 
     def fake_start_manifest(stage_name, run_id, params, inputs, outputs):
-        return {"stage": stage_name, "run_id": run_id, "params": params, "inputs": inputs, "outputs": outputs}
+        return {
+            "stage": stage_name,
+            "run_id": run_id,
+            "params": params,
+            "inputs": inputs,
+            "outputs": outputs,
+        }
 
     def fake_finalize_manifest(manifest, status, error=None, stats=None):
         finalized["status"] = status
@@ -226,9 +247,13 @@ def test_build_cleaned_prefers_run_scoped_raw_and_funding(monkeypatch, tmp_path)
     run_id = "r_scoped"
     data_root = tmp_path / "data"
 
-    run_raw_dir = data_root / "lake" / "runs" / run_id / "raw" / "binance" / "perp" / "BTCUSDT" / "ohlcv_5m"
+    run_raw_dir = (
+        data_root / "lake" / "runs" / run_id / "raw" / "binance" / "perp" / "BTCUSDT" / "ohlcv_5m"
+    )
     global_raw_dir = data_root / "lake" / "raw" / "binance" / "perp" / "BTCUSDT" / "ohlcv_5m"
-    run_funding_dir = data_root / "lake" / "runs" / run_id / "raw" / "binance" / "perp" / "BTCUSDT" / "funding"
+    run_funding_dir = (
+        data_root / "lake" / "runs" / run_id / "raw" / "binance" / "perp" / "BTCUSDT" / "funding"
+    )
     global_funding_dir = data_root / "lake" / "raw" / "binance" / "perp" / "BTCUSDT" / "funding"
 
     for directory in (run_raw_dir, global_raw_dir, run_funding_dir, global_funding_dir):
@@ -254,7 +279,13 @@ def test_build_cleaned_prefers_run_scoped_raw_and_funding(monkeypatch, tmp_path)
         raise AssertionError(f"unexpected fallback read: {first}")
 
     def fake_start_manifest(stage_name, run_id, params, inputs, outputs):
-        return {"stage": stage_name, "run_id": run_id, "params": params, "inputs": inputs, "outputs": outputs}
+        return {
+            "stage": stage_name,
+            "run_id": run_id,
+            "params": params,
+            "inputs": inputs,
+            "outputs": outputs,
+        }
 
     def fake_finalize_manifest(manifest, status, error=None, stats=None):
         return manifest

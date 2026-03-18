@@ -7,9 +7,8 @@ from project.strategy.dsl.schema import Blueprint
 from project.strategy.dsl.references import REGISTRY_SIGNAL_COLUMNS
 from project.strategy.dsl.contract_v1 import resolve_trigger_column
 
-def first_overlay_param(
-    blueprint: Blueprint, overlay_name: str, key: str, default: float
-) -> float:
+
+def first_overlay_param(blueprint: Blueprint, overlay_name: str, key: str, default: float) -> float:
     for overlay in blueprint.overlays:
         if overlay.name == overlay_name:
             try:
@@ -18,21 +17,18 @@ def first_overlay_param(
                 return default
     return default
 
+
 def signal_mask(signal: str, frame: pd.DataFrame, blueprint: Blueprint) -> pd.Series:
     """
     Evaluates a specific named signal against the current context.
     """
     if signal in REGISTRY_SIGNAL_COLUMNS:
         if signal not in frame.columns:
-            raise ValueError(
-                f"Blueprint `{blueprint.id}` missing registry signal column: {signal}"
-            )
+            raise ValueError(f"Blueprint `{blueprint.id}` missing registry signal column: {signal}")
         return frame[signal].fillna(False).astype(bool)
 
     if signal == "spread_guard_pass":
-        max_spread = first_overlay_param(
-            blueprint, "spread_guard", "max_spread_bps", default=12.0
-        )
+        max_spread = first_overlay_param(blueprint, "spread_guard", "max_spread_bps", default=12.0)
         return (frame["spread_abs"] <= max_spread).fillna(False)
     if signal == "cross_venue_consensus_pass":
         max_desync = first_overlay_param(
@@ -62,7 +58,10 @@ def signal_mask(signal: str, frame: pd.DataFrame, blueprint: Blueprint) -> pd.Se
             return frame["event_detected"].fillna(True).astype(bool)
         return pd.Series(True, index=frame.index, dtype=bool)
 
-    raise ValueError(f"unknown trigger signals: `{signal}` is not a recognized registry or built-in signal")
+    raise ValueError(
+        f"unknown trigger signals: `{signal}` is not a recognized registry or built-in signal"
+    )
+
 
 def signal_list_mask(
     frame: pd.DataFrame, signal_names: List[str], blueprint: Blueprint, signal_kind: str
@@ -74,6 +73,7 @@ def signal_list_mask(
     for signal in signal_names:
         out = out & signal_mask(signal=signal, frame=frame, blueprint=blueprint)
     return out.fillna(False)
+
 
 def compute_trigger_coverage(frame: pd.DataFrame, triggers: List[str]) -> Dict[str, object]:
     """

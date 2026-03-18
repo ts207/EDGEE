@@ -3,6 +3,7 @@ Contract test: phase2_search_engine uses search_feature_utils to serve features,
 not the deleted search_feature_frame module. This test guards the new feature-serving
 boundary against regression.
 """
+
 import importlib
 import pytest
 
@@ -16,6 +17,7 @@ def test_search_feature_frame_not_importable():
 def test_search_engine_imports_search_feature_utils():
     """phase2_search_engine must import from search_feature_utils, not from the deleted module."""
     import project.pipelines.research.phase2_search_engine as eng
+
     source = open(eng.__file__).read()
     assert "search_feature_utils" in source, (
         "phase2_search_engine must use search_feature_utils for feature serving"
@@ -31,5 +33,6 @@ def test_search_feature_utils_importable():
         normalize_search_feature_columns,
         prepare_search_features_for_symbol,
     )
+
     assert callable(normalize_search_feature_columns)
     assert callable(prepare_search_features_for_symbol)

@@ -7,6 +7,7 @@ import pandas as pd
 
 import project.pipelines.clean.build_cleaned_bars as build_cleaned_bars
 
+
 def test_build_cleaned_coerces_integer_volume_to_float_before_schema(monkeypatch, tmp_path):
     captured_frames: list[pd.DataFrame] = []
 
@@ -16,7 +17,9 @@ def test_build_cleaned_coerces_integer_volume_to_float_before_schema(monkeypatch
     def fake_read_parquet(_files):
         return pd.DataFrame(
             {
-                "timestamp": pd.to_datetime(["2026-01-01T00:00:00Z", "2026-01-01T00:05:00Z"], utc=True),
+                "timestamp": pd.to_datetime(
+                    ["2026-01-01T00:00:00Z", "2026-01-01T00:05:00Z"], utc=True
+                ),
                 "open": [100.0, 101.0],
                 "high": [101.0, 102.0],
                 "low": [99.0, 100.0],
@@ -27,7 +30,13 @@ def test_build_cleaned_coerces_integer_volume_to_float_before_schema(monkeypatch
         )
 
     def fake_start_manifest(stage_name, run_id, params, inputs, outputs):
-        return {"stage": stage_name, "run_id": run_id, "params": params, "inputs": inputs, "outputs": outputs}
+        return {
+            "stage": stage_name,
+            "run_id": run_id,
+            "params": params,
+            "inputs": inputs,
+            "outputs": outputs,
+        }
 
     def fake_finalize_manifest(manifest, status, error=None, stats=None):
         return manifest

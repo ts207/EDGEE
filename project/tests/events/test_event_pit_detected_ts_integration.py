@@ -11,6 +11,7 @@ Family coverage:
   - Window events (VOL_SHOCK, LIQUIDATION_CASCADE) — phenom_enter_ts != detected_ts possible
   - Confirmation-lag events — detected_ts explicitly later than phenom_enter_ts
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -26,10 +27,12 @@ from project.events.registry import _signal_ts_column, _active_signal_column
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _grid(n_bars: int = 20, freq_min: int = 5, start: str = "2026-01-01T00:00:00Z") -> pd.Series:
     """Return a Series of n_bars UTC timestamps spaced freq_min minutes apart."""
     base = pd.Timestamp(start, tz="UTC")
     return pd.Series([base + pd.Timedelta(minutes=freq_min * i) for i in range(n_bars)])
+
 
 def _event_row(
     signal_col: str,
@@ -56,6 +59,7 @@ def _event_row(
         }
     )
 
+
 def _signal_bar(flags: pd.DataFrame, signal_col: str, symbol: str) -> pd.Timestamp | None:
     """Return the single timestamp where _signal is True, or None if none."""
     rows = flags[(flags["symbol"] == symbol) & flags[signal_col]]
@@ -64,11 +68,13 @@ def _signal_bar(flags: pd.DataFrame, signal_col: str, symbol: str) -> pd.Timesta
     assert len(rows) == 1, f"Expected 1 signal bar, got {len(rows)}"
     return rows.iloc[0]["timestamp"]
 
+
 # ---------------------------------------------------------------------------
 # Family 1: OI_SPIKE / impulse threshold event
 # Condition crosses at bar k; detected_ts = bar k.
 # _signal must fire at bar k+1.
 # ---------------------------------------------------------------------------
+
 
 class TestImpulseThresholdFamily:
     """OI_SPIKE, FUNDING_EXTREME — single-bar threshold crossing."""
@@ -133,18 +139,24 @@ class TestImpulseThresholdFamily:
         # Only bar k triggers the event
         enter_ts = grid.iloc[k]
         events = _event_row(
-            "vol_shock_relaxation_event", "BTCUSDT",
-            enter_ts=enter_ts, exit_ts=enter_ts, detected_ts=enter_ts,
+            "vol_shock_relaxation_event",
+            "BTCUSDT",
+            enter_ts=enter_ts,
+            exit_ts=enter_ts,
+            detected_ts=enter_ts,
             event_type="OI_SPIKE_NEGATIVE",
         )
         flags = registry.build_event_flags(
-            events=events, symbols=["BTCUSDT"],
-            data_root=Path("/tmp"), run_id="imp2", timeframe="5m",
+            events=events,
+            symbols=["BTCUSDT"],
+            data_root=Path("/tmp"),
+            run_id="imp2",
+            timeframe="5m",
         )
 
         sig_col = _signal_ts_column("vol_shock_relaxation_event")
         sig_ts = _signal_bar(flags, sig_col, "BTCUSDT")
-        assert sig_ts == grid.iloc[k + 1], f"Signal should be at bar {k+1}"
+        assert sig_ts == grid.iloc[k + 1], f"Signal should be at bar {k + 1}"
 
         # Bars 0..k have no signal
         for i in range(k + 1):
@@ -152,12 +164,14 @@ class TestImpulseThresholdFamily:
             row = flags[(flags["symbol"] == "BTCUSDT") & (flags["timestamp"] == ts)].iloc[0]
             assert not bool(row[sig_col])
 
+
 # ---------------------------------------------------------------------------
 # Family 2: VOL_SHOCK / window event
 # phenom_enter_ts = bar k (shock onset), detected_ts = bar k (same for impulse variant)
 # exit_ts = bar k+6 (relaxation window)
 # _active covers [k+1, k+6]; _signal fires at bar k+1.
 # ---------------------------------------------------------------------------
+
 
 class TestWindowEventFamily:
     """VOL_SHOCK, LIQUIDATION_CASCADE — event spans multiple bars."""
@@ -172,12 +186,18 @@ class TestWindowEventFamily:
         exit_ts = grid.iloc[k + 6]
 
         events = _event_row(
-            "vol_shock_relaxation_event", "BTCUSDT",
-            enter_ts=enter_ts, exit_ts=exit_ts, detected_ts=enter_ts,
+            "vol_shock_relaxation_event",
+            "BTCUSDT",
+            enter_ts=enter_ts,
+            exit_ts=exit_ts,
+            detected_ts=enter_ts,
         )
         flags = registry.build_event_flags(
-            events=events, symbols=["BTCUSDT"],
-            data_root=Path("/tmp"), run_id="win_test", timeframe="5m",
+            events=events,
+            symbols=["BTCUSDT"],
+            data_root=Path("/tmp"),
+            run_id="win_test",
+            timeframe="5m",
         )
 
         sig_col = _signal_ts_column("vol_shock_relaxation_event")
@@ -206,17 +226,24 @@ class TestWindowEventFamily:
 
         enter_ts = grid.iloc[-1]  # last bar
         events = _event_row(
-            "vol_shock_relaxation_event", "BTCUSDT",
-            enter_ts=enter_ts, exit_ts=enter_ts, detected_ts=enter_ts,
+            "vol_shock_relaxation_event",
+            "BTCUSDT",
+            enter_ts=enter_ts,
+            exit_ts=enter_ts,
+            detected_ts=enter_ts,
         )
         flags = registry.build_event_flags(
-            events=events, symbols=["BTCUSDT"],
-            data_root=Path("/tmp"), run_id="win_last", timeframe="5m",
+            events=events,
+            symbols=["BTCUSDT"],
+            data_root=Path("/tmp"),
+            run_id="win_last",
+            timeframe="5m",
         )
 
         sig_col = _signal_ts_column("vol_shock_relaxation_event")
         btc = flags[flags["symbol"] == "BTCUSDT"]
         assert not btc[sig_col].any(), "_signal must not fire when no bar exists after detected_ts"
+
 
 # ---------------------------------------------------------------------------
 # Family 3: Confirmation-lag events
@@ -224,6 +251,7 @@ class TestWindowEventFamily:
 # detected_ts = bar k+m (confirmation after m bars of persistence)
 # _signal fires at bar k+m+1.
 # ---------------------------------------------------------------------------
+
 
 class TestConfirmationLagFamily:
     """
@@ -233,8 +261,8 @@ class TestConfirmationLagFamily:
 
     def test_signal_after_confirmation_lag(self, monkeypatch):
         n_bars = 20
-        k_onset = 3   # funding crossed extreme at bar 3
-        m = 4         # persistence required: bars 3,4,5,6 all extreme → confirmed at bar 6
+        k_onset = 3  # funding crossed extreme at bar 3
+        m = 4  # persistence required: bars 3,4,5,6 all extreme → confirmed at bar 6
         k_detected = k_onset + m - 1  # = 6
 
         grid = _grid(n_bars)
@@ -259,8 +287,11 @@ class TestConfirmationLagFamily:
         )
 
         flags = registry.build_event_flags(
-            events=events, symbols=["BTCUSDT"],
-            data_root=Path("/tmp"), run_id="conf_lag", timeframe="5m",
+            events=events,
+            symbols=["BTCUSDT"],
+            data_root=Path("/tmp"),
+            run_id="conf_lag",
+            timeframe="5m",
         )
 
         sig_col = _signal_ts_column("vol_shock_relaxation_event")

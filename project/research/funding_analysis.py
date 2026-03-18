@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 from typing import Dict, List, Tuple
 
+
 def extract_funding_event_indices(
     df: pd.DataFrame,
     extreme_pct: float,
@@ -29,6 +30,7 @@ def extract_funding_event_indices(
     accel_pos = accel.where(accel > 0)
     # Using a local rolling percentile if not provided
     from project.research.helpers.events import rolling_percentile
+
     accel_rank = rolling_percentile(accel_pos.astype(float), window=2880)
     accel_raw = ((accel_rank >= accel_pct) & (accel_rank.shift(1) < accel_pct)).fillna(False)
 
@@ -46,9 +48,7 @@ def extract_funding_event_indices(
         .astype(bool)
     )
     normalization_raw = (
-        (f_pct <= normalization_pct)
-        & (f_pct.shift(1) > normalization_pct)
-        & recent_extreme
+        (f_pct <= normalization_pct) & (f_pct.shift(1) > normalization_pct) & recent_extreme
     ).fillna(False)
 
     persistence_trigger_raw = (accel_raw | persistence_raw).fillna(False)
@@ -58,6 +58,12 @@ def extract_funding_event_indices(
         "FUNDING_PERSISTENCE_TRIGGER": np.flatnonzero(persistence_trigger_raw.values).tolist(),
         "FUNDING_NORMALIZATION_TRIGGER": np.flatnonzero(normalization_raw.values).tolist(),
     }
-    
+
     from project.research.helpers.events import sparsify_event_mask
-    return {k: sparsify_event_mask(pd.Series(False, index=df.index).set_axis(v, True), min_event_spacing) for k, v in raw_map.items()}
+
+    return {
+        k: sparsify_event_mask(
+            pd.Series(False, index=df.index).set_axis(v, True), min_event_spacing
+        )
+        for k, v in raw_map.items()
+    }

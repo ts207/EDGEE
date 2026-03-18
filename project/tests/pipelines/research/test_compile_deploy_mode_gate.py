@@ -10,6 +10,7 @@ import pytest
 
 import project.pipelines.research.compile_strategy_blueprints as compiler
 
+
 @dataclass
 class _StubContract:
     retail_profile_name: str = "capital_constrained"
@@ -29,14 +30,14 @@ class _StubContract:
         return {
             "retail_profile_name": self.retail_profile_name,
             "require_retail_viability": bool(self.require_retail_viability),
-            "forbid_fallback_in_deploy_mode": bool(
-                self.forbid_fallback_in_deploy_mode
-            ),
+            "forbid_fallback_in_deploy_mode": bool(self.forbid_fallback_in_deploy_mode),
         }
+
 
 def _write_json(path: Path, payload: dict[str, object]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
 
 def test_load_run_mode_reads_mode_alias(monkeypatch, tmp_path):
     monkeypatch.setattr(compiler, "DATA_ROOT", tmp_path)
@@ -45,6 +46,7 @@ def test_load_run_mode_reads_mode_alias(monkeypatch, tmp_path):
         {"mode": "Certification"},
     )
     assert compiler._load_run_mode("run_mode_alias") == "certification"
+
 
 def test_enforce_deploy_mode_retail_viability_blocks_fallback_tracks():
     df = pd.DataFrame(
@@ -64,6 +66,7 @@ def test_enforce_deploy_mode_retail_viability_blocks_fallback_tracks():
             require_retail_viability=True,
             forbid_fallback_in_deploy_mode=True,
         )
+
 
 def test_main_fails_closed_for_non_viable_promoted_candidates_in_deploy_mode(
     monkeypatch, tmp_path, capsys

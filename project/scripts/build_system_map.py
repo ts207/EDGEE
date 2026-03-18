@@ -27,7 +27,9 @@ def _write(path: Path, content: str) -> None:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Generate canonical system map artifacts.")
     parser.add_argument("--format", choices=("markdown", "json", "both"), default="both")
-    parser.add_argument("--check", action="store_true", help="Fail if generated files drift from disk.")
+    parser.add_argument(
+        "--check", action="store_true", help="Fail if generated files drift from disk."
+    )
     args = parser.parse_args(argv)
 
     issues = validate_system_map_surfaces()

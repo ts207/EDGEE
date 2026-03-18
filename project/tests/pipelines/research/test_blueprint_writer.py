@@ -15,6 +15,7 @@ from project.strategy.dsl.schema import (
     SymbolScopeSpec,
 )
 
+
 def _make_blueprint(*, bp_id: str, candidate_id: str) -> Blueprint:
     return Blueprint(
         id=bp_id,
@@ -64,6 +65,7 @@ def _make_blueprint(*, bp_id: str, candidate_id: str) -> Blueprint:
         ),
     )
 
+
 def test_apply_retail_constraints_with_pydantic_blueprints():
     bp = _make_blueprint(bp_id="bp_1", candidate_id="c_1")
 
@@ -79,6 +81,7 @@ def test_apply_retail_constraints_with_pydantic_blueprints():
     assert updated[0].lineage.constraints["retail_profile"] == "balanced_growth"
     assert updated[0].lineage.constraints["retail_min_net_expectancy_bps"] == 2.0
     assert bp.lineage.constraints == {}
+
 
 def test_sort_cap_and_write_artifacts(tmp_path):
     bp1 = _make_blueprint(bp_id="bp_1", candidate_id="c_1")
@@ -115,7 +118,11 @@ def test_sort_cap_and_write_artifacts(tmp_path):
         out_yaml=out_yaml,
     )
 
-    jsonl_rows = [json.loads(line) for line in out_jsonl.read_text(encoding="utf-8").splitlines() if line.strip()]
+    jsonl_rows = [
+        json.loads(line)
+        for line in out_jsonl.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
     yaml_rows = yaml.safe_load(out_yaml.read_text(encoding="utf-8"))
 
     assert len(jsonl_rows) == 1

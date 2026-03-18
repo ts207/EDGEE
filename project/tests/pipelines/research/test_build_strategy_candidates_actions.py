@@ -8,6 +8,7 @@ import pandas as pd
 
 from project.pipelines.research import build_strategy_candidates
 
+
 def test_edge_candidate_market_entry_action_is_executable(monkeypatch):
     row = {
         "event": "LIQUIDITY_VACUUM",
@@ -40,6 +41,7 @@ def test_edge_candidate_market_entry_action_is_executable(monkeypatch):
 
     assert candidate["executable_action"] is True
 
+
 def test_fractional_allocation_synthesizer_downsizes_non_tradable_profile():
     policy = build_strategy_candidates._synthesize_fractional_allocation_policy(
         {
@@ -61,7 +63,9 @@ def test_fractional_allocation_synthesizer_downsizes_non_tradable_profile():
 def _run_builder(monkeypatch, tmp_path, argv):
     monkeypatch.setattr(build_strategy_candidates, "get_data_root", lambda: tmp_path)
     monkeypatch.setattr(build_strategy_candidates, "checklist_decision", lambda **kwargs: "PROMOTE")
-    monkeypatch.setattr(build_strategy_candidates, "load_promoted_blueprints", lambda **kwargs: ([], {}))
+    monkeypatch.setattr(
+        build_strategy_candidates, "load_promoted_blueprints", lambda **kwargs: ([], {})
+    )
     monkeypatch.setattr(
         build_strategy_candidates,
         "load_retail_profile",
@@ -72,10 +76,16 @@ def _run_builder(monkeypatch, tmp_path, argv):
         },
     )
     monkeypatch.setattr(build_strategy_candidates, "start_manifest", lambda *args, **kwargs: {})
-    monkeypatch.setattr(build_strategy_candidates, "finalize_manifest", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        build_strategy_candidates, "finalize_manifest", lambda *args, **kwargs: None
+    )
     monkeypatch.setattr(sys, "argv", argv)
     assert build_strategy_candidates.main() == 0
-    return json.loads((tmp_path / "reports" / "strategy_builder" / "r1" / "strategy_candidates.json").read_text(encoding="utf-8"))
+    return json.loads(
+        (tmp_path / "reports" / "strategy_builder" / "r1" / "strategy_candidates.json").read_text(
+            encoding="utf-8"
+        )
+    )
 
 
 def test_builder_loads_parquet_edge_artifacts_and_applies_top_k(monkeypatch, tmp_path):

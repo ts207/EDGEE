@@ -5,6 +5,7 @@ import yaml
 
 from project.pipelines.research import hypothesis_spec_translator as hst
 
+
 def test_load_active_hypothesis_specs_filters_to_active(tmp_path):
     spec_dir = tmp_path / "spec" / "hypotheses"
     spec_dir.mkdir(parents=True)
@@ -30,13 +31,16 @@ def test_load_active_hypothesis_specs_filters_to_active(tmp_path):
         ),
         encoding="utf-8",
     )
-    (spec_dir / "template_verb_lexicon.yaml").write_text("kind: template_verb_lexicon\n", encoding="utf-8")
+    (spec_dir / "template_verb_lexicon.yaml").write_text(
+        "kind: template_verb_lexicon\n", encoding="utf-8"
+    )
 
     specs = hst.load_active_hypothesis_specs(tmp_path)
     assert [s["hypothesis_id"] for s in specs] == ["H_ACTIVE"]
     assert specs[0]["conditioning_features"] == ["vol_regime"]
     assert specs[0]["status"] == "active"
     assert str(specs[0]["spec_hash"]).startswith("sha256:")
+
 
 def test_translate_candidate_hypotheses_emits_executable_row():
     specs = [
@@ -47,7 +51,15 @@ def test_translate_candidate_hypotheses_emits_executable_row():
             "spec_hash": "sha256:speca",
             "conditioning_features": ["vol_regime", "carry_state"],
             "metric": "lift_bps",
-            "output_schema": ["lift_bps", "p_value", "q_value", "n", "effect_ci", "stability_score", "net_after_cost"],
+            "output_schema": [
+                "lift_bps",
+                "p_value",
+                "q_value",
+                "n",
+                "effect_ci",
+                "stability_score",
+                "net_after_cost",
+            ],
         }
     ]
     side_policy = {"mean_reversion": "contrarian"}
@@ -90,6 +102,7 @@ def test_translate_candidate_hypotheses_emits_executable_row():
     ]
     assert audit and audit[0]["status"] == "executed"
 
+
 def test_translate_candidate_hypotheses_strict_fails_on_missing_spec_condition_key():
     specs = [
         {
@@ -120,6 +133,7 @@ def test_translate_candidate_hypotheses_strict_fails_on_missing_spec_condition_k
             template_side_policy={},
             strict=True,
         )
+
 
 def test_translate_candidate_hypotheses_strict_fails_on_unimplemented_event():
     specs = [
@@ -153,6 +167,7 @@ def test_translate_candidate_hypotheses_strict_fails_on_unimplemented_event():
             strict=True,
             implemented_event_types={"VOL_SHOCK"},
         )
+
 
 def test_candidate_id_changes_when_hypothesis_spec_hash_changes():
     base = {

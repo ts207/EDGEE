@@ -273,6 +273,9 @@ clean-repo: clean
 
 debloat: clean-repo
 
+clean-run-data:
+	$(CLEAN_SCRIPT) data
+
 check-hygiene:
 	bash $(ROOT_DIR)/project/scripts/check_repo_hygiene.sh
 

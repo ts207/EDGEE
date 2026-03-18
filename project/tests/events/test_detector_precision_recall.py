@@ -9,6 +9,7 @@ failed), allowing incremental population during the fix phase.
 
 Mark: pytest.mark.slow — run with `pytest -m slow` or include in full suite.
 """
+
 from __future__ import annotations
 
 import json

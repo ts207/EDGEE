@@ -9,6 +9,7 @@ where Y is forward log-return discretized into n_bins quantile bins.
 High IG indicates the event carries genuine predictive information.
 Low IG (near 0) indicates the event fires independently of future returns.
 """
+
 from __future__ import annotations
 
 import re
@@ -62,9 +63,8 @@ def compute_information_gain(
     # Forward log-returns
     fwd = np.full(n_bars, np.nan)
     if n_bars > horizon_bars:
-        fwd[: n_bars - horizon_bars] = (
-            np.log(np.maximum(close[horizon_bars:], 1e-12))
-            - np.log(np.maximum(close[: n_bars - horizon_bars], 1e-12))
+        fwd[: n_bars - horizon_bars] = np.log(np.maximum(close[horizon_bars:], 1e-12)) - np.log(
+            np.maximum(close[: n_bars - horizon_bars], 1e-12)
         )
 
     # Discretize into quantile bins (ignore NaN)
@@ -93,22 +93,24 @@ def compute_information_gain(
         n_fires = int(mask.sum())
 
         if n_fires < min_fires:
-            rows.append({
-                "event_id": event_id,
-                "column_name": col,
-                "n_fires": n_fires,
-                "n_nonfires": n_bars - n_fires,
-                "baseline_entropy_bits": round(h_y, 6),
-                "conditional_entropy_bits": float("nan"),
-                "ig_bits": float("nan"),
-            })
+            rows.append(
+                {
+                    "event_id": event_id,
+                    "column_name": col,
+                    "n_fires": n_fires,
+                    "n_nonfires": n_bars - n_fires,
+                    "baseline_entropy_bits": round(h_y, 6),
+                    "conditional_entropy_bits": float("nan"),
+                    "ig_bits": float("nan"),
+                }
+            )
             continue
 
         # H(Y | event) = P(event=1)*H(Y|event=1) + P(event=0)*H(Y|event=0)
         # Using bars where fwd is valid
         fire_valid = mask & valid
         nfire_valid = (~mask) & valid
-        
+
         n_v = valid.sum()
         p_fire = fire_valid.sum() / n_v
         p_nofire = nfire_valid.sum() / n_v
@@ -122,15 +124,17 @@ def compute_information_gain(
         h_y_given_event = p_fire * h_y_given_fire + p_nofire * h_y_given_nofire
         ig = max(0.0, h_y - h_y_given_event)
 
-        rows.append({
-            "event_id": event_id,
-            "column_name": col,
-            "n_fires": n_fires,
-            "n_nonfires": n_bars - n_fires,
-            "baseline_entropy_bits": round(h_y, 6),
-            "conditional_entropy_bits": round(h_y_given_event, 6),
-            "ig_bits": round(ig, 6),
-        })
+        rows.append(
+            {
+                "event_id": event_id,
+                "column_name": col,
+                "n_fires": n_fires,
+                "n_nonfires": n_bars - n_fires,
+                "baseline_entropy_bits": round(h_y, 6),
+                "conditional_entropy_bits": round(h_y_given_event, 6),
+                "ig_bits": round(ig, 6),
+            }
+        )
 
     if not rows:
         return pd.DataFrame()

@@ -1,8 +1,10 @@
 """Tests for the permutation test gate."""
+
 import numpy as np
 import pytest
 
 from project.pipelines.research.permutation_gate import permutation_test_expectancy
+
 
 class TestPermutationGate:
     """Tests for permutation_test_expectancy."""

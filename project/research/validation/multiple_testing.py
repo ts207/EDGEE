@@ -14,11 +14,13 @@ def assign_test_families(
     out_col: str = "correction_family_id",
 ) -> pd.DataFrame:
     out = df.copy()
+
     def _compose(row: pd.Series) -> str:
         parts = []
         for col in family_cols:
             parts.append(str(row.get(col, "")))
         return "::".join(parts)
+
     out[out_col] = out.apply(_compose, axis=1)
     return out
 

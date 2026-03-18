@@ -6,6 +6,7 @@ import sys
 from project.pipelines import run_all
 from project.pipelines.ingest import ingest_binance_um_ohlcv as _ingest_ohlcv
 
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="backtest",
@@ -20,11 +21,11 @@ def _build_parser() -> argparse.ArgumentParser:
     pipeline_sub.required = True
 
     # Ingest subcommand
-    ingest_parser = subparsers.add_parser(
-        "ingest", help="Ingest raw data from external exchanges"
-    )
+    ingest_parser = subparsers.add_parser("ingest", help="Ingest raw data from external exchanges")
     ingest_parser.add_argument("--run_id", required=True, help="Unique identifier for this run")
-    ingest_parser.add_argument("--symbols", required=True, help="Comma‑separated list of symbols to ingest")
+    ingest_parser.add_argument(
+        "--symbols", required=True, help="Comma‑separated list of symbols to ingest"
+    )
     ingest_parser.add_argument("--start", required=True, help="Inclusive start date (YYYY-MM-DD)")
     ingest_parser.add_argument("--end", required=True, help="Inclusive end date (YYYY-MM-DD)")
     ingest_parser.add_argument(
@@ -37,7 +38,9 @@ def _build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Output root directory for ingested Parquet files. Defaults to data root",
     )
-    ingest_parser.add_argument("--concurrency", type=int, default=5, help="Number of concurrent downloads")
+    ingest_parser.add_argument(
+        "--concurrency", type=int, default=5, help="Number of concurrent downloads"
+    )
     ingest_parser.add_argument("--max_retries", type=int, default=5)
     ingest_parser.add_argument("--retry_backoff_sec", type=float, default=2.0)
     ingest_parser.add_argument("--force", type=int, default=0)
@@ -45,6 +48,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
     subparsers.required = True
     return parser
+
 
 def main() -> int:
     parser = _build_parser()
@@ -85,6 +89,7 @@ def main() -> int:
 
     parser.print_help()
     return 1
+
 
 if __name__ == "__main__":
     sys.exit(main())

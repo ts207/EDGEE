@@ -16,10 +16,12 @@ def _make_regime_features(n_bars: int = 600) -> pd.DataFrame:
     dates = pd.date_range("2023-01-01", periods=n_bars, freq="5min")
 
     # Rising price in first half (positive fwd returns), falling in second
-    close = np.concatenate([
-        100.0 + np.cumsum(np.abs(np.random.normal(0.05, 0.02, 300))),
-        100.0 + np.cumsum(-np.abs(np.random.normal(0.05, 0.02, 300))),
-    ])
+    close = np.concatenate(
+        [
+            100.0 + np.cumsum(np.abs(np.random.normal(0.05, 0.02, 300))),
+            100.0 + np.cumsum(-np.abs(np.random.normal(0.05, 0.02, 300))),
+        ]
+    )
 
     df = pd.DataFrame({"timestamp": dates, "close": close})
     df["event_vol_shock"] = [i % 10 == 0 for i in range(n_bars)]

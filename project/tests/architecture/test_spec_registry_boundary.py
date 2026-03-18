@@ -8,8 +8,9 @@ def test_spec_registry_init_does_not_define_loader_functions():
     init_path = Path(inspect.getfile(registry_mod))
     tree = ast.parse(init_path.read_text())
     defined_in_init = [
-        node.name for node in ast.walk(tree)
-        if isinstance(node, ast.FunctionDef) and node.name.startswith('load_')
+        node.name
+        for node in ast.walk(tree)
+        if isinstance(node, ast.FunctionDef) and node.name.startswith("load_")
     ]
     assert not defined_in_init, (
         f"__init__.py defines loader functions directly: {defined_in_init}. "
@@ -31,6 +32,7 @@ def test_spec_registry_public_api_unchanged():
         REPO_ROOT,
         SPEC_ROOT,
     )
+
     assert callable(load_gates_spec)
     assert callable(clear_caches)
     assert REPO_ROOT.exists()

@@ -85,7 +85,7 @@ def test_query_surfaces_return_machine_readable_rows(tmp_path, monkeypatch):
                 "agent_level": "advanced",
                 "mutability": "inspect_only",
                 "risk": "high",
-            }
+            },
         ]
     ).to_parquet(static_root / "agent_knobs.parquet", index=False)
 
@@ -110,7 +110,7 @@ def test_query_surfaces_return_machine_readable_rows(tmp_path, monkeypatch):
                     "horizon": "15m",
                     "entry_lag": 0,
                     "context_hash": "ctx1",
-                    "context_json": "{\"liquidity_regime\":\"low\"}",
+                    "context_json": '{"liquidity_regime":"low"}',
                     "eval_status": "rejected",
                     "train_n_obs": 100,
                     "validation_n_obs": 40,
@@ -154,7 +154,9 @@ def test_query_surfaces_return_machine_readable_rows(tmp_path, monkeypatch):
     )
 
     static_payload = query_static_rows(data_root=data_root, event="BASIS_DISLOC")
-    memory_payload = query_memory_rows(data_root=data_root, program_id="btc_campaign", event_type="BASIS_DISLOC")
+    memory_payload = query_memory_rows(
+        data_root=data_root, program_id="btc_campaign", event_type="BASIS_DISLOC"
+    )
     adjacent_payload = query_adjacent_regions(
         data_root=data_root,
         program_id="btc_campaign",

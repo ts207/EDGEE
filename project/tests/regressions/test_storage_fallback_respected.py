@@ -9,8 +9,8 @@ from project.reliability.regression_checks import assert_storage_fallback_respec
 
 
 def test_storage_fallback_respected(tmp_path: Path, monkeypatch):
-    monkeypatch.setenv('BACKTEST_FORCE_CSV_FALLBACK', '1')
-    df = pd.DataFrame({'a': [1, 2]})
-    actual, storage = write_parquet(df, tmp_path / 'artifact.parquet')
-    assert storage == 'csv'
+    monkeypatch.setenv("BACKTEST_FORCE_CSV_FALLBACK", "1")
+    df = pd.DataFrame({"a": [1, 2]})
+    actual, storage = write_parquet(df, tmp_path / "artifact.parquet")
+    assert storage == "csv"
     assert_storage_fallback_respected(actual)

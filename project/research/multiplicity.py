@@ -17,6 +17,7 @@ from project.research.gating import bh_adjust
 
 log = logging.getLogger(__name__)
 
+
 def make_family_id(
     symbol: str,
     event_type: str,
@@ -40,6 +41,7 @@ def make_family_id(
     )
     return f"{str(symbol).strip().upper()}_{base}"
 
+
 def resolved_sample_size(joined_event_count: int, symbol_event_count: int) -> int:
     try:
         joined = int(joined_event_count)
@@ -48,24 +50,30 @@ def resolved_sample_size(joined_event_count: int, symbol_event_count: int) -> in
         return 0
     return max(0, min(joined, symbol_total if symbol_total > 0 else joined))
 
+
 def resolve_state_context_column(columns: pd.Index, state_id: Optional[str]) -> Optional[str]:
     state = str(state_id or "").strip()
-    if not state: return None
+    if not state:
+        return None
     by_id = state_id_to_context_column(state)
     for candidate in [by_id, state, state.upper(), state.lower()]:
         if candidate and candidate in columns:
             return str(candidate)
     return None
 
+
 def simes_p_value(p_vals: pd.Series) -> float:
     p = p_vals.dropna().sort_values()
     m = len(p)
-    if m == 0: return 1.0
+    if m == 0:
+        return 1.0
     return float((p * m / np.arange(1, m + 1)).min())
+
 
 def by_adjust(p_values: np.ndarray) -> np.ndarray:
     """Benjamini-Yekutieli FDR adjustment."""
-    if len(p_values) == 0: return p_values
+    if len(p_values) == 0:
+        return p_values
     n = len(p_values)
     idx = np.argsort(p_values)
     sorted_p = np.asarray(p_values, dtype=float)[idx]
@@ -80,6 +88,7 @@ def by_adjust(p_values: np.ndarray) -> np.ndarray:
     rev_idx[idx] = np.arange(n)
     return np.clip(adj[rev_idx], 0.0, 1.0)
 
+
 def apply_multiplicity_controls(
     raw_df: pd.DataFrame,
     max_q: float,
@@ -91,13 +100,27 @@ def apply_multiplicity_controls(
     enable_by_diagnostic: bool = True,
 ) -> pd.DataFrame:
     """Apply BH correction per-family, then a global BH over family-adjusted q-values."""
-    if raw_df.empty: return raw_df.copy()
+    if raw_df.empty:
+        return raw_df.copy()
     out = raw_df.copy()
-    
+
     # Init columns
-    for col in ["p_value_family", "q_value_family", "q_value", "q_value_by", "p_value_cluster", "q_value_cluster"]:
+    for col in [
+        "p_value_family",
+        "q_value_family",
+        "q_value",
+        "q_value_by",
+        "p_value_cluster",
+        "q_value_cluster",
+    ]:
         out[col] = np.nan
-    for col in ["is_discovery_family", "is_discovery", "is_discovery_by", "is_discovery_cluster", "multiplicity_pool_eligible"]:
+    for col in [
+        "is_discovery_family",
+        "is_discovery",
+        "is_discovery_by",
+        "is_discovery_cluster",
+        "multiplicity_pool_eligible",
+    ]:
         out[col] = False
     out["family_cluster_id"] = ""
     out["num_tests_event_family"] = 0
@@ -108,12 +131,18 @@ def apply_multiplicity_controls(
     out.loc[eligible_mask, "multiplicity_pool_eligible"] = True
 
     eligible = out[eligible_mask].copy()
-    if eligible.empty: return out
+    if eligible.empty:
+        return out
 
     p_col = "p_value_for_fdr" if "p_value_for_fdr" in eligible.columns else "p_value"
-    
+
     # 1. Family Simes p-values
-    family_simes = eligible.groupby("family_id")[p_col].apply(simes_p_value).rename("p_value_family").reset_index()
+    family_simes = (
+        eligible.groupby("family_id")[p_col]
+        .apply(simes_p_value)
+        .rename("p_value_family")
+        .reset_index()
+    )
     family_simes["q_value_family"] = bh_adjust(family_simes["p_value_family"].values)
     family_simes["is_discovery_family"] = family_simes["q_value_family"] <= float(max_q)
 
@@ -129,10 +158,9 @@ def apply_multiplicity_controls(
             qvals = bh_adjust(group[p_col].fillna(1.0).to_numpy())
             out.loc[group.index, "q_value"] = qvals
 
-    out["is_discovery"] = (
-        out["is_discovery_family"].astype("boolean").fillna(False).astype(bool)
-        & (out["q_value"] <= float(max_q))
-    )
+    out["is_discovery"] = out["is_discovery_family"].astype("boolean").fillna(False).astype(
+        bool
+    ) & (out["q_value"] <= float(max_q))
 
     # 3. BY Adjustment (Optional Diagnostic)
     if enable_by_diagnostic:
@@ -149,17 +177,23 @@ def apply_multiplicity_controls(
         horizon = str(row.get("horizon", "")).strip()
         state = str(row.get("state_id", "")).strip()
         return f"{symbol}_{event}_{horizon}_{state}"
-    
+
     out["family_cluster_id"] = out.apply(_cluster_key, axis=1)
-    
+
     if enable_cluster_adjusted and not out[out["multiplicity_pool_eligible"]].empty:
-        cluster_simes = out[out["multiplicity_pool_eligible"]].groupby("family_cluster_id")[p_col].apply(simes_p_value).rename("p_value_cluster").reset_index()
+        cluster_simes = (
+            out[out["multiplicity_pool_eligible"]]
+            .groupby("family_cluster_id")[p_col]
+            .apply(simes_p_value)
+            .rename("p_value_cluster")
+            .reset_index()
+        )
         cluster_simes["q_value_cluster"] = bh_adjust(cluster_simes["p_value_cluster"].values)
-        
+
         for col in ["p_value_cluster", "q_value_cluster"]:
             mapping = dict(zip(cluster_simes["family_cluster_id"], cluster_simes[col]))
             out[col] = out["family_cluster_id"].map(mapping)
-            
+
         out["is_discovery_cluster"] = out["q_value_cluster"] <= float(max_q)
 
     # 5. Metadata
@@ -167,11 +201,11 @@ def apply_multiplicity_controls(
     out["num_tests_event_family"] = out["family_id"].map(family_counts).fillna(0).astype(int)
 
     out["gate_multiplicity"] = out["is_discovery"].astype(bool)
-    out["gate_multiplicity_strict"] = (
-        out["is_discovery"].astype(bool) 
-        & out["is_discovery_by"].astype("boolean").fillna(False).astype(bool)
-    )
+    out["gate_multiplicity_strict"] = out["is_discovery"].astype(bool) & out[
+        "is_discovery_by"
+    ].astype("boolean").fillna(False).astype(bool)
     return out
+
 
 def build_multiplicity_diagnostics(
     scored: pd.DataFrame,
@@ -183,23 +217,41 @@ def build_multiplicity_diagnostics(
     """Compute summary diagnostics for multiplicity results."""
     if scored.empty:
         return {"global": {"discovery_count": 0}, "families": {}}
-        
+
     discovery_mask = scored.get("is_discovery", pd.Series(False, index=scored.index))
     family_discovery_mask = scored.get("is_discovery_family", pd.Series(False, index=scored.index))
-    
+
     return {
         "global": {
             "run_id": str(scored["run_id"].iloc[0]) if "run_id" in scored.columns else "unknown",
             "max_q_threshold": float(max_q),
             "candidates_total": len(scored),
-            "families_total": int(scored["family_id"].nunique()) if "family_id" in scored.columns else 0,
-            "eligible_candidates": int(scored.get("multiplicity_pool_eligible", pd.Series(False)).sum()),
-            "families_pool_eligible": int(scored[scored.get("multiplicity_pool_eligible", pd.Series(False))]["family_id"].nunique()) if "family_id" in scored.columns else 0,
+            "families_total": int(scored["family_id"].nunique())
+            if "family_id" in scored.columns
+            else 0,
+            "eligible_candidates": int(
+                scored.get("multiplicity_pool_eligible", pd.Series(False)).sum()
+            ),
+            "families_pool_eligible": int(
+                scored[scored.get("multiplicity_pool_eligible", pd.Series(False))][
+                    "family_id"
+                ].nunique()
+            )
+            if "family_id" in scored.columns
+            else 0,
             "discoveries_total": int(discovery_mask.sum()),
-            "discovered_families_count": int(scored[family_discovery_mask]["family_id"].nunique()) if "family_id" in scored.columns else 0,
+            "discovered_families_count": int(scored[family_discovery_mask]["family_id"].nunique())
+            if "family_id" in scored.columns
+            else 0,
             "discoveries_by_total": int(scored.get("is_discovery_by", pd.Series(False)).sum()),
-            "discoveries_cluster_total": int(scored.get("is_discovery_cluster", pd.Series(False)).sum()),
+            "discoveries_cluster_total": int(
+                scored.get("is_discovery_cluster", pd.Series(False)).sum()
+            ),
         },
-        "by_family": scored.groupby("family_id").size().to_dict() if "family_id" in scored.columns else {},
-        "by_cluster": scored.groupby("family_cluster_id").size().to_dict() if "family_cluster_id" in scored.columns else {}
+        "by_family": scored.groupby("family_id").size().to_dict()
+        if "family_id" in scored.columns
+        else {},
+        "by_cluster": scored.groupby("family_cluster_id").size().to_dict()
+        if "family_cluster_id" in scored.columns
+        else {},
     }

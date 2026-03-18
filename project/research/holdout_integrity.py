@@ -46,13 +46,10 @@ def assert_holdout_split_integrity(
     frame = pd.DataFrame({"_ts": ts, "_split": labels})
     frame = frame.dropna(subset=["_ts"])
     if frame.empty:
-        raise ValueError(
-            "Holdout integrity sentinel failed: all holdout timestamps are null."
-        )
+        raise ValueError("Holdout integrity sentinel failed: all holdout timestamps are null.")
 
     counts: Dict[str, int] = {
-        split: int((frame["_split"] == split).sum())
-        for split in ("train", "validation", "test")
+        split: int((frame["_split"] == split).sum()) for split in ("train", "validation", "test")
     }
     ranges: Dict[str, Dict[str, str]] = {}
     for split in ("train", "validation", "test"):
@@ -86,7 +83,12 @@ def assert_holdout_split_integrity(
         error_messages.append("train/validation overlap or inversion detected")
     if val_end is not None and test_start is not None and val_end >= test_start:
         error_messages.append("validation/test overlap or inversion detected")
-    if val_start is None and train_end is not None and test_start is not None and train_end >= test_start:
+    if (
+        val_start is None
+        and train_end is not None
+        and test_start is not None
+        and train_end >= test_start
+    ):
         error_messages.append("train/test overlap or inversion detected")
 
     if error_messages:
@@ -120,8 +122,8 @@ def assert_no_lookahead_join(
     leak_mask = feature_ts.notna() & event_ts.notna() & (feature_ts > event_ts)
     if leak_mask.any():
         leaked = int(leak_mask.sum())
-        sample = merged.loc[leak_mask, [event_ts_col, feature_ts_col]].head(1).to_dict(
-            orient="records"
+        sample = (
+            merged.loc[leak_mask, [event_ts_col, feature_ts_col]].head(1).to_dict(orient="records")
         )
         location = f" ({context})" if context else ""
         raise ValueError(

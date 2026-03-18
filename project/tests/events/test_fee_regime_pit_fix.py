@@ -1,4 +1,5 @@
 """Regression test: FeeRegimeChangeDetector must not use future data."""
+
 from __future__ import annotations
 import pandas as pd
 import numpy as np
@@ -8,11 +9,13 @@ from project.events.families.temporal import FeeRegimeChangeDetector
 def _make_fee_df(fee_values: list[float]) -> pd.DataFrame:
     n = len(fee_values)
     ts = pd.date_range("2024-01-01", periods=n, freq="5min", tz="UTC")
-    return pd.DataFrame({
-        "timestamp": ts,
-        "fee_bps": fee_values,
-        "close": np.ones(n),
-    })
+    return pd.DataFrame(
+        {
+            "timestamp": ts,
+            "fee_bps": fee_values,
+            "close": np.ones(n),
+        }
+    )
 
 
 def test_fee_regime_detector_no_future_lookahead():

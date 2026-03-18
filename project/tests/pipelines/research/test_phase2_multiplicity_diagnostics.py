@@ -7,6 +7,7 @@ from project.research.multiplicity import (
     build_multiplicity_diagnostics,
 )
 
+
 def test_build_multiplicity_diagnostics_exports_global_and_family_views():
     raw_df = pd.DataFrame(
         [

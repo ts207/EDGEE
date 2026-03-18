@@ -68,10 +68,7 @@ class DomainRegistry:
         return self.template_operator_definitions.get(str(template_id).strip())
 
     def operator_rows(self) -> Dict[str, Dict[str, Any]]:
-        return {
-            name: dict(spec.raw)
-            for name, spec in self.template_operator_definitions.items()
-        }
+        return {name: dict(spec.raw) for name, spec in self.template_operator_definitions.items()}
 
     def family_templates(self, family_name: str) -> tuple[str, ...]:
         template_families = self.template_registry_payload.get("families", {})
@@ -165,11 +162,7 @@ class DomainRegistry:
     def context_labels_for_family(self, family: str) -> tuple[str, ...]:
         normalized = str(family).strip()
         return tuple(
-            sorted(
-                label
-                for fam, label in self.context_state_map.keys()
-                if fam == normalized
-            )
+            sorted(label for fam, label in self.context_state_map.keys() if fam == normalized)
         )
 
     @property

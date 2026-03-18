@@ -1,22 +1,40 @@
 """
 F-3: family_id must include symbol so BH-FDR is applied per-symbol, not pooled.
 """
+
 from __future__ import annotations
 import pandas as pd
 import pytest
 
 SAMPLE_ROWS = [
-    {"event_type": "VOL_SHOCK", "rule_template": "mean_reversion", "horizon": "5m",
-     "symbol": "BTCUSDT", "conditioning": "all"},
-    {"event_type": "VOL_SHOCK", "rule_template": "mean_reversion", "horizon": "5m",
-     "symbol": "ETHUSDT", "conditioning": "all"},
-    {"event_type": "VOL_SHOCK", "rule_template": "mean_reversion", "horizon": "5m",
-     "symbol": "BTCUSDT", "conditioning": "vol_regime_high"},
+    {
+        "event_type": "VOL_SHOCK",
+        "rule_template": "mean_reversion",
+        "horizon": "5m",
+        "symbol": "BTCUSDT",
+        "conditioning": "all",
+    },
+    {
+        "event_type": "VOL_SHOCK",
+        "rule_template": "mean_reversion",
+        "horizon": "5m",
+        "symbol": "ETHUSDT",
+        "conditioning": "all",
+    },
+    {
+        "event_type": "VOL_SHOCK",
+        "rule_template": "mean_reversion",
+        "horizon": "5m",
+        "symbol": "BTCUSDT",
+        "conditioning": "vol_regime_high",
+    },
 ]
+
 
 def _build_family_id(row: dict) -> str:
     """Reproduce the family_id construction from phase2_candidate_discovery.py."""
     from project.research.multiplicity import make_family_id
+
     return make_family_id(
         row["symbol"],
         row["event_type"],
@@ -24,6 +42,7 @@ def _build_family_id(row: dict) -> str:
         row["horizon"],
         row["conditioning"],
     )
+
 
 class TestFamilyIdIncludesSymbol:
     def test_family_id_starts_with_symbol(self):
@@ -36,7 +55,9 @@ class TestFamilyIdIncludesSymbol:
     def test_btc_and_eth_have_different_family_ids_for_same_template(self):
         btc = _build_family_id(SAMPLE_ROWS[0])
         eth = _build_family_id(SAMPLE_ROWS[1])
-        assert btc != eth, "BTC and ETH must produce different family_ids for same (event, rule, horizon, cond)"
+        assert btc != eth, (
+            "BTC and ETH must produce different family_ids for same (event, rule, horizon, cond)"
+        )
 
     def test_family_id_format_is_symbol_prefixed(self):
         fid = _build_family_id(SAMPLE_ROWS[0])

@@ -11,6 +11,7 @@ import pandas as pd
 
 from project.core.config import load_configs
 
+
 @dataclass(frozen=True)
 class ResolvedExecutionCosts:
     config_paths: List[str]
@@ -21,14 +22,17 @@ class ResolvedExecutionCosts:
     execution_model: Dict[str, float]
     config_digest: str
 
+
 def _sha256_text(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
 
 def _default_config_paths(project_root: Path) -> List[Path]:
     cfg = project_root / "project" / "configs"
     if not cfg.exists():
         cfg = project_root / "configs"
     return [cfg / "pipeline.yaml", cfg / "fees.yaml"]
+
 
 def _resolve_config_paths(project_root: Path, config_paths: Sequence[str] | None) -> List[Path]:
     paths = _default_config_paths(project_root)
@@ -38,6 +42,7 @@ def _resolve_config_paths(project_root: Path, config_paths: Sequence[str] | None
             path = project_root / path
         paths.append(path)
     return paths
+
 
 def resolve_execution_costs(
     *,
@@ -51,7 +56,11 @@ def resolve_execution_costs(
     merged = load_configs([str(path) for path in paths])
 
     fee = float(fees_bps) if fees_bps is not None else float(merged.get("fee_bps_per_side", 4.0))
-    slippage = float(slippage_bps) if slippage_bps is not None else float(merged.get("slippage_bps_per_fill", 2.0))
+    slippage = (
+        float(slippage_bps)
+        if slippage_bps is not None
+        else float(merged.get("slippage_bps_per_fill", 2.0))
+    )
     cost = float(cost_bps) if cost_bps is not None else float(fee + slippage)
 
     execution_model_raw = merged.get("execution_model", {})
@@ -108,10 +117,14 @@ def estimate_transaction_cost_bps(
     liquidity_weight = float(config.get("liquidity_weight", 0.1))
     impact_weight = float(config.get("impact_weight", 0.1))
 
-    tob_coverage = pd.to_numeric(
-        frame.get("tob_coverage", pd.Series(0.0, index=idx)),
-        errors="coerce",
-    ).reindex(idx).fillna(0.0)
+    tob_coverage = (
+        pd.to_numeric(
+            frame.get("tob_coverage", pd.Series(0.0, index=idx)),
+            errors="coerce",
+        )
+        .reindex(idx)
+        .fillna(0.0)
+    )
     spread = pd.to_numeric(
         frame.get("spread_bps", pd.Series(np.nan, index=idx)),
         errors="coerce",
@@ -123,16 +136,26 @@ def estimate_transaction_cost_bps(
 
     use_dynamic = (tob_coverage >= min_tob_coverage) & spread.notna()
 
-    atr = pd.to_numeric(frame.get("atr_14", pd.Series(np.nan, index=idx)), errors="coerce").reindex(idx)
-    close = pd.to_numeric(frame.get("close", pd.Series(np.nan, index=idx)), errors="coerce").reindex(idx)
-    high = pd.to_numeric(frame.get("high", pd.Series(np.nan, index=idx)), errors="coerce").reindex(idx)
-    low = pd.to_numeric(frame.get("low", pd.Series(np.nan, index=idx)), errors="coerce").reindex(idx)
+    atr = pd.to_numeric(frame.get("atr_14", pd.Series(np.nan, index=idx)), errors="coerce").reindex(
+        idx
+    )
+    close = pd.to_numeric(
+        frame.get("close", pd.Series(np.nan, index=idx)), errors="coerce"
+    ).reindex(idx)
+    high = pd.to_numeric(frame.get("high", pd.Series(np.nan, index=idx)), errors="coerce").reindex(
+        idx
+    )
+    low = pd.to_numeric(frame.get("low", pd.Series(np.nan, index=idx)), errors="coerce").reindex(
+        idx
+    )
     quote_vol = pd.to_numeric(
         frame.get("quote_volume", pd.Series(np.nan, index=idx)),
         errors="coerce",
     ).reindex(idx)
 
-    range_bps = (((high - low) / close.replace(0.0, np.nan)) * 10000.0).replace([np.inf, -np.inf], np.nan)
+    range_bps = (((high - low) / close.replace(0.0, np.nan)) * 10000.0).replace(
+        [np.inf, -np.inf], np.nan
+    )
     atr_bps = ((atr / close.replace(0.0, np.nan)) * 10000.0).replace([np.inf, -np.inf], np.nan)
     vol_bps = atr_bps.fillna(range_bps).fillna(0.0).abs()
 
@@ -141,10 +164,14 @@ def estimate_transaction_cost_bps(
     impact_sqrt = np.sqrt(participation_rate)
 
     max_part = max(1e-4, float(config.get("max_participation_rate", 0.10)))
-    participation_penalty = np.exp(np.clip((participation_rate - max_part) / max_part, 0.0, 5.0)) - 1.0
+    participation_penalty = (
+        np.exp(np.clip((participation_rate - max_part) / max_part, 0.0, 5.0)) - 1.0
+    )
 
     liq_scale = (1.0 / available_liquidity).replace([np.inf, -np.inf], np.nan)
-    liq_scale = liq_scale.fillna(liq_scale.median() if liq_scale.notna().any() else 0.0).clip(lower=0.0)
+    liq_scale = liq_scale.fillna(liq_scale.median() if liq_scale.notna().any() else 0.0).clip(
+        lower=0.0
+    )
     if float(liq_scale.max()) > 0:
         liq_scale = liq_scale / float(liq_scale.max())
 
@@ -157,6 +184,7 @@ def estimate_transaction_cost_bps(
 
     cost_bps = base_fee_bps + np.where(use_dynamic, dynamic_slippage, base_slippage_bps)
     return pd.Series(cost_bps, index=idx).clip(lower=0.0, upper=cap_bps).astype(float)
+
 
 def _is_floatable(value: object) -> bool:
     try:

@@ -17,4 +17,3 @@ __all__ = [
     "ResearchOriginSpec",
     "transform_blueprint_to_spec",
 ]
-

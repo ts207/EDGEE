@@ -4,6 +4,7 @@ import pandas as pd
 
 from project.live.ingest.parsers import parse_kline_event, parse_book_ticker_event
 
+
 def test_parse_kline_event_valid():
     payload = {
         "e": "kline",
@@ -26,10 +27,10 @@ def test_parse_kline_event_valid():
             "q": "1.0000",
             "V": "500",
             "Q": "0.500",
-            "B": "123456"
-        }
+            "B": "123456",
+        },
     }
-    
+
     event = parse_kline_event(payload)
     assert event is not None
     assert event.symbol == "BTCUSDT"
@@ -42,7 +43,8 @@ def test_parse_kline_event_valid():
     assert event.quote_volume == 1.0
     assert event.taker_base_volume == 500.0
     assert event.is_final is False
-    
+
+
 def test_parse_book_ticker_event_combined():
     payload = {
         "stream": "btcusdt@bookTicker",
@@ -55,8 +57,8 @@ def test_parse_book_ticker_event_combined():
             "a": "25.3652",
             "A": "40.66",
             "T": 1672531200000,
-            "E": 1672531200005
-        }
+            "E": 1672531200005,
+        },
     }
     event = parse_book_ticker_event(payload)
     assert event is not None
@@ -65,7 +67,8 @@ def test_parse_book_ticker_event_combined():
     assert event.best_bid_qty == 31.21
     assert event.best_ask_price == 25.3652
     assert event.best_ask_qty == 40.66
-    
+
+
 def test_parse_book_ticker_event_single():
     payload = {
         "u": 400900217,
@@ -73,7 +76,7 @@ def test_parse_book_ticker_event_single():
         "b": "25.3519",
         "B": "31.21",
         "a": "25.3652",
-        "A": "40.66"
+        "A": "40.66",
     }
     event = parse_book_ticker_event(payload)
     assert event is not None

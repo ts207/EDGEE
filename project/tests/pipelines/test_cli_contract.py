@@ -9,12 +9,14 @@ import pytest
 PROJECT_ROOT = Path(__file__).resolve().parents[2] / "project"
 CLI_PATH = PROJECT_ROOT / "cli.py"
 
+
 def _load_cli_module():
     spec = importlib.util.spec_from_file_location("project_cli", CLI_PATH)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)  # type: ignore[union-attr]
     return module
+
 
 def test_cli_rejects_removed_strategy_subcommand(monkeypatch, capsys):
     cli = _load_cli_module()
@@ -24,6 +26,7 @@ def test_cli_rejects_removed_strategy_subcommand(monkeypatch, capsys):
     assert int(exc.value.code) == 2
     err = capsys.readouterr().err.lower()
     assert "invalid choice: 'strategy'" in err
+
 
 def test_cli_pipeline_run_all_delegates(monkeypatch):
     cli = _load_cli_module()

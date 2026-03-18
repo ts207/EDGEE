@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict
 from project import PROJECT_ROOT
+
 REPO_ROOT = PROJECT_ROOT.parent
 DATA_ROOT = get_data_root()
 
@@ -17,8 +18,10 @@ from project.core.golden_regression import (
     load_tolerance_config,
 )
 
+
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
 
 def _read_json(path: Path) -> Dict[str, Any]:
     if not path.exists():
@@ -27,6 +30,7 @@ def _read_json(path: Path) -> Dict[str, Any]:
     if not isinstance(payload, dict):
         raise ValueError(f"Baseline snapshot must be a JSON object: {path}")
     return payload
+
 
 def main() -> int:
     parser = argparse.ArgumentParser(
@@ -85,9 +89,7 @@ def main() -> int:
     )
 
     snapshot = collect_core_artifact_snapshot(data_root=data_root, run_id=args.run_id)
-    snapshot_out.write_text(
-        json.dumps(snapshot, indent=2, sort_keys=True), encoding="utf-8"
-    )
+    snapshot_out.write_text(json.dumps(snapshot, indent=2, sort_keys=True), encoding="utf-8")
 
     baseline_path = str(args.baseline_snapshot).strip()
     if not baseline_path:
@@ -101,9 +103,7 @@ def main() -> int:
             "diff_count": 0,
             "diffs": [],
         }
-        report_out.write_text(
-            json.dumps(report, indent=2, sort_keys=True), encoding="utf-8"
-        )
+        report_out.write_text(json.dumps(report, indent=2, sort_keys=True), encoding="utf-8")
         print(
             json.dumps(
                 {
@@ -153,6 +153,7 @@ def main() -> int:
         )
     )
     return 0 if bool(report["passed"]) else 1
+
 
 if __name__ == "__main__":
     raise SystemExit(main())

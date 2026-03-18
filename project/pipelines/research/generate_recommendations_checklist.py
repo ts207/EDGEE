@@ -37,7 +37,11 @@ def _parse_args() -> argparse.Namespace:
     DATA_ROOT = get_data_root()
     parser = argparse.ArgumentParser(description="Generate checklist.")
     parser.add_argument("--run_id", required=True)
-    parser.add_argument("--gate_profile", choices=["discovery", "promotion", "custom", "synthetic"], default="discovery")
+    parser.add_argument(
+        "--gate_profile",
+        choices=["discovery", "promotion", "custom", "synthetic"],
+        default="discovery",
+    )
     parser.add_argument("--reports_root", default=str(DATA_ROOT / "reports"))
     parser.add_argument("--runs_root", default=str(DATA_ROOT / "runs"))
     parser.add_argument("--out_dir", default="")
@@ -104,9 +108,13 @@ def _edge_candidate_metrics(
     if not edge_df.empty:
         status = edge_df.get("status", pd.Series("", index=edge_df.index)).astype(str).str.upper()
         promoted = status.isin({"PROMOTED", "PROMOTED_RESEARCH"})
-        bridge = edge_df.get("gate_bridge_tradable", pd.Series(False, index=edge_df.index)).map(as_bool)
+        bridge = edge_df.get("gate_bridge_tradable", pd.Series(False, index=edge_df.index)).map(
+            as_bool
+        )
         return {
-            "source": "edge_candidates_parquet" if edge_parquet_path.exists() else "edge_candidates_csv",
+            "source": "edge_candidates_parquet"
+            if edge_parquet_path.exists()
+            else "edge_candidates_csv",
             "rows": int(len(edge_df)),
             "promoted": int(promoted.sum()),
             "bridge_tradable": int(bridge.sum()),
@@ -115,11 +123,19 @@ def _edge_candidate_metrics(
 
     promo_df = _read_table(promotion_audit_parquet_path, promotion_audit_csv_path)
     if not promo_df.empty:
-        decision = promo_df.get("promotion_decision", pd.Series("", index=promo_df.index)).astype(str).str.lower()
+        decision = (
+            promo_df.get("promotion_decision", pd.Series("", index=promo_df.index))
+            .astype(str)
+            .str.lower()
+        )
         promoted = decision.eq("promoted")
-        bridge = promo_df.get("gate_bridge_tradable", pd.Series(False, index=promo_df.index)).map(as_bool)
+        bridge = promo_df.get("gate_bridge_tradable", pd.Series(False, index=promo_df.index)).map(
+            as_bool
+        )
         return {
-            "source": "promotion_audit_parquet" if promotion_audit_parquet_path.exists() else "promotion_audit_csv",
+            "source": "promotion_audit_parquet"
+            if promotion_audit_parquet_path.exists()
+            else "promotion_audit_csv",
             "rows": int(len(promo_df)),
             "promoted": int(promoted.sum()),
             "bridge_tradable": int(bridge.sum()),
@@ -149,11 +165,35 @@ def _hydrate_kpi_payload_with_promotion_fallback(
     out = dict(kpi_payload)
     out["hydrated_with_promotion_fallback"] = True
     out["metrics"] = {
-        "trade_count": {"value": float(pd.to_numeric(promo_df.get("n_events"), errors="coerce").fillna(0.0).sum())},
-        "net_expectancy_bps": {"value": float(pd.to_numeric(promo_df.get("bridge_validation_stressed_after_cost_bps"), errors="coerce").dropna().mean())},
-        "oos_sign_consistency": {"value": float(pd.to_numeric(promo_df.get("sign_consistency"), errors="coerce").dropna().mean())},
-        "turnover_proxy_mean": {"value": float(pd.to_numeric(promo_df.get("turnover_proxy_mean"), errors="coerce").dropna().mean())},
-        "max_drawdown_pct": {"value": float(pd.to_numeric(promo_df.get("naive_max_drawdown"), errors="coerce").dropna().min())},
+        "trade_count": {
+            "value": float(
+                pd.to_numeric(promo_df.get("n_events"), errors="coerce").fillna(0.0).sum()
+            )
+        },
+        "net_expectancy_bps": {
+            "value": float(
+                pd.to_numeric(
+                    promo_df.get("bridge_validation_stressed_after_cost_bps"), errors="coerce"
+                )
+                .dropna()
+                .mean()
+            )
+        },
+        "oos_sign_consistency": {
+            "value": float(
+                pd.to_numeric(promo_df.get("sign_consistency"), errors="coerce").dropna().mean()
+            )
+        },
+        "turnover_proxy_mean": {
+            "value": float(
+                pd.to_numeric(promo_df.get("turnover_proxy_mean"), errors="coerce").dropna().mean()
+            )
+        },
+        "max_drawdown_pct": {
+            "value": float(
+                pd.to_numeric(promo_df.get("naive_max_drawdown"), errors="coerce").dropna().min()
+            )
+        },
     }
     return out
 
@@ -192,7 +232,9 @@ def _build_payload(
         if gate["name"] == "robust_survivor_count":
             gate["note"] = f"definition={survivor_definition}"
     payload["metrics"]["robust_survivor_count"] = survivor_count
-    payload["metrics"]["bridge_tradable_promoted"] = int(edge_metrics.get("bridge_tradable_promoted", 0))
+    payload["metrics"]["bridge_tradable_promoted"] = int(
+        edge_metrics.get("bridge_tradable_promoted", 0)
+    )
 
     capital_payload = dict(capital_footprint_payload or {})
     slot_pressure = int(capital_payload.get("slot_pressure_over_limit_count", 0))
@@ -217,7 +259,9 @@ def _build_payload(
             "note": "",
         }
     )
-    payload["decision"] = "PROMOTE" if all(g["passed"] for g in payload["gates"]) else "KEEP_RESEARCH"
+    payload["decision"] = (
+        "PROMOTE" if all(g["passed"] for g in payload["gates"]) else "KEEP_RESEARCH"
+    )
     return payload
 
 
@@ -242,35 +286,40 @@ def _build_release_signoff(
         },
         {
             "name": "kpi_trade_count",
-            "passed": _metric_value(kpi_payload, "trade_count") >= safe_float(hard_gates.get("min_trade_count"), 0.0),
+            "passed": _metric_value(kpi_payload, "trade_count")
+            >= safe_float(hard_gates.get("min_trade_count"), 0.0),
             "observed": _metric_value(kpi_payload, "trade_count"),
             "threshold": safe_float(hard_gates.get("min_trade_count"), 0.0),
             "note": "",
         },
         {
             "name": "kpi_oos_sign_consistency",
-            "passed": _metric_value(kpi_payload, "oos_sign_consistency") >= safe_float(hard_gates.get("min_oos_sign_consistency"), 0.0),
+            "passed": _metric_value(kpi_payload, "oos_sign_consistency")
+            >= safe_float(hard_gates.get("min_oos_sign_consistency"), 0.0),
             "observed": _metric_value(kpi_payload, "oos_sign_consistency"),
             "threshold": safe_float(hard_gates.get("min_oos_sign_consistency"), 0.0),
             "note": "",
         },
         {
             "name": "kpi_max_drawdown_pct",
-            "passed": abs(_metric_value(kpi_payload, "max_drawdown_pct")) <= safe_float(hard_gates.get("max_drawdown_pct"), 1.0),
+            "passed": abs(_metric_value(kpi_payload, "max_drawdown_pct"))
+            <= safe_float(hard_gates.get("max_drawdown_pct"), 1.0),
             "observed": _metric_value(kpi_payload, "max_drawdown_pct"),
             "threshold": safe_float(hard_gates.get("max_drawdown_pct"), 1.0),
             "note": "",
         },
         {
             "name": "retail_net_expectancy_bps",
-            "passed": _metric_value(kpi_payload, "net_expectancy_bps") >= safe_float(retail_cfg.get("min_net_expectancy_bps"), 0.0),
+            "passed": _metric_value(kpi_payload, "net_expectancy_bps")
+            >= safe_float(retail_cfg.get("min_net_expectancy_bps"), 0.0),
             "observed": _metric_value(kpi_payload, "net_expectancy_bps"),
             "threshold": safe_float(retail_cfg.get("min_net_expectancy_bps"), 0.0),
             "note": "",
         },
         {
             "name": "retail_turnover_proxy_mean",
-            "passed": _metric_value(kpi_payload, "turnover_proxy_mean") <= safe_float(retail_cfg.get("max_daily_turnover_multiple"), np.inf),
+            "passed": _metric_value(kpi_payload, "turnover_proxy_mean")
+            <= safe_float(retail_cfg.get("max_daily_turnover_multiple"), np.inf),
             "observed": _metric_value(kpi_payload, "turnover_proxy_mean"),
             "threshold": safe_float(retail_cfg.get("max_daily_turnover_multiple"), np.inf),
             "note": "",
@@ -302,7 +351,9 @@ def main() -> int:
     runs_root = Path(args.runs_root)
 
     expectancy_path = reports_root / "expectancy" / args.run_id / "conditional_expectancy.json"
-    robustness_path = reports_root / "expectancy" / args.run_id / "conditional_expectancy_robustness.json"
+    robustness_path = (
+        reports_root / "expectancy" / args.run_id / "conditional_expectancy_robustness.json"
+    )
     manifest_path = run_manifest_path(args.run_id, runs_root.parent)
     kpi_path = kpi_scorecard_path(args.run_id, runs_root.parent)
 
@@ -340,7 +391,9 @@ def main() -> int:
 
     out_dir = Path(args.out_dir) if args.out_dir else runs_root / args.run_id / "research_checklist"
     out_dir.mkdir(parents=True, exist_ok=True)
-    (out_dir / "checklist.json").write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+    (out_dir / "checklist.json").write_text(
+        json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8"
+    )
     print(json.dumps({"decision": payload["decision"], "out_dir": str(out_dir)}, indent=2))
     return 0 if payload["decision"] == "PROMOTE" else 1
 

@@ -11,7 +11,6 @@ class PITValidationError(ValueError):
     """Raised when milestone-2 point-in-time timing rules are violated."""
 
 
-
 def _utc_ts(value: Any) -> pd.Timestamp:
     ts = pd.Timestamp(value)
     if pd.isna(ts):
@@ -21,7 +20,6 @@ def _utc_ts(value: Any) -> pd.Timestamp:
     else:
         ts = ts.tz_convert("UTC")
     return ts
-
 
 
 def validate_event_row_pit(
@@ -49,7 +47,6 @@ def validate_event_row_pit(
         )
 
 
-
 def validate_event_frame_pit(
     events: pd.DataFrame,
     *,
@@ -70,7 +67,6 @@ def validate_event_frame_pit(
         )
 
 
-
 def assert_shifted_rolling_mean(
     feature: pd.Series,
     source: pd.Series,
@@ -83,7 +79,6 @@ def assert_shifted_rolling_mean(
     _assert_series_close(feature, expected, atol=atol, label="shifted rolling mean")
 
 
-
 def assert_shifted_rolling_quantile(
     feature: pd.Series,
     source: pd.Series,
@@ -93,12 +88,15 @@ def assert_shifted_rolling_quantile(
     min_periods: int | None = None,
     atol: float = 1e-12,
 ) -> None:
-    expected = source.rolling(window=window, min_periods=min_periods or window).quantile(quantile).shift(1)
+    expected = (
+        source.rolling(window=window, min_periods=min_periods or window).quantile(quantile).shift(1)
+    )
     _assert_series_close(feature, expected, atol=atol, label="shifted rolling quantile")
 
 
-
-def _assert_series_close(actual: pd.Series, expected: pd.Series, *, atol: float, label: str) -> None:
+def _assert_series_close(
+    actual: pd.Series, expected: pd.Series, *, atol: float, label: str
+) -> None:
     actual_num = pd.to_numeric(actual, errors="coerce")
     expected_num = pd.to_numeric(expected, errors="coerce")
     aligned = pd.concat([actual_num.rename("actual"), expected_num.rename("expected")], axis=1)

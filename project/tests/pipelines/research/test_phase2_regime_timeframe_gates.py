@@ -6,6 +6,7 @@ import pandas as pd
 
 from project.research.services import phase2_support
 
+
 def test_regime_ess_diagnostics_requires_min_regime_count():
     events = pd.DataFrame(
         {
@@ -19,6 +20,7 @@ def test_regime_ess_diagnostics_requires_min_regime_count():
     )
     assert diag["gate_regime_ess"] is True
     assert diag["pass_count"] == 3
+
 
 def test_timeframe_consensus_gate_uses_cross_timeframe_alignment(monkeypatch):
     args = SimpleNamespace(
@@ -43,7 +45,10 @@ def test_timeframe_consensus_gate_uses_cross_timeframe_alignment(monkeypatch):
         phase2_support,
         "load_phase2_features",
         lambda run_id, symbol, timeframe="5m": pd.DataFrame(
-            {"timestamp": pd.date_range("2025-01-01", periods=10, freq="5min", tz="UTC"), "close": [100.0] * 10}
+            {
+                "timestamp": pd.date_range("2025-01-01", periods=10, freq="5min", tz="UTC"),
+                "close": [100.0] * 10,
+            }
         ),
     )
 
@@ -58,7 +63,9 @@ def test_timeframe_consensus_gate_uses_cross_timeframe_alignment(monkeypatch):
     diag = phase2_support.timeframe_expectancy_consensus(
         run_id="r1",
         symbol="BTCUSDT",
-        events_df=pd.DataFrame({"enter_ts": pd.date_range("2025-01-01", periods=20, freq="5min", tz="UTC")}),
+        events_df=pd.DataFrame(
+            {"enter_ts": pd.date_range("2025-01-01", periods=20, freq="5min", tz="UTC")}
+        ),
         rule="continuation",
         horizon="15m",
         canonical_family="VOLATILITY_TRANSITION",

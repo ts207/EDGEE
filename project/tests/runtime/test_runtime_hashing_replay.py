@@ -7,6 +7,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2] / "project"
 from project.runtime.hashing import compute_run_hash, load_hashing_spec
 from project.runtime.replay import determinism_replay_check
 
+
 def test_compute_run_hash_stable_for_artifact_key_order():
     hashing_spec = load_hashing_spec(PROJECT_ROOT.parent)
     manifest = {
@@ -47,6 +48,7 @@ def test_compute_run_hash_stable_for_artifact_key_order():
     )
     assert h1 == h2
     assert h1.startswith("blake2b_256:")
+
 
 def test_determinism_replay_check_is_order_invariant():
     hashing_spec = load_hashing_spec(PROJECT_ROOT.parent)

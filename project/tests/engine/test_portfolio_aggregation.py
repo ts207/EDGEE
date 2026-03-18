@@ -12,7 +12,9 @@ from project.engine.reporting_summarizer import summarize_portfolio_ledger
 from project.engine.schema import validate_portfolio_frame_schema
 
 
-def _make_frame(strategy: str, symbol: str, net_pnls: list[float], capital_base: float = 1.0) -> pd.DataFrame:
+def _make_frame(
+    strategy: str, symbol: str, net_pnls: list[float], capital_base: float = 1.0
+) -> pd.DataFrame:
     ts = pd.date_range("2024-01-01", periods=len(net_pnls), freq="5min", tz="UTC")
     return pd.DataFrame(
         {
@@ -66,8 +68,12 @@ def test_contribution_tables_reconcile_to_portfolio_totals() -> None:
     assert by_ts_symbol.tolist() == pytest.approx(expected.tolist())
 
     expected_ret = portfolio.set_index("timestamp")["portfolio_equity_return"]
-    by_ts_strategy_ret = strategy_contrib.groupby("timestamp", sort=True)["equity_return_contribution"].sum()
-    by_ts_symbol_ret = symbol_contrib.groupby("timestamp", sort=True)["equity_return_contribution"].sum()
+    by_ts_strategy_ret = strategy_contrib.groupby("timestamp", sort=True)[
+        "equity_return_contribution"
+    ].sum()
+    by_ts_symbol_ret = symbol_contrib.groupby("timestamp", sort=True)[
+        "equity_return_contribution"
+    ].sum()
     assert by_ts_strategy_ret.tolist() == pytest.approx(expected_ret.tolist())
     assert by_ts_symbol_ret.tolist() == pytest.approx(expected_ret.tolist())
 

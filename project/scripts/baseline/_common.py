@@ -45,7 +45,9 @@ def write_json(path: Path, payload: Any) -> Path:
 
 def get_git_value(*args: str) -> str:
     try:
-        result = subprocess.run(["git", *args], cwd=REPO_ROOT, check=True, capture_output=True, text=True)
+        result = subprocess.run(
+            ["git", *args], cwd=REPO_ROOT, check=True, capture_output=True, text=True
+        )
         return result.stdout.strip()
     except Exception:
         return ""
@@ -212,7 +214,11 @@ def _safe_read_table(path: Path) -> pd.DataFrame:
 
 
 def compare_snapshot_dirs(baseline_dir: Path, candidate_dir: Path) -> dict[str, Any]:
-    report: dict[str, Any] = {"event_counts": {}, "missing_in_candidate": [], "missing_in_baseline": []}
+    report: dict[str, Any] = {
+        "event_counts": {},
+        "missing_in_candidate": [],
+        "missing_in_baseline": [],
+    }
     baseline_files = {path.name: path for path in baseline_dir.glob("*.parquet")}
     candidate_files = {path.name: path for path in candidate_dir.glob("*.parquet")}
     for name in sorted(set(baseline_files) | set(candidate_files)):
@@ -226,5 +232,9 @@ def compare_snapshot_dirs(baseline_dir: Path, candidate_dir: Path) -> dict[str, 
             continue
         bdf = _safe_read_table(b)
         cdf = _safe_read_table(c)
-        report["event_counts"][name] = {"baseline": int(len(bdf)), "candidate": int(len(cdf)), "delta": int(len(cdf) - len(bdf))}
+        report["event_counts"][name] = {
+            "baseline": int(len(bdf)),
+            "candidate": int(len(cdf)),
+            "delta": int(len(cdf) - len(bdf)),
+        }
     return report

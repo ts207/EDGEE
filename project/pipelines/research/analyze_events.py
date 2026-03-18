@@ -207,7 +207,9 @@ def main(argv: List[str] | None = None) -> int:
         _LOG.error("No detector found for event_type: %s", event_type)
         return 1
 
-    stage_name = os.getenv("BACKTEST_STAGE_INSTANCE_ID", f"analyze_events__{event_type}_{args.timeframe}")
+    stage_name = os.getenv(
+        "BACKTEST_STAGE_INSTANCE_ID", f"analyze_events__{event_type}_{args.timeframe}"
+    )
     manifest = start_manifest(stage_name, args.run_id, vars(args), [], [])
 
     try:

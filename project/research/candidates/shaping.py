@@ -58,11 +58,13 @@ EVENT_FAMILY_STRATEGY_ROUTING: Dict[str, Dict[str, str]] = {
     },
 }
 
+
 def route_event_family(event: str) -> Optional[Dict[str, str]]:
     key = str(event).strip()
     if key in EVENT_FAMILY_STRATEGY_ROUTING:
         return EVENT_FAMILY_STRATEGY_ROUTING.get(key)
     return EVENT_FAMILY_STRATEGY_ROUTING.get(key.upper())
+
 
 def risk_controls_from_action(action: str) -> Dict[str, object]:
     controls: Dict[str, object] = {
@@ -88,6 +90,7 @@ def risk_controls_from_action(action: str) -> Dict[str, object]:
         return controls
     return controls
 
+
 def infer_condition_from_blueprint(blueprint: Dict[str, object]) -> str:
     entry = blueprint.get("entry", {}) if isinstance(blueprint.get("entry"), dict) else {}
     conditions = entry.get("conditions", []) if isinstance(entry.get("conditions"), list) else []
@@ -96,6 +99,7 @@ def infer_condition_from_blueprint(blueprint: Dict[str, object]) -> str:
         if text:
             return text
     return "all"
+
 
 def infer_action_from_blueprint(blueprint: Dict[str, object]) -> str:
     overlays = blueprint.get("overlays", []) if isinstance(blueprint.get("overlays"), list) else []
@@ -116,6 +120,7 @@ def infer_action_from_blueprint(blueprint: Dict[str, object]) -> str:
         return f"delay_{delay}"
     return "no_action"
 
+
 def symbol_scope_from_row(row: Dict[str, object], symbols: List[str]) -> Dict[str, object]:
     run_symbols = [str(s).strip().upper() for s in symbols if str(s).strip()]
     candidate_symbol = str(row.get("candidate_symbol", "")).strip().upper()
@@ -130,6 +135,7 @@ def symbol_scope_from_row(row: Dict[str, object], symbols: List[str]) -> Dict[st
     if not candidate_symbol:
         candidate_symbol = run_symbols[0] if len(run_symbols) == 1 else "ALL"
     return {"candidate_symbol": candidate_symbol, "run_symbols": run_symbols}
+
 
 def sanitize_id(value: str) -> str:
     return re.sub(r"[^a-z0-9_]+", "_", str(value).strip().lower()).strip("_")

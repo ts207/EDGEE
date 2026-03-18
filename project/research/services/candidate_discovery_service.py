@@ -53,6 +53,7 @@ DEFAULT_SAMPLE_QUALITY_POLICY: Dict[str, Dict[str, int]] = {
     },
 }
 
+
 @dataclass(frozen=True)
 class CandidateDiscoveryConfig:
     run_id: str
@@ -139,7 +140,9 @@ class CandidateDiscoveryConfig:
             "frozen_spec_hash": self.frozen_spec_hash,
             "experiment_config": self.experiment_config,
             "registry_root": str(self.registry_root) if self.registry_root is not None else None,
-            "min_validation_n_obs": None if self.min_validation_n_obs is None else int(self.min_validation_n_obs),
+            "min_validation_n_obs": None
+            if self.min_validation_n_obs is None
+            else int(self.min_validation_n_obs),
             "min_test_n_obs": None if self.min_test_n_obs is None else int(self.min_test_n_obs),
             "min_total_n_obs": None if self.min_total_n_obs is None else int(self.min_total_n_obs),
         }
@@ -159,9 +162,15 @@ def _resolve_sample_quality_policy(config: CandidateDiscoveryConfig) -> Dict[str
     defaults = DEFAULT_SAMPLE_QUALITY_POLICY.get(profile, DEFAULT_SAMPLE_QUALITY_POLICY["standard"])
     resolved = {
         "profile": profile,
-        "min_validation_n_obs": int(config.min_validation_n_obs) if config.min_validation_n_obs is not None else int(defaults["min_validation_n_obs"]),
-        "min_test_n_obs": int(config.min_test_n_obs) if config.min_test_n_obs is not None else int(defaults["min_test_n_obs"]),
-        "min_total_n_obs": int(config.min_total_n_obs) if config.min_total_n_obs is not None else int(defaults["min_total_n_obs"]),
+        "min_validation_n_obs": int(config.min_validation_n_obs)
+        if config.min_validation_n_obs is not None
+        else int(defaults["min_validation_n_obs"]),
+        "min_test_n_obs": int(config.min_test_n_obs)
+        if config.min_test_n_obs is not None
+        else int(defaults["min_test_n_obs"]),
+        "min_total_n_obs": int(config.min_total_n_obs)
+        if config.min_total_n_obs is not None
+        else int(defaults["min_total_n_obs"]),
         "explicit_overrides": {
             "min_validation_n_obs": config.min_validation_n_obs is not None,
             "min_test_n_obs": config.min_test_n_obs is not None,
@@ -173,6 +182,8 @@ def _resolve_sample_quality_policy(config: CandidateDiscoveryConfig) -> Dict[str
 
 _build_false_discovery_diagnostics = build_false_discovery_diagnostics
 _apply_sample_quality_gates = apply_sample_quality_gates
+
+
 def _split_and_score_candidates(*args: Any, **kwargs: Any) -> pd.DataFrame:
     return candidate_scoring.split_and_score_candidates(
         *args,
@@ -191,7 +202,9 @@ def execute_candidate_discovery(config: CandidateDiscoveryConfig) -> CandidateDi
 
     out_dir = config.resolved_out_dir()
     ensure_dir(out_dir)
-    manifest = start_manifest("phase2_candidate_discovery", config.run_id, config.manifest_params(), [], [])
+    manifest = start_manifest(
+        "phase2_candidate_discovery", config.run_id, config.manifest_params(), [], []
+    )
     hyp_registry = HypothesisRegistry()
     symbol_candidates: Dict[str, pd.DataFrame] = {}
     combined = pd.DataFrame()
@@ -210,7 +223,9 @@ def execute_candidate_discovery(config: CandidateDiscoveryConfig) -> CandidateDi
         except FileNotFoundError:
             fee_bps = float(config.fees_bps) if config.fees_bps is not None else 4.0
             slippage_bps = float(config.slippage_bps) if config.slippage_bps is not None else 2.0
-            total_cost_bps = float(config.cost_bps) if config.cost_bps is not None else fee_bps + slippage_bps
+            total_cost_bps = (
+                float(config.cost_bps) if config.cost_bps is not None else fee_bps + slippage_bps
+            )
             resolved_costs = type(
                 "ResolvedCostsFallback",
                 (),
@@ -237,12 +252,15 @@ def execute_candidate_discovery(config: CandidateDiscoveryConfig) -> CandidateDi
             load_event_type: str | List[str] = config.event_type
             if config.experiment_config:
                 import importlib
-                experiment_engine = importlib.import_module("project.pipelines.research.experiment_engine")
+
+                experiment_engine = importlib.import_module(
+                    "project.pipelines.research.experiment_engine"
+                )
                 plan = experiment_engine.build_experiment_plan(
                     Path(config.experiment_config),
                     config.registry_root or Path("project/configs/registries"),
                 )
-                
+
                 # Filter required event IDs for this symbol/run
                 # We load all events mentioned in any hypothesis trigger to support cross-event evaluation
                 required_events = set()
@@ -253,9 +271,11 @@ def execute_candidate_discovery(config: CandidateDiscoveryConfig) -> CandidateDi
                     elif t.trigger_type == "sequence" and t.events:
                         required_events.update(t.events)
                     elif t.trigger_type == "interaction":
-                        if t.left: required_events.add(t.left)
-                        if t.right: required_events.add(t.right)
-                
+                        if t.left:
+                            required_events.add(t.left)
+                        if t.right:
+                            required_events.add(t.right)
+
                 if required_events:
                     # Keep current event_type in the list just in case, but usually it's already there
                     required_events.add(config.event_type)
@@ -367,7 +387,9 @@ def execute_candidate_discovery(config: CandidateDiscoveryConfig) -> CandidateDi
                     search_budget=config.search_budget,
                 )
                 if candidates.empty and not bool(direction_policy["resolved"]):
-                    symbol_diag["direction_policy"]["skipped_non_directional_registry_generation"] = True
+                    symbol_diag["direction_policy"][
+                        "skipped_non_directional_registry_generation"
+                    ] = True
             symbol_diag["generated_candidate_rows"] = int(len(candidates))
             if candidates.empty:
                 symbol_diagnostics[symbol] = symbol_diag
@@ -396,10 +418,14 @@ def execute_candidate_discovery(config: CandidateDiscoveryConfig) -> CandidateDi
             if "validation_n_obs" in candidates.columns or "test_n_obs" in candidates.columns:
                 symbol_diag["rejected_by_min_sample"] = int(
                     (
-                        pd.to_numeric(candidates.get("validation_n_obs", 0), errors="coerce").fillna(0) <= 0
+                        pd.to_numeric(
+                            candidates.get("validation_n_obs", 0), errors="coerce"
+                        ).fillna(0)
+                        <= 0
                     ).sum()
                     + (
-                        pd.to_numeric(candidates.get("test_n_obs", 0), errors="coerce").fillna(0) <= 0
+                        pd.to_numeric(candidates.get("test_n_obs", 0), errors="coerce").fillna(0)
+                        <= 0
                     ).sum()
                 )
             for idx, row in candidates.iterrows():
@@ -430,13 +456,14 @@ def execute_candidate_discovery(config: CandidateDiscoveryConfig) -> CandidateDi
                 min_total_n_obs=int(sample_quality_policy["min_total_n_obs"]),
             )
             symbol_candidates = {
-                str(symbol): sym_df.copy()
-                for symbol, sym_df in combined.groupby("symbol")
+                str(symbol): sym_df.copy() for symbol, sym_df in combined.groupby("symbol")
             }
             for symbol, sym_df in symbol_candidates.items():
                 symbol_diagnostics.setdefault(symbol, {"symbol": symbol})
                 pre_gate_survivors = int(
-                    pd.to_numeric(sym_df.get("is_discovery_pre_sample_quality", False), errors="coerce")
+                    pd.to_numeric(
+                        sym_df.get("is_discovery_pre_sample_quality", False), errors="coerce"
+                    )
                     .fillna(0)
                     .astype(bool)
                     .sum()
@@ -453,7 +480,9 @@ def execute_candidate_discovery(config: CandidateDiscoveryConfig) -> CandidateDi
                     .astype(bool)
                     .sum()
                 )
-                symbol_diagnostics[symbol]["survivors_before_sample_quality_gate"] = pre_gate_survivors
+                symbol_diagnostics[symbol]["survivors_before_sample_quality_gate"] = (
+                    pre_gate_survivors
+                )
 
         write_candidate_reports(
             out_dir=out_dir,

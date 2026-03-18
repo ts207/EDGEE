@@ -13,9 +13,11 @@ import project.pipelines.run_all as run_all
 import project.pipelines.pipeline_planning as pipeline_planning
 from project.pipelines.stages.evaluation import build_evaluation_stages
 
+
 def _load_manifest(tmp_path: Path, run_id: str) -> dict:
     path = tmp_path / "data" / "runs" / run_id / "run_manifest.json"
     return json.loads(path.read_text(encoding="utf-8"))
+
 
 def test_run_all_performance_mode_sets_manifest_fields(monkeypatch, tmp_path):
     captured: list[str] = []
@@ -58,7 +60,10 @@ def test_run_all_performance_mode_sets_manifest_fields(monkeypatch, tmp_path):
     assert isinstance(manifest["objective_spec_hash"], str) and manifest["objective_spec_hash"]
     assert int(manifest["objective_hard_gates"]["min_trade_count"]) == 150
     assert manifest["retail_profile_name"] == "capital_constrained"
-    assert isinstance(manifest["retail_profile_spec_hash"], str) and manifest["retail_profile_spec_hash"]
+    assert (
+        isinstance(manifest["retail_profile_spec_hash"], str)
+        and manifest["retail_profile_spec_hash"]
+    )
     assert float(manifest["retail_profile_config"]["max_leverage"]) == 3.0
     assert manifest["runtime_invariants_mode"] == "off"
     assert manifest["runtime_invariants_status"] == "disabled"
@@ -67,11 +72,16 @@ def test_run_all_performance_mode_sets_manifest_fields(monkeypatch, tmp_path):
     assert manifest["effective_config_schema_version"] == "effective_run_config_v1"
     assert str(manifest["effective_config_path"]).endswith("/effective_config.json")
     assert str(manifest["effective_config_hash"]).startswith("sha256:")
-    effective_config = json.loads(Path(manifest["effective_config_path"]).read_text(encoding="utf-8"))
+    effective_config = json.loads(
+        Path(manifest["effective_config_path"]).read_text(encoding="utf-8")
+    )
     assert effective_config["run_id"] == "perf_mode_run"
     assert effective_config["config_resolution"]["normalized_symbols"] == ["BTCUSDT"]
 
-def test_run_all_disables_expectancy_chain_when_checklist_dependency_is_missing(monkeypatch, tmp_path):
+
+def test_run_all_disables_expectancy_chain_when_checklist_dependency_is_missing(
+    monkeypatch, tmp_path
+):
     captured: list[str] = []
 
     def fake_run_stage(stage, script, base_args, run_id, **kwargs) -> bool:
@@ -172,6 +182,7 @@ def test_run_all_production_auto_enables_phase2_when_not_explicit(monkeypatch, t
     assert "phase2_search_engine" in planned
     assert "promote_candidates" in planned
 
+
 def test_run_all_auto_promotion_q_matches_phase2_profile(monkeypatch, tmp_path):
     promote_args: dict[str, list[str]] = {}
 
@@ -247,6 +258,7 @@ def test_run_all_auto_promotion_q_matches_phase2_profile(monkeypatch, tmp_path):
     assert float(args[args.index("--min_cost_survival_ratio") + 1]) == 0.50
     assert float(args[args.index("--min_tob_coverage") + 1]) == 0.50
     assert float(args[args.index("--max_negative_control_pass_rate") + 1]) == 0.10
+
 
 def test_run_all_explicit_promotion_q_with_equals_syntax_is_respected(monkeypatch, tmp_path):
     promote_args: dict[str, list[str]] = {}
@@ -551,13 +563,18 @@ def test_run_all_wires_strategy_builder_fractional_allocation_flag(monkeypatch, 
     strategy_stage = next(stage for stage in stages if stage[0] == "build_strategy_candidates")
     args = strategy_stage[2]
     assert "--blueprints_file" in args
-    assert args[args.index("--blueprints_file") + 1].endswith("/reports/strategy_blueprints/strategy_builder_fractional_wiring/blueprints.jsonl")
+    assert args[args.index("--blueprints_file") + 1].endswith(
+        "/reports/strategy_blueprints/strategy_builder_fractional_wiring/blueprints.jsonl"
+    )
     assert "--enable_fractional_allocation" in args
     assert args[args.index("--enable_fractional_allocation") + 1] == "0"
     profitable_stage = next(stage for stage in stages if stage[0] == "select_profitable_strategies")
     profitable_args = profitable_stage[2]
     assert "--candidates_path" in profitable_args
-    assert profitable_args[profitable_args.index("--candidates_path") + 1].endswith("/reports/strategy_builder/strategy_builder_fractional_wiring/strategy_candidates.parquet")
+    assert profitable_args[profitable_args.index("--candidates_path") + 1].endswith(
+        "/reports/strategy_builder/strategy_builder_fractional_wiring/strategy_candidates.parquet"
+    )
+
 
 def test_run_all_runtime_invariants_enforce_fails_preflight(monkeypatch, tmp_path):
     executed: list[str] = []
@@ -623,6 +640,7 @@ def test_run_all_runtime_invariants_enforce_fails_preflight(monkeypatch, tmp_pat
     assert manifest["failed_stage"] == "runtime_invariants_preflight"
     assert manifest["status"] == "failed"
 
+
 def test_run_all_runtime_invariants_audit_records_issues_and_continues(monkeypatch, tmp_path):
     executed: list[str] = []
 
@@ -665,6 +683,7 @@ def test_run_all_runtime_invariants_audit_records_issues_and_continues(monkeypat
     assert manifest["runtime_invariants_status"] == "invalid_spec"
     assert manifest["failed_stage"] != "runtime_invariants_preflight"
 
+
 def test_run_all_runtime_postflight_enforce_blocks_on_violations(monkeypatch, tmp_path):
     executed: list[str] = []
 
@@ -687,7 +706,10 @@ def test_run_all_runtime_postflight_enforce_blocks_on_violations(monkeypatch, tm
             "normalization_issue_examples": [],
             "watermark_status": "failed",
             "watermark_violation_count": 2,
-            "watermark_violations_by_type": {"future_event_time": 1, "decision_before_watermark": 1},
+            "watermark_violations_by_type": {
+                "future_event_time": 1,
+                "decision_before_watermark": 1,
+            },
             "watermark_violation_examples": ["event_id=e1 event_time_us=10 > recv_time_us=1"],
             "max_observed_lag_us": 2_000_000,
             "determinism_replay_checks_status": (
@@ -751,7 +773,10 @@ def test_run_all_runtime_postflight_enforce_blocks_on_violations(monkeypatch, tm
     assert int(manifest["runtime_watermark_violation_count"]) == 2
     assert manifest["runtime_invariants_status"] == "violations"
 
-def test_run_all_runtime_postflight_audit_mode_records_violations_and_succeeds(monkeypatch, tmp_path):
+
+def test_run_all_runtime_postflight_audit_mode_records_violations_and_succeeds(
+    monkeypatch, tmp_path
+):
     def fake_run_stage(stage, script, base_args, run_id, **kwargs) -> bool:
         return True
 
@@ -832,6 +857,7 @@ def test_run_all_runtime_postflight_audit_mode_records_violations_and_succeeds(m
     assert manifest["runtime_invariants_status"] == "violations"
     assert int(manifest["runtime_watermark_violation_count"]) == 1
 
+
 def test_run_all_runtime_mode_plans_runtime_stages(monkeypatch, tmp_path):
     executed: list[str] = []
 
@@ -892,6 +918,7 @@ def test_run_all_runtime_mode_plans_runtime_stages(monkeypatch, tmp_path):
     assert "run_determinism_replay_checks" in planned
     assert "run_oms_replay_validation" in planned
 
+
 def test_run_all_emit_run_hash_computed_when_requested(monkeypatch, tmp_path):
     def fake_run_stage(stage, script, base_args, run_id, **kwargs) -> bool:
         return True
@@ -945,6 +972,7 @@ def test_run_all_emit_run_hash_computed_when_requested(monkeypatch, tmp_path):
     assert str(manifest["run_hash"]).startswith("blake2b_256:")
     assert manifest["hash_schema_version"] == "runtime_hash_v1"
 
+
 def test_run_all_enforce_fails_on_firewall_or_determinism_or_oms_violations(monkeypatch, tmp_path):
     def fake_run_stage(stage, script, base_args, run_id, **kwargs) -> bool:
         return True
@@ -955,16 +983,22 @@ def test_run_all_enforce_fails_on_firewall_or_determinism_or_oms_violations(monk
     monkeypatch.setattr(
         run_all,
         "_refresh_runtime_lineage_fields",
-        lambda manifest, run_id, determinism_replay_checks_requested, oms_replay_checks_requested: manifest.update(
-            {
-                "runtime_firewall_violation_count": 1,
-                "runtime_firewall_violation_examples": ["role=alpha provenance=execution forbidden"],
-                "determinism_status": "failed",
-                "determinism_replay_checks_status": "failed",
-                "oms_replay_status": "failed",
-                "oms_replay_violation_count": 1,
-                "oms_replay_violation_examples": ["order_id=o1 fill without submit event_id=e2"],
-            }
+        lambda manifest, run_id, determinism_replay_checks_requested, oms_replay_checks_requested: (
+            manifest.update(
+                {
+                    "runtime_firewall_violation_count": 1,
+                    "runtime_firewall_violation_examples": [
+                        "role=alpha provenance=execution forbidden"
+                    ],
+                    "determinism_status": "failed",
+                    "determinism_replay_checks_status": "failed",
+                    "oms_replay_status": "failed",
+                    "oms_replay_violation_count": 1,
+                    "oms_replay_violation_examples": [
+                        "order_id=o1 fill without submit event_id=e2"
+                    ],
+                }
+            )
         ),
     )
     monkeypatch.setattr(
@@ -1036,6 +1070,7 @@ def test_run_all_enforce_fails_on_firewall_or_determinism_or_oms_violations(monk
     assert manifest["determinism_status"] == "failed"
     assert manifest["oms_replay_status"] == "failed"
 
+
 def test_run_all_resume_from_failed_stage_instance(monkeypatch, tmp_path):
     executed: list[str] = []
 
@@ -1095,6 +1130,8 @@ def test_run_all_resume_from_failed_stage_instance(monkeypatch, tmp_path):
     assert rc == 1
     assert executed
     assert executed[0] == "build_cleaned_5m"
+
+
 def test_run_all_success_clears_failed_stage_instance(monkeypatch, tmp_path):
     def fake_run_stage(stage, script, base_args, run_id, **kwargs) -> bool:
         return True
@@ -1167,6 +1204,7 @@ def test_run_all_success_clears_failed_stage_instance(monkeypatch, tmp_path):
     assert manifest["failed_stage"] is None
     assert manifest["failed_stage_instance"] is None
 
+
 def test_benchmark_pipeline_script_writes_outputs(tmp_path, monkeypatch):
     data_root = tmp_path / "data"
     run_dir = data_root / "runs" / "bench_run"
@@ -1197,12 +1235,19 @@ def test_benchmark_pipeline_script_writes_outputs(tmp_path, monkeypatch):
     monkeypatch.setattr(
         sys,
         "argv",
-        ["benchmark_pipeline.py", "--run_id", "bench_run", "--out_dir", str(data_root / "reports" / "perf")],
+        [
+            "benchmark_pipeline.py",
+            "--run_id",
+            "bench_run",
+            "--out_dir",
+            str(data_root / "reports" / "perf"),
+        ],
     )
     rc = module.main()
     assert rc == 0
     assert (data_root / "reports" / "perf" / "summary.json").exists()
     assert (data_root / "reports" / "perf" / "stages.csv").exists()
+
 
 def test_run_all_writes_kpi_scorecard_from_promotion_audit(monkeypatch, tmp_path):
     def fake_run_stage(stage, script, base_args, run_id, **kwargs) -> bool:
@@ -1284,6 +1329,7 @@ def test_run_all_writes_kpi_scorecard_from_promotion_audit(monkeypatch, tmp_path
     assert abs(float(payload["metrics"]["trade_count"]["value"]) - 150.0) < 1e-9
     assert abs(float(payload["metrics"]["max_drawdown_pct"]["value"]) - (-0.2)) < 1e-9
 
+
 def test_run_all_certification_auto_enables_strict_modes(monkeypatch, tmp_path):
     data_root = tmp_path / "data"
 
@@ -1316,6 +1362,7 @@ def test_run_all_certification_auto_enables_strict_modes(monkeypatch, tmp_path):
     assert manifest["strict_run_scoped_reads"] is True
     assert manifest["require_stage_manifests"] is True
 
+
 def test_run_all_research_defaults_disable_strict_modes(monkeypatch, tmp_path):
     data_root = tmp_path / "data"
 
@@ -1347,6 +1394,7 @@ def test_run_all_research_defaults_disable_strict_modes(monkeypatch, tmp_path):
     manifest = _load_manifest(tmp_path, "research_default_modes")
     assert manifest["strict_run_scoped_reads"] is False
     assert manifest["require_stage_manifests"] is False
+
 
 def test_data_fingerprint_ignores_timestamp_and_path_relocation(monkeypatch, tmp_path):
     data_root = tmp_path / "data"

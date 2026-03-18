@@ -83,7 +83,10 @@ def regime_ess_diagnostics(
         return {"gate_regime_ess": False, "pass_count": 0}
     counts = events_df["vol_regime"].value_counts()
     pass_count = (counts >= min_ess_per_regime).sum()
-    return {"gate_regime_ess": bool(pass_count >= min_regimes_required), "pass_count": int(pass_count)}
+    return {
+        "gate_regime_ess": bool(pass_count >= min_regimes_required),
+        "pass_count": int(pass_count),
+    }
 
 
 def timeframe_expectancy_consensus(**kwargs: Any) -> dict[str, Any]:
@@ -122,7 +125,11 @@ def timeframe_expectancy_consensus(**kwargs: Any) -> dict[str, Any]:
         if np.sign(sign) == np.sign(base_sign):
             aligned_count += 1
 
-    required = max(min_timeframes_required, int(np.ceil(available_count * min_consistency_ratio))) if available_count else 0
+    required = (
+        max(min_timeframes_required, int(np.ceil(available_count * min_consistency_ratio)))
+        if available_count
+        else 0
+    )
     return {
         "gate_timeframe_consensus": bool(available_count and aligned_count >= required),
         "aligned_count": int(aligned_count),

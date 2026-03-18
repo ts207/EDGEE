@@ -31,7 +31,9 @@ def _write_registry(reg_dir: Path) -> None:
     (reg_dir / "states.yaml").write_text(yaml.dump({"states": {}}))
     (reg_dir / "features.yaml").write_text(yaml.dump({"features": {}}))
     (reg_dir / "templates.yaml").write_text(
-        yaml.dump({"templates": {"continuation": {"enabled": True, "supports_trigger_types": ["EVENT"]}}})
+        yaml.dump(
+            {"templates": {"continuation": {"enabled": True, "supports_trigger_types": ["EVENT"]}}}
+        )
     )
     (reg_dir / "contexts.yaml").write_text(
         yaml.dump({"context_dimensions": {"session": {"allowed_values": ["open", "close"]}}})
@@ -98,17 +100,21 @@ def test_issue_proposal_writes_program_memory_audit(monkeypatch, tmp_path):
     _write_registry(registry_root)
     _write_proposal(proposal_path)
 
-    monkeypatch.setattr(issue_proposal_module, "execute_proposal", lambda *args, **kwargs: {
-        "run_id": kwargs["run_id"],
-        "proposal_path": str(args[0]),
-        "experiment_config_path": str(Path(kwargs["out_dir"]) / "experiment.yaml"),
-        "run_all_overrides_path": str(Path(kwargs["out_dir"]) / "run_all_overrides.json"),
-        "command": ["python", "-m", "project.pipelines.run_all"],
-        "returncode": 0,
-        "stdout": "Plan for run\n",
-        "stderr": "",
-        "validated_plan": {"program_id": "btc_campaign", "estimated_hypothesis_count": 2},
-    })
+    monkeypatch.setattr(
+        issue_proposal_module,
+        "execute_proposal",
+        lambda *args, **kwargs: {
+            "run_id": kwargs["run_id"],
+            "proposal_path": str(args[0]),
+            "experiment_config_path": str(Path(kwargs["out_dir"]) / "experiment.yaml"),
+            "run_all_overrides_path": str(Path(kwargs["out_dir"]) / "run_all_overrides.json"),
+            "command": ["python", "-m", "project.pipelines.run_all"],
+            "returncode": 0,
+            "stdout": "Plan for run\n",
+            "stderr": "",
+            "validated_plan": {"program_id": "btc_campaign", "estimated_hypothesis_count": 2},
+        },
+    )
 
     result = issue_proposal(
         proposal_path,
@@ -117,7 +123,9 @@ def test_issue_proposal_writes_program_memory_audit(monkeypatch, tmp_path):
         plan_only=True,
     )
 
-    proposals_path = data_root / "artifacts" / "experiments" / "btc_campaign" / "memory" / "proposals.parquet"
+    proposals_path = (
+        data_root / "artifacts" / "experiments" / "btc_campaign" / "memory" / "proposals.parquet"
+    )
     proposals = pd.read_parquet(proposals_path)
     proposal_dir = Path(result["proposal_memory_dir"])
     memory_payload = query_memory_rows(program_id="btc_campaign", data_root=data_root)

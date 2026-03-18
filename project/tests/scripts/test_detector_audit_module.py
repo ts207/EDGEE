@@ -1,4 +1,5 @@
 """Tests for detector_audit_module shared measurement logic."""
+
 import math
 import pandas as pd
 import pytest
@@ -7,26 +8,29 @@ import pytest
 def _make_df(n: int = 5000) -> pd.DataFrame:
     """Build a minimal rich DataFrame for testing."""
     import numpy as np
+
     ts = pd.date_range("2023-01-01", periods=n, freq="5min", tz="UTC")
     close = pd.Series(30000.0 + np.cumsum(np.random.randn(n) * 50), name="close")
-    df = pd.DataFrame({
-        "timestamp": ts,
-        "open": close,
-        "high": close * 1.001,
-        "low": close * 0.999,
-        "close": close,
-        "close_perp": close,
-        "close_spot": close * 0.9998,
-        "volume": 1000.0,
-        "quote_volume": close * 1000.0,
-        "trade_count": 500,
-        "taker_buy_volume": 500.0,
-        "taker_buy_quote_volume": close * 500.0,
-        "spread_bps": 2.5,
-        "depth_usd": 5_000_000.0,
-        "funding_rate_scaled": 0.0001,
-        "symbol": "BTCUSDT",
-    })
+    df = pd.DataFrame(
+        {
+            "timestamp": ts,
+            "open": close,
+            "high": close * 1.001,
+            "low": close * 0.999,
+            "close": close,
+            "close_perp": close,
+            "close_spot": close * 0.9998,
+            "volume": 1000.0,
+            "quote_volume": close * 1000.0,
+            "trade_count": 500,
+            "taker_buy_volume": 500.0,
+            "taker_buy_quote_volume": close * 500.0,
+            "spread_bps": 2.5,
+            "depth_usd": 5_000_000.0,
+            "funding_rate_scaled": 0.0001,
+            "symbol": "BTCUSDT",
+        }
+    )
     log_ret = np.log(close / close.shift(1))
     df["rv_96"] = log_ret.rolling(96, min_periods=12).std()
     return df
@@ -72,48 +76,60 @@ def test_measure_detector_handles_missing_required_column():
 
 def test_classify_noisy():
     from project.scripts.detector_audit_module import _classify
+
     assert _classify(precision=0.30, recall=0.60, expected_windows=5) == "noisy"
 
 
 def test_classify_silent():
     from project.scripts.detector_audit_module import _classify
+
     assert _classify(precision=0.70, recall=0.10, expected_windows=5) == "silent"
 
 
 def test_classify_broken():
     from project.scripts.detector_audit_module import _classify
+
     assert _classify(precision=0.20, recall=0.10, expected_windows=5) == "broken"
 
 
 def test_classify_stable():
     from project.scripts.detector_audit_module import _classify
+
     assert _classify(precision=0.60, recall=0.50, expected_windows=5) == "stable"
 
 
 def test_classify_uncovered():
     from project.scripts.detector_audit_module import _classify
+
     assert _classify(precision=0.0, recall=0.0, expected_windows=0) == "uncovered"
 
 
 def test_count_hits_basic():
     from project.scripts.detector_audit_module import _count_hits
+
     base = pd.Timestamp("2023-01-01 12:00:00", tz="UTC")
-    event_times = pd.to_datetime(pd.Series([
-        base,                              # inside window 1
-        base + pd.Timedelta("1h"),         # inside window 1
-        base + pd.Timedelta("10h"),        # outside both windows
-    ]), utc=True)
+    event_times = pd.to_datetime(
+        pd.Series(
+            [
+                base,  # inside window 1
+                base + pd.Timedelta("1h"),  # inside window 1
+                base + pd.Timedelta("10h"),  # outside both windows
+            ]
+        ),
+        utc=True,
+    )
     windows = [
-        (base - pd.Timedelta("30min"), base + pd.Timedelta("2h")),   # window 1
-        (base + pd.Timedelta("20h"), base + pd.Timedelta("22h")),     # window 2 — no hits
+        (base - pd.Timedelta("30min"), base + pd.Timedelta("2h")),  # window 1
+        (base + pd.Timedelta("20h"), base + pd.Timedelta("22h")),  # window 2 — no hits
     ]
     in_window, windows_hit = _count_hits(event_times, windows)
-    assert in_window == 2       # 2 events inside window 1
-    assert windows_hit == 1     # only window 1 was hit
+    assert in_window == 2  # 2 events inside window 1
+    assert windows_hit == 1  # only window 1 was hit
 
 
 def test_build_truth_windows_filters():
     from project.scripts.detector_audit_module import _build_truth_windows
+
     segments = [
         {
             "symbol": "BTCUSDT",
@@ -136,7 +152,7 @@ def test_build_truth_windows_filters():
     ]
     tolerance = pd.Timedelta("30min")
     windows = _build_truth_windows(segments, "VOL_SPIKE", "BTCUSDT", tolerance)
-    assert len(windows) == 1   # only first segment matches
+    assert len(windows) == 1  # only first segment matches
     start, end = windows[0]
     assert start == pd.Timestamp("2023-01-01T00:00:00+00:00") - tolerance
     assert end == pd.Timestamp("2023-01-01T01:00:00+00:00") + tolerance
@@ -145,16 +161,19 @@ def test_build_truth_windows_filters():
 def test_enrich_df_computes_range_columns():
     from project.scripts.detector_audit_module import _enrich_df
     import numpy as np
+
     n = 200
     ts = pd.date_range("2023-01-01", periods=n, freq="5min", tz="UTC")
     close = pd.Series(30000.0 + np.arange(n, dtype=float), name="close")
-    df = pd.DataFrame({
-        "timestamp": ts,
-        "open": close,
-        "high": close * 1.001,
-        "low": close * 0.999,
-        "close": close,
-    })
+    df = pd.DataFrame(
+        {
+            "timestamp": ts,
+            "open": close,
+            "high": close * 1.001,
+            "low": close * 0.999,
+            "close": close,
+        }
+    )
     result = _enrich_df(df)
     assert "rv_96" in result.columns
     assert "spread_zscore" not in result.columns
@@ -171,16 +190,18 @@ def test_enrich_df_computes_spread_zscore_and_imbalance_when_available():
     n = 300
     ts = pd.date_range("2023-01-01", periods=n, freq="5min", tz="UTC")
     close = pd.Series(30000.0 + np.arange(n, dtype=float), name="close")
-    df = pd.DataFrame({
-        "timestamp": ts,
-        "open": close,
-        "high": close * 1.001,
-        "low": close * 0.999,
-        "close": close,
-        "spread_bps": np.linspace(2.0, 5.0, n),
-        "bid_depth_usd": np.linspace(1_200_000.0, 1_400_000.0, n),
-        "ask_depth_usd": np.linspace(800_000.0, 600_000.0, n),
-    })
+    df = pd.DataFrame(
+        {
+            "timestamp": ts,
+            "open": close,
+            "high": close * 1.001,
+            "low": close * 0.999,
+            "close": close,
+            "spread_bps": np.linspace(2.0, 5.0, n),
+            "bid_depth_usd": np.linspace(1_200_000.0, 1_400_000.0, n),
+            "ask_depth_usd": np.linspace(800_000.0, 600_000.0, n),
+        }
+    )
     result = _enrich_df(df)
     assert "spread_zscore" in result.columns
     assert "imbalance" in result.columns
@@ -191,22 +212,28 @@ def test_enrich_df_computes_spread_zscore_and_imbalance_when_available():
 def test_enrich_df_does_not_overwrite_existing():
     from project.scripts.detector_audit_module import _enrich_df
     import numpy as np
+
     n = 200
     ts = pd.date_range("2023-01-01", periods=n, freq="5min", tz="UTC")
     close = pd.Series(30000.0 + np.arange(n, dtype=float), name="close")
-    df = pd.DataFrame({
-        "timestamp": ts,
-        "close": close,
-        "open": close, "high": close * 1.001, "low": close * 0.999,
-        "rv_96": 99.0,   # sentinel value
-    })
+    df = pd.DataFrame(
+        {
+            "timestamp": ts,
+            "close": close,
+            "open": close,
+            "high": close * 1.001,
+            "low": close * 0.999,
+            "rv_96": 99.0,  # sentinel value
+        }
+    )
     result = _enrich_df(df)
-    assert (result["rv_96"] == 99.0).all()   # must not overwrite
+    assert (result["rv_96"] == 99.0).all()  # must not overwrite
 
 
 def test_audit_script_is_importable():
     """Verify the audit CLI script can be imported without errors."""
     import importlib
+
     mod = importlib.import_module("project.scripts.audit_detector_precision_recall")
     assert hasattr(mod, "main")
 

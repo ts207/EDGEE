@@ -6,6 +6,7 @@ import pytest
 from project.pipelines.research import phase2_candidate_discovery as p2  # noqa: E402
 from project.research.services import phase2_support
 
+
 def test_phase2_parser_rejects_removed_candidate_plan_flag():
     parser = p2._make_parser()
     with pytest.raises(SystemExit) as exc:
@@ -23,6 +24,7 @@ def test_phase2_parser_rejects_removed_candidate_plan_flag():
         )
     assert int(exc.value.code) == 2
 
+
 def test_phase2_parser_rejects_removed_atlas_mode_flag():
     parser = p2._make_parser()
     with pytest.raises(SystemExit) as exc:
@@ -37,7 +39,7 @@ def test_phase2_parser_rejects_removed_atlas_mode_flag():
                 "--atlas_mode",
                 "1",
             ]
-    )
+        )
     assert int(exc.value.code) == 2
 
 

@@ -26,6 +26,7 @@ _EMA_WINDOW = 20
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 
+
 def _make_bars(n: int = _N_BARS, seed: int = _SEED) -> pd.DataFrame:
     """
     Synthetic OHLCV bars with a slight upward drift so momentum has a real edge.
@@ -111,6 +112,7 @@ def _make_zero_edge_positions(bars: pd.DataFrame) -> pd.Series:
 
 # ── test class ────────────────────────────────────────────────────────────────
 
+
 class TestResearchEngineReconciliation:
     """Integration tests verifying sign and rank agreement between research and engine metrics."""
 
@@ -141,9 +143,7 @@ class TestResearchEngineReconciliation:
         assert research > 0.0, (
             f"Research metric for variant A should be positive, got {research:.6f}"
         )
-        assert engine > 0.0, (
-            f"Engine Sharpe for variant A should be positive, got {engine:.4f}"
-        )
+        assert engine > 0.0, f"Engine Sharpe for variant A should be positive, got {engine:.4f}"
 
     # ── test 2 ────────────────────────────────────────────────────────────────
 
@@ -161,9 +161,7 @@ class TestResearchEngineReconciliation:
         assert research_a > research_b, (
             f"Research rank wrong: A={research_a:.6f}, B={research_b:.6f}"
         )
-        assert engine_a > engine_b, (
-            f"Engine rank wrong: A={engine_a:.4f}, B={engine_b:.4f}"
-        )
+        assert engine_a > engine_b, f"Engine rank wrong: A={engine_a:.4f}, B={engine_b:.4f}"
 
     # ── test 3 ────────────────────────────────────────────────────────────────
 
@@ -193,12 +191,8 @@ class TestResearchEngineReconciliation:
             cost_bps=_COST_BPS,
         )
 
-        assert isinstance(ledger, pd.DataFrame), (
-            f"Expected DataFrame, got {type(ledger)}"
-        )
+        assert isinstance(ledger, pd.DataFrame), f"Expected DataFrame, got {type(ledger)}"
         assert "equity_return" in ledger.columns, (
             f"'equity_return' column missing; available: {ledger.columns.tolist()}"
         )
-        assert len(ledger) == len(bars), (
-            f"Ledger length {len(ledger)} != bars length {len(bars)}"
-        )
+        assert len(ledger) == len(bars), f"Ledger length {len(ledger)} != bars length {len(bars)}"

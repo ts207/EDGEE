@@ -4,6 +4,7 @@ E3-T1: DSR must be a nonzero default in all promotion entrypoints.
 Parses the source of each CLI script to extract the --min_dsr default.
 Prevents regression to min_dsr=0.0 which silently disables multiple-testing protection.
 """
+
 from __future__ import annotations
 
 import re

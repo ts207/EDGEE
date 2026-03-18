@@ -1,9 +1,11 @@
 """Tests for DSR promotion gate wired into _evaluate_row."""
+
 import numpy as np
 import pandas as pd
 import pytest
 
 from project.research.promotion import evaluate_row
+
 
 def _make_row(**overrides):
     """Create a minimal candidate row dict with sensible defaults."""
@@ -12,7 +14,7 @@ def _make_row(**overrides):
     effect = overrides.get("effect_shrunk_state", 0.04)
     std = overrides.get("std_return", 0.02)
     size = overrides.get("sample_size", 200)
-    
+
     # We must construct a valid returns_oos_combined array to pass the new strict DSR gate
     returns = list(rng.normal(effect, std + 1e-6, size))
 
@@ -46,6 +48,7 @@ def _make_row(**overrides):
     base.update(overrides)
     return base
 
+
 def _base_eval_kwargs(**overrides):
     """Base keyword arguments for _evaluate_row."""
     base = {
@@ -64,6 +67,7 @@ def _base_eval_kwargs(**overrides):
     }
     base.update(overrides)
     return base
+
 
 class TestDSRGate:
     """Tests for the DSR gate in evaluate_row."""

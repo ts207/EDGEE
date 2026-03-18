@@ -6,6 +6,7 @@ The hypothesis generator must support:
   - Family-level quotas (event, state, transition, feature).
   - Template-level budgets.
 """
+
 from __future__ import annotations
 
 import yaml
@@ -30,12 +31,12 @@ def base_spec_doc():
             "feature_predicates": [
                 {"feature": "f1", "operator": ">", "threshold": 2.0},
                 {"feature": "f2", "operator": "<", "threshold": -1.0},
-            ]
+            ],
         },
         "templates": ["mean_reversion", "continuation"],
         "horizons": ["5m"],
         "directions": ["long"],
-        "entry_lags": [1]
+        "entry_lags": [1],
     }
 
 
@@ -62,20 +63,20 @@ def test_family_quotas(tmp_path, base_spec_doc):
         "event": 2,
         "state": 1,
         "transition": 0,
-        "feature_predicate": 10  # more than available
+        "feature_predicate": 10,  # more than available
     }
     spec_path = _write_spec(tmp_path, doc)
-    
+
     hypotheses = generate_hypotheses(spec_path)
-    
+
     # Quotas are applied to the number of TRIGGERS (or unique triggers * templates combos?)
     # Usually quotas apply to the final count of hypotheses per family.
-    
+
     events = [h for h in hypotheses if h.trigger.trigger_type == "event"]
     states = [h for h in hypotheses if h.trigger.trigger_type == "state"]
     transitions = [h for h in hypotheses if h.trigger.trigger_type == "transition"]
     features = [h for h in hypotheses if h.trigger.trigger_type == "feature_predicate"]
-    
+
     assert len(events) == 2
     assert len(states) == 1
     assert len(transitions) == 0
@@ -94,17 +95,14 @@ def test_template_budgets(tmp_path, base_spec_doc):
     }
 
     doc = base_spec_doc.copy()
-    doc["template_budgets"] = {
-        "mean_reversion": 3,
-        "continuation": 100
-    }
+    doc["template_budgets"] = {"mean_reversion": 3, "continuation": 100}
     spec_path = _write_spec(tmp_path, doc)
-    
+
     hypotheses = generate_hypotheses(spec_path)
-    
+
     t1_hyp = [h for h in hypotheses if h.template_id == "mean_reversion"]
     t2_hyp = [h for h in hypotheses if h.template_id == "continuation"]
-    
+
     assert len(t1_hyp) == 3
     # Continuation should remain uncapped; current totals reflect valid generated
     # hypotheses after validation, not a fixed pre-expansion template count.

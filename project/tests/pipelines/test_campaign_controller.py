@@ -4,33 +4,49 @@ import json
 import sys
 import yaml
 from pathlib import Path
-from project.pipelines.research.campaign_controller import CampaignController, CampaignConfig, CampaignSummary
+from project.pipelines.research.campaign_controller import (
+    CampaignController,
+    CampaignConfig,
+    CampaignSummary,
+)
+
 
 @pytest.fixture
 def test_env(tmp_path):
     reg_dir = tmp_path / "registries"
     reg_dir.mkdir()
-    
-    (reg_dir / "events.yaml").write_text(yaml.dump({
-        "events": {
-            "E1": {"enabled": True, "family": "F1", "instrument_classes": ["crypto"]},
-            "E2": {"enabled": True, "family": "F1", "instrument_classes": ["crypto"]},
-            "E3": {"enabled": True, "family": "F2", "instrument_classes": ["crypto"]},
-            "E4": {"enabled": True, "family": "F2", "instrument_classes": ["crypto"]}
-        }
-    }))
-    (reg_dir / "templates.yaml").write_text(yaml.dump({"templates": {"continuation": {"enabled": True, "supports_trigger_types": ["EVENT"]}}}))
+
+    (reg_dir / "events.yaml").write_text(
+        yaml.dump(
+            {
+                "events": {
+                    "E1": {"enabled": True, "family": "F1", "instrument_classes": ["crypto"]},
+                    "E2": {"enabled": True, "family": "F1", "instrument_classes": ["crypto"]},
+                    "E3": {"enabled": True, "family": "F2", "instrument_classes": ["crypto"]},
+                    "E4": {"enabled": True, "family": "F2", "instrument_classes": ["crypto"]},
+                }
+            }
+        )
+    )
+    (reg_dir / "templates.yaml").write_text(
+        yaml.dump(
+            {"templates": {"continuation": {"enabled": True, "supports_trigger_types": ["EVENT"]}}}
+        )
+    )
     (reg_dir / "contexts.yaml").write_text(yaml.dump({"context_dimensions": {}}))
-    (reg_dir / "search_limits.yaml").write_text(yaml.dump({"limits": {"max_events_per_run": 10, "max_templates_per_run": 10}}))
+    (reg_dir / "search_limits.yaml").write_text(
+        yaml.dump({"limits": {"max_events_per_run": 10, "max_templates_per_run": 10}})
+    )
     (reg_dir / "states.yaml").write_text(yaml.dump({"states": {}}))
     (reg_dir / "features.yaml").write_text(yaml.dump({"features": {}}))
     (reg_dir / "detectors.yaml").write_text(yaml.dump({"detector_ownership": {}}))
-    
+
     data_root = tmp_path / "data"
     data_root.mkdir()
-    
+
     config = CampaignConfig(program_id="test_campaign", max_runs=2)
     return CampaignController(config, data_root, reg_dir)
+
 
 def test_campaign_request_generation(test_env):
     controller = test_env
@@ -38,6 +54,7 @@ def test_campaign_request_generation(test_env):
     assert req is not None
     assert req["program_id"] == "test_campaign"
     assert len(req["trigger_space"]["events"]["include"]) > 0
+
 
 def test_frontier_tracking(test_env, tmp_path):
     controller = test_env
@@ -49,19 +66,19 @@ def test_frontier_tracking(test_env, tmp_path):
             "trigger_payload": json.dumps({"event_id": "E1"}),
             "eval_status": "evaluated",
             "expectancy": 0.1,
-            "run_id": "run1"
+            "run_id": "run1",
         }
     ]
     pd.DataFrame(ledger_data).to_parquet(controller.ledger_path)
-    
+
     summary = controller._update_campaign_stats()
     assert summary.total_runs == 1
-    
+
     frontier = json.loads(controller.frontier_path.read_text())
     assert "E1" not in frontier["untested_events"]
     assert "E2" in frontier["untested_events"]
     assert "E3" in frontier["untested_events"]
-    
+
     # F1 is partially explored (E1 tested, E2 not)
     assert "F1" in frontier["partially_explored_families"]
     # F2 is NOT partially explored because tested count is 0

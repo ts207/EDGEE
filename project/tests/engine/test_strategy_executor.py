@@ -8,7 +8,9 @@ from project.engine.strategy_executor import build_live_order_metadata, calculat
 
 
 class _DummyStrategy:
-    def generate_positions(self, bars: pd.DataFrame, features: pd.DataFrame, params: dict) -> pd.Series:
+    def generate_positions(
+        self, bars: pd.DataFrame, features: pd.DataFrame, params: dict
+    ) -> pd.Series:
         out = pd.Series([0.0, 1.0, 1.0], index=pd.DatetimeIndex(bars["timestamp"]), dtype=float)
         out.attrs["strategy_metadata"] = {"family": "test"}
         return out
@@ -45,7 +47,9 @@ def test_calculate_strategy_returns_applies_execution_aware_sizing(monkeypatch, 
     monkeypatch.setattr("project.engine.strategy_executor.get_strategy", lambda _: _DummyStrategy())
     monkeypatch.setattr(
         "project.engine.strategy_executor.load_symbol_constraints",
-        lambda symbol, meta_dir: SymbolConstraints(tick_size=None, step_size=None, min_notional=None),
+        lambda symbol, meta_dir: SymbolConstraints(
+            tick_size=None, step_size=None, min_notional=None
+        ),
     )
 
     bars = _bars()
@@ -94,21 +98,34 @@ def test_calculate_strategy_returns_applies_execution_aware_sizing(monkeypatch, 
 
     assert legacy_scale == pytest.approx(1000.0)
     assert aware_scale < legacy_scale
-    assert float(aware.data["target_position"].iloc[-1]) < float(legacy.data["target_position"].iloc[-1])
+    assert float(aware.data["target_position"].iloc[-1]) < float(
+        legacy.data["target_position"].iloc[-1]
+    )
     assert aware.strategy_metadata["execution_aware_scale"] == pytest.approx(aware_scale)
     assert aware.strategy_metadata["execution_aware_estimated_cost_bps"] > 0.0
-    assert aware.strategy_metadata["live_order_metadata_template"]["expected_return_bps"] == pytest.approx(20.0)
-    assert aware.strategy_metadata["live_order_metadata_template"]["expected_adverse_bps"] == pytest.approx(20.0)
+    assert aware.strategy_metadata["live_order_metadata_template"][
+        "expected_return_bps"
+    ] == pytest.approx(20.0)
+    assert aware.strategy_metadata["live_order_metadata_template"][
+        "expected_adverse_bps"
+    ] == pytest.approx(20.0)
     assert aware.strategy_metadata["live_order_metadata_template"]["expected_cost_bps"] > 0.0
-    assert aware.strategy_metadata["live_order_metadata_template"]["volatility_regime"] == "elevated"
-    assert aware.strategy_metadata["live_order_metadata_template"]["microstructure_regime"] == "healthy"
+    assert (
+        aware.strategy_metadata["live_order_metadata_template"]["volatility_regime"] == "elevated"
+    )
+    assert (
+        aware.strategy_metadata["live_order_metadata_template"]["microstructure_regime"]
+        == "healthy"
+    )
 
 
 def test_build_live_order_metadata_uses_latest_strategy_row(monkeypatch, tmp_path) -> None:
     monkeypatch.setattr("project.engine.strategy_executor.get_strategy", lambda _: _DummyStrategy())
     monkeypatch.setattr(
         "project.engine.strategy_executor.load_symbol_constraints",
-        lambda symbol, meta_dir: SymbolConstraints(tick_size=None, step_size=None, min_notional=None),
+        lambda symbol, meta_dir: SymbolConstraints(
+            tick_size=None, step_size=None, min_notional=None
+        ),
     )
 
     result = calculate_strategy_returns(
@@ -121,7 +138,11 @@ def test_build_live_order_metadata_uses_latest_strategy_row(monkeypatch, tmp_pat
             "execution_lag_bars": 0,
             "expected_return_bps": 30.0,
             "expected_adverse_bps": 5.0,
-            "execution_model": {"cost_model": "static", "base_fee_bps": 2.0, "base_slippage_bps": 1.0},
+            "execution_model": {
+                "cost_model": "static",
+                "base_fee_bps": 2.0,
+                "base_slippage_bps": 1.0,
+            },
         },
         0.0,
         tmp_path,

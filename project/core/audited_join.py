@@ -7,6 +7,7 @@ from typing import Optional, Any, Dict
 
 LOGGER = logging.getLogger(__name__)
 
+
 def audited_merge_asof(
     left: pd.DataFrame,
     right: pd.DataFrame,
@@ -28,16 +29,18 @@ def audited_merge_asof(
     # 1. PIT Safety Assertions
     if direction == "forward":
         # Forward joins are extremely dangerous in research unless carefully used for labels
-        LOGGER.warning(f"DANGEROUS: Forward as-of join used for feature {feature_name}. Ensure this is for label construction only.")
-    
+        LOGGER.warning(
+            f"DANGEROUS: Forward as-of join used for feature {feature_name}. Ensure this is for label construction only."
+        )
+
     # 2. Perform Join
     # Ensure sorted timestamps
     left = left.sort_values(left_on)
     right = right.sort_values(right_on)
-    
+
     # Check for same-timestamp lookahead if direction is backward
     # (In standard merge_asof backward, left_ts >= right_ts is matched)
-    
+
     merged = pd.merge_asof(
         left,
         right,
@@ -46,12 +49,12 @@ def audited_merge_asof(
         direction=direction,
         tolerance=tolerance,
     )
-    
+
     # 3. Auditing and Staleness Check
     if right_on in merged.columns:
         # Compute age
         age_seconds = (merged[left_on] - merged[right_on]).dt.total_seconds()
-        
+
         # Log to registry if provided (F1/F2 integration)
         if audit_registry:
             feature_cols = [c for c in right.columns if c != right_on]
@@ -63,15 +66,15 @@ def audited_merge_asof(
                 join_tolerance=str(tolerance),
                 age_seconds=age_seconds,
                 symbol=symbol,
-                run_id=run_id
+                run_id=run_id,
             )
-            
+
         # Hard fail if excessive staleness
         stale_mask = age_seconds > stale_threshold_seconds
         stale_rate = stale_mask.mean()
-        if stale_rate > 0.05: # Global 5% threshold
-             msg = f"Audited join for {feature_name} failed: excessive stale usage {stale_rate:.2%} > 5%"
-             LOGGER.error(msg)
-             # In confirmatory mode we'd raise here, but for now we follow the existing pattern
-             
+        if stale_rate > 0.05:  # Global 5% threshold
+            msg = f"Audited join for {feature_name} failed: excessive stale usage {stale_rate:.2%} > 5%"
+            LOGGER.error(msg)
+            # In confirmatory mode we'd raise here, but for now we follow the existing pattern
+
     return merged

@@ -74,15 +74,16 @@ def test_validate_trace_schema_accepts_trace_subset() -> None:
     validate_trace_schema(trace)
 
 
-
 def test_validate_portfolio_frame_schema_accepts_equity_based_portfolio_frame() -> None:
     idx = pd.date_range("2024-01-01", periods=2, freq="5min", tz="UTC")
-    frame = pd.DataFrame({
-        "timestamp": idx,
-        "portfolio_net_pnl": [0.0, 0.1],
-        "portfolio_equity": [1.0, 1.1],
-        "portfolio_equity_return": [0.0, 0.1],
-    })
+    frame = pd.DataFrame(
+        {
+            "timestamp": idx,
+            "portfolio_net_pnl": [0.0, 0.1],
+            "portfolio_equity": [1.0, 1.1],
+            "portfolio_equity_return": [0.0, 0.1],
+        }
+    )
     validate_portfolio_frame_schema(frame)
 
 

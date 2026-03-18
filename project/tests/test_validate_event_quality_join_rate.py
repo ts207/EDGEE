@@ -10,6 +10,7 @@ that falls within the feature table's time range still joins successfully.
 
 A test that fails when exact equality is used is included explicitly.
 """
+
 from __future__ import annotations
 
 import numpy as np
@@ -24,6 +25,7 @@ from project.pipelines.research.validate_event_quality import _compute_join_rate
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _bar_features(n_bars: int = 20, bar_seconds: int = 300) -> pd.DataFrame:
     """Return a minimal features DataFrame with bar-aligned timestamps."""
     base = pd.Timestamp("2024-01-01 00:00:00", tz="UTC")
@@ -35,9 +37,11 @@ def _bar_features(n_bars: int = 20, bar_seconds: int = 300) -> pd.DataFrame:
         }
     )
 
+
 def _events_at_bar_boundaries(features_df: pd.DataFrame) -> pd.DataFrame:
     """Events whose timestamps exactly match feature bar boundaries."""
     return pd.DataFrame({"timestamp": features_df["timestamp"].values.copy()})
+
 
 def _events_offset_within_bars(features_df: pd.DataFrame, offset_seconds: int = 30) -> pd.DataFrame:
     """
@@ -46,6 +50,7 @@ def _events_offset_within_bars(features_df: pd.DataFrame, offset_seconds: int = 
     """
     shifted = features_df["timestamp"] + pd.Timedelta(seconds=offset_seconds)
     return pd.DataFrame({"timestamp": shifted.values})
+
 
 def _exact_join_rate_reference(events_df: pd.DataFrame, features_df: pd.DataFrame) -> float:
     """
@@ -58,9 +63,11 @@ def _exact_join_rate_reference(events_df: pd.DataFrame, features_df: pd.DataFram
     matched = sum(1 for ts in event_ts if ts in feat_ts_set)
     return float(matched / len(event_ts)) if len(event_ts) > 0 else 0.0
 
+
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
+
 
 class TestComputeJoinRateEmpty:
     def test_empty_events_returns_zeros(self):
@@ -81,6 +88,7 @@ class TestComputeJoinRateEmpty:
         result = _compute_join_rate(events, features, horizons_bars=[1])
         assert result["features"] == 0.0
 
+
 class TestFeatureJoinRateExactTimestamps:
     """When event timestamps exactly match bar boundaries, join rate should be 1.0."""
 
@@ -99,6 +107,7 @@ class TestFeatureJoinRateExactTimestamps:
         result = _compute_join_rate(events, features, horizons_bars=[1])
         # All 10 should join via merge_asof (offset ones match the bar before them).
         assert result["features"] == pytest.approx(1.0)
+
 
 class TestFeatureJoinRateSubBarTimestamps:
     """
@@ -146,6 +155,7 @@ class TestFeatureJoinRateSubBarTimestamps:
         result = _compute_join_rate(events, features, horizons_bars=[1])
         assert result["features"] == pytest.approx(0.0)
 
+
 class TestLabelJoinRateBasedOnMatchedBarIndex:
     """
     Label join rate must be derived from the matched bar's integer position, not
@@ -192,9 +202,7 @@ class TestLabelJoinRateBasedOnMatchedBarIndex:
 
     def test_no_close_column_gives_zero_label_rate(self):
         features = _bar_features(n_bars=10).drop(columns=["close"])
-        events = _events_offset_within_bars(
-            _bar_features(n_bars=10), offset_seconds=30
-        )
+        events = _events_offset_within_bars(_bar_features(n_bars=10), offset_seconds=30)
         result = _compute_join_rate(events, features, horizons_bars=[1, 3])
         assert result["label_1b"] == pytest.approx(0.0)
         assert result["label_3b"] == pytest.approx(0.0)
@@ -207,6 +215,7 @@ class TestLabelJoinRateBasedOnMatchedBarIndex:
         )
         result = _compute_join_rate(events, features, horizons_bars=[1])
         assert result["features"] == pytest.approx(1.0)
+
 
 class TestJoinStalenessTolerance:
     def test_stale_event_does_not_join_when_tolerance_applied(self):

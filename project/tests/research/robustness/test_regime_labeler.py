@@ -8,10 +8,12 @@ from project.research.robustness.regime_labeler import label_regimes, REGIME_DIM
 def _make_features_with_states(n_bars: int = 200) -> pd.DataFrame:
     """Synthetic features with known state column patterns."""
     dates = pd.date_range("2023-01-01", periods=n_bars, freq="5min")
-    df = pd.DataFrame({
-        "timestamp": dates,
-        "close": 100.0 + np.cumsum(np.random.normal(0, 0.05, n_bars)),
-    })
+    df = pd.DataFrame(
+        {
+            "timestamp": dates,
+            "close": 100.0 + np.cumsum(np.random.normal(0, 0.05, n_bars)),
+        }
+    )
     # High vol in first half, low vol in second half
     df["state_high_vol_regime"] = [1] * 100 + [0] * 100
     df["state_low_vol_regime"] = [0] * 100 + [1] * 100
@@ -53,10 +55,12 @@ def test_label_regimes_second_half():
 
 
 def test_label_regimes_no_state_columns():
-    df = pd.DataFrame({
-        "timestamp": pd.date_range("2023-01-01", periods=10, freq="5min"),
-        "close": 100.0,
-    })
+    df = pd.DataFrame(
+        {
+            "timestamp": pd.date_range("2023-01-01", periods=10, freq="5min"),
+            "close": 100.0,
+        }
+    )
     labels = label_regimes(df)
     # Should return "unknown" for all dimensions when no state cols found
     assert all("unknown" in lbl for lbl in labels)

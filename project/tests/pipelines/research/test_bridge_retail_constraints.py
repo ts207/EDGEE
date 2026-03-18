@@ -13,6 +13,7 @@ from project.pipelines.research.bridge_evaluate_phase2 import (
 )
 from project.research.helpers.viability import evaluate_retail_constraints
 
+
 def test_evaluate_retail_constraints_falls_back_to_after_cost_expectancy():
     out = evaluate_retail_constraints(
         {
@@ -32,6 +33,7 @@ def test_evaluate_retail_constraints_falls_back_to_after_cost_expectancy():
     assert out["gate_cost_budget"] is True
     assert out["gate_turnover"] is True
     assert out["gate_retail_viability"] is True
+
 
 def test_bridge_row_applies_retail_gate_when_required():
     row = pd.Series(
@@ -74,6 +76,7 @@ def test_bridge_row_applies_retail_gate_when_required():
     assert result["gate_bridge_tradable"] is False
     assert "gate_bridge_retail_net_expectancy" in str(result["bridge_fail_reasons"])
 
+
 def test_bridge_row_keeps_retail_gate_soft_when_not_required():
     row = pd.Series(
         {
@@ -110,6 +113,7 @@ def test_bridge_row_keeps_retail_gate_soft_when_not_required():
     assert overlay_delta is None
     assert result["gate_bridge_retail_net_expectancy"] is False
     assert result["gate_bridge_tradable"] is True
+
 
 def test_bridge_row_flags_microstructure_risk_gate():
     row = pd.Series(
@@ -151,6 +155,7 @@ def test_bridge_row_flags_microstructure_risk_gate():
     assert result["gate_bridge_tradable_without_microstructure"] is True
     assert result["gate_bridge_tradable"] is False
     assert "gate_bridge_micro_spread_stress" in str(result["bridge_fail_reasons"])
+
 
 def test_bridge_row_enforces_low_capital_viability_when_enabled():
     row = pd.Series(
@@ -217,6 +222,7 @@ def test_bridge_row_enforces_low_capital_viability_when_enabled():
     assert abs(float(result["low_capital_required_min_notional_usd"]) - 50.0) < 1e-9
     assert abs(float(result["low_capital_min_order_ratio"]) - 30.0) < 1e-9
     assert result["low_capital_estimated_position_notional_source"] == "turnover_implied"
+
 
 def test_bridge_symbol_cost_calibration_round_trip(tmp_path: Path):
     metrics_df = pd.DataFrame(

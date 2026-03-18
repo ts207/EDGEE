@@ -107,7 +107,9 @@ def _classify_volatility_regime(vol_bps: float) -> str:
     return "calm"
 
 
-def _classify_microstructure_regime(*, spread_bps: float, depth_usd: float, tob_coverage: float) -> str:
+def _classify_microstructure_regime(
+    *, spread_bps: float, depth_usd: float, tob_coverage: float
+) -> str:
     spread = float(spread_bps or 0.0)
     depth = float(depth_usd or 0.0)
     coverage = float(tob_coverage or 0.0)
@@ -226,7 +228,9 @@ def calculate_strategy_returns(
 
     timestamp_index = pd.DatetimeIndex(pd.to_datetime(bars["timestamp"], utc=True))
     allow_continuous_position = bool(int(params.get("allow_continuous_position", 0) or 0))
-    positions = pd.to_numeric(positions.reindex(timestamp_index).fillna(0), errors="coerce").fillna(0.0)
+    positions = pd.to_numeric(positions.reindex(timestamp_index).fillna(0), errors="coerce").fillna(
+        0.0
+    )
     _validate_positions(positions, allow_continuous=allow_continuous_position)
     if not allow_continuous_position:
         positions = positions.astype(int)
@@ -354,8 +358,12 @@ def calculate_strategy_returns(
                 "close": close.reindex(timestamp_index).astype(float),
                 "high": _to_series(bars_indexed.get("high", close), timestamp_index),
                 "low": _to_series(bars_indexed.get("low", close), timestamp_index),
-                "quote_volume": _to_series(features_aligned.get("quote_volume", 0.0), timestamp_index),
-                "tob_coverage": _to_series(features_aligned.get("tob_coverage", 0.0), timestamp_index),
+                "quote_volume": _to_series(
+                    features_aligned.get("quote_volume", 0.0), timestamp_index
+                ),
+                "tob_coverage": _to_series(
+                    features_aligned.get("tob_coverage", 0.0), timestamp_index
+                ),
                 "depth_usd": _to_series(features_aligned.get("depth_usd", 0.0), timestamp_index),
             },
             index=timestamp_index,
@@ -367,7 +375,9 @@ def calculate_strategy_returns(
     use_carry = _is_carry_strategy(strategy_name, strategy_metadata)
     expected_return_bps = float(params.get("expected_return_bps", 0.0) or 0.0)
     expected_adverse_bps = float(params.get("expected_adverse_bps", 0.0) or 0.0)
-    expected_cost_series = pd.to_numeric(dynamic_cost_bps, errors="coerce").reindex(timestamp_index).fillna(0.0)
+    expected_cost_series = (
+        pd.to_numeric(dynamic_cost_bps, errors="coerce").reindex(timestamp_index).fillna(0.0)
+    )
     expected_net_edge_bps = expected_return_bps - expected_adverse_bps - expected_cost_series
     vol_bps_series = pd.to_numeric(
         features_aligned.get("vol_regime_bps", pd.Series(np.nan, index=timestamp_index)),
@@ -450,17 +460,19 @@ def calculate_strategy_returns(
 
     validate_strategy_frame_schema(df)
 
-    strategy_metadata["live_order_metadata_template"] = build_live_order_metadata(result=StrategyResult(
-        strategy_name,
-        df,
-        {
-            "total_bars": len(df),
-            "clipped_trades": clipped_trades,
-            "allow_continuous_position": allow_continuous_position,
-        },
-        dict(strategy_metadata),
-        pd.DataFrame(),
-    ))
+    strategy_metadata["live_order_metadata_template"] = build_live_order_metadata(
+        result=StrategyResult(
+            strategy_name,
+            df,
+            {
+                "total_bars": len(df),
+                "clipped_trades": clipped_trades,
+                "allow_continuous_position": allow_continuous_position,
+            },
+            dict(strategy_metadata),
+            pd.DataFrame(),
+        )
+    )
 
     trace = df[
         [

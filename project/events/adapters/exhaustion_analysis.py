@@ -5,7 +5,10 @@ from typing import Any
 import pandas as pd
 
 from project.events.detectors.exhaustion import FlowExhaustionDetector
-from project.events.registries.exhaustion import EXHAUSTION_DETECTORS, ensure_exhaustion_detectors_registered
+from project.events.registries.exhaustion import (
+    EXHAUSTION_DETECTORS,
+    ensure_exhaustion_detectors_registered,
+)
 from project.research.analyzers import run_analyzer_suite
 
 

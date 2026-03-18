@@ -9,10 +9,12 @@ from project.runtime.normalized_event import NormalizedEvent
 _MAX_ISSUE_EXAMPLES = 20
 _TERMINAL_STATES = {"filled", "rejected", "canceled"}
 
+
 @dataclass
 class _OrderState:
     state: str
     last_source_seq: int
+
 
 def _is_execution_related(event: NormalizedEvent) -> bool:
     if str(event.provenance).strip().lower() == "execution":
@@ -24,6 +26,7 @@ def _is_execution_related(event: NormalizedEvent) -> bool:
         return True
     source = str(event.source_id).strip().lower()
     return ("oms" in source) or ("order" in source)
+
 
 def _action_from_event_type(event_type: str) -> str:
     token = str(event_type).strip().lower()
@@ -41,6 +44,7 @@ def _action_from_event_type(event_type: str) -> str:
         return "cancel"
     return "other"
 
+
 def _push_issue(
     counters: Dict[str, int],
     examples: List[str],
@@ -52,6 +56,7 @@ def _push_issue(
     counters[key] = int(counters.get(key, 0)) + 1
     if len(examples) < int(max_examples):
         examples.append(str(message))
+
 
 def audit_oms_replay(
     events: Iterable[NormalizedEvent],
@@ -110,7 +115,14 @@ def audit_oms_replay(
             current.last_source_seq = max(int(current.last_source_seq), int(event.source_seq))
 
         state_before = str(current.state)
-        if state_before in _TERMINAL_STATES and action in {"submit", "ack", "fill", "partial_fill", "reject", "cancel"}:
+        if state_before in _TERMINAL_STATES and action in {
+            "submit",
+            "ack",
+            "fill",
+            "partial_fill",
+            "reject",
+            "cancel",
+        }:
             _push_issue(
                 counters,
                 examples,

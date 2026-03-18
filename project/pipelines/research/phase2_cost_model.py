@@ -9,6 +9,7 @@ import pandas as pd
 from project.core.execution_costs import resolve_execution_costs
 from project.pipelines.research.cost_calibration import ToBRegimeCostCalibrator
 
+
 def _resolve_phase2_costs(
     args: argparse.Namespace,
     project_root: Path,
@@ -33,6 +34,7 @@ def _resolve_phase2_costs(
         "slippage_bps_per_fill": costs.slippage_bps_per_fill,
     }
     return costs.cost_bps, coordinate
+
 
 def init_cost_calibrator(
     run_id: str,

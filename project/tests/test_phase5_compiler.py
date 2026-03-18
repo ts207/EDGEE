@@ -14,6 +14,7 @@ from project.strategy.dsl.schema import (
 from project.compilers.spec_transformer import transform_blueprint_to_spec
 from project.compilers.nautilus.core import compile_to_nautilus_backtest, compile_to_nautilus_live
 
+
 def test_nautilus_compilation_pipeline():
     # 1. Create a dummy Blueprint
     blueprint = Blueprint(
@@ -22,9 +23,7 @@ def test_nautilus_compilation_pipeline():
         event_type="VOL_SPIKE",
         candidate_id="cand_456",
         symbol_scope=SymbolScopeSpec(
-            mode="single_symbol",
-            symbols=["BTCUSDT"],
-            candidate_symbol="BTCUSDT"
+            mode="single_symbol", symbols=["BTCUSDT"], candidate_symbol="BTCUSDT"
         ),
         direction="long",
         entry=DSLEntrySpec(
@@ -33,7 +32,7 @@ def test_nautilus_compilation_pipeline():
             confirmations=[],
             delay_bars=0,
             cooldown_bars=0,
-            condition_nodes=[]
+            condition_nodes=[],
         ),
         exit=DSLExitSpec(
             time_stop_bars=10,
@@ -41,28 +40,34 @@ def test_nautilus_compilation_pipeline():
             stop_type="percent",
             stop_value=0.02,
             target_type="percent",
-            target_value=0.05
+            target_value=0.05,
         ),
         execution=DSLExecutionSpec(mode="market"),
-        sizing=SizingSpec(mode="fixed_risk", risk_per_trade=0.01, max_gross_leverage=1.0, max_position_scale=0.5),
+        sizing=SizingSpec(
+            mode="fixed_risk", risk_per_trade=0.01, max_gross_leverage=1.0, max_position_scale=0.5
+        ),
         overlays=[],
         evaluation=EvaluationSpec(
             min_trades=10,
             cost_model={"fees_bps": 2.0, "slippage_bps": 1.0, "funding_included": True},
-            robustness_flags={"oos_required": True, "multiplicity_required": True, "regime_stability_required": True}
+            robustness_flags={
+                "oos_required": True,
+                "multiplicity_required": True,
+                "regime_stability_required": True,
+            },
         ),
         lineage=LineageSpec(
             source_path="path/to/src",
             compiler_version="1.0",
-            generated_at_utc="2026-03-06T12:00:00Z"
-        )
+            generated_at_utc="2026-03-06T12:00:00Z",
+        ),
     )
 
     # 2. Transform to StrategySpec
     spec = transform_blueprint_to_spec(blueprint)
     assert spec.strategy_id == "test_strat"
     assert spec.instrument == "BTCUSDT"
-    assert spec.exit.take_profit_bps == 500.0 # 0.05 * 10000
+    assert spec.exit.take_profit_bps == 500.0  # 0.05 * 10000
 
     # 3. Compile to Nautilus Backtest
     backtest_bundle = compile_to_nautilus_backtest(spec)
@@ -74,6 +79,7 @@ def test_nautilus_compilation_pipeline():
     live_bundle = compile_to_nautilus_live(spec, venue_profile={"api_key_ref": "secret_key"})
     assert live_bundle["adapter_config"]["api_key_ref"] == "secret_key"
     assert live_bundle["execution_policy"]["style"] == "market"
+
 
 if __name__ == "__main__":
     test_nautilus_compilation_pipeline()

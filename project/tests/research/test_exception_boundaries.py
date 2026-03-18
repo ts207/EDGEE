@@ -28,7 +28,9 @@ def test_load_candidate_detail_returns_empty_dict_on_invalid_json(tmp_path) -> N
     assert filtering.load_candidate_detail(source_path, "cand_1") == {}
 
 
-def test_load_candidate_detail_does_not_swallow_unexpected_runtime_errors(monkeypatch, tmp_path) -> None:
+def test_load_candidate_detail_does_not_swallow_unexpected_runtime_errors(
+    monkeypatch, tmp_path
+) -> None:
     source_path = tmp_path / "candidate.json"
     source_path.write_text(json.dumps({"candidate_id": "cand_1"}), encoding="utf-8")
 

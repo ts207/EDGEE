@@ -17,10 +17,19 @@ def test_catalog_paths_and_json_loading(tmp_path: Path) -> None:
     root = tmp_path / "data"
     run_id = "r1"
     assert run_manifest_path(run_id, root) == root / "runs" / run_id / "run_manifest.json"
-    assert checklist_path(run_id, root) == root / "runs" / run_id / "research_checklist" / "checklist.json"
+    assert (
+        checklist_path(run_id, root)
+        == root / "runs" / run_id / "research_checklist" / "checklist.json"
+    )
     assert kpi_scorecard_path(run_id, root) == root / "runs" / run_id / "kpi_scorecard.json"
-    assert promotion_summary_path(run_id, root) == root / "reports" / "promotions" / run_id / "promotion_summary.json"
-    assert blueprint_summary_path(run_id, root) == root / "reports" / "strategy_blueprints" / run_id / "blueprint_summary.json"
+    assert (
+        promotion_summary_path(run_id, root)
+        == root / "reports" / "promotions" / run_id / "promotion_summary.json"
+    )
+    assert (
+        blueprint_summary_path(run_id, root)
+        == root / "reports" / "strategy_blueprints" / run_id / "blueprint_summary.json"
+    )
 
     p = run_manifest_path(run_id, root)
     p.parent.mkdir(parents=True, exist_ok=True)

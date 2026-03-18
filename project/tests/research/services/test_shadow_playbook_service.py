@@ -154,4 +154,7 @@ def test_build_shadow_playbook_applies_adjacent_survivorship_blocker(tmp_path):
     assert group["status"] == "research_only"
     assert "adjacent_window_fail" in group["deploy_blockers"]
     assert group["adjacent_survivorship"]["matched"] is True
-    assert group["adjacent_survivorship"]["failure_reasons"] == ["after_cost_negative", "bridge_fail"]
+    assert group["adjacent_survivorship"]["failure_reasons"] == [
+        "after_cost_negative",
+        "bridge_fail",
+    ]

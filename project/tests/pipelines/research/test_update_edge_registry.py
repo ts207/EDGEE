@@ -8,11 +8,13 @@ import pandas as pd
 
 import project.pipelines.research.update_edge_registry as update_edge_registry
 
+
 def _write_run_manifest(data_root: Path, run_id: str) -> None:
     run_dir = data_root / "runs" / run_id
     run_dir.mkdir(parents=True, exist_ok=True)
     payload = {"run_id": run_id, "ontology_spec_hash": "sha256:test"}
     (run_dir / "run_manifest.json").write_text(json.dumps(payload), encoding="utf-8")
+
 
 def _write_promotions(data_root: Path, run_id: str, effect: float) -> None:
     promo_dir = data_root / "reports" / "promotions" / run_id
@@ -117,6 +119,7 @@ def _write_promotions_statistical_audit_only(data_root: Path, run_id: str, effec
     )
     footprint.to_parquet(promo_dir / "promotion_capital_footprint.parquet", index=False)
 
+
 def test_update_edge_registry_appends_and_aggregates(monkeypatch, tmp_path):
     data_root = tmp_path / "data"
     monkeypatch.setattr(update_edge_registry, "get_data_root", lambda: data_root)
@@ -159,6 +162,7 @@ def test_update_edge_registry_appends_and_aggregates(monkeypatch, tmp_path):
     assert abs(float(row["median_effect"]) - 0.015) < 1e-9
     assert abs(float(row["capital_slot_pressure_median"]) - 1.0) < 1e-9
     assert int(row["capital_slot_limit_breaches"]) == 1
+
 
 def test_update_edge_registry_replay_with_same_baseline_is_isolated(monkeypatch, tmp_path):
     data_root = tmp_path / "data"

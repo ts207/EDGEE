@@ -51,15 +51,23 @@ def resolve_live_engine_session_metadata(
         resolved_symbols = ["btcusdt", "ethusdt"]
 
     resolved_snapshot_path = snapshot_path or str(
-        config.get("live_state_snapshot_path", PROJECT_ROOT.parent / "artifacts" / "live_state.json")
+        config.get(
+            "live_state_snapshot_path", PROJECT_ROOT.parent / "artifacts" / "live_state.json"
+        )
     )
     recovery_streak = int(config.get("microstructure_recovery_streak", 3) or 3)
     account_sync_interval_seconds = float(config.get("account_sync_interval_seconds", 30.0) or 30.0)
     account_sync_failure_threshold = int(config.get("account_sync_failure_threshold", 3) or 3)
     execution_degradation_min_samples = int(config.get("execution_degradation_min_samples", 3) or 3)
-    execution_degradation_warn_edge_bps = float(config.get("execution_degradation_warn_edge_bps", 0.0) or 0.0)
-    execution_degradation_block_edge_bps = float(config.get("execution_degradation_block_edge_bps", -5.0) or -5.0)
-    execution_degradation_throttle_scale = float(config.get("execution_degradation_throttle_scale", 0.5) or 0.5)
+    execution_degradation_warn_edge_bps = float(
+        config.get("execution_degradation_warn_edge_bps", 0.0) or 0.0
+    )
+    execution_degradation_block_edge_bps = float(
+        config.get("execution_degradation_block_edge_bps", -5.0) or -5.0
+    )
+    execution_degradation_throttle_scale = float(
+        config.get("execution_degradation_throttle_scale", 0.5) or 0.5
+    )
     return {
         "symbols": list(resolved_symbols),
         "live_state_snapshot_path": str(resolved_snapshot_path),
@@ -92,7 +100,9 @@ def _normalize_path_for_match(path: str | Path) -> str:
 def _path_matches_expected(actual: str, expected: str | Path) -> bool:
     normalized_actual = _normalize_path_for_match(actual)
     normalized_expected = _normalize_path_for_match(expected)
-    return normalized_actual == normalized_expected or normalized_actual.endswith(normalized_expected)
+    return normalized_actual == normalized_expected or normalized_actual.endswith(
+        normalized_expected
+    )
 
 
 def validate_live_runtime_environment(
@@ -111,7 +121,9 @@ def validate_live_runtime_environment(
     edge_environment = str(env.get("EDGE_ENVIRONMENT", "")).strip().lower()
     edge_venue = str(env.get("EDGE_VENUE", "")).strip().lower()
     edge_live_config = str(env.get("EDGE_LIVE_CONFIG", "")).strip()
-    resolved_snapshot_path = snapshot_path or str(config.get("live_state_snapshot_path", "")).strip()
+    resolved_snapshot_path = (
+        snapshot_path or str(config.get("live_state_snapshot_path", "")).strip()
+    )
     edge_live_snapshot_path = str(env.get("EDGE_LIVE_SNAPSHOT_PATH", "")).strip()
 
     if edge_environment != environment_name:
@@ -124,7 +136,9 @@ def validate_live_runtime_environment(
         errors.append(f"EDGE_LIVE_CONFIG must point to {config_path}")
     if not edge_live_snapshot_path:
         errors.append("EDGE_LIVE_SNAPSHOT_PATH must be set")
-    elif resolved_snapshot_path and not _path_matches_expected(edge_live_snapshot_path, resolved_snapshot_path):
+    elif resolved_snapshot_path and not _path_matches_expected(
+        edge_live_snapshot_path, resolved_snapshot_path
+    ):
         errors.append(f"EDGE_LIVE_SNAPSHOT_PATH must point to {resolved_snapshot_path}")
 
     if environment_name == "paper":
@@ -191,7 +205,9 @@ def normalize_binance_futures_account_snapshot(payload: Dict[str, Any]) -> Dict[
                 "mark_price": mark_price,
                 "unrealized_pnl": float(raw.get("unrealizedProfit", 0.0) or 0.0),
                 "liquidation_price": (
-                    float(raw["liquidationPrice"]) if raw.get("liquidationPrice") not in (None, "") else None
+                    float(raw["liquidationPrice"])
+                    if raw.get("liquidationPrice") not in (None, "")
+                    else None
                 ),
                 "leverage": float(raw.get("leverage", 1.0) or 1.0),
                 "margin_type": str(raw.get("marginType", "ISOLATED")).upper(),
@@ -281,7 +297,9 @@ async def fetch_binance_futures_account_snapshot(
     api_key = credentials["api_key"]
     api_secret = credentials["api_secret"]
     if not base_url or not api_key or not api_secret:
-        raise VenueConnectivityError("Binance API credentials must be set for account snapshot fetch")
+        raise VenueConnectivityError(
+            "Binance API credentials must be set for account snapshot fetch"
+        )
 
     session_factory = session_factory or _default_aiohttp_session_factory
     params = {"timestamp": int(time.time() * 1000)}
@@ -313,7 +331,9 @@ def _default_aiohttp_session_factory(*, timeout_seconds: float):
     return aiohttp.ClientSession(timeout=timeout)
 
 
-def build_live_runner(*, config_path: Path, symbols: list[str] | None = None, snapshot_path: str | None = None):
+def build_live_runner(
+    *, config_path: Path, symbols: list[str] | None = None, snapshot_path: str | None = None
+):
     from project.live.runner import LiveEngineRunner
 
     session_metadata = resolve_live_engine_session_metadata(
@@ -329,16 +349,28 @@ def build_live_runner(*, config_path: Path, symbols: list[str] | None = None, sn
         account_sync_failure_threshold=session_metadata["account_sync_failure_threshold"],
         execution_degradation_min_samples=session_metadata["execution_degradation_min_samples"],
         execution_degradation_warn_edge_bps=session_metadata["execution_degradation_warn_edge_bps"],
-        execution_degradation_block_edge_bps=session_metadata["execution_degradation_block_edge_bps"],
-        execution_degradation_throttle_scale=session_metadata["execution_degradation_throttle_scale"],
+        execution_degradation_block_edge_bps=session_metadata[
+            "execution_degradation_block_edge_bps"
+        ],
+        execution_degradation_throttle_scale=session_metadata[
+            "execution_degradation_throttle_scale"
+        ],
     )
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Run the live engine with persistent state.")
-    parser.add_argument("--config", default=str(_default_config_path()), help="Live engine config YAML path.")
-    parser.add_argument("--symbols", default="", help="Comma-separated symbols. Defaults to config freshness streams.")
-    parser.add_argument("--snapshot_path", default="", help="Path for durable live state snapshot JSON.")
+    parser.add_argument(
+        "--config", default=str(_default_config_path()), help="Live engine config YAML path."
+    )
+    parser.add_argument(
+        "--symbols",
+        default="",
+        help="Comma-separated symbols. Defaults to config freshness streams.",
+    )
+    parser.add_argument(
+        "--snapshot_path", default="", help="Path for durable live state snapshot JSON."
+    )
     parser.add_argument(
         "--print_session_metadata",
         action="store_true",

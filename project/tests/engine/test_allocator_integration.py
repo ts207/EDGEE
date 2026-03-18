@@ -20,7 +20,16 @@ def test_allocate_position_details_exposes_portfolio_cap_diagnostics() -> None:
         "s1": pd.Series([1.0, 1.0, 1.0], index=idx),
         "s2": pd.Series([1.0, 1.0, 1.0], index=idx),
     }
-    details = allocate_position_details(raw, req, RiskLimits(max_portfolio_gross=1.0, max_symbol_gross=10.0, max_strategy_gross=10.0, max_new_exposure_per_bar=10.0))
+    details = allocate_position_details(
+        raw,
+        req,
+        RiskLimits(
+            max_portfolio_gross=1.0,
+            max_symbol_gross=10.0,
+            max_strategy_gross=10.0,
+            max_new_exposure_per_bar=10.0,
+        ),
+    )
 
     diag = details.diagnostics.set_index("timestamp")
     assert details.allocated_positions_by_strategy["s1"].iloc[1] == pytest.approx(0.5)

@@ -1,4 +1,5 @@
 """Tests that sizing limits are not hardcoded and can be overridden."""
+
 from project.portfolio.sizing import calculate_target_notional
 
 
@@ -24,7 +25,9 @@ def test_concentration_cap_is_overridable():
         symbol="BTC",
         concentration_cap_pct=0.10,  # 10% instead of hardcoded 5%
     )
-    assert higher_cap["target_notional"] >= base["target_notional"], "Higher concentration cap should allow equal-or-larger position."
+    assert higher_cap["target_notional"] >= base["target_notional"], (
+        "Higher concentration cap should allow equal-or-larger position."
+    )
 
 
 def test_kelly_clip_is_overridable():
@@ -48,4 +51,7 @@ def test_kelly_clip_is_overridable():
         symbol="BTC",
         max_kelly_multiplier=2.0,  # tighter clip
     )
-    assert clipped_lower["target_notional"] < base["target_notional"] or clipped_lower["target_notional"] <= base["target_notional"], "Lower kelly clip must reduce or equal the position size."
+    assert (
+        clipped_lower["target_notional"] < base["target_notional"]
+        or clipped_lower["target_notional"] <= base["target_notional"]
+    ), "Lower kelly clip must reduce or equal the position size."

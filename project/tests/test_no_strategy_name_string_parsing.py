@@ -24,6 +24,7 @@ ALLOW = {
     "project/strategy/runtime/registry.py",  # Centralized parser uses partition("__")
 }
 
+
 def test_no_strategy_name_string_parsing_in_production():
     """Regression test: forbid string-based strategy name parsing in production code."""
     root = Path(__file__).resolve().parents[1]
@@ -44,6 +45,7 @@ def test_no_strategy_name_string_parsing_in_production():
         + "\n".join(f"{p} :: {pat}" for p, pat in offenders)
         + "\n\nUse strategies.registry.parse_strategy_name() or is_dsl_strategy() instead."
     )
+
 
 def test_is_dsl_strategy_exact_match_not_substring():
     """Invariant: is_dsl_strategy must match exact base, not substring."""

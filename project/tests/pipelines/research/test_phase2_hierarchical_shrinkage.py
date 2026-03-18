@@ -12,6 +12,7 @@ from project.research.helpers.shrinkage import (
 )
 from project.research.gating import calculate_expectancy_stats
 
+
 def _base_rows() -> pd.DataFrame:
     return pd.DataFrame(
         [
@@ -69,6 +70,7 @@ def _base_rows() -> pd.DataFrame:
         ]
     )
 
+
 def test_hierarchical_shrinkage_small_n_pools_toward_event_more():
     df = _base_rows()
     out = _apply_hierarchical_shrinkage(
@@ -88,6 +90,7 @@ def test_hierarchical_shrinkage_small_n_pools_toward_event_more():
 
     # Large-N state should stay close to raw estimate.
     assert abs(post_carry["effect_shrunk_state"] - post_carry["effect_raw"]) < 0.01
+
 
 def test_hierarchical_shrinkage_preserves_raw_and_adds_contract_columns():
     df = _base_rows()
@@ -109,6 +112,7 @@ def test_hierarchical_shrinkage_preserves_raw_and_adds_contract_columns():
     assert not missing
     assert (out["effect_raw"] == df["expectancy"]).all()
     assert ((out["p_value_for_fdr"] >= 0.0) & (out["p_value_for_fdr"] <= 1.0)).all()
+
 
 def test_shrunk_p_value_for_fdr_increases_when_small_n_effect_is_pooled_down():
     df = pd.DataFrame(
@@ -150,11 +154,14 @@ def test_shrunk_p_value_for_fdr_increases_when_small_n_effect_is_pooled_down():
         ]
     )
 
-    out = _apply_hierarchical_shrinkage(df, lambda_state=100.0, lambda_event=300.0, lambda_family=1000.0)
+    out = _apply_hierarchical_shrinkage(
+        df, lambda_state=100.0, lambda_event=300.0, lambda_family=1000.0
+    )
     pooled_row = out[out["n_events"] == 5].iloc[0]
     assert pooled_row["effect_shrunk_state"] < pooled_row["effect_raw"]
     assert pooled_row["p_value_shrunk"] != pooled_row["p_value_raw"]
     assert pooled_row["p_value_for_fdr"] == pooled_row["p_value_shrunk"]
+
 
 def test_adaptive_lambda_single_state_uses_lambda_max():
     df = pd.DataFrame(
@@ -183,6 +190,7 @@ def test_adaptive_lambda_single_state_uses_lambda_max():
     assert row["lambda_state_status"] in {"single_child", "no_state"}
     if row["lambda_state_status"] == "single_child":
         assert row["lambda_state"] == 5000.0
+
 
 def test_adaptive_lambda_insufficient_data_skips_state_pooling():
     df = pd.DataFrame(
@@ -232,6 +240,7 @@ def test_adaptive_lambda_insufficient_data_skips_state_pooling():
     assert (out["shrinkage_weight_state_group"] == 1.0).all()
     assert (out["effect_shrunk_state"] == out["effect_raw"]).all()
 
+
 def test_time_decay_weights_respect_floor_and_recency_order():
     ts = pd.to_datetime(
         ["2026-01-10T00:00:00Z", "2026-01-09T00:00:00Z", "2026-01-01T00:00:00Z"],
@@ -246,16 +255,32 @@ def test_time_decay_weights_respect_floor_and_recency_order():
     assert w.iloc[0] >= w.iloc[1] >= w.iloc[2]
     assert (w >= 0.02).all()
 
+
 def test_effective_sample_size_less_than_count_when_weights_uneven():
     w = pd.Series([1.0, 0.5, 0.25, 0.125], dtype=float)
     n_eff = _effective_sample_size(w)
     assert 0.0 < n_eff < float(len(w))
 
+
 def test_adaptive_lambda_smoothing_and_shock_cap_applied():
     units = pd.DataFrame(
         [
-            {"verb": "mean_reversion", "horizon": "5m", "event": "A", "n": 500.0, "mean": 0.20, "var": 0.10},
-            {"verb": "mean_reversion", "horizon": "5m", "event": "B", "n": 500.0, "mean": -0.20, "var": 0.10},
+            {
+                "verb": "mean_reversion",
+                "horizon": "5m",
+                "event": "A",
+                "n": 500.0,
+                "mean": 0.20,
+                "var": 0.10,
+            },
+            {
+                "verb": "mean_reversion",
+                "horizon": "5m",
+                "event": "B",
+                "n": 500.0,
+                "mean": -0.20,
+                "var": 0.10,
+            },
         ]
     )
     prev = {("mean_reversion", "5m"): 1000.0}
@@ -282,6 +307,7 @@ def test_adaptive_lambda_smoothing_and_shock_cap_applied():
     assert row["lambda_state_prev"] == 1000.0
     assert 500.0 <= row["lambda_state"] <= 1500.0
 
+
 def test_regime_conditioned_tau_mapping_contract():
     tau = _regime_conditioned_tau_days(
         canonical_family="POSITIONING_EXTREMES",
@@ -290,6 +316,7 @@ def test_regime_conditioned_tau_mapping_contract():
         base_tau_days_override=None,
     )
     assert abs(tau - 25.2) < 1e-9
+
 
 def test_directional_asymmetric_tau_contract():
     tau_up_eff, tau_up, tau_down, ratio = _asymmetric_tau_days(
@@ -316,14 +343,29 @@ def test_directional_asymmetric_tau_contract():
     assert abs(tau_down_eff - tau_down) < 1e-9
     assert 1.5 <= ratio <= 3.0
 
+
 def test_calculate_expectancy_stats_emits_regime_conditioned_tau_metrics():
     ts = pd.date_range("2026-01-01", periods=120, freq="5min", tz="UTC")
-    features = pd.DataFrame({"timestamp": ts, "close": 100.0 + pd.Series(range(len(ts)), dtype=float)})
+    features = pd.DataFrame(
+        {"timestamp": ts, "close": 100.0 + pd.Series(range(len(ts)), dtype=float)}
+    )
     events = pd.DataFrame(
         {
             "enter_ts": [ts[20], ts[40], ts[60], ts[80], ts[100]],
-            "vol_regime": ["LOW_VOL_REGIME", "MID_VOL_REGIME", "HIGH_VOL_REGIME", "VOL_SHOCK_STATE", "HIGH_VOL_REGIME"],
-            "liquidity_state": ["NORMAL_LIQUIDITY_STATE", "NORMAL_LIQUIDITY_STATE", "LOW_LIQUIDITY_STATE", "LOW_LIQUIDITY_STATE", "DEPTH_RECOVERY_STATE"],
+            "vol_regime": [
+                "LOW_VOL_REGIME",
+                "MID_VOL_REGIME",
+                "HIGH_VOL_REGIME",
+                "VOL_SHOCK_STATE",
+                "HIGH_VOL_REGIME",
+            ],
+            "liquidity_state": [
+                "NORMAL_LIQUIDITY_STATE",
+                "NORMAL_LIQUIDITY_STATE",
+                "LOW_LIQUIDITY_STATE",
+                "LOW_LIQUIDITY_STATE",
+                "DEPTH_RECOVERY_STATE",
+            ],
             "direction": [1, 1, -1, -1, 1],
         }
     )

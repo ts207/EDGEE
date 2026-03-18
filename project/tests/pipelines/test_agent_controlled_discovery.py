@@ -9,6 +9,7 @@ sys.path.insert(0, str(Path(__file__).parents[2]))
 
 from project.pipelines.stages.research import build_research_stages
 
+
 def _make_args(**overrides):
     defaults = dict(
         run_phase2_conditional=1,
@@ -64,6 +65,7 @@ def _make_args(**overrides):
     ns = types.SimpleNamespace(**{**defaults, **overrides})
     return ns
 
+
 DUMMY_REGISTRY = {
     "defaults": {
         "templates": ["continuation", "mean_reversion"],
@@ -77,20 +79,21 @@ DUMMY_REGISTRY = {
         "LIQUIDITY_GAP_PRINT": {
             "templates": ["continuation", "mean_reversion"],
             "horizons": ["15m"],
-        }
-    }
+        },
+    },
 }
+
 
 @patch("project.pipelines.research.registry_validation.load_template_registry")
 def test_filter_events_by_agent_selection(mock_load_registry, tmp_path):
     mock_load_registry.return_value = DUMMY_REGISTRY
-    
+
     phase2_event_chain = [
         ("VOL_SPIKE", "analyze_events.py", []),
         ("LIQUIDITY_GAP_PRINT", "analyze_events.py", []),
         ("TREND_ACCELERATION", "analyze_events.py", []),
     ]
-    
+
     # Select only VOL_SPIKE
     args = _make_args(events=["VOL_SPIKE"])
     stages = build_research_stages(
@@ -104,18 +107,21 @@ def test_filter_events_by_agent_selection(mock_load_registry, tmp_path):
         data_root=tmp_path,
         phase2_event_chain=phase2_event_chain,
     )
-    
+
     names = [s[0] for s in stages]
     assert any("VOL_SPIKE" in n for n in names)
     assert not any("LIQUIDITY_GAP_PRINT" in n for n in names)
     assert not any("TREND_ACCELERATION" in n for n in names)
 
+
 @patch("project.pipelines.research.registry_validation.load_template_registry")
 def test_invalid_event_raises_error(mock_load_registry, tmp_path):
     mock_load_registry.return_value = DUMMY_REGISTRY
-    
+
     args = _make_args(events=["INVALID_EVENT"])
-    with pytest.raises(ValueError, match="Event ID 'INVALID_EVENT' is not in the authoritative registry"):
+    with pytest.raises(
+        ValueError, match="Event ID 'INVALID_EVENT' is not in the authoritative registry"
+    ):
         build_research_stages(
             args=args,
             run_id="r0",
@@ -127,13 +133,16 @@ def test_invalid_event_raises_error(mock_load_registry, tmp_path):
             data_root=tmp_path,
             phase2_event_chain=[],
         )
+
 
 @patch("project.pipelines.research.registry_validation.load_template_registry")
 def test_invalid_template_raises_error(mock_load_registry, tmp_path):
     mock_load_registry.return_value = DUMMY_REGISTRY
-    
+
     args = _make_args(templates=["INVALID_TEMPLATE"])
-    with pytest.raises(ValueError, match="Template 'INVALID_TEMPLATE' is not in the authoritative registry"):
+    with pytest.raises(
+        ValueError, match="Template 'INVALID_TEMPLATE' is not in the authoritative registry"
+    ):
         build_research_stages(
             args=args,
             run_id="r0",
@@ -146,20 +155,21 @@ def test_invalid_template_raises_error(mock_load_registry, tmp_path):
             phase2_event_chain=[],
         )
 
+
 @patch("project.pipelines.research.registry_validation.load_template_registry")
 def test_pass_templates_and_horizons_to_stages(mock_load_registry, tmp_path):
     mock_load_registry.return_value = DUMMY_REGISTRY
-    
+
     phase2_event_chain = [("VOL_SPIKE", "analyze_events.py", [])]
-    
+
     args = _make_args(
-        events=["VOL_SPIKE"], 
-        templates=["continuation"], 
+        events=["VOL_SPIKE"],
+        templates=["continuation"],
         horizons=["15m", "60m"],
         directions=["long"],
         entry_lags=[1, 2],
         program_id="test_program",
-        search_budget=100
+        search_budget=100,
     )
     stages = build_research_stages(
         args=args,
@@ -172,10 +182,10 @@ def test_pass_templates_and_horizons_to_stages(mock_load_registry, tmp_path):
         data_root=tmp_path,
         phase2_event_chain=phase2_event_chain,
     )
-    
+
     discovery_stage = next(s for s in stages if "phase2_conditional_hypotheses" in s[0])
     s_args = discovery_stage[2]
-    
+
     assert "--templates" in s_args
     assert "continuation" in s_args
     assert "--horizons" in s_args

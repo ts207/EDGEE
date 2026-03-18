@@ -8,11 +8,13 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2] / "project"
 from project.pipelines.pipeline_audit import apply_runtime_postflight_to_manifest
 from project.pipelines.pipeline_audit import run_runtime_postflight_audit
 
+
 def _write_events_csv(path: Path, rows: list[dict[str, object]]) -> None:
     import pandas as pd
 
     path.parent.mkdir(parents=True, exist_ok=True)
     pd.DataFrame(rows).to_csv(path, index=False)
+
 
 def test_runtime_postflight_passes_for_causal_events(tmp_path):
     data_root = tmp_path / "data"
@@ -48,6 +50,7 @@ def test_runtime_postflight_passes_for_causal_events(tmp_path):
     assert int(out["watermark_violation_count"]) == 0
     assert int(out["normalization_issue_count"]) == 0
     assert int(out["normalized_event_count"]) == 2
+
 
 def test_runtime_postflight_fails_on_future_event_time(tmp_path):
     data_root = tmp_path / "data"

@@ -10,13 +10,15 @@ from project.pipelines.research.run_event_quality_analysis import run_event_qual
 def _make_features(n_bars: int = 400) -> pd.DataFrame:
     np.random.seed(1)
     dates = pd.date_range("2023-01-01", periods=n_bars, freq="5min")
-    df = pd.DataFrame({
-        "timestamp": dates,
-        "close": 100.0 + np.cumsum(np.random.normal(0, 0.05, n_bars)),
-    })
+    df = pd.DataFrame(
+        {
+            "timestamp": dates,
+            "close": 100.0 + np.cumsum(np.random.normal(0, 0.05, n_bars)),
+        }
+    )
     df["event_vol_spike"] = [i % 15 == 0 for i in range(n_bars)]
     df["event_band_break"] = [i % 15 == 0 for i in range(n_bars)]  # co-fires with vol_spike
-    df["event_rare"] = [i % 200 == 0 for i in range(n_bars)]       # below min_n
+    df["event_rare"] = [i % 200 == 0 for i in range(n_bars)]  # below min_n
     return df
 
 

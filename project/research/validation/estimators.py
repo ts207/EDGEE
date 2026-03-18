@@ -6,7 +6,11 @@ import numpy as np
 import pandas as pd
 
 from project.research.validation.bootstrap import bootstrap_mean_ci
-from project.research.validation.clustered import clustered_standard_error, clustered_t_stat, p_value_from_t
+from project.research.validation.clustered import (
+    clustered_standard_error,
+    clustered_t_stat,
+    p_value_from_t,
+)
 from project.research.validation.schemas import EffectEstimate
 
 
@@ -38,7 +42,11 @@ def estimate_effect(
         vals = vals.loc[valid_cluster_mask]
         raw_clusters = raw_clusters.loc[valid_cluster_mask]
         aligned_clusters = raw_clusters.astype(str)
-        valid_text_mask = aligned_clusters.notna() & (aligned_clusters != "") & (aligned_clusters.str.lower() != "nan")
+        valid_text_mask = (
+            aligned_clusters.notna()
+            & (aligned_clusters != "")
+            & (aligned_clusters.str.lower() != "nan")
+        )
         valid_index = aligned_clusters.index[valid_text_mask]
         vals = vals.loc[valid_index]
         aligned_clusters = aligned_clusters.loc[valid_index]
@@ -60,7 +68,9 @@ def estimate_effect(
     dof = max(1, (n_clusters - 1) if n_clusters > 1 else (len(vals) - 1))
     p_val = p_value_from_t(t_stat, dof)
     if use_bootstrap_ci:
-        ci_low, ci_high = bootstrap_mean_ci(vals, clusters=aligned_clusters, n_boot=n_boot, ci=1.0 - alpha)
+        ci_low, ci_high = bootstrap_mean_ci(
+            vals, clusters=aligned_clusters, n_boot=n_boot, ci=1.0 - alpha
+        )
     else:
         width = 1.96 * stderr
         ci_low, ci_high = estimate - width, estimate + width
@@ -87,7 +97,9 @@ def estimate_effect_from_frame(
     n_boot: int = 1000,
 ) -> EffectEstimate:
     if df.empty or value_col not in df.columns:
-        return estimate_effect(pd.Series(dtype=float), alpha=alpha, use_bootstrap_ci=use_bootstrap_ci, n_boot=n_boot)
+        return estimate_effect(
+            pd.Series(dtype=float), alpha=alpha, use_bootstrap_ci=use_bootstrap_ci, n_boot=n_boot
+        )
     clusters = df[cluster_col] if cluster_col and cluster_col in df.columns else None
     return estimate_effect(
         df[value_col],

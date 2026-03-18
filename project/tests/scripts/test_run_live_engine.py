@@ -85,9 +85,7 @@ def test_run_live_engine_print_session_metadata(capsys, tmp_path: Path) -> None:
         encoding="utf-8",
     )
 
-    assert run_live_engine.main(
-        ["--config", str(config_path), "--print_session_metadata"]
-    ) == 0
+    assert run_live_engine.main(["--config", str(config_path), "--print_session_metadata"]) == 0
     out = json.loads(capsys.readouterr().out)
     assert out["symbols"] == ["btcusdt"]
     assert out["live_state_snapshot_path"].endswith("state/live_state.json")
@@ -139,7 +137,9 @@ def test_validate_live_runtime_environment_rejects_missing_production_credential
     assert "EDGE_BINANCE_API_SECRET must be set" in message
 
 
-def test_run_live_engine_print_session_metadata_skips_runtime_env_validation(monkeypatch, capsys) -> None:
+def test_run_live_engine_print_session_metadata_skips_runtime_env_validation(
+    monkeypatch, capsys
+) -> None:
     called = {"count": 0}
 
     def _fail_validation(**kwargs):
@@ -148,9 +148,12 @@ def test_run_live_engine_print_session_metadata_skips_runtime_env_validation(mon
 
     monkeypatch.setattr(run_live_engine, "validate_live_runtime_environment", _fail_validation)
 
-    assert run_live_engine.main(
-        ["--config", "project/configs/live_production.yaml", "--print_session_metadata"]
-    ) == 0
+    assert (
+        run_live_engine.main(
+            ["--config", "project/configs/live_production.yaml", "--print_session_metadata"]
+        )
+        == 0
+    )
     out = json.loads(capsys.readouterr().out)
     assert out["live_state_snapshot_path"] == "artifacts/live_state_production.json"
     assert called["count"] == 0

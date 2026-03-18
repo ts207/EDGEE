@@ -6,6 +6,7 @@ import sys
 
 import pandas as pd
 
+
 def test_run_determinism_replay_stage_emits_digest(monkeypatch, tmp_path):
     run_id = "replay_stage_run"
     data_root = tmp_path / "data"

@@ -10,8 +10,12 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from project import PROJECT_ROOT
-from project.spec_registry import feature_schema_registry_path as registry_feature_schema_registry_path
-from project.spec_registry import load_feature_schema_registry as registry_load_feature_schema_registry
+from project.spec_registry import (
+    feature_schema_registry_path as registry_feature_schema_registry_path,
+)
+from project.spec_registry import (
+    load_feature_schema_registry as registry_load_feature_schema_registry,
+)
 from project.specs.utils import get_spec_hashes
 from project.specs.ontology import (
     ontology_component_hash_fields,
@@ -19,8 +23,10 @@ from project.specs.ontology import (
     ontology_spec_hash,
 )
 
+
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
 
 def _manifest_path(run_id: str, stage: str, stage_instance_id: str | None = None) -> Path:
     project_root = PROJECT_ROOT
@@ -33,10 +39,12 @@ def _manifest_path(run_id: str, stage: str, stage_instance_id: str | None = None
     out_name = resolved_stage_instance_id or stage
     return out_dir / f"{out_name}.json"
 
+
 def _run_manifest_path(run_id: str) -> Path:
     project_root = PROJECT_ROOT
     data_root = get_data_root()
     return data_root / "runs" / run_id / "run_manifest.json"
+
 
 def _is_stale_pipeline_session(manifest: Dict[str, Any]) -> bool:
     session_id = str(os.getenv("BACKTEST_PIPELINE_SESSION_ID", "")).strip()
@@ -54,8 +62,10 @@ def _is_stale_pipeline_session(manifest: Dict[str, Any]) -> bool:
     current = str(payload.get("pipeline_session_id", "")).strip()
     return bool(current) and current != session_id
 
+
 def _project_root() -> Path:
     return PROJECT_ROOT
+
 
 def _git_commit(project_root: Path) -> str:
     try:
@@ -63,9 +73,10 @@ def _git_commit(project_root: Path) -> str:
             ["git", "-C", str(project_root), "rev-parse", "HEAD"],
             text=True,
             stderr=subprocess.DEVNULL,
-                ).strip()
+        ).strip()
     except Exception:
         return "unknown"
+
 
 def _file_fingerprint(path: Path) -> str:
     """Content hash for manifest lineage comparisons."""
@@ -77,6 +88,7 @@ def _file_fingerprint(path: Path) -> str:
         return digest.hexdigest()
     except OSError:
         return "error"
+
 
 def _normalize_manifest_value(value: Any) -> Any:
     if isinstance(value, dict):
@@ -90,11 +102,13 @@ def _normalize_manifest_value(value: Any) -> Any:
         return [_normalize_manifest_value(v) for v in value]
     return value
 
+
 def _normalize_manifest_dict(value: Dict[str, Any]) -> Dict[str, Any]:
     return {
         str(k): _normalize_manifest_value(v)
         for k, v in sorted(dict(value).items(), key=lambda item: str(item[0]))
     }
+
 
 def _normalize_artifact_rows(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     normalized: List[Dict[str, Any]] = []
@@ -103,6 +117,7 @@ def _normalize_artifact_rows(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]
             continue
         normalized.append(_normalize_manifest_dict(row))
     return normalized
+
 
 def _input_parquet_hashes(inputs: List[Dict[str, Any]], *, max_files: int = 32) -> Dict[str, Any]:
     files: List[Path] = []
@@ -142,6 +157,7 @@ def _input_parquet_hashes(inputs: List[Dict[str, Any]], *, max_files: int = 32) 
         "max_files": int(max_files),
     }
 
+
 def _artifact_hashes(rows: List[Dict[str, Any]], *, max_files: int = 256) -> Dict[str, Any]:
     files: List[Path] = []
     seen: set[str] = set()
@@ -176,6 +192,7 @@ def _artifact_hashes(rows: List[Dict[str, Any]], *, max_files: int = 256) -> Dic
         "truncated": len(files) >= max_files,
         "max_files": int(max_files),
     }
+
 
 def validate_stage_manifest_contract(
     manifest: Dict[str, Any],
@@ -221,6 +238,7 @@ def validate_stage_manifest_contract(
         if status in {"success", "failed", "warning", "aborted_stale_run"} and not ended:
             raise ValueError("stage manifest.ended_at must be a non-empty timestamp when present")
 
+
 REQUIRED_INPUT_PROVENANCE_KEYS = (
     "vendor",
     "exchange",
@@ -230,10 +248,12 @@ REQUIRED_INPUT_PROVENANCE_KEYS = (
     "extraction_end",
 )
 
+
 def schema_hash_from_columns(columns: List[str]) -> str:
     normalized = [str(col) for col in columns]
     payload = "|".join(normalized)
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
 
 def validate_input_provenance(inputs: List[Dict[str, Any]]) -> None:
     for idx, item in enumerate(inputs):
@@ -245,11 +265,14 @@ def validate_input_provenance(inputs: List[Dict[str, Any]]) -> None:
             path = item.get("path", f"input[{idx}]")
             raise ValueError(f"Input {path} missing required provenance keys: {missing}")
 
+
 def feature_schema_registry_path() -> Path:
     return registry_feature_schema_registry_path()
 
+
 def load_feature_schema_registry() -> Dict[str, Any]:
     return registry_load_feature_schema_registry()
+
 
 def feature_schema_identity() -> Tuple[str, str]:
     schema_path = feature_schema_registry_path()
@@ -257,6 +280,7 @@ def feature_schema_identity() -> Tuple[str, str]:
     version = str(payload.get("version", "feature_schema_v2"))
     schema_hash = hashlib.sha256(schema_path.read_bytes()).hexdigest()
     return version, schema_hash
+
 
 def validate_feature_schema_columns(*, dataset_key: str, columns: List[str]) -> Tuple[str, str]:
     registry = load_feature_schema_registry()
@@ -268,11 +292,16 @@ def validate_feature_schema_columns(*, dataset_key: str, columns: List[str]) -> 
         raise ValueError(f"Feature schema registry missing dataset contract: {dataset_key}")
     required_columns = contract.get("required_columns", [])
     if not isinstance(required_columns, list):
-        raise ValueError(f"Feature schema required_columns must be a list for dataset: {dataset_key}")
+        raise ValueError(
+            f"Feature schema required_columns must be a list for dataset: {dataset_key}"
+        )
     missing = [col for col in required_columns if col not in columns]
     if missing:
-        raise ValueError(f"Feature schema contract violated for {dataset_key}; missing columns: {missing}")
+        raise ValueError(
+            f"Feature schema contract violated for {dataset_key}; missing columns: {missing}"
+        )
     return feature_schema_identity()
+
 
 def start_manifest(
     stage_name: str,
@@ -303,7 +332,9 @@ def start_manifest(
         "spec_hashes": get_spec_hashes(project_root.parent),
         "ontology_spec_hash": ontology_hash,
         "taxonomy_hash": ontology_component_fields.get("taxonomy_hash"),
-        "canonical_event_registry_hash": ontology_component_fields.get("canonical_event_registry_hash"),
+        "canonical_event_registry_hash": ontology_component_fields.get(
+            "canonical_event_registry_hash"
+        ),
         "state_registry_hash": ontology_component_fields.get("state_registry_hash"),
         "verb_lexicon_hash": ontology_component_fields.get("verb_lexicon_hash"),
         "parameters": _normalize_manifest_dict(dict(params)),
@@ -316,6 +347,7 @@ def start_manifest(
         "stats": None,
     }
     return enrich_manifest_with_env(manifest)
+
 
 def finalize_manifest(
     manifest: Dict[str, Any],
@@ -352,6 +384,7 @@ def finalize_manifest(
     temp_path.replace(out_path)
     return manifest
 
+
 def load_run_manifest(run_id: str) -> Dict[str, Any]:
     path = _run_manifest_path(run_id)
     if not path.exists():
@@ -361,8 +394,10 @@ def load_run_manifest(run_id: str) -> Dict[str, Any]:
     except Exception:
         return {}
 
+
 def enrich_manifest_with_env(manifest: dict):
     import platform, sys, os
+
     manifest["python_version"] = sys.version
     manifest["platform"] = platform.platform()
     manifest["env_snapshot"] = {k: os.environ.get(k) for k in ["BACKTEST_DATA_ROOT"]}

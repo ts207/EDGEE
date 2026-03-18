@@ -1,6 +1,7 @@
 """
 Numerical reasoning and core shrinkage math kernels.
 """
+
 from __future__ import annotations
 import logging
 from typing import Any, Dict, List, Optional, Tuple
@@ -9,6 +10,8 @@ import numpy as np
 import pandas as pd
 
 log = logging.getLogger(__name__)
+
+
 def _time_decay_weights(
     event_ts: pd.Series,
     *,
@@ -30,6 +33,7 @@ def _time_decay_weights(
     floor = max(0.0, min(1.0, float(floor_weight)))
     return pd.Series(np.maximum(w, floor), index=event_ts.index, dtype=float)
 
+
 def _effective_sample_size(weights: pd.Series) -> float:
     w = pd.to_numeric(weights, errors="coerce").fillna(0.0).clip(lower=0.0)
     s1 = float(w.sum())
@@ -37,6 +41,7 @@ def _effective_sample_size(weights: pd.Series) -> float:
     if s1 <= 0.0 or s2 <= 0.0:
         return 0.0
     return float((s1 * s1) / s2)
+
 
 def _aggregate_effect_units(
     df: pd.DataFrame,
@@ -49,16 +54,12 @@ def _aggregate_effect_units(
 ) -> pd.DataFrame:
     cols = unit_cols + [n_col, mean_col, var_col]
     if df.empty:
-        return pd.DataFrame(
-            columns=unit_cols + [f"n_{prefix}", f"mean_{prefix}", f"var_{prefix}"]
-        )
+        return pd.DataFrame(columns=unit_cols + [f"n_{prefix}", f"mean_{prefix}", f"var_{prefix}"])
 
     work = df[cols].copy()
     work["_n"] = pd.to_numeric(work[n_col], errors="coerce").fillna(0.0).clip(lower=0.0)
     work["_mean"] = pd.to_numeric(work[mean_col], errors="coerce").fillna(0.0)
-    work["_var"] = (
-        pd.to_numeric(work[var_col], errors="coerce").fillna(0.0).clip(lower=0.0)
-    )
+    work["_var"] = pd.to_numeric(work[var_col], errors="coerce").fillna(0.0).clip(lower=0.0)
 
     rows: List[Dict[str, Any]] = []
     for keys, g in work.groupby(unit_cols, dropna=False):
@@ -82,6 +83,7 @@ def _aggregate_effect_units(
         row[f"var_{prefix}"] = var_u
         rows.append(row)
     return pd.DataFrame(rows)
+
 
 def _estimate_adaptive_lambda(
     units_df: pd.DataFrame,
@@ -160,12 +162,8 @@ def _estimate_adaptive_lambda(
         else:
             mean_global = float((n * mean).sum() / max(total_n, 1.0))
             denom_within = float((n - 1.0).clip(lower=0.0).sum())
-            sigma_within = float(
-                ((n - 1.0).clip(lower=0.0) * var).sum() / max(denom_within, 1.0)
-            )
-            sigma_between = float(
-                (n * (mean - mean_global) ** 2).sum() / max(total_n, 1.0)
-            )
+            sigma_within = float(((n - 1.0).clip(lower=0.0) * var).sum() / max(denom_within, 1.0))
+            sigma_between = float((n * (mean - mean_global) ** 2).sum() / max(total_n, 1.0))
             lam_raw = float(sigma_within / max(sigma_between, float(eps)))
             lam = float(np.clip(lam_raw, float(lambda_min), float(lambda_max)))
 
@@ -187,9 +185,7 @@ def _estimate_adaptive_lambda(
         row = dict(parent_payload)
         row[lambda_name] = float(lam)
         row[f"{lambda_name}_raw"] = float(lam_raw)
-        row[f"{lambda_name}_prev"] = (
-            float(lam_prev) if np.isfinite(lam_prev) else np.nan
-        )
+        row[f"{lambda_name}_prev"] = float(lam_prev) if np.isfinite(lam_prev) else np.nan
         row[f"{lambda_name}_status"] = status
         row[f"{lambda_name}_sigma_within"] = (
             float(sigma_within) if np.isfinite(sigma_within) else np.nan
@@ -201,6 +197,7 @@ def _estimate_adaptive_lambda(
         row[f"{lambda_name}_child_count"] = child_count
         rows.append(row)
     return pd.DataFrame(rows)
+
 
 def _compute_loso_stability(
     df: pd.DataFrame,
@@ -216,31 +213,33 @@ def _compute_loso_stability(
     """
     if df.empty:
         return pd.Series(dtype=bool)
-    
+
     out_stable = pd.Series(True, index=df.index)
-    
+
     # Iterate over pooling groups
     for keys, group in df.groupby(group_cols, dropna=False):
         if len(group[symbol_col].unique()) <= 1:
             # If group has only one symbol, LOSO is impossible or trivial.
             # We mark as potentially unstable if effect is small.
             continue
-            
+
         total_n = group[n_col].sum()
         group_mean = (group[n_col] * group[effect_col]).sum() / max(total_n, 1.0)
-        
+
         for sym in group[symbol_col].unique():
             sym_mask = group[symbol_col] == sym
             sym_n = group.loc[sym_mask, n_col].sum()
-            sym_mean = (group.loc[sym_mask, n_col] * group.loc[sym_mask, effect_col]).sum() / max(sym_n, 1.0)
-            
+            sym_mean = (group.loc[sym_mask, n_col] * group.loc[sym_mask, effect_col]).sum() / max(
+                sym_n, 1.0
+            )
+
             # Compute group mean excluding this symbol
             loso_n = total_n - sym_n
             if loso_n <= 0:
                 loso_mean = 0.0
             else:
                 loso_mean = (total_n * group_mean - sym_n * sym_mean) / loso_n
-            
+
             # Stability check:
             # 1. Sign consistency: Shrunk effect should have same sign as raw if pooling is fair.
             # Here we check if the pooling target (loso_mean) has the same sign.
@@ -250,8 +249,9 @@ def _compute_loso_stability(
                     # We flag it if the borrowed component is dominant.
                     # For simplicity, mark as unstable if signs oppose.
                     out_stable.loc[group[sym_mask].index] = False
-                    
+
     return out_stable
+
 
 def _apply_hierarchical_shrinkage(
     raw_df: pd.DataFrame,
@@ -269,15 +269,21 @@ def _apply_hierarchical_shrinkage(
     lambda_shock_cap_pct: float = 0.5,
     train_only_lambda: bool = False,
     split_col: Optional[str] = None,
-    run_mode: str = "exploratory", # Added run_mode
+    run_mode: str = "exploratory",  # Added run_mode
 ) -> pd.DataFrame:
     """Empirical-Bayes partial pooling across family -> event -> state."""
-    
+
     # S1: Enforce train-only estimation if split is available
-    is_confirmatory = str(run_mode).lower() in {"confirmatory", "production", "certification", "promotion", "deploy"}
+    is_confirmatory = str(run_mode).lower() in {
+        "confirmatory",
+        "production",
+        "certification",
+        "promotion",
+        "deploy",
+    }
     effective_train_only = train_only_lambda
     aggregate_train_count_col: Optional[str] = None
-    
+
     if split_col and split_col in raw_df.columns:
         # Respect the explicit caller contract. Train-only estimation is enabled
         # only when requested or when confirmatory mode requires it.
@@ -326,7 +332,8 @@ def _apply_hierarchical_shrinkage(
     out["_n"] = (
         pd.to_numeric(
             out.get(
-                "effective_sample_size", out.get("n_events", out.get("sample_size", pd.Series(0, index=out.index)))
+                "effective_sample_size",
+                out.get("n_events", out.get("sample_size", pd.Series(0, index=out.index))),
             ),
             errors="coerce",
         )
@@ -352,15 +359,9 @@ def _apply_hierarchical_shrinkage(
         if "template_verb" in out.columns
         else out.get("rule_template", pd.Series("", index=out.index))
     )
-    horizon_col = (
-        out["horizon"] if "horizon" in out.columns else pd.Series("", index=out.index)
-    )
-    symbol_col = (
-        out["symbol"] if "symbol" in out.columns else pd.Series("", index=out.index)
-    )
-    state_col = (
-        out["state_id"] if "state_id" in out.columns else pd.Series("", index=out.index)
-    )
+    horizon_col = out["horizon"] if "horizon" in out.columns else pd.Series("", index=out.index)
+    symbol_col = out["symbol"] if "symbol" in out.columns else pd.Series("", index=out.index)
+    state_col = out["state_id"] if "state_id" in out.columns else pd.Series("", index=out.index)
 
     out["_family"] = family_col.astype(str).str.strip().str.upper()
     out["_event"] = event_col.astype(str).str.strip().str.upper()
@@ -383,9 +384,7 @@ def _apply_hierarchical_shrinkage(
 
     out["_regime"] = out["_state"].apply(_extract_regime)
 
-    out["_var"] = (
-        (out["std_return"] ** 2).replace([np.inf, -np.inf], np.nan).fillna(0.0)
-    )
+    out["_var"] = (out["std_return"] ** 2).replace([np.inf, -np.inf], np.nan).fillna(0.0)
 
     # Preserve condition-level candidates while shrinking along ontology levels.
     # Adaptive lambdas are estimated per (family,event,verb,horizon), not per symbol.
@@ -401,7 +400,11 @@ def _apply_hierarchical_shrinkage(
         _lambda_src = out[out[split_col].astype(str).str.strip().str.lower() == "train"].copy()
         if _lambda_src.empty:
             _lambda_src = out  # Fall back to all data if no train rows
-    elif effective_train_only and aggregate_train_count_col and aggregate_train_count_col in out.columns:
+    elif (
+        effective_train_only
+        and aggregate_train_count_col
+        and aggregate_train_count_col in out.columns
+    ):
         _lambda_src = out.copy()
         _lambda_src["_n"] = (
             pd.to_numeric(_lambda_src[aggregate_train_count_col], errors="coerce")
@@ -489,16 +492,11 @@ def _apply_hierarchical_shrinkage(
         out["n_family"]
         / (
             out["n_family"]
-            + pd.to_numeric(out["lambda_family"], errors="coerce").fillna(
-                float(lambda_family)
-            )
+            + pd.to_numeric(out["lambda_family"], errors="coerce").fillna(float(lambda_family))
         ),
     )
     out["shrinkage_weight_family"] = (
-        out["shrinkage_weight_family"]
-        .replace([np.inf, -np.inf], np.nan)
-        .fillna(0.0)
-        .clip(0.0, 1.0)
+        out["shrinkage_weight_family"].replace([np.inf, -np.inf], np.nan).fillna(0.0).clip(0.0, 1.0)
     )
     out["effect_shrunk_family"] = (
         out["shrinkage_weight_family"] * out["mean_family"]
@@ -561,16 +559,11 @@ def _apply_hierarchical_shrinkage(
         out["n_event"]
         / (
             out["n_event"]
-            + pd.to_numeric(out["lambda_event"], errors="coerce").fillna(
-                float(lambda_event)
-            )
+            + pd.to_numeric(out["lambda_event"], errors="coerce").fillna(float(lambda_event))
         ),
     )
     out["shrinkage_weight_event"] = (
-        out["shrinkage_weight_event"]
-        .replace([np.inf, -np.inf], np.nan)
-        .fillna(0.0)
-        .clip(0.0, 1.0)
+        out["shrinkage_weight_event"].replace([np.inf, -np.inf], np.nan).fillna(0.0).clip(0.0, 1.0)
     )
     out["effect_shrunk_event"] = (
         out["shrinkage_weight_event"] * out["mean_event"]
@@ -635,9 +628,7 @@ def _apply_hierarchical_shrinkage(
         out["n_state"]
         / (
             out["n_state"]
-            + pd.to_numeric(out["lambda_state"], errors="coerce").fillna(
-                float(lambda_state)
-            )
+            + pd.to_numeric(out["lambda_state"], errors="coerce").fillna(float(lambda_state))
         ),
     )
     out["shrinkage_weight_state_group"] = (
@@ -682,11 +673,13 @@ def _apply_hierarchical_shrinkage(
     )
 
     out = out.merge(
-        lambda_symbol_df[state_cols + ["lambda_symbol", "lambda_symbol_status", "lambda_symbol_child_count"]],
+        lambda_symbol_df[
+            state_cols + ["lambda_symbol", "lambda_symbol_status", "lambda_symbol_child_count"]
+        ],
         on=state_cols,
         how="left",
     )
-    
+
     # Store pooling group size
     out["shrinkage_pooling_group_size"] = out["lambda_symbol_child_count"]
 
@@ -695,17 +688,12 @@ def _apply_hierarchical_shrinkage(
     out["lambda_symbol_eff"] = np.where(
         out["lambda_symbol_status"].isin(["insufficient_data", "single_child"]),
         float(lambda_state),
-        pd.to_numeric(out["lambda_symbol"], errors="coerce").fillna(
-            float(lambda_state)
-        ),
+        pd.to_numeric(out["lambda_symbol"], errors="coerce").fillna(float(lambda_state)),
     )
 
     out["shrinkage_weight_state"] = out["_n"] / (out["_n"] + out["lambda_symbol_eff"])
     out["shrinkage_weight_state"] = (
-        out["shrinkage_weight_state"]
-        .replace([np.inf, -np.inf], np.nan)
-        .fillna(0.0)
-        .clip(0.0, 1.0)
+        out["shrinkage_weight_state"].replace([np.inf, -np.inf], np.nan).fillna(0.0).clip(0.0, 1.0)
     )
 
     # The candidate is shrunk towards the cross-symbol group mean!
@@ -713,40 +701,40 @@ def _apply_hierarchical_shrinkage(
         out["shrinkage_weight_state"] * out["effect_raw"]
         + (1.0 - out["shrinkage_weight_state"]) * out["effect_shrunk_state_group"]
     )
-    
+
     out["shrinkage_factor"] = 1.0 - out["shrinkage_weight_state"]
-    
+
     # S2: LOSO Stability and Diagnostics
     out["shrinkage_loso_stable"] = _compute_loso_stability(
-        out,
-        group_cols=state_cols,
-        symbol_col="_symbol",
-        effect_col="effect_raw",
-        n_col="_n"
+        out, group_cols=state_cols, symbol_col="_symbol", effect_col="effect_raw", n_col="_n"
     )
-    
+
     # Posterior residual dispersion: (raw - shrunk) / stderr
     # This identifies symbols that are "outliers" from their pooling group.
     se = out["std_return"] / np.sqrt(np.maximum(out["_n"], 1.0))
-    out["shrinkage_posterior_residual_z"] = (out["effect_raw"] - out["effect_shrunk_state"]) / se.replace(0, np.nan)
-    
+    out["shrinkage_posterior_residual_z"] = (
+        out["effect_raw"] - out["effect_shrunk_state"]
+    ) / se.replace(0, np.nan)
+
     # Shrinkage contribution breakdown
     # Total Shrinkage = Raw - Shrunk
     out["shrinkage_delta"] = out["effect_raw"] - out["effect_shrunk_state"]
     # We can also track contributions from each layer if we kept them
-    
+
     # Flag candidates whose effect exists ONLY due to cross-symbol borrowing
     # i.e., raw effect sign != shrunk effect sign OR raw effect magnitude is very small compared to borrowed component
     out["shrinkage_borrowing_dominant"] = np.where(
-        (np.sign(out["effect_raw"]) != np.sign(out["effect_shrunk_state"])) & (out["effect_raw"] != 0),
-        True, False
+        (np.sign(out["effect_raw"]) != np.sign(out["effect_shrunk_state"]))
+        & (out["effect_raw"] != 0),
+        True,
+        False,
     )
 
     # Build shrunken p-values from state-shrunk effect and raw standard error.
     valid_se = np.isfinite(se) & (se > 0.0) & (out["_n"] > 1.0)
     p_shrunk = out["p_value_raw"].astype(float).copy()
     t_shrunk = pd.Series(0.0, index=out.index, dtype=float)
-    
+
     val = out.loc[valid_se, "effect_shrunk_state"] / se.loc[valid_se]
     t_shrunk.loc[valid_se] = val.astype(float)
     # Vectorized: use scipy when present; otherwise use compatibility fallback.
@@ -762,9 +750,7 @@ def _apply_hierarchical_shrinkage(
     if not _t_abs.empty:
         p_shrunk.loc[valid_se] = (2.0 * _scipy_t.sf(_t_abs, df=_df_vals)).clip(0.0, 1.0)
     out["p_value_shrunk"] = (
-        pd.to_numeric(p_shrunk, errors="coerce")
-        .fillna(out["p_value_raw"])
-        .clip(0.0, 1.0)
+        pd.to_numeric(p_shrunk, errors="coerce").fillna(out["p_value_raw"]).clip(0.0, 1.0)
     )
     out["p_value_for_fdr"] = out["p_value_shrunk"]
 

@@ -50,8 +50,10 @@ def direction_to_sign(direction: Any) -> int:
         return -1
     return 0
 
+
 def format_event_id(event_type: str, symbol: str, idx: int, sub_idx: int = 0) -> str:
     return f"{event_type.lower()}_{symbol}_{idx:08d}_{sub_idx:03d}"
+
 
 def emit_event(
     *,

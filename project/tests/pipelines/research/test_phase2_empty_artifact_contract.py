@@ -4,6 +4,7 @@ import json
 
 from project.research.services.phase2_support import write_empty_phase2_outputs_with_diagnostics
 
+
 def test_write_empty_phase2_outputs_emits_report_and_core_artifacts(tmp_path):
     reports_root = tmp_path / "phase2" / "run_x" / "EVENT_X"
     diagnostics = {

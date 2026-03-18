@@ -8,9 +8,11 @@ from project.core.feature_schema import feature_dataset_dir_name
 
 from project.pipelines.clean import validate_feature_integrity as integrity
 
+
 def _write_csv(path: Path, frame: pd.DataFrame) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     frame.to_csv(path, index=False)
+
 
 def test_validate_symbol_prefers_run_scoped_artifacts(tmp_path):
     data_root = tmp_path / "data"
@@ -21,7 +23,14 @@ def test_validate_symbol_prefers_run_scoped_artifacts(tmp_path):
     run_features = pd.DataFrame({"x": [1.0, None, None]})
 
     _write_csv(
-        data_root / "lake" / "features" / "perp" / symbol / "5m" / feature_dataset_dir_name() / "global.csv",
+        data_root
+        / "lake"
+        / "features"
+        / "perp"
+        / symbol
+        / "5m"
+        / feature_dataset_dir_name()
+        / "global.csv",
         global_features,
     )
     _write_csv(
@@ -49,6 +58,7 @@ def test_validate_symbol_prefers_run_scoped_artifacts(tmp_path):
     assert "features" in issues
     assert any("Column 'x'" in msg for msg in issues["features"])
 
+
 def test_main_fails_when_issues_found_and_fail_on_issues_enabled(monkeypatch, tmp_path):
     data_root = tmp_path / "data"
     symbol = "BTCUSDT"
@@ -70,9 +80,18 @@ def test_main_fails_when_issues_found_and_fail_on_issues_enabled(monkeypatch, tm
     monkeypatch.setattr(
         sys,
         "argv",
-        ["validate_feature_integrity.py", "--run_id", run_id, "--symbols", symbol, "--nan_threshold", "0.5"],
+        [
+            "validate_feature_integrity.py",
+            "--run_id",
+            run_id,
+            "--symbols",
+            symbol,
+            "--nan_threshold",
+            "0.5",
+        ],
     )
     assert integrity.main() == 1
+
 
 def test_main_warns_only_when_fail_on_issues_disabled(monkeypatch, tmp_path):
     data_root = tmp_path / "data"

@@ -4,6 +4,7 @@ E4-T1: Stress-conditional correlation limits.
 When regime_series contains a stress label, the allocator must use
 stressed_max_pairwise_correlation (tighter limit) instead of max_pairwise_correlation.
 """
+
 from __future__ import annotations
 
 import numpy as np
@@ -37,7 +38,7 @@ def test_calm_regime_uses_normal_correlation_limit():
     req = {k: pd.Series(1.0, index=ts) for k in pos}
 
     limits = RiskLimits(
-        max_pairwise_correlation=0.95,          # calm: allow 95% correlation
+        max_pairwise_correlation=0.95,  # calm: allow 95% correlation
         stressed_max_pairwise_correlation=0.3,  # stressed: tighten to 30%
         stressed_regime_values=frozenset({"stress", "crisis"}),
     )
@@ -67,7 +68,9 @@ def test_stress_regime_applies_tighter_correlation_limit():
     regime = pd.Series("stress", index=ts)
 
     scales_no_stress, _ = allocate_position_scales(pos, req, limits_no_stress, regime_series=regime)
-    scales_with_stress, _ = allocate_position_scales(pos, req, limits_with_stress, regime_series=regime)
+    scales_with_stress, _ = allocate_position_scales(
+        pos, req, limits_with_stress, regime_series=regime
+    )
 
     # With stress-conditional limit, positions during stress must be more clipped
     agg_no_stress = sum(s.abs().mean() for s in scales_no_stress.values())
@@ -102,7 +105,7 @@ def test_mixed_regime_applies_limit_per_bar():
     req = {k: pd.Series(1.0, index=ts) for k in pos}
 
     limits = RiskLimits(
-        max_pairwise_correlation=0.99,          # calm: very permissive
+        max_pairwise_correlation=0.99,  # calm: very permissive
         stressed_max_pairwise_correlation=0.1,  # stressed: very tight
         stressed_regime_values=frozenset({"stress"}),
     )

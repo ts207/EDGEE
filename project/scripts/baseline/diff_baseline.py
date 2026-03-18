@@ -19,7 +19,13 @@ def main() -> None:
     parser.add_argument("--baseline-events", type=Path, default=BASELINE_ROOT / "events")
     parser.add_argument("--candidate-events", type=Path, required=True)
     args = parser.parse_args()
-    print(json.dumps(compare_snapshot_dirs(args.baseline_events, args.candidate_events), indent=2, sort_keys=True))
+    print(
+        json.dumps(
+            compare_snapshot_dirs(args.baseline_events, args.candidate_events),
+            indent=2,
+            sort_keys=True,
+        )
+    )
 
 
 if __name__ == "__main__":

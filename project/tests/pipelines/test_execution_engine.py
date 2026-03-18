@@ -8,6 +8,7 @@ import pytest
 
 import project.pipelines.execution_engine as engine
 
+
 def test_run_stage_cache_hit_short_circuits_subprocess(monkeypatch, tmp_path):
     run_id = "cache_hit_run"
     data_root = tmp_path / "data"
@@ -26,23 +27,25 @@ def test_run_stage_cache_hit_short_circuits_subprocess(monkeypatch, tmp_path):
     )
     manifest_path = data_root / "runs" / run_id / f"{stage_instance}.json"
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
-    
+
     # We need to satisfy _manifest_declared_outputs_exist and validation.
     manifest_path.write_text(
-        json.dumps({
-            "status": "success",
-            "input_hash": input_hash,
-            "outputs": [{"path": str(script_path)}],
-            "run_id": run_id,
-            "stage": stage,
-            "stage_instance_id": stage_instance,
-            "started_at": "2024-01-01T00:00:00Z",
-            "finished_at": "2024-01-01T00:00:01Z",
-            "parameters": {},
-            "inputs": [],
-            "spec_hashes": {},
-            "ontology_spec_hash": "sha256:abc",
-        }),
+        json.dumps(
+            {
+                "status": "success",
+                "input_hash": input_hash,
+                "outputs": [{"path": str(script_path)}],
+                "run_id": run_id,
+                "stage": stage,
+                "stage_instance_id": stage_instance,
+                "started_at": "2024-01-01T00:00:00Z",
+                "finished_at": "2024-01-01T00:00:01Z",
+                "parameters": {},
+                "inputs": [],
+                "spec_hashes": {},
+                "ontology_spec_hash": "sha256:abc",
+            }
+        ),
         encoding="utf-8",
     )
 
@@ -67,6 +70,7 @@ def test_run_stage_cache_hit_short_circuits_subprocess(monkeypatch, tmp_path):
     )
     assert ok is True
     assert stage_cache_meta[stage_instance]["cache_hit"] is True
+
 
 def test_run_stage_retries_once_then_succeeds(monkeypatch, tmp_path):
     run_id = "retry_run"
@@ -114,6 +118,7 @@ def test_run_stage_retries_once_then_succeeds(monkeypatch, tmp_path):
     )
     assert ok is True
     assert calls["count"] == 2
+
 
 def test_run_stage_buffers_output_with_stage_prefix(monkeypatch, tmp_path, capsys):
     run_id = "buffered_output_run"
@@ -203,6 +208,7 @@ def test_run_stage_sets_stage_identity_in_subprocess_env(monkeypatch, tmp_path):
     assert captured_env["BACKTEST_STAGE_INSTANCE_ID"] == "build_features__worker_a"
     assert captured_env["BACKTEST_PIPELINE_SESSION_ID"] == "pipeline_session_a"
 
+
 def test_run_stages_parallel_sequential_path_stops_on_failure():
     seen: list[str] = []
 
@@ -221,6 +227,7 @@ def test_run_stages_parallel_sequential_path_stops_on_failure():
     assert all_ok is False
     assert [row[1] for row in timings] == ["stage_1", "stage_2"]
     assert seen == ["stage_1", "stage_2"]
+
 
 def test_run_stages_parallel_parallel_branch(monkeypatch):
     class _FakeFuture:
@@ -267,6 +274,7 @@ def test_run_stages_parallel_parallel_branch(monkeypatch):
     assert len(timings) == 2
     assert {row[1] for row in timings} == {"stage_1", "stage_2"}
 
+
 def test_run_stages_parallel_falls_back_on_thread_pool_error(monkeypatch):
     class _RaisingPool:
         def __init__(self, max_workers: int):
@@ -289,6 +297,7 @@ def test_run_stages_parallel_falls_back_on_thread_pool_error(monkeypatch):
     assert len(timings) == 2
     assert seen == ["stage_1", "stage_2"]
 
+
 def test_run_stages_parallel_fail_fast_terminates_pending_stage_instances(monkeypatch):
     terminated: list[tuple[str, ...]] = []
 
@@ -296,6 +305,7 @@ def test_run_stages_parallel_fail_fast_terminates_pending_stage_instances(monkey
         terminated.append(tuple(stage_instance_ids))
 
     monkeypatch.setattr(engine, "terminate_stage_instances", _fake_terminate)
+
     class _FakeFuture:
         def __init__(self, result):
             self._result = result
@@ -344,6 +354,7 @@ def test_run_stages_parallel_fail_fast_terminates_pending_stage_instances(monkey
     assert any("s3" in batch for batch in terminated)
     assert len(timings) >= 1
 
+
 def test_partition_items_preserves_order_within_partition():
     items = [
         {"symbol": "ETHUSDT", "value": 1},
@@ -353,6 +364,7 @@ def test_partition_items_preserves_order_within_partition():
     out = engine.partition_items(items, key_fn=lambda row: row["symbol"])
     assert list(out.keys()) == ["ETHUSDT", "BTCUSDT"]
     assert [row["value"] for row in out["ETHUSDT"]] == [1, 3]
+
 
 def test_partition_map_reduce_is_deterministic_across_worker_counts():
     partitions = {
@@ -381,6 +393,7 @@ def test_partition_map_reduce_is_deterministic_across_worker_counts():
     assert reduced_seq == ["a=3", "b=7"]
     assert reduced_par == reduced_seq
     assert results_seq["a"]["sum"] == results_par["a"]["sum"] == 3
+
 
 def test_run_stage_requires_manifest_when_enabled(monkeypatch, tmp_path):
     run_id = "manifest_required"
@@ -422,6 +435,7 @@ def test_run_stage_requires_manifest_when_enabled(monkeypatch, tmp_path):
     payload = json.loads(manifest_path.read_text(encoding="utf-8"))
     assert payload["status"] == "failed"
 
+
 def test_run_stage_cache_hit_rejected_when_declared_output_missing(monkeypatch, tmp_path):
     run_id = "cache_rejection_run"
     data_root = tmp_path / "data"
@@ -430,7 +444,7 @@ def test_run_stage_cache_hit_rejected_when_declared_output_missing(monkeypatch, 
     stage = "phase2_conditional_hypotheses"
     base_args = ["--event_type", "VOL_SHOCK"]
     stage_instance = engine.stage_instance_base(stage, base_args)
-    
+
     cache_context = {
         "feature_schema_version": "v2",
         "pipeline_session_id": "",
@@ -441,45 +455,56 @@ def test_run_stage_cache_hit_rejected_when_declared_output_missing(monkeypatch, 
     )
     manifest_path = data_root / "runs" / run_id / f"{stage_instance}.json"
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
-    
+
     # Declare an output that DOES NOT exist
     missing_path = tmp_path / "never_created.parquet"
     manifest_path.write_text(
-        json.dumps({
-            "status": "success",
-            "input_hash": input_hash,
-            "outputs": [{"path": str(missing_path)}],
-            "run_id": run_id,
-            "stage": stage,
-            "stage_instance_id": stage_instance,
-            "started_at": "2024-01-01T00:00:00Z",
-            "finished_at": "2024-01-01T00:00:01Z",
-            "parameters": {},
-            "inputs": [],
-            "spec_hashes": {},
-            "ontology_spec_hash": "sha256:abc",
-        }),
+        json.dumps(
+            {
+                "status": "success",
+                "input_hash": input_hash,
+                "outputs": [{"path": str(missing_path)}],
+                "run_id": run_id,
+                "stage": stage,
+                "stage_instance_id": stage_instance,
+                "started_at": "2024-01-01T00:00:00Z",
+                "finished_at": "2024-01-01T00:00:01Z",
+                "parameters": {},
+                "inputs": [],
+                "spec_hashes": {},
+                "ontology_spec_hash": "sha256:abc",
+            }
+        ),
         encoding="utf-8",
     )
 
     monkeypatch.setenv("BACKTEST_STAGE_CACHE", "1")
-    
+
     # If the cache hit is rejected, it WILL try to call Popen
     popen_called = []
+
     def _fake_popen(*_args, **_kwargs):
         popen_called.append(True)
+
         class _FakeProc:
             def __init__(self):
                 self.returncode = 0
                 self.pid = 123
-            def communicate(self): return "ok", None
-            def wait(self, timeout=None): return 0
-            def poll(self): return 0
+
+            def communicate(self):
+                return "ok", None
+
+            def wait(self, timeout=None):
+                return 0
+
+            def poll(self):
+                return 0
+
         return _FakeProc()
 
     monkeypatch.setattr(engine.subprocess, "Popen", _fake_popen)
     stage_cache_meta: dict[str, dict[str, object]] = {}
-    
+
     ok = engine.run_stage(
         stage,
         script_path,
@@ -499,7 +524,9 @@ def test_run_stage_cache_hit_rejected_when_declared_output_missing(monkeypatch, 
     assert stage_cache_meta[stage_instance]["cache_reason"] == "miss_or_invalid_manifest_or_outputs"
 
 
-def test_validate_stage_manifest_on_disk_propagates_unexpected_runtime_errors(monkeypatch, tmp_path):
+def test_validate_stage_manifest_on_disk_propagates_unexpected_runtime_errors(
+    monkeypatch, tmp_path
+):
     manifest_path = tmp_path / "stage.json"
     manifest_path.write_text("{}", encoding="utf-8")
 
@@ -526,7 +553,9 @@ def test_terminate_stage_process_does_not_swallow_unexpected_runtime_errors(monk
         monkeypatch.setattr(
             engine.os,
             "killpg",
-            lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("unexpected terminate failure")),
+            lambda *_args, **_kwargs: (_ for _ in ()).throw(
+                RuntimeError("unexpected terminate failure")
+            ),
         )
     else:
         monkeypatch.setattr(

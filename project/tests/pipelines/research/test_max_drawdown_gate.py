@@ -1,8 +1,10 @@
 """Tests for the max drawdown gate."""
+
 import numpy as np
 import pytest
 
 from project.research.gating import max_drawdown_gate
+
 
 class TestMaxDrawdownGate:
     """Tests for max_drawdown_gate."""

@@ -9,10 +9,12 @@ from project.pipelines.research.validate_event_quality import (
 
 
 def test_compute_sensitivity_without_severity_marks_metric_unavailable():
-    events_df = pd.DataFrame({
-        "symbol": ["BTCUSDT", "BTCUSDT"],
-        "enter_ts": pd.date_range("2024-01-01", periods=2, freq="5min", tz="UTC"),
-    })
+    events_df = pd.DataFrame(
+        {
+            "symbol": ["BTCUSDT", "BTCUSDT"],
+            "enter_ts": pd.date_range("2024-01-01", periods=2, freq="5min", tz="UTC"),
+        }
+    )
 
     result = _compute_sensitivity(events_df, severity_cols=["severity"])
 
@@ -22,10 +24,12 @@ def test_compute_sensitivity_without_severity_marks_metric_unavailable():
 
 
 def test_rerun_proxy_metrics_without_severity_marks_metric_unavailable():
-    events_df = pd.DataFrame({
-        "symbol": ["BTCUSDT", "BTCUSDT"],
-        "enter_ts": pd.date_range("2024-01-01", periods=2, freq="5min", tz="UTC"),
-    })
+    events_df = pd.DataFrame(
+        {
+            "symbol": ["BTCUSDT", "BTCUSDT"],
+            "enter_ts": pd.date_range("2024-01-01", periods=2, freq="5min", tz="UTC"),
+        }
+    )
 
     result = _compute_rerun_proxy_metrics(events_df, severity_cols=["severity"])
 

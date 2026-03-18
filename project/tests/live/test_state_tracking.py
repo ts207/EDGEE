@@ -4,6 +4,7 @@ E6-T1: Live state tracking (Account/Position).
 LiveStateStore must correctly parse exchange snapshots and update
 AccountState/PositionState.
 """
+
 from __future__ import annotations
 
 import pytest
@@ -37,22 +38,22 @@ def test_update_from_snapshot():
                 "entry_price": 3000.0,
                 "mark_price": 3100.0,
                 "unrealized_pnl": -200.0,
-            }
-        ]
+            },
+        ],
     }
-    
+
     store.update_from_exchange_snapshot(snapshot)
-    
+
     assert store.account.wallet_balance == 10000.0
     assert store.account.available_balance == 9800.0
     assert store.account.exchange_status == "NORMAL"
-    assert store.account.total_unrealized_pnl == 300.0 # 500 - 200
-    
+    assert store.account.total_unrealized_pnl == 300.0  # 500 - 200
+
     # Check BTC position
     btc_pos = store.account.positions["BTCUSDT"]
     assert btc_pos.side == "LONG"
     assert btc_pos.quantity == 0.5
-    
+
     # Check ETH position
     eth_pos = store.account.positions["ETHUSDT"]
     assert eth_pos.side == "SHORT"
@@ -62,15 +63,15 @@ def test_update_from_snapshot():
 def test_closing_position_removes_it():
     store = LiveStateStore()
     # First, open a position
-    store.update_from_exchange_snapshot({
-        "positions": [{"symbol": "BTCUSDT", "quantity": 0.5, "unrealized_pnl": 10.0}]
-    })
+    store.update_from_exchange_snapshot(
+        {"positions": [{"symbol": "BTCUSDT", "quantity": 0.5, "unrealized_pnl": 10.0}]}
+    )
     assert "BTCUSDT" in store.account.positions
-    
+
     # Now, snapshot with quantity 0
-    store.update_from_exchange_snapshot({
-        "positions": [{"symbol": "BTCUSDT", "quantity": 0.0, "unrealized_pnl": 0.0}]
-    })
+    store.update_from_exchange_snapshot(
+        {"positions": [{"symbol": "BTCUSDT", "quantity": 0.0, "unrealized_pnl": 0.0}]}
+    )
     assert "BTCUSDT" not in store.account.positions
     assert store.account.total_unrealized_pnl == 0.0
 

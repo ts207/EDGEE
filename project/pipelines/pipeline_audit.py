@@ -24,12 +24,13 @@ def _report_dirs_for_run(run_id: str) -> List[Path]:
             run_dirs.append(candidate)
     return sorted(run_dirs)
 
+
 def collect_late_artifacts(run_id: str, cutoff: datetime) -> List[str]:
     """Find files for this run written after the terminal cutoff."""
     late_files = []
     scan_dirs = [DATA_ROOT / "runs" / run_id, *_report_dirs_for_run(run_id)]
     cutoff_ts = cutoff.timestamp()
-    
+
     for d in scan_dirs:
         if not d.exists():
             continue
@@ -47,6 +48,7 @@ def collect_late_artifacts(run_id: str, cutoff: datetime) -> List[str]:
                 except OSError:
                     continue
     return sorted(late_files)
+
 
 def _artifact_catalog_for_run(run_id: str) -> Dict[str, Any]:
     scan_dirs = [DATA_ROOT / "runs" / run_id, *_report_dirs_for_run(run_id)]
@@ -99,6 +101,7 @@ def apply_run_terminal_audit(run_id: str, manifest: Dict[str, Any]) -> None:
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps(catalog, indent=2, sort_keys=True), encoding="utf-8")
 
+
 def load_checklist_decision(run_id: str) -> str | None:
     """Loads the research checklist decision for a given run."""
     path = DATA_ROOT / "runs" / run_id / "research_checklist" / "checklist.json"
@@ -110,30 +113,37 @@ def load_checklist_decision(run_id: str) -> str | None:
     except Exception:
         return None
 
+
 def run_runtime_postflight_audit(
-    run_id: str, 
-    data_root: Path = DATA_ROOT, 
+    run_id: str,
+    data_root: Path = DATA_ROOT,
     repo_root: Path = PROJECT_ROOT,
     determinism_replay_checks: bool = False,
     max_events: int = 250_000,
-    **kwargs
+    **kwargs,
 ) -> Dict[str, Any]:
     """Runs the runtime postflight audit by calling the core implementation."""
     from project.runtime.invariants import run_runtime_postflight_audit as _run
+
     return _run(
         data_root=data_root,
         repo_root=repo_root,
         run_id=run_id,
         determinism_replay_checks=determinism_replay_checks,
-        max_events=max_events
+        max_events=max_events,
     )
 
-def apply_runtime_postflight_to_manifest(run_manifest: Dict[str, Any], runtime_postflight: Dict[str, Any]) -> str:
+
+def apply_runtime_postflight_to_manifest(
+    run_manifest: Dict[str, Any], runtime_postflight: Dict[str, Any]
+) -> str:
     """Copies key stats from the runtime postflight audit result to the manifest."""
     status = runtime_postflight.get("status", "pass")
     run_manifest["runtime_postflight_status"] = status
     run_manifest["runtime_postflight_event_count"] = runtime_postflight.get("event_count", 0)
-    run_manifest["runtime_postflight_violation_count"] = runtime_postflight.get("watermark_violation_count", 0)
+    run_manifest["runtime_postflight_violation_count"] = runtime_postflight.get(
+        "watermark_violation_count", 0
+    )
     run_manifest["runtime_postflight_max_lag_us"] = runtime_postflight.get("max_observed_lag_us", 0)
     for src, dst in [
         ("normalization_issue_count", "runtime_normalization_issue_count"),
@@ -148,15 +158,14 @@ def apply_runtime_postflight_to_manifest(run_manifest: Dict[str, Any], runtime_p
             run_manifest[dst] = runtime_postflight.get(src)
     return status
 
+
 def enforce_runtime_postflight(
-    run_manifest: Dict[str, Any],
-    runtime_invariants_mode: str = "warn",
-    **kwargs
+    run_manifest: Dict[str, Any], runtime_invariants_mode: str = "warn", **kwargs
 ) -> tuple[bool, List[str]]:
     """Determines if the pipeline should fail based on runtime postflight results."""
     status = run_manifest.get("runtime_postflight_status", "pass")
     violations = run_manifest.get("runtime_postflight_violation_count", 0)
-    
+
     messages = []
     if status != "pass" or violations > 0:
         msg = f"Runtime postflight audit failed: status={status}, violations={violations}"
@@ -165,10 +174,12 @@ def enforce_runtime_postflight(
             return True, messages
     return False, messages
 
+
 def emit_failure_messages(messages: List[str]) -> None:
     """Prints failure messages to stderr."""
     for m in messages:
         print(f"AUDIT FAILURE: {m}", file=sys.stderr)
+
 
 def record_non_production_overrides(
     run_manifest: Dict[str, Any],
@@ -182,7 +193,7 @@ def record_non_production_overrides(
     actual_overrides = overrides or non_production_overrides
     if not actual_overrides:
         return
-    
+
     if isinstance(actual_overrides, dict):
         sorted_val = {k: actual_overrides[k] for k in sorted(actual_overrides.keys())}
     elif isinstance(actual_overrides, list):
@@ -191,6 +202,6 @@ def record_non_production_overrides(
         sorted_val = actual_overrides
 
     run_manifest["non_production_overrides"] = sorted_val
-    
+
     if write_run_manifest and run_id:
         write_run_manifest(run_id, run_manifest)

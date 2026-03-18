@@ -10,6 +10,7 @@ from project.pipelines.research._hypothesis_defaults import (
     parse_symbols_filter,
 )
 
+
 def test_load_hypothesis_defaults_reads_global_defaults():
     defaults = load_hypothesis_defaults(project_root=PROJECT_ROOT)
     assert "5m" in defaults["horizons"]
@@ -21,9 +22,11 @@ def test_load_hypothesis_defaults_reads_global_defaults():
     assert "ms_trend_state" in defaults["conditioning"]
     assert "ms_spread_state" in defaults["conditioning"]
 
+
 def test_parse_symbols_filter_restricts_to_run_universe():
     selected = parse_symbols_filter("BTC|SOL", universe=["BTCUSDT", "ETHUSDT"])
     assert selected == ["BTCUSDT"]
+
 
 def test_extract_event_type_from_statement():
     statement = 'Some payload {""event_type"": ""LIQUIDITY_VACUUM""}'

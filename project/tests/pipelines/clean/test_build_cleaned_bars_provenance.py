@@ -7,6 +7,7 @@ import pandas as pd
 
 import project.pipelines.clean.build_cleaned_bars as build_cleaned_bars
 
+
 def _raw_frame() -> pd.DataFrame:
     return pd.DataFrame(
         {
@@ -20,6 +21,7 @@ def _raw_frame() -> pd.DataFrame:
         }
     )
 
+
 def _funding_frame() -> pd.DataFrame:
     return pd.DataFrame(
         {
@@ -28,6 +30,7 @@ def _funding_frame() -> pd.DataFrame:
             "source": ["fundingRate", "fundingRate"],
         }
     )
+
 
 def test_build_cleaned_validates_input_provenance(monkeypatch, tmp_path):
     read_calls = {"i": 0}
@@ -41,7 +44,13 @@ def test_build_cleaned_validates_input_provenance(monkeypatch, tmp_path):
         return _raw_frame() if read_calls["i"] == 1 else _funding_frame()
 
     def fake_start_manifest(stage_name, run_id, params, inputs, outputs):
-        return {"stage": stage_name, "run_id": run_id, "params": params, "inputs": inputs, "outputs": outputs}
+        return {
+            "stage": stage_name,
+            "run_id": run_id,
+            "params": params,
+            "inputs": inputs,
+            "outputs": outputs,
+        }
 
     def fake_finalize_manifest(manifest, status, error=None, stats=None):
         captured["status"] = status
@@ -60,7 +69,9 @@ def test_build_cleaned_validates_input_provenance(monkeypatch, tmp_path):
     monkeypatch.setattr(build_cleaned_bars, "start_manifest", fake_start_manifest)
     monkeypatch.setattr(build_cleaned_bars, "finalize_manifest", fake_finalize_manifest)
     monkeypatch.setattr(build_cleaned_bars, "write_parquet", fake_write_parquet)
-    monkeypatch.setattr(build_cleaned_bars, "validate_input_provenance", fake_validate_input_provenance)
+    monkeypatch.setattr(
+        build_cleaned_bars, "validate_input_provenance", fake_validate_input_provenance
+    )
     monkeypatch.setattr(
         sys,
         "argv",

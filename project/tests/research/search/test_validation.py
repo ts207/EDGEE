@@ -1,4 +1,5 @@
 """Tests for project.research.search.validation."""
+
 from __future__ import annotations
 
 import pytest
@@ -44,9 +45,7 @@ def test_negative_entry_lag():
 
 def test_feature_predicate_invalid_operator():
     spec = _valid_spec(
-        trigger=TriggerSpec.feature_predicate(
-            feature="spread_pct", operator="!=", threshold=0.5
-        )
+        trigger=TriggerSpec.feature_predicate(feature="spread_pct", operator="!=", threshold=0.5)
     )
     errors = validate_hypothesis_spec(spec)
     assert any("operator" in e.lower() for e in errors)
@@ -54,17 +53,13 @@ def test_feature_predicate_invalid_operator():
 
 def test_feature_predicate_valid_operator():
     spec = _valid_spec(
-        trigger=TriggerSpec.feature_predicate(
-            feature="spread_pct", operator=">=", threshold=0.5
-        )
+        trigger=TriggerSpec.feature_predicate(feature="spread_pct", operator=">=", threshold=0.5)
     )
     assert validate_hypothesis_spec(spec) == []
 
 
 def test_feature_condition_must_be_feature_predicate():
-    spec = _valid_spec(
-        feature_condition=TriggerSpec.event("VOL_SPIKE")
-    )
+    spec = _valid_spec(feature_condition=TriggerSpec.event("VOL_SPIKE"))
     errors = validate_hypothesis_spec(spec)
     assert any("feature_condition" in e.lower() for e in errors)
 

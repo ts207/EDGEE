@@ -7,6 +7,7 @@ from unittest.mock import patch
 
 from project.scripts import ontology_consistency_audit as audit
 
+
 def test_ontology_consistency_audit_fail_closed_passes_for_repo_contract():
     repo_root = str(Path(__file__).resolve().parents[2])
     args = [
@@ -22,7 +23,12 @@ def test_ontology_consistency_audit_fail_closed_passes_for_repo_contract():
     assert rc == 0
     report = audit.run_audit(Path(__file__).resolve().parents[2])
     counts = report["counts"]
-    assert counts["state_registry_materialized_total"] + counts["state_registry_not_materialized_total"] == counts["state_registry_total"]
+    assert (
+        counts["state_registry_materialized_total"]
+        + counts["state_registry_not_materialized_total"]
+        == counts["state_registry_total"]
+    )
+
 
 def test_ontology_consistency_audit_reports_chain_mismatch_failure(tmp_path):
     fake_chain = [("UNKNOWN_EVENT", "missing_script.py", [])]

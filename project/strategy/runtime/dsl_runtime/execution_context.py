@@ -4,12 +4,15 @@ import numpy as np
 import pandas as pd
 from typing import Tuple
 
+
 def safe_divide(numerator: pd.Series, denominator: pd.Series) -> pd.Series:
     denom = denominator.replace(0.0, np.nan)
     return (numerator / denom).replace([np.inf, -np.inf], np.nan)
 
+
 def rolling_quantile(series: pd.Series, window: int, q: float) -> pd.Series:
     return series.rolling(window, min_periods=1).quantile(q)
+
 
 def build_signal_frame(merged: pd.DataFrame) -> pd.DataFrame:
     """
@@ -24,9 +27,7 @@ def build_signal_frame(merged: pd.DataFrame) -> pd.DataFrame:
     frame["timestamp"] = timestamp
     frame["session_hour_utc"] = timestamp.dt.hour.astype(float)
 
-    close = pd.to_numeric(
-        frame.get("close", pd.Series(np.nan, index=frame.index)), errors="coerce"
-    )
+    close = pd.to_numeric(frame.get("close", pd.Series(np.nan, index=frame.index)), errors="coerce")
     frame["close"] = close
 
     volume = pd.to_numeric(
@@ -91,9 +92,7 @@ def build_signal_frame(merged: pd.DataFrame) -> pd.DataFrame:
     frame["range_ratio"] = range_ratio
     vol_mean = range_ratio.rolling(96, min_periods=96).mean()
     vol_std = range_ratio.rolling(96, min_periods=96).std().replace(0.0, np.nan)
-    frame["vol_z"] = ((range_ratio - vol_mean) / vol_std).replace(
-        [np.inf, -np.inf], np.nan
-    )
+    frame["vol_z"] = ((range_ratio - vol_mean) / vol_std).replace([np.inf, -np.inf], np.nan)
     realized_vol = ret_1.abs().rolling(96, min_periods=1).mean()
     vol_q33 = realized_vol.rolling(480, min_periods=1).quantile(1.0 / 3.0)
     vol_q66 = realized_vol.rolling(480, min_periods=1).quantile(2.0 / 3.0)

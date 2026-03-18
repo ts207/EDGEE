@@ -7,6 +7,7 @@ import pandas as pd
 
 import project.pipelines.clean.build_cleaned_bars as build_cleaned_bars
 
+
 def test_build_cleaned_fails_fast_when_raw_ohlcv_schema_missing(monkeypatch):
     manifest_calls = []
 

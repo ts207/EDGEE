@@ -5,7 +5,10 @@ import json
 import sys
 from pathlib import Path
 
-from project.research.services.run_comparison_service import compare_run_ids, research_diagnostics_paths
+from project.research.services.run_comparison_service import (
+    compare_run_ids,
+    research_diagnostics_paths,
+)
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2] / "project"
@@ -28,6 +31,7 @@ def _seed_research_diagnostics(
     _write_json(paths["phase2"], phase2)
     _write_json(paths["promotion"], promotion)
     import pandas as pd
+
     paths["edge_candidates"].parent.mkdir(parents=True, exist_ok=True)
     pd.DataFrame(edge_candidates or []).to_parquet(paths["edge_candidates"])
 
@@ -47,8 +51,17 @@ def test_compare_run_ids_uses_canonical_research_report_paths(tmp_path):
         "baseline_run",
         phase2={
             "false_discovery_diagnostics": {
-                "global": {"candidates_total": 10, "survivors_total": 2, "symbols_total": 1, "families_total": 1},
-                "sample_quality": {"zero_eval_rows": 1, "median_validation_n_obs": 25, "median_test_n_obs": 18},
+                "global": {
+                    "candidates_total": 10,
+                    "survivors_total": 2,
+                    "symbols_total": 1,
+                    "families_total": 1,
+                },
+                "sample_quality": {
+                    "zero_eval_rows": 1,
+                    "median_validation_n_obs": 25,
+                    "median_test_n_obs": 18,
+                },
                 "survivor_quality": {"median_q_value": 0.04, "median_estimate_bps": 8.0},
             }
         },
@@ -62,15 +75,26 @@ def test_compare_run_ids_uses_canonical_research_report_paths(tmp_path):
                 "primary_reject_reason_counts": {"stability_score": 1},
             }
         },
-        edge_candidates=[{"gate_bridge_tradable": "fail", "resolved_cost_bps": 0.5, "expectancy_bps": -0.5}],
+        edge_candidates=[
+            {"gate_bridge_tradable": "fail", "resolved_cost_bps": 0.5, "expectancy_bps": -0.5}
+        ],
     )
     _seed_research_diagnostics(
         tmp_path,
         "candidate_run",
         phase2={
             "false_discovery_diagnostics": {
-                "global": {"candidates_total": 14, "survivors_total": 3, "symbols_total": 2, "families_total": 2},
-                "sample_quality": {"zero_eval_rows": 0, "median_validation_n_obs": 31, "median_test_n_obs": 21},
+                "global": {
+                    "candidates_total": 14,
+                    "survivors_total": 3,
+                    "symbols_total": 2,
+                    "families_total": 2,
+                },
+                "sample_quality": {
+                    "zero_eval_rows": 0,
+                    "median_validation_n_obs": 31,
+                    "median_test_n_obs": 21,
+                },
                 "survivor_quality": {"median_q_value": 0.03, "median_estimate_bps": 10.0},
             }
         },
@@ -84,7 +108,9 @@ def test_compare_run_ids_uses_canonical_research_report_paths(tmp_path):
                 "primary_reject_reason_counts": {"stability_score": 1, "negative_control_fail": 1},
             }
         },
-        edge_candidates=[{"gate_bridge_tradable": "pass", "resolved_cost_bps": 0.1, "expectancy_bps": -0.1}],
+        edge_candidates=[
+            {"gate_bridge_tradable": "pass", "resolved_cost_bps": 0.1, "expectancy_bps": -0.1}
+        ],
     )
 
     out = compare_run_ids(
@@ -107,8 +133,17 @@ def test_compare_research_runs_script_writes_report(tmp_path, monkeypatch):
         "base1",
         phase2={
             "false_discovery_diagnostics": {
-                "global": {"candidates_total": 6, "survivors_total": 1, "symbols_total": 1, "families_total": 1},
-                "sample_quality": {"zero_eval_rows": 2, "median_validation_n_obs": 20, "median_test_n_obs": 15},
+                "global": {
+                    "candidates_total": 6,
+                    "survivors_total": 1,
+                    "symbols_total": 1,
+                    "families_total": 1,
+                },
+                "sample_quality": {
+                    "zero_eval_rows": 2,
+                    "median_validation_n_obs": 20,
+                    "median_test_n_obs": 15,
+                },
                 "survivor_quality": {"median_q_value": 0.05, "median_estimate_bps": 6.0},
             }
         },
@@ -122,15 +157,26 @@ def test_compare_research_runs_script_writes_report(tmp_path, monkeypatch):
                 "primary_reject_reason_counts": {"stability_score": 1},
             }
         },
-        edge_candidates=[{"gate_bridge_tradable": "fail", "resolved_cost_bps": 0.5, "expectancy_bps": -0.5}],
+        edge_candidates=[
+            {"gate_bridge_tradable": "fail", "resolved_cost_bps": 0.5, "expectancy_bps": -0.5}
+        ],
     )
     _seed_research_diagnostics(
         tmp_path / "data",
         "cand1",
         phase2={
             "false_discovery_diagnostics": {
-                "global": {"candidates_total": 9, "survivors_total": 2, "symbols_total": 2, "families_total": 1},
-                "sample_quality": {"zero_eval_rows": 1, "median_validation_n_obs": 26, "median_test_n_obs": 19},
+                "global": {
+                    "candidates_total": 9,
+                    "survivors_total": 2,
+                    "symbols_total": 2,
+                    "families_total": 1,
+                },
+                "sample_quality": {
+                    "zero_eval_rows": 1,
+                    "median_validation_n_obs": 26,
+                    "median_test_n_obs": 19,
+                },
                 "survivor_quality": {"median_q_value": 0.03, "median_estimate_bps": 9.0},
             }
         },
@@ -144,7 +190,9 @@ def test_compare_research_runs_script_writes_report(tmp_path, monkeypatch):
                 "primary_reject_reason_counts": {"stability_score": 1},
             }
         },
-        edge_candidates=[{"gate_bridge_tradable": "pass", "resolved_cost_bps": 0.1, "expectancy_bps": -0.1}],
+        edge_candidates=[
+            {"gate_bridge_tradable": "pass", "resolved_cost_bps": 0.1, "expectancy_bps": -0.1}
+        ],
     )
 
     out_dir = tmp_path / "data" / "reports" / "research_comparison" / "cand1" / "vs_base1"

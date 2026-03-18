@@ -9,7 +9,9 @@ from project.research.services.confirmatory_candidate_service import write_confi
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Plan the next confirmatory window from local data availability and existing target runs.")
+    parser = argparse.ArgumentParser(
+        description="Plan the next confirmatory window from local data availability and existing target runs."
+    )
     parser.add_argument("--origin_run_id", required=True)
     parser.add_argument("--data_root", default=None)
     parser.add_argument("--out_dir", default=None)

@@ -12,6 +12,7 @@ Path conventions (discovered from _lake_fingerprint / _spec_component_digests):
 - Spec files:  {project_root.parent}/spec/**/*.{yaml,yml,json,csv}
 - project_root itself only needs to exist (configs sub-dir is optional).
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -24,6 +25,7 @@ from project.pipelines.pipeline_provenance import data_fingerprint
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _create_minimal_lake(data_root: Path, symbol: str, content: str = "ts,price\n1,100\n") -> Path:
     """Create a minimal perp CSV file for *symbol* under the expected lake path."""
@@ -52,6 +54,7 @@ def _fingerprint(symbols, data_root: Path, project_root: Path):
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
+
 
 class TestLakeFileDriftDetection:
     """Lake-file mutation must be reflected in lake_digest and overall hash."""

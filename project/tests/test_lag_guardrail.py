@@ -4,6 +4,7 @@ import pytest
 import pandas as pd
 from project.core.feature_schema import feature_dataset_dir_name
 
+
 def test_lag_guardrail_non_dsl_name_cannot_bypass():
     """
     Verifies that a non-DSL strategy named 'dsl_interpreter_v1__fake'
@@ -21,6 +22,7 @@ def test_lag_guardrail_non_dsl_name_cannot_bypass():
     assert execution_lag == 1, (
         f"Expected execution_lag=1 for non-DSL strategy with DSL prefix, but got {execution_lag}"
     )
+
 
 def test_lag_guardrail_dsl_engine_integration(tmp_path):
     """
@@ -138,9 +140,7 @@ def test_lag_guardrail_dsl_engine_integration(tmp_path):
                 "regime_stability_required": False,
             },
         ),
-        lineage=LineageSpec(
-            source_path="mock", compiler_version="mock", generated_at_utc="mock"
-        ),
+        lineage=LineageSpec(source_path="mock", compiler_version="mock", generated_at_utc="mock"),
     )
 
     result = run_engine(
@@ -148,9 +148,7 @@ def test_lag_guardrail_dsl_engine_integration(tmp_path):
         run_id="test_run",
         symbols=["BTCUSDT"],
         strategies=["dsl_interpreter_v1__lag_test"],
-        params_by_strategy={
-            "dsl_interpreter_v1__lag_test": {"dsl_blueprint": bp.model_dump()}
-        },
+        params_by_strategy={"dsl_interpreter_v1__lag_test": {"dsl_blueprint": bp.model_dump()}},
         params={},
         cost_bps=5.0,
         start_ts=pd.Timestamp("2024-01-01", tz="UTC"),
@@ -166,6 +164,7 @@ def test_lag_guardrail_dsl_engine_integration(tmp_path):
         f"Expected execution_lag=1 by default, but got {execution_lag_used}. "
         f"The lag guardrail is not working correctly."
     )
+
 
 def test_lag_guardrail_default_applies_to_all_strategies(tmp_path):
     """
@@ -277,9 +276,7 @@ def test_lag_guardrail_default_applies_to_all_strategies(tmp_path):
                 "regime_stability_required": False,
             },
         ),
-        lineage=LineageSpec(
-            source_path="mock", compiler_version="mock", generated_at_utc="mock"
-        ),
+        lineage=LineageSpec(source_path="mock", compiler_version="mock", generated_at_utc="mock"),
     )
 
     result = run_engine(
@@ -287,9 +284,7 @@ def test_lag_guardrail_default_applies_to_all_strategies(tmp_path):
         run_id="test_run",
         symbols=["BTCUSDT"],
         strategies=["dsl_interpreter_v1__lag_test"],
-        params_by_strategy={
-            "dsl_interpreter_v1__lag_test": {"dsl_blueprint": bp.model_dump()}
-        },
+        params_by_strategy={"dsl_interpreter_v1__lag_test": {"dsl_blueprint": bp.model_dump()}},
         params={},
         cost_bps=5.0,
         start_ts=pd.Timestamp("2024-01-01", tz="UTC"),

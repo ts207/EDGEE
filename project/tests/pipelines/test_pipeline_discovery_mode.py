@@ -1,4 +1,5 @@
 """Tests for canonical search-only discovery planning."""
+
 import types
 from pathlib import Path
 import pytest
@@ -6,6 +7,7 @@ import sys
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parents[2]))
+
 
 # Build a comprehensive args namespace that satisfies build_research_stages
 def _make_args(**overrides):
@@ -59,6 +61,7 @@ def _make_args(**overrides):
 
 def test_discovery_mode_search_includes_search_stage(tmp_path):
     from project.pipelines.stages.research import build_research_stages
+
     stages = build_research_stages(
         args=_make_args(discovery_mode="search"),
         run_id="r0",
@@ -75,8 +78,10 @@ def test_discovery_mode_search_includes_search_stage(tmp_path):
     assert not any("compare_discovery_paths" in n for n in names)
     assert "phase1_correlation_clustering" in names
 
+
 def test_discovery_mode_argument_is_ignored_in_favor_of_canonical_search(tmp_path):
     from project.pipelines.stages.research import build_research_stages
+
     stages = build_research_stages(
         args=_make_args(discovery_mode="legacy"),
         run_id="r0",

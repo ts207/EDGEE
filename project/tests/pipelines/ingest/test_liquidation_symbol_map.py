@@ -4,6 +4,7 @@ PR-5 / F-8: Liquidation symbol map validation.
 Tests that _assert_cm_mapping_complete and _assert_events_per_symbol
 raise ValueError with clear messages on bad input, and pass on good input.
 """
+
 from __future__ import annotations
 
 import pytest
@@ -19,6 +20,7 @@ from project.pipelines.ingest.ingest_binance_um_liquidation_snapshot import (
 # ---------------------------------------------------------------------------
 # _assert_cm_mapping_complete
 # ---------------------------------------------------------------------------
+
 
 class TestAssertCmMappingComplete:
     def test_known_btc_variants_pass(self):
@@ -69,9 +71,11 @@ class TestAssertCmMappingComplete:
     def test_known_contracts_set_is_nonempty(self):
         assert len(_KNOWN_CM_CONTRACTS) >= 2
 
+
 # ---------------------------------------------------------------------------
 # _assert_events_per_symbol
 # ---------------------------------------------------------------------------
+
 
 class TestAssertEventsPerSymbol:
     def test_all_symbols_have_events_passes(self):
@@ -104,25 +108,30 @@ class TestAssertEventsPerSymbol:
         """Exactly 1 event is sufficient."""
         _assert_events_per_symbol({"BTC": 1})
 
+
 # ---------------------------------------------------------------------------
 # _to_cm_contract round-trip sanity (guards against regression in the mapper)
 # ---------------------------------------------------------------------------
 
+
 class TestToCmContract:
-    @pytest.mark.parametrize("sym, expected", [
-        ("BTC",         "BTCUSD_PERP"),
-        ("BTCUSDT",     "BTCUSD_PERP"),
-        ("BTCUSD",      "BTCUSD_PERP"),
-        ("BTCUSD_PERP", "BTCUSD_PERP"),
-        ("ETH",         "ETHUSD_PERP"),
-        ("ETHUSDT",     "ETHUSD_PERP"),
-        ("ETHUSD",      "ETHUSD_PERP"),
-        ("ETHUSD_PERP", "ETHUSD_PERP"),
-        ("SOL",         "SOLUSD_PERP"),
-        ("SOLUSDT",     "SOLUSD_PERP"),
-        ("SOLUSD",      "SOLUSD_PERP"),
-        ("SOLUSD_PERP", "SOLUSD_PERP"),
-    ])
+    @pytest.mark.parametrize(
+        "sym, expected",
+        [
+            ("BTC", "BTCUSD_PERP"),
+            ("BTCUSDT", "BTCUSD_PERP"),
+            ("BTCUSD", "BTCUSD_PERP"),
+            ("BTCUSD_PERP", "BTCUSD_PERP"),
+            ("ETH", "ETHUSD_PERP"),
+            ("ETHUSDT", "ETHUSD_PERP"),
+            ("ETHUSD", "ETHUSD_PERP"),
+            ("ETHUSD_PERP", "ETHUSD_PERP"),
+            ("SOL", "SOLUSD_PERP"),
+            ("SOLUSDT", "SOLUSD_PERP"),
+            ("SOLUSD", "SOLUSD_PERP"),
+            ("SOLUSD_PERP", "SOLUSD_PERP"),
+        ],
+    )
     def test_known_symbols_map_to_known_cm_contracts(self, sym, expected):
         assert _to_cm_contract(sym) == expected
         assert _to_cm_contract(sym) in _KNOWN_CM_CONTRACTS

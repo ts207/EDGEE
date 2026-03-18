@@ -23,4 +23,3 @@ __all__ = [
     "nanmedian_or_nan",
     "required_columns",
 ]
-

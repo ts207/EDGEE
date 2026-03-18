@@ -1,6 +1,7 @@
 import pytest
 from project.research.search.generator import generate_hypotheses
 
+
 def test_generate_hypotheses_phase1():
     # Phase 1: Core discovery
     h1 = generate_hypotheses("phase1")
@@ -9,12 +10,14 @@ def test_generate_hypotheses_phase1():
     event_ids = [h.trigger.event_id for h in h1 if h.trigger.event_id]
     assert "VOL_SPIKE" in event_ids
 
+
 def test_generate_hypotheses_full():
     # Full mode
     h_full = generate_hypotheses("full")
     h_phase1 = generate_hypotheses("phase1")
     # Full should have more hypotheses than phase 1
     assert len(h_full) > len(h_phase1)
+
 
 def test_generate_hypotheses_wildcards():
     h = generate_hypotheses("phase1")
@@ -26,6 +29,7 @@ def test_generate_hypotheses_wildcards():
 def test_context_combinations_scalar_string():
     """Scalar context values must not be iterated as characters."""
     from project.research.search.generator import _context_combinations
+
     result = _context_combinations({"vol_regime": "low"})
     assert result == [{"vol_regime": "low"}]
 
@@ -33,6 +37,7 @@ def test_context_combinations_scalar_string():
 def test_context_combinations_mixed_scalar_and_list():
     """Mix of list and scalar context values."""
     from project.research.search.generator import _context_combinations
+
     result = _context_combinations({"vol_regime": ["low", "high"], "carry_state": "funding_pos"})
     assert len(result) == 2
     assert {"vol_regime": "low", "carry_state": "funding_pos"} in result

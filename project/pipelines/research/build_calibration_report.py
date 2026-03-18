@@ -6,6 +6,7 @@ Produces a per-event-type summary with:
   - PIT compliance: % events where signal_ts > eval_bar_ts
   - episode stats: merge ratio, mean episode duration
 """
+
 from __future__ import annotations
 from project.core.config import get_data_root
 
@@ -26,6 +27,7 @@ _TIMEFRAME_TO_NS: Dict[str, int] = {
     "15m": 900_000_000_000,
     "1h": 3_600_000_000_000,
 }
+
 
 def _calibration_for_type(
     df: pd.DataFrame,
@@ -71,7 +73,9 @@ def _calibration_for_type(
 
     # Year distribution
     if "enter_ts" in sub.columns:
-        enter = pd.to_datetime(pd.to_numeric(sub["enter_ts"], errors="coerce"), unit="ns", utc=True, errors="coerce")
+        enter = pd.to_datetime(
+            pd.to_numeric(sub["enter_ts"], errors="coerce"), unit="ns", utc=True, errors="coerce"
+        )
         years = enter.dropna().dt.year
         if not years.empty:
             row["year_min"] = int(years.min())
@@ -83,6 +87,7 @@ def _calibration_for_type(
         row["symbol_count"] = int(sub["symbol"].nunique())
 
     return row
+
 
 def calibration_report(
     events: pd.DataFrame,
@@ -102,9 +107,13 @@ def calibration_report(
             ep_sub = episodes[episodes["event_type"] == event_type]
             if not ep_sub.empty:
                 row["episode_count"] = int(len(ep_sub))
-                row["merge_ratio"] = float(row["count"] / len(ep_sub)) if len(ep_sub) > 0 else np.nan
+                row["merge_ratio"] = (
+                    float(row["count"] / len(ep_sub)) if len(ep_sub) > 0 else np.nan
+                )
                 if "episode_start_ts" in ep_sub.columns and "episode_end_ts" in ep_sub.columns:
-                    dur = pd.to_numeric(ep_sub["episode_end_ts"], errors="coerce") - pd.to_numeric(ep_sub["episode_start_ts"], errors="coerce")
+                    dur = pd.to_numeric(ep_sub["episode_end_ts"], errors="coerce") - pd.to_numeric(
+                        ep_sub["episode_start_ts"], errors="coerce"
+                    )
                     dur_bars = dur / timeframe_ns
                     row["episode_duration_bars_mean"] = float(dur_bars.mean())
                     row["episode_duration_bars_median"] = float(dur_bars.median())
@@ -112,6 +121,7 @@ def calibration_report(
         rows.append(row)
 
     return pd.DataFrame(rows)
+
 
 def main() -> int:
     DATA_ROOT = get_data_root()
@@ -141,7 +151,9 @@ def main() -> int:
 
     report = calibration_report(events, timeframe_ns, episodes)
 
-    out_dir = Path(args.out_dir) if args.out_dir else DATA_ROOT / "reports" / "calibration" / args.run_id
+    out_dir = (
+        Path(args.out_dir) if args.out_dir else DATA_ROOT / "reports" / "calibration" / args.run_id
+    )
     ensure_dir(out_dir)
 
     write_parquet(report, out_dir / "event_calibration.parquet")
@@ -155,6 +167,7 @@ def main() -> int:
     print(f"  Total zero-delay events: {int(zero_leaks)}")
     print(f"  Output: {out_dir}")
     return 0
+
 
 if __name__ == "__main__":
     raise SystemExit(main())

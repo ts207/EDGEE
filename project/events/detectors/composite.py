@@ -13,7 +13,9 @@ class CompositeDetector(BaseEventDetector):
     combination: str = "all"
     min_spacing: int = 1
 
-    def compute_raw_mask(self, df: pd.DataFrame, *, features: Mapping[str, pd.Series], **params: Any) -> pd.Series:
+    def compute_raw_mask(
+        self, df: pd.DataFrame, *, features: Mapping[str, pd.Series], **params: Any
+    ) -> pd.Series:
         columns = tuple(params.get("component_columns", self.component_columns))
         if not columns:
             raise ValueError("CompositeDetector requires component_columns")
@@ -36,6 +38,8 @@ class CompositeDetector(BaseEventDetector):
             return out
         raise ValueError(f"Unsupported combination: {combo}")
 
-    def event_indices(self, df: pd.DataFrame, *, features: Mapping[str, pd.Series], **params: Any) -> list[int]:
+    def event_indices(
+        self, df: pd.DataFrame, *, features: Mapping[str, pd.Series], **params: Any
+    ) -> list[int]:
         mask = self.compute_raw_mask(df, features=features, **params)
         return sparsify_mask(mask, min_spacing=int(params.get("min_spacing", self.min_spacing)))

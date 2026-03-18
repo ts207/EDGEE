@@ -15,7 +15,10 @@ if TYPE_CHECKING:
 
 _EXPORTS = {
     "AgentProposal": ("project.research.agent_io.proposal_schema", "AgentProposal"),
-    "build_run_all_command": ("project.research.agent_io.execute_proposal", "build_run_all_command"),
+    "build_run_all_command": (
+        "project.research.agent_io.execute_proposal",
+        "build_run_all_command",
+    ),
     "build_run_all_overrides": (
         "project.research.agent_io.proposal_to_experiment",
         "build_run_all_overrides",

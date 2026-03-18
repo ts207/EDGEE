@@ -1,4 +1,5 @@
 """Tests for metric-level golden regression checks (E2-T3)."""
+
 from __future__ import annotations
 
 import json
@@ -14,9 +15,7 @@ from project.core.golden_regression import (
     load_tolerance_config,
 )
 
-_TOLERANCE_YAML = (
-    Path(__file__).parent.parent / "fixtures" / "golden_tolerance_config.yaml"
-)
+_TOLERANCE_YAML = Path(__file__).parent.parent / "fixtures" / "golden_tolerance_config.yaml"
 
 _RUN_ID = "test-run-001"
 
@@ -100,7 +99,6 @@ def _seed_artifacts(
 
 
 class TestGoldenMetricRegression:
-
     def test_identical_run_passes_regression(self, tmp_path: Path) -> None:
         """Same artifacts as golden baseline must pass all metric tolerance checks."""
         tolerance = load_tolerance_config(_TOLERANCE_YAML)
@@ -128,12 +126,8 @@ class TestGoldenMetricRegression:
         _seed_artifacts(baseline_root, run_id=_RUN_ID, net_expectancy_bps=5.0)
         _seed_artifacts(candidate_root, run_id=_RUN_ID, net_expectancy_bps=5.5)
 
-        baseline = collect_core_artifact_snapshot(
-            data_root=baseline_root, run_id=_RUN_ID
-        )
-        candidate = collect_core_artifact_snapshot(
-            data_root=candidate_root, run_id=_RUN_ID
-        )
+        baseline = collect_core_artifact_snapshot(data_root=baseline_root, run_id=_RUN_ID)
+        candidate = collect_core_artifact_snapshot(data_root=candidate_root, run_id=_RUN_ID)
 
         result = compare_golden_snapshots(
             baseline=baseline,
@@ -156,12 +150,8 @@ class TestGoldenMetricRegression:
         _seed_artifacts(baseline_root, run_id=_RUN_ID, net_expectancy_bps=5.0)
         _seed_artifacts(candidate_root, run_id=_RUN_ID, net_expectancy_bps=8.0)
 
-        baseline = collect_core_artifact_snapshot(
-            data_root=baseline_root, run_id=_RUN_ID
-        )
-        candidate = collect_core_artifact_snapshot(
-            data_root=candidate_root, run_id=_RUN_ID
-        )
+        baseline = collect_core_artifact_snapshot(data_root=baseline_root, run_id=_RUN_ID)
+        candidate = collect_core_artifact_snapshot(data_root=candidate_root, run_id=_RUN_ID)
 
         result = compare_golden_snapshots(
             baseline=baseline,
@@ -187,8 +177,7 @@ class TestGoldenMetricRegression:
         assert isinstance(tolerance, GoldenToleranceConfig)
         assert "kpi_scorecard.net_expectancy_bps" in tolerance.per_metric_abs_tolerance
         assert (
-            abs(tolerance.per_metric_abs_tolerance["kpi_scorecard.net_expectancy_bps"] - 1.0)
-            < 1e-9
+            abs(tolerance.per_metric_abs_tolerance["kpi_scorecard.net_expectancy_bps"] - 1.0) < 1e-9
         ), (
             f"Expected 1.0 but got "
             f"{tolerance.per_metric_abs_tolerance['kpi_scorecard.net_expectancy_bps']}"

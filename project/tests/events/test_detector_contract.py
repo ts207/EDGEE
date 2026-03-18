@@ -5,13 +5,15 @@ from project.events.detector_contract import DetectorContract, DetectorContractE
 
 def _minimal_df():
     ts = pd.date_range("2024-01-01", periods=10, freq="5min", tz="UTC")
-    return pd.DataFrame({
-        "timestamp": ts,
-        "close": [100.0 + i for i in range(10)],
-        "high": [101.0 + i for i in range(10)],
-        "low": [99.0 + i for i in range(10)],
-        "volume": [1000.0] * 10,
-    })
+    return pd.DataFrame(
+        {
+            "timestamp": ts,
+            "close": [100.0 + i for i in range(10)],
+            "high": [101.0 + i for i in range(10)],
+            "low": [99.0 + i for i in range(10)],
+            "volume": [1000.0] * 10,
+        }
+    )
 
 
 class _GoodDetector(DetectorContract):

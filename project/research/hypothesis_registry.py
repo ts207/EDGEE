@@ -12,9 +12,11 @@ from project.io.utils import write_parquet
 from project.spec_registry import load_unified_event_registry
 from project.domain.hypotheses import HypothesisSpec, TriggerSpec
 
+
 @dataclass(frozen=True)
 class Hypothesis:
     """Explicit tested hypothesis metadata."""
+
     event_family: str
     event_type: str
     symbol_scope: str
@@ -31,7 +33,11 @@ class Hypothesis:
 
     def to_spec(self) -> HypothesisSpec:
         """Return the canonical HypothesisSpec representation."""
-        ctx = {"state_filter": self.state_filter} if self.state_filter and self.state_filter != "all" else None
+        ctx = (
+            {"state_filter": self.state_filter}
+            if self.state_filter and self.state_filter != "all"
+            else None
+        )
         return HypothesisSpec(
             trigger=TriggerSpec.event(self.event_type),
             direction=self.side,
@@ -43,7 +49,6 @@ class Hypothesis:
     def hypothesis_id(self) -> str:
         """Deterministic ID delegating to HypothesisSpec for cross-path comparability."""
         return self.to_spec().hypothesis_id()
-
 
 
 @lru_cache(maxsize=1)
@@ -83,7 +88,11 @@ def _spec_horizons(event_type: str, requested: List[str]) -> List[str]:
     spec = _event_spec(event_type)
     horizons = spec.get("horizons", []) if isinstance(spec, dict) else []
     normalized_requested = [str(h).strip() for h in requested if str(h).strip()]
-    normalized_spec = [str(h).strip() for h in horizons if str(h).strip()] if isinstance(horizons, (list, tuple)) else []
+    normalized_spec = (
+        [str(h).strip() for h in horizons if str(h).strip()]
+        if isinstance(horizons, (list, tuple))
+        else []
+    )
     if normalized_spec and normalized_requested:
         overlap = [h for h in normalized_requested if h in normalized_spec]
         if overlap:
@@ -95,8 +104,21 @@ def _spec_horizons(event_type: str, requested: List[str]) -> List[str]:
 
 def _template_side(template: str) -> str:
     token = str(template).strip().lower()
-    continuation_like = {"continuation", "trend_following", "momentum", "breakout_follow", "carry_continuation"}
-    contrarian_like = {"mean_reversion", "momentum_fade", "overshoot_repair", "stop_run_repair", "fade", "reversal"}
+    continuation_like = {
+        "continuation",
+        "trend_following",
+        "momentum",
+        "breakout_follow",
+        "carry_continuation",
+    }
+    contrarian_like = {
+        "mean_reversion",
+        "momentum_fade",
+        "overshoot_repair",
+        "stop_run_repair",
+        "fade",
+        "reversal",
+    }
     if token in continuation_like:
         return "long"
     if token in contrarian_like:
@@ -106,7 +128,7 @@ def _template_side(template: str) -> str:
 
 class HypothesisRegistry:
     """Registry for managing the searched hypothesis set."""
-    
+
     def __init__(self):
         self.hypotheses: Dict[str, Hypothesis] = {}
 
@@ -122,11 +144,21 @@ class HypothesisRegistry:
             row["hypothesis_id"] = hid
             rows.append(row)
         if not rows:
-            return pd.DataFrame(columns=[
-                "event_family", "event_type", "symbol_scope", "side", "horizon",
-                "condition_template", "state_filter", "parameterization_id",
-                "family_id", "cluster_id", "hypothesis_id"
-            ])
+            return pd.DataFrame(
+                columns=[
+                    "event_family",
+                    "event_type",
+                    "symbol_scope",
+                    "side",
+                    "horizon",
+                    "condition_template",
+                    "state_filter",
+                    "parameterization_id",
+                    "family_id",
+                    "cluster_id",
+                    "hypothesis_id",
+                ]
+            )
         return pd.DataFrame(rows)
 
     def write_artifacts(self, out_dir: Path) -> str:
@@ -134,13 +166,14 @@ class HypothesisRegistry:
         out_dir.mkdir(parents=True, exist_ok=True)
         df = self.to_dataframe()
         write_parquet(df, out_dir / "hypothesis_registry.parquet")
-        
+
         # Compute registry hash
         payload = df.sort_values("hypothesis_id").to_json(orient="records").encode("utf-8")
         reg_hash = hashlib.sha256(payload).hexdigest()
         (out_dir / "hypothesis_registry_hash.txt").write_text(reg_hash)
-        
+
         return reg_hash
+
 
 def generate_discovery_registry(
     event_types: List[str],
@@ -175,7 +208,7 @@ def generate_discovery_registry(
                         state_filter="all",
                         parameterization_id="registry_v1",
                         family_id=f"fam_{event_family}_{et}_{template}_{h}",
-                        cluster_id=f"cluster_{event_family}_{cluster_suffix}"
+                        cluster_id=f"cluster_{event_family}_{cluster_suffix}",
                     )
                     registry.register(hyp)
     return registry

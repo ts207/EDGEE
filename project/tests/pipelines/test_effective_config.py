@@ -92,8 +92,12 @@ def test_effective_config_write_is_deterministic(tmp_path: Path) -> None:
             "search_spec": "spec/search_space.yaml",
         },
     )
-    path_a, hash_a = write_effective_config(data_root=tmp_path, run_id="deterministic", payload=payload)
-    path_b, hash_b = write_effective_config(data_root=tmp_path, run_id="deterministic", payload=payload)
+    path_a, hash_a = write_effective_config(
+        data_root=tmp_path, run_id="deterministic", payload=payload
+    )
+    path_b, hash_b = write_effective_config(
+        data_root=tmp_path, run_id="deterministic", payload=payload
+    )
 
     assert path_a == path_b
     assert hash_a == hash_b
@@ -133,9 +137,7 @@ def test_data_fingerprint_changes_when_effective_config_hash_changes(tmp_path: P
 def test_pipeline_parser_rejects_removed_blueprint_promotion_alias() -> None:
     parser = build_parser()
     option_strings = {
-        option
-        for action in parser._actions
-        for option in getattr(action, "option_strings", [])
+        option for action in parser._actions for option in getattr(action, "option_strings", [])
     }
     assert "--run_candidate_promotion" in option_strings
     assert "--run_blueprint_promotion" not in option_strings

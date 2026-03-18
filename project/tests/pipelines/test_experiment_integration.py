@@ -10,6 +10,7 @@ sys.path.insert(0, str(Path(__file__).parents[2]))
 
 from project.pipelines.stages.research import build_research_stages
 
+
 def _make_args(**overrides):
     defaults = dict(
         run_phase2_conditional=1,
@@ -67,36 +68,38 @@ def _make_args(**overrides):
     ns = types.SimpleNamespace(**{**defaults, **overrides})
     return ns
 
+
 @patch("project.pipelines.stages.research.build_experiment_plan")
 def test_build_research_stages_with_experiment_config(mock_build_plan, tmp_path):
     # Mock the plan
     mock_trigger = MagicMock()
     mock_trigger.trigger_type = "event"
     mock_trigger.event_id = "VOL_SPIKE"
-    
+
     mock_hyp = MagicMock()
     mock_hyp.trigger = mock_trigger
     mock_hyp.template_id = "continuation"
     mock_hyp.horizon = "12b"
     mock_hyp.direction = "long"
     mock_hyp.entry_lag = 0
-    
+
     mock_plan = MagicMock()
     mock_plan.program_id = "test_prog"
     mock_plan.hypotheses = [mock_hyp]
     mock_plan.estimated_hypothesis_count = 1
     mock_build_plan.return_value = mock_plan
-    
+
     phase2_event_chain = [
         ("VOL_SPIKE", "analyze_events.py", []),
         ("LIQUIDITY_GAP_PRINT", "analyze_events.py", []),
     ]
-    
+
     experiment_config_path = tmp_path / "some_path.yaml"
     import yaml
+
     experiment_config_path.write_text(yaml.dump({"program_id": "test_prog"}))
     args = _make_args(experiment_config=str(experiment_config_path))
-    
+
     stages = build_research_stages(
         args=args,
         run_id="r0",
@@ -108,12 +111,12 @@ def test_build_research_stages_with_experiment_config(mock_build_plan, tmp_path)
         data_root=tmp_path,
         phase2_event_chain=phase2_event_chain,
     )
-    
+
     # Check that only VOL_SPIKE stages are planned
     names = [s[0] for s in stages]
     assert any("VOL_SPIKE" in n for n in names)
     assert not any("LIQUIDITY_GAP_PRINT" in n for n in names)
-    
+
     # Check that discovery stage has the right args
     discovery_stage = next(s for s in stages if "phase2_conditional_hypotheses" in s[0])
     s_args = discovery_stage[2]

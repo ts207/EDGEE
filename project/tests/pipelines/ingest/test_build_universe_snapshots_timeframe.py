@@ -10,11 +10,22 @@ from project.pipelines.ingest import build_universe_snapshots
 
 
 def _write_bars(root: Path, timeframe: str) -> None:
-    out_dir = root / "lake" / "cleaned" / "perp" / "BTCUSDT" / f"bars_{timeframe}" / "year=2026" / "month=01"
+    out_dir = (
+        root
+        / "lake"
+        / "cleaned"
+        / "perp"
+        / "BTCUSDT"
+        / f"bars_{timeframe}"
+        / "year=2026"
+        / "month=01"
+    )
     out_dir.mkdir(parents=True, exist_ok=True)
     df = pd.DataFrame(
         {
-            "timestamp": pd.date_range("2026-01-01", periods=3, freq="1min" if timeframe == "1m" else "5min", tz="UTC"),
+            "timestamp": pd.date_range(
+                "2026-01-01", periods=3, freq="1min" if timeframe == "1m" else "5min", tz="UTC"
+            ),
             "open": [1.0, 1.0, 1.0],
             "high": [1.0, 1.0, 1.0],
             "low": [1.0, 1.0, 1.0],
@@ -56,6 +67,10 @@ def test_universe_snapshot_reads_requested_timeframe(monkeypatch, tmp_path: Path
     ]
     assert build_universe_snapshots.main() == 0
 
-    summary = json.loads((data_root / "reports" / "universe" / "r1" / "1m" / "universe_membership.json").read_text(encoding="utf-8"))
+    summary = json.loads(
+        (data_root / "reports" / "universe" / "r1" / "1m" / "universe_membership.json").read_text(
+            encoding="utf-8"
+        )
+    )
     assert summary["timeframe"] == "1m"
     assert summary["dataset"] == "bars_1m"

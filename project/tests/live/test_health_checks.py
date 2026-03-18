@@ -3,6 +3,7 @@ E6-T4: Live health checks and stale-feed supervision.
 
 Verify that DataHealthMonitor correctly identifies stale data streams.
 """
+
 from __future__ import annotations
 
 import time
@@ -18,12 +19,12 @@ from project.live.health_checks import (
 def test_stale_feed_detection():
     # Set a very tight stale threshold for testing
     monitor = DataHealthMonitor(stale_threshold_sec=0.1)
-    
+
     # 1. Initially healthy
     monitor.on_event("BTCUSDT", "kline_1m")
     health = monitor.check_health()
     assert health["is_healthy"]
-    
+
     # 2. Becomes stale
     time.sleep(0.15)
     health = monitor.check_health()
@@ -31,7 +32,7 @@ def test_stale_feed_detection():
     assert health["freshness_status"] == "stale"
     assert health["stale_count"] == 1
     assert health["stale_streams"][0]["stream"] == "BTCUSDT:kline_1m"
-    
+
     # 3. Recovered
     monitor.on_event("BTCUSDT", "kline_1m")
     health = monitor.check_health()
@@ -40,11 +41,11 @@ def test_stale_feed_detection():
 
 def test_stale_data_with_frozen_time():
     monitor = DataHealthMonitor(stale_threshold_sec=60.0)
-    
+
     # Mock some data seen 10 mins ago
     past_time = datetime.now(timezone.utc) - timedelta(minutes=10)
     monitor.last_update_times["ETHUSDT:ticker"] = past_time
-    
+
     health = monitor.check_health()
     assert not health["is_healthy"]
     assert health["stale_count"] == 1

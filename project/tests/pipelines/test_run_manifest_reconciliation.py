@@ -11,7 +11,9 @@ def _write_json(path: Path, payload: dict) -> None:
     path.write_text(json.dumps(payload), encoding="utf-8")
 
 
-def test_reconcile_run_manifest_from_stage_manifests_marks_completed_manual_replay_success(tmp_path, monkeypatch):
+def test_reconcile_run_manifest_from_stage_manifests_marks_completed_manual_replay_success(
+    tmp_path, monkeypatch
+):
     data_root = tmp_path / "data"
     monkeypatch.setattr(provenance, "_get_data_root", lambda: data_root)
 
@@ -21,7 +23,11 @@ def test_reconcile_run_manifest_from_stage_manifests_marks_completed_manual_repl
         "status": "failed",
         "failed_stage": "promote_candidates",
         "failed_stage_instance": "promote_candidates",
-        "planned_stage_instances": ["export_edge_candidates", "promote_candidates", "update_edge_registry"],
+        "planned_stage_instances": [
+            "export_edge_candidates",
+            "promote_candidates",
+            "update_edge_registry",
+        ],
         "stage_timings_sec": {},
         "stage_instance_timings_sec": {},
     }
@@ -64,7 +70,9 @@ def test_reconcile_run_manifest_from_stage_manifests_marks_completed_manual_repl
     assert "update_edge_registry" in reconciled["stage_instance_timings_sec"]
 
 
-def test_reconcile_run_manifest_from_stage_manifests_keeps_failed_when_planned_stage_missing(tmp_path, monkeypatch):
+def test_reconcile_run_manifest_from_stage_manifests_keeps_failed_when_planned_stage_missing(
+    tmp_path, monkeypatch
+):
     data_root = tmp_path / "data"
     monkeypatch.setattr(provenance, "_get_data_root", lambda: data_root)
 
@@ -74,7 +82,11 @@ def test_reconcile_run_manifest_from_stage_manifests_keeps_failed_when_planned_s
         "status": "failed",
         "failed_stage": "promote_candidates",
         "failed_stage_instance": "promote_candidates",
-        "planned_stage_instances": ["export_edge_candidates", "promote_candidates", "update_edge_registry"],
+        "planned_stage_instances": [
+            "export_edge_candidates",
+            "promote_candidates",
+            "update_edge_registry",
+        ],
         "stage_timings_sec": {},
         "stage_instance_timings_sec": {},
     }
@@ -104,7 +116,9 @@ def test_reconcile_run_manifest_from_stage_manifests_keeps_failed_when_planned_s
     assert reconciled["failed_stage"] == "promote_candidates"
 
 
-def test_reconcile_run_manifest_from_stage_manifests_treats_warning_as_terminal(tmp_path, monkeypatch):
+def test_reconcile_run_manifest_from_stage_manifests_treats_warning_as_terminal(
+    tmp_path, monkeypatch
+):
     data_root = tmp_path / "data"
     monkeypatch.setattr(provenance, "_get_data_root", lambda: data_root)
 

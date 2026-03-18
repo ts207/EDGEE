@@ -4,6 +4,7 @@ Live Kill-Switch and Unwind Orchestration.
 Monitors drift and account health to trigger automated de-risking (kill-switches)
 and position unwinding.
 """
+
 from __future__ import annotations
 
 import logging
@@ -53,7 +54,9 @@ class KillSwitchManager:
         return {
             "is_active": bool(self.status.is_active),
             "reason": self.status.reason.name if self.status.reason is not None else None,
-            "triggered_at": self.status.triggered_at.isoformat() if self.status.triggered_at else None,
+            "triggered_at": self.status.triggered_at.isoformat()
+            if self.status.triggered_at
+            else None,
             "message": str(self.status.message),
             "recovery_streak": int(self.status.recovery_streak),
         }
@@ -76,7 +79,9 @@ class KillSwitchManager:
             try:
                 triggered_at = datetime.fromisoformat(str(triggered_at_raw))
             except ValueError:
-                LOGGER.warning("Invalid persisted kill-switch timestamp %r; ignoring.", triggered_at_raw)
+                LOGGER.warning(
+                    "Invalid persisted kill-switch timestamp %r; ignoring.", triggered_at_raw
+                )
         self.status = KillSwitchStatus(
             is_active=bool(snapshot.get("is_active", False)),
             reason=reason,
@@ -98,7 +103,7 @@ class KillSwitchManager:
         )
         self._persist_status()
         LOGGER.critical(f"KILL-SWITCH TRIGGERED: {reason.name} - {message}")
-        
+
         for cb in self._on_trigger_callbacks:
             try:
                 cb(reason, message)
@@ -114,13 +119,13 @@ class KillSwitchManager:
         """Trigger if current unrealized PnL exceeds drawdown limit."""
         equity = self.state_store.account.wallet_balance
         unrealized = self.state_store.account.total_unrealized_pnl
-        
+
         if equity > 0:
             drawdown = -unrealized / equity
             if drawdown > max_drawdown_pct:
                 self.trigger(
-                    KillSwitchReason.EXCESSIVE_DRAWDOWN, 
-                    f"Drawdown {drawdown:.2%} exceeded limit {max_drawdown_pct:.2%}"
+                    KillSwitchReason.EXCESSIVE_DRAWDOWN,
+                    f"Drawdown {drawdown:.2%} exceeded limit {max_drawdown_pct:.2%}",
                 )
 
     def check_microstructure(
@@ -144,7 +149,10 @@ class KillSwitchManager:
             min_depth_usd=min_depth_usd,
             min_tob_coverage=min_tob_coverage,
         )
-        if self.status.is_active and self.status.reason not in {None, KillSwitchReason.MICROSTRUCTURE_BREAKDOWN}:
+        if self.status.is_active and self.status.reason not in {
+            None,
+            KillSwitchReason.MICROSTRUCTURE_BREAKDOWN,
+        }:
             gate["is_tradable"] = False
             gate["reasons"] = list(gate.get("reasons", [])) + ["kill_switch_active"]
             gate["recovery_streak"] = int(self.status.recovery_streak)
@@ -167,7 +175,10 @@ class KillSwitchManager:
             gate["required_recovery_streak"] = int(self.microstructure_recovery_streak)
             return gate
 
-        if self.status.is_active and self.status.reason == KillSwitchReason.MICROSTRUCTURE_BREAKDOWN:
+        if (
+            self.status.is_active
+            and self.status.reason == KillSwitchReason.MICROSTRUCTURE_BREAKDOWN
+        ):
             self.status.recovery_streak += 1
             if self.status.recovery_streak < self.microstructure_recovery_streak:
                 gate["is_tradable"] = False
@@ -192,6 +203,7 @@ class UnwindOrchestrator:
     """
     Handles the actual closing of positions once a kill-switch is triggered.
     """
+
     def __init__(self, state_store: LiveStateStore, oms_manager: Any):
         self.state_store = state_store
         self.oms_manager = oms_manager
@@ -203,15 +215,15 @@ class UnwindOrchestrator:
         """
         if self.is_unwinding:
             return
-        
+
         self.is_unwinding = True
         try:
             # 1. Cancel all open orders first
             await self.oms_manager.cancel_all_orders()
-            
+
             # 2. Flatten all positions
             await self.oms_manager.flatten_all_positions(self.state_store)
-            
+
             LOGGER.warning("Emergency unwind orchestration completed successfully.")
         except Exception as e:
             LOGGER.error(f"Error during emergency unwind: {e}")

@@ -43,7 +43,9 @@ def test_prepare_events_dataframe_fallback_filters_symbols(monkeypatch, tmp_path
         run_id="r2",
         event_type="VOL_SHOCK",
         symbols=["BTCUSDT"],
-        event_registry_specs={"VOL_SHOCK": SimpleNamespace(reports_dir="vol", events_file="events.csv")},
+        event_registry_specs={
+            "VOL_SHOCK": SimpleNamespace(reports_dir="vol", events_file="events.csv")
+        },
         horizons=["5m"],
         entry_lag_bars=1,
         fam_config={},
@@ -75,6 +77,7 @@ def test_populate_fail_reasons_considers_retail_gates():
     assert out.loc[0, "fail_gate_primary"] == "gate_retail_net_expectancy"
     assert out.loc[0, "fail_reason_primary"] == "failed_gate_retail_net_expectancy"
 
+
 def test_populate_fail_reasons_considers_oos_gates():
     df = pd.DataFrame(
         [
@@ -100,6 +103,7 @@ def test_populate_fail_reasons_considers_oos_gates():
     out = svc.populate_fail_reasons(df)
     assert out.loc[0, "fail_gate_primary"] == "gate_oos_min_samples"
     assert out.loc[0, "fail_reason_primary"] == "failed_gate_oos_min_samples"
+
 
 def test_populate_fail_reasons_falls_back_to_fail_reasons_tokens():
     df = pd.DataFrame(

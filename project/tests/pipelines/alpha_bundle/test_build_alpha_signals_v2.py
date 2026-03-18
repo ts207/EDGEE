@@ -45,7 +45,9 @@ def test_alpha_signals_require_canonical_funding_rate_scaled(monkeypatch, tmp_pa
         return _bars_frame() if calls["i"] == 1 else _funding_frame(scaled=False)
 
     monkeypatch.setattr(build_alpha_signals_v2, "read_parquet", fake_read_parquet)
-    monkeypatch.setattr(build_alpha_signals_v2, "write_parquet", lambda df, path: (Path(path), "parquet"))
+    monkeypatch.setattr(
+        build_alpha_signals_v2, "write_parquet", lambda df, path: (Path(path), "parquet")
+    )
     monkeypatch.setattr(
         sys,
         "argv",

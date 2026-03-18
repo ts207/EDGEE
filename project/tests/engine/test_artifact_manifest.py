@@ -16,71 +16,95 @@ class _DummyStrategy:
 
 def _make_frame(strategy_name: str, symbol: str) -> pd.DataFrame:
     ts = pd.date_range("2024-01-01", periods=4, freq="5min", tz="UTC")
-    return pd.DataFrame({
-        "timestamp": ts,
-        "symbol": symbol,
-        "strategy": strategy_name,
-        "signal_position": [0.0, 1.0, 1.0, 1.0],
-        "requested_position_scale": [1.0, 1.0, 1.0, 1.0],
-        "target_position": [0.0, 1.0, 1.0, 1.0],
-        "executed_position": [0.0, 0.0, 1.0, 1.0],
-        "prior_executed_position": [0.0, 0.0, 0.0, 1.0],
-        "fill_mode": ["close"] * 4,
-        "fill_price": [None, None, 101.0, None],
-        "mark_price": [100.0, 101.0, 102.0, 103.0],
-        "open": [100.0, 101.0, 102.0, 103.0],
-        "close": [100.0, 101.0, 102.0, 103.0],
-        "bar_return_close_to_close": [None, 0.01, 102.0 / 101.0 - 1.0, 103.0 / 102.0 - 1.0],
-        "entry_return_next_open": [None, None, None, None],
-        "holding_return": [None, 0.01, 102.0 / 101.0 - 1.0, 103.0 / 102.0 - 1.0],
-        "turnover": [0.0, 0.0, 1.0, 0.0],
-        "gross_pnl": [0.0, 0.0, 102.0 / 101.0 - 1.0, 103.0 / 102.0 - 1.0],
-        "transaction_cost": [0.0, 0.0, 0.0, 0.0],
-        "slippage_cost": [0.0, 0.0, 0.0, 0.0],
-        "funding_pnl": [0.0, 0.0, 0.0, 0.0],
-        "borrow_cost": [0.0, 0.0, 0.0, 0.0],
-        "net_pnl": [0.0, 0.0, 102.0 / 101.0 - 1.0, 103.0 / 102.0 - 1.0],
-        "gross_exposure": [0.0, 0.0, 1.0, 1.0],
-        "net_exposure": [0.0, 0.0, 1.0, 1.0],
-        "capital_base": [1.0, 1.0, 1.0, 1.0],
-        "equity_return": [0.0, 0.0, 102.0 / 101.0 - 1.0, 103.0 / 102.0 - 1.0],
-    })
+    return pd.DataFrame(
+        {
+            "timestamp": ts,
+            "symbol": symbol,
+            "strategy": strategy_name,
+            "signal_position": [0.0, 1.0, 1.0, 1.0],
+            "requested_position_scale": [1.0, 1.0, 1.0, 1.0],
+            "target_position": [0.0, 1.0, 1.0, 1.0],
+            "executed_position": [0.0, 0.0, 1.0, 1.0],
+            "prior_executed_position": [0.0, 0.0, 0.0, 1.0],
+            "fill_mode": ["close"] * 4,
+            "fill_price": [None, None, 101.0, None],
+            "mark_price": [100.0, 101.0, 102.0, 103.0],
+            "open": [100.0, 101.0, 102.0, 103.0],
+            "close": [100.0, 101.0, 102.0, 103.0],
+            "bar_return_close_to_close": [None, 0.01, 102.0 / 101.0 - 1.0, 103.0 / 102.0 - 1.0],
+            "entry_return_next_open": [None, None, None, None],
+            "holding_return": [None, 0.01, 102.0 / 101.0 - 1.0, 103.0 / 102.0 - 1.0],
+            "turnover": [0.0, 0.0, 1.0, 0.0],
+            "gross_pnl": [0.0, 0.0, 102.0 / 101.0 - 1.0, 103.0 / 102.0 - 1.0],
+            "transaction_cost": [0.0, 0.0, 0.0, 0.0],
+            "slippage_cost": [0.0, 0.0, 0.0, 0.0],
+            "funding_pnl": [0.0, 0.0, 0.0, 0.0],
+            "borrow_cost": [0.0, 0.0, 0.0, 0.0],
+            "net_pnl": [0.0, 0.0, 102.0 / 101.0 - 1.0, 103.0 / 102.0 - 1.0],
+            "gross_exposure": [0.0, 0.0, 1.0, 1.0],
+            "net_exposure": [0.0, 0.0, 1.0, 1.0],
+            "capital_base": [1.0, 1.0, 1.0, 1.0],
+            "equity_return": [0.0, 0.0, 102.0 / 101.0 - 1.0, 103.0 / 102.0 - 1.0],
+        }
+    )
 
 
-def test_run_engine_writes_versioned_manifest_and_inventory(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_run_engine_writes_versioned_manifest_and_inventory(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     def fake_get_strategy(_name: str):
         return _DummyStrategy()
 
     def fake_load_symbol_raw_data(*args, **kwargs):
         ts = pd.date_range("2024-01-01", periods=4, freq="5min", tz="UTC")
-        bars = pd.DataFrame({
-            "timestamp": ts,
-            "open": [100.0, 101.0, 102.0, 103.0],
-            "high": [101.0, 102.0, 103.0, 104.0],
-            "low": [99.0, 100.0, 101.0, 102.0],
-            "close": [100.0, 101.0, 102.0, 103.0],
-            "volume": [1.0, 1.0, 1.0, 1.0],
-        })
+        bars = pd.DataFrame(
+            {
+                "timestamp": ts,
+                "open": [100.0, 101.0, 102.0, 103.0],
+                "high": [101.0, 102.0, 103.0, 104.0],
+                "low": [99.0, 100.0, 101.0, 102.0],
+                "close": [100.0, 101.0, 102.0, 103.0],
+                "volume": [1.0, 1.0, 1.0, 1.0],
+            }
+        )
         return bars, pd.DataFrame({"timestamp": ts})
 
     def fake_context(bars, features_raw, *args, **kwargs):
         return features_raw
 
-    def fake_calc(symbol, bars, features, strategy_name, strategy_params, cost_bps, data_root, **kwargs):
+    def fake_calc(
+        symbol, bars, features, strategy_name, strategy_params, cost_bps, data_root, **kwargs
+    ):
         frame = _make_frame(strategy_name, symbol)
-        trace = frame[[
-            "timestamp", "symbol", "strategy", "signal_position", "target_position",
-            "executed_position", "prior_executed_position", "fill_mode", "gross_pnl",
-            "net_pnl", "turnover"
-        ]].copy()
-        return StrategyResult(strategy_name, frame, {}, {"engine_execution_lag_bars_used": 1}, trace)
+        trace = frame[
+            [
+                "timestamp",
+                "symbol",
+                "strategy",
+                "signal_position",
+                "target_position",
+                "executed_position",
+                "prior_executed_position",
+                "fill_mode",
+                "gross_pnl",
+                "net_pnl",
+                "turnover",
+            ]
+        ].copy()
+        return StrategyResult(
+            strategy_name, frame, {}, {"engine_execution_lag_bars_used": 1}, trace
+        )
 
     monkeypatch.setattr("project.engine.runner.get_strategy", fake_get_strategy)
     monkeypatch.setattr("project.engine.runner.load_symbol_raw_data", fake_load_symbol_raw_data)
     monkeypatch.setattr("project.engine.runner.assemble_symbol_context", fake_context)
     monkeypatch.setattr("project.engine.runner.calculate_strategy_returns", fake_calc)
-    monkeypatch.setattr("project.engine.runner.load_universe_snapshots", lambda *args, **kwargs: pd.DataFrame())
-    monkeypatch.setattr("project.engine.runner.is_dsl_strategy", lambda *args, **kwargs: (False, None))
+    monkeypatch.setattr(
+        "project.engine.runner.load_universe_snapshots", lambda *args, **kwargs: pd.DataFrame()
+    )
+    monkeypatch.setattr(
+        "project.engine.runner.is_dsl_strategy", lambda *args, **kwargs: (False, None)
+    )
 
     result = run_engine(
         run_id="manifest_test",
@@ -119,40 +143,60 @@ def test_run_engine_writes_versioned_manifest_and_inventory(monkeypatch: pytest.
         assert isinstance(item["columns"], list)
 
 
-def test_strategy_frame_artifact_uses_canonical_columns_only(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_strategy_frame_artifact_uses_canonical_columns_only(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     def fake_get_strategy(_name: str):
         return _DummyStrategy()
 
     def fake_load_symbol_raw_data(*args, **kwargs):
         ts = pd.date_range("2024-01-01", periods=2, freq="5min", tz="UTC")
-        bars = pd.DataFrame({
-            "timestamp": ts,
-            "open": [100.0, 101.0],
-            "high": [101.0, 102.0],
-            "low": [99.0, 100.0],
-            "close": [100.0, 101.0],
-            "volume": [1.0, 1.0],
-        })
+        bars = pd.DataFrame(
+            {
+                "timestamp": ts,
+                "open": [100.0, 101.0],
+                "high": [101.0, 102.0],
+                "low": [99.0, 100.0],
+                "close": [100.0, 101.0],
+                "volume": [1.0, 1.0],
+            }
+        )
         return bars, pd.DataFrame({"timestamp": ts})
 
     def fake_context(bars, features_raw, *args, **kwargs):
         return features_raw
 
-    def fake_calc(symbol, bars, features, strategy_name, strategy_params, cost_bps, data_root, **kwargs):
+    def fake_calc(
+        symbol, bars, features, strategy_name, strategy_params, cost_bps, data_root, **kwargs
+    ):
         frame = _make_frame(strategy_name, symbol).iloc[:2].copy()
-        trace = frame[[
-            "timestamp", "symbol", "strategy", "signal_position", "target_position",
-            "executed_position", "prior_executed_position", "fill_mode", "gross_pnl",
-            "net_pnl", "turnover"
-        ]].copy()
+        trace = frame[
+            [
+                "timestamp",
+                "symbol",
+                "strategy",
+                "signal_position",
+                "target_position",
+                "executed_position",
+                "prior_executed_position",
+                "fill_mode",
+                "gross_pnl",
+                "net_pnl",
+                "turnover",
+            ]
+        ].copy()
         return StrategyResult(strategy_name, frame, {}, {}, trace)
 
     monkeypatch.setattr("project.engine.runner.get_strategy", fake_get_strategy)
     monkeypatch.setattr("project.engine.runner.load_symbol_raw_data", fake_load_symbol_raw_data)
     monkeypatch.setattr("project.engine.runner.assemble_symbol_context", fake_context)
     monkeypatch.setattr("project.engine.runner.calculate_strategy_returns", fake_calc)
-    monkeypatch.setattr("project.engine.runner.load_universe_snapshots", lambda *args, **kwargs: pd.DataFrame())
-    monkeypatch.setattr("project.engine.runner.is_dsl_strategy", lambda *args, **kwargs: (False, None))
+    monkeypatch.setattr(
+        "project.engine.runner.load_universe_snapshots", lambda *args, **kwargs: pd.DataFrame()
+    )
+    monkeypatch.setattr(
+        "project.engine.runner.is_dsl_strategy", lambda *args, **kwargs: (False, None)
+    )
 
     result = run_engine(
         run_id="canonical_columns_test",
@@ -189,9 +233,13 @@ def test_run_engine_resolves_default_data_root_at_call_time(
 
     monkeypatch.setenv("BACKTEST_DATA_ROOT", str(tmp_path))
     monkeypatch.setattr("project.engine.runner.get_strategy", fake_get_strategy)
-    monkeypatch.setattr("project.engine.runner.load_universe_snapshots", fake_load_universe_snapshots)
+    monkeypatch.setattr(
+        "project.engine.runner.load_universe_snapshots", fake_load_universe_snapshots
+    )
     monkeypatch.setattr("project.engine.runner.load_symbol_raw_data", fake_load_symbol_raw_data)
-    monkeypatch.setattr("project.engine.runner.is_dsl_strategy", lambda *args, **kwargs: (False, None))
+    monkeypatch.setattr(
+        "project.engine.runner.is_dsl_strategy", lambda *args, **kwargs: (False, None)
+    )
 
     with pytest.raises(RuntimeError, match="stop_after_data_root_capture"):
         run_engine(
@@ -215,34 +263,54 @@ def test_manifest_records_deterministic_optimizer_contract(
 
     def fake_load_symbol_raw_data(*args, **kwargs):
         ts = pd.date_range("2024-01-01", periods=4, freq="5min", tz="UTC")
-        bars = pd.DataFrame({
-            "timestamp": ts,
-            "open": [100.0, 101.0, 102.0, 103.0],
-            "high": [101.0, 102.0, 103.0, 104.0],
-            "low": [99.0, 100.0, 101.0, 102.0],
-            "close": [100.0, 101.0, 102.0, 103.0],
-            "volume": [1.0, 1.0, 1.0, 1.0],
-        })
+        bars = pd.DataFrame(
+            {
+                "timestamp": ts,
+                "open": [100.0, 101.0, 102.0, 103.0],
+                "high": [101.0, 102.0, 103.0, 104.0],
+                "low": [99.0, 100.0, 101.0, 102.0],
+                "close": [100.0, 101.0, 102.0, 103.0],
+                "volume": [1.0, 1.0, 1.0, 1.0],
+            }
+        )
         return bars, pd.DataFrame({"timestamp": ts})
 
     def fake_context(bars, features_raw, *args, **kwargs):
         return features_raw
 
-    def fake_calc(symbol, bars, features, strategy_name, strategy_params, cost_bps, data_root, **kwargs):
+    def fake_calc(
+        symbol, bars, features, strategy_name, strategy_params, cost_bps, data_root, **kwargs
+    ):
         frame = _make_frame(strategy_name, symbol)
-        trace = frame[[
-            "timestamp", "symbol", "strategy", "signal_position", "target_position",
-            "executed_position", "prior_executed_position", "fill_mode", "gross_pnl",
-            "net_pnl", "turnover"
-        ]].copy()
-        return StrategyResult(strategy_name, frame, {}, {"engine_execution_lag_bars_used": 1}, trace)
+        trace = frame[
+            [
+                "timestamp",
+                "symbol",
+                "strategy",
+                "signal_position",
+                "target_position",
+                "executed_position",
+                "prior_executed_position",
+                "fill_mode",
+                "gross_pnl",
+                "net_pnl",
+                "turnover",
+            ]
+        ].copy()
+        return StrategyResult(
+            strategy_name, frame, {}, {"engine_execution_lag_bars_used": 1}, trace
+        )
 
     monkeypatch.setattr("project.engine.runner.get_strategy", fake_get_strategy)
     monkeypatch.setattr("project.engine.runner.load_symbol_raw_data", fake_load_symbol_raw_data)
     monkeypatch.setattr("project.engine.runner.assemble_symbol_context", fake_context)
     monkeypatch.setattr("project.engine.runner.calculate_strategy_returns", fake_calc)
-    monkeypatch.setattr("project.engine.runner.load_universe_snapshots", lambda *args, **kwargs: pd.DataFrame())
-    monkeypatch.setattr("project.engine.runner.is_dsl_strategy", lambda *args, **kwargs: (False, None))
+    monkeypatch.setattr(
+        "project.engine.runner.load_universe_snapshots", lambda *args, **kwargs: pd.DataFrame()
+    )
+    monkeypatch.setattr(
+        "project.engine.runner.is_dsl_strategy", lambda *args, **kwargs: (False, None)
+    )
 
     result = run_engine(
         run_id="optimizer_manifest_test",
@@ -276,34 +344,54 @@ def test_manifest_records_family_budget_contract(
 
     def fake_load_symbol_raw_data(*args, **kwargs):
         ts = pd.date_range("2024-01-01", periods=4, freq="5min", tz="UTC")
-        bars = pd.DataFrame({
-            "timestamp": ts,
-            "open": [100.0, 101.0, 102.0, 103.0],
-            "high": [101.0, 102.0, 103.0, 104.0],
-            "low": [99.0, 100.0, 101.0, 102.0],
-            "close": [100.0, 101.0, 102.0, 103.0],
-            "volume": [1.0, 1.0, 1.0, 1.0],
-        })
+        bars = pd.DataFrame(
+            {
+                "timestamp": ts,
+                "open": [100.0, 101.0, 102.0, 103.0],
+                "high": [101.0, 102.0, 103.0, 104.0],
+                "low": [99.0, 100.0, 101.0, 102.0],
+                "close": [100.0, 101.0, 102.0, 103.0],
+                "volume": [1.0, 1.0, 1.0, 1.0],
+            }
+        )
         return bars, pd.DataFrame({"timestamp": ts})
 
     def fake_context(bars, features_raw, *args, **kwargs):
         return features_raw
 
-    def fake_calc(symbol, bars, features, strategy_name, strategy_params, cost_bps, data_root, **kwargs):
+    def fake_calc(
+        symbol, bars, features, strategy_name, strategy_params, cost_bps, data_root, **kwargs
+    ):
         frame = _make_frame(strategy_name, symbol)
-        trace = frame[[
-            "timestamp", "symbol", "strategy", "signal_position", "target_position",
-            "executed_position", "prior_executed_position", "fill_mode", "gross_pnl",
-            "net_pnl", "turnover"
-        ]].copy()
-        return StrategyResult(strategy_name, frame, {}, {"engine_execution_lag_bars_used": 1}, trace)
+        trace = frame[
+            [
+                "timestamp",
+                "symbol",
+                "strategy",
+                "signal_position",
+                "target_position",
+                "executed_position",
+                "prior_executed_position",
+                "fill_mode",
+                "gross_pnl",
+                "net_pnl",
+                "turnover",
+            ]
+        ].copy()
+        return StrategyResult(
+            strategy_name, frame, {}, {"engine_execution_lag_bars_used": 1}, trace
+        )
 
     monkeypatch.setattr("project.engine.runner.get_strategy", fake_get_strategy)
     monkeypatch.setattr("project.engine.runner.load_symbol_raw_data", fake_load_symbol_raw_data)
     monkeypatch.setattr("project.engine.runner.assemble_symbol_context", fake_context)
     monkeypatch.setattr("project.engine.runner.calculate_strategy_returns", fake_calc)
-    monkeypatch.setattr("project.engine.runner.load_universe_snapshots", lambda *args, **kwargs: pd.DataFrame())
-    monkeypatch.setattr("project.engine.runner.is_dsl_strategy", lambda *args, **kwargs: (False, None))
+    monkeypatch.setattr(
+        "project.engine.runner.load_universe_snapshots", lambda *args, **kwargs: pd.DataFrame()
+    )
+    monkeypatch.setattr(
+        "project.engine.runner.is_dsl_strategy", lambda *args, **kwargs: (False, None)
+    )
 
     result = run_engine(
         run_id="family_budget_manifest_test",

@@ -3,6 +3,7 @@ calibrate_execution_costs.py
 Reads tob_5m_agg per symbol and writes per-symbol cost calibration JSON.
 Output: data/reports/cost_calibration/<run_id>/<symbol>.json
 """
+
 from __future__ import annotations
 from project.core.config import get_data_root
 
@@ -13,8 +14,15 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from project.io.utils import choose_partition_dir, ensure_dir, list_parquet_files, read_parquet, run_scoped_lake_path
+from project.io.utils import (
+    choose_partition_dir,
+    ensure_dir,
+    list_parquet_files,
+    read_parquet,
+    run_scoped_lake_path,
+)
 from project.specs.manifest import finalize_manifest, start_manifest
+
 
 def _calibrate_symbol(symbol: str, run_id: str) -> tuple[dict, Path] | None:
     data_root = get_data_root()
@@ -56,16 +64,27 @@ def _calibrate_symbol(symbol: str, run_id: str) -> tuple[dict, Path] | None:
     }
     return calib, tob_dir
 
+
 def main() -> int:
     data_root = get_data_root()
-    parser = argparse.ArgumentParser(description="Calibrate per-symbol execution costs from ToB aggregates")
+    parser = argparse.ArgumentParser(
+        description="Calibrate per-symbol execution costs from ToB aggregates"
+    )
     parser.add_argument("--run_id", required=True)
-    parser.add_argument("--symbols", nargs="*", default=None,
-        help="Symbols to calibrate. Defaults to all symbols in universe.")
+    parser.add_argument(
+        "--symbols",
+        nargs="*",
+        default=None,
+        help="Symbols to calibrate. Defaults to all symbols in universe.",
+    )
     parser.add_argument("--out_dir", default=None)
     args = parser.parse_args()
 
-    out_dir = Path(args.out_dir) if args.out_dir else data_root / "reports" / "cost_calibration" / args.run_id
+    out_dir = (
+        Path(args.out_dir)
+        if args.out_dir
+        else data_root / "reports" / "cost_calibration" / args.run_id
+    )
     ensure_dir(out_dir)
 
     params = {"run_id": args.run_id, "out_dir": str(out_dir)}
@@ -98,6 +117,7 @@ def main() -> int:
     except Exception as exc:
         finalize_manifest(manifest, "failed", error=str(exc), stats={})
         return 1
+
 
 if __name__ == "__main__":
     sys.exit(main())

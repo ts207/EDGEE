@@ -10,12 +10,14 @@ from project.specs.invariants import load_runtime_invariants_specs
 
 DEFAULT_HASH_SCHEMA_VERSION = "runtime_hash_v1"
 
+
 def load_hashing_spec(repo_root: Path) -> Dict[str, Any]:
     specs = load_runtime_invariants_specs(Path(repo_root))
     raw = specs.get("hashing", {})
     if not isinstance(raw, dict):
         raw = {}
     return dict(raw)
+
 
 def _sanitize(value: Any) -> Any:
     if isinstance(value, dict):
@@ -35,6 +37,7 @@ def _sanitize(value: Any) -> Any:
             return str(value)
     return str(value)
 
+
 def _canonical_json_bytes(payload: Any, *, ensure_ascii: bool = True) -> bytes:
     return json.dumps(
         _sanitize(payload),
@@ -42,6 +45,7 @@ def _canonical_json_bytes(payload: Any, *, ensure_ascii: bool = True) -> bytes:
         separators=(",", ":"),
         ensure_ascii=bool(ensure_ascii),
     ).encode("utf-8")
+
 
 def _hash_bytes(payload: bytes, *, algorithm: str) -> str:
     algo = str(algorithm).strip().lower()
@@ -51,8 +55,10 @@ def _hash_bytes(payload: bytes, *, algorithm: str) -> str:
         return "sha256:" + hashlib.sha256(payload).hexdigest()
     raise ValueError(f"unsupported hash algorithm: {algorithm}")
 
+
 def _record_sort_key(record: Mapping[str, Any], sort_keys: Iterable[str]) -> tuple:
     return tuple(_sanitize(record.get(k)) for k in sort_keys)
+
 
 def hash_record(
     record: Mapping[str, Any],
@@ -63,6 +69,7 @@ def hash_record(
     ensure_ascii = bool(hashing_spec.get("canonicalization", {}).get("ensure_ascii", True))
     payload = _canonical_json_bytes(record, ensure_ascii=ensure_ascii)
     return _hash_bytes(payload, algorithm=algo)
+
 
 def hash_records(
     records: Iterable[Mapping[str, Any]],
@@ -81,12 +88,14 @@ def hash_records(
     payload = _canonical_json_bytes(ordered, ensure_ascii=ensure_ascii)
     return _hash_bytes(payload, algorithm=algo)
 
+
 def hash_file_sha256(path: Path) -> str:
     hasher = hashlib.sha256()
     with Path(path).open("rb") as handle:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             hasher.update(chunk)
     return "sha256:" + hasher.hexdigest()
+
 
 def compute_artifact_hashes(paths: Iterable[Path]) -> Dict[str, str]:
     out: Dict[str, str] = {}
@@ -99,6 +108,7 @@ def compute_artifact_hashes(paths: Iterable[Path]) -> Dict[str, str]:
         except OSError:
             continue
     return out
+
 
 def compute_run_hash(
     *,

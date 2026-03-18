@@ -2,6 +2,7 @@ import pytest
 import types
 from unittest.mock import patch
 
+
 # Define the fallback shim for njit
 def fallback_njit(*args, **kwargs):
     """
@@ -16,7 +17,9 @@ def fallback_njit(*args, **kwargs):
         # Case: @njit(...) (parametrized decorator)
         def _decorator(fn):
             return fn
+
         return _decorator
+
 
 # --- Test 1: Validate fallback behavior with bare @njit ---
 def test_njit_fallback_supports_bare_decorator():
@@ -25,10 +28,13 @@ def test_njit_fallback_supports_bare_decorator():
     """
     # Monkeypatch njit to use our fallback shim for this test scope
     with patch("project.strategy.runtime.dsl_interpreter_v1.njit", fallback_njit):
+
         @fallback_njit
         def f(x):
             return x + 1
+
         assert f(1) == 2
+
 
 # --- Test 2: Validate fallback behavior with parametrized @njit ---
 def test_njit_fallback_supports_parametrized_decorator():
@@ -37,10 +43,13 @@ def test_njit_fallback_supports_parametrized_decorator():
     """
     # Monkeypatch njit to use our fallback shim for this test scope
     with patch("project.strategy.runtime.dsl_interpreter_v1.njit", fallback_njit):
-        @fallback_njit(cache=True) # Example of a parameter
+
+        @fallback_njit(cache=True)  # Example of a parameter
         def g(x):
             return x + 2
+
         assert g(1) == 3
+
 
 # --- Test 3: Validate fallback behavior by checking the module symbol ---
 # This test is designed to be stable across environments (with or without numba)
@@ -61,14 +70,14 @@ def test_njit_symbol_uses_fallback_or_numba():
     # A real njit decorator would return a numba.core.decorators.njit object or similar.
     # A simple way to check if it's the shim is to see if it's callable and returns itself.
     # More robust check: inspect its module.
-    
+
     # If njit is from numba, it will be in numba's module.
     # If it's our fallback, it will be in this module or a custom shim.
-    
+
     # To test the fallback specifically, we can monkeypatch it to our shim first,
     # then check if the shim works, as done in tests 1 and 2.
     # For a test that verifies *if* the fallback is active in the actual module:
-    
+
     # Approach: Monkeypatch __import__ to simulate numba being unavailable.
     # This is more complex and might affect other imports.
     # A simpler approach is to rely on the fact that if numba is NOT installed,
@@ -77,26 +86,26 @@ def test_njit_symbol_uses_fallback_or_numba():
 
     # Let's rely on tests 1 & 2 to validate the fallback logic itself.
     # This test will be more of a sanity check on the module's symbol.
-    
+
     # If njit is decorated and is itself callable, it might be the shim.
     # If it's a function that returns a decorator, it's likely the real one or a shim.
-    
+
     # A more direct check for the *actual* fallback path:
     # We can check the module of the njit object if it's present.
     # If numba is installed, this would be 'numba.core.decorators'.
     # If numba is *not* installed, the project might provide its own shim,
     # or the import might fail in a way that leads to our fallback.
-    
+
     # Let's assume for this test that if we can call it and it behaves like the shim,
     # it's either the shim or numba is not present.
     # Test 1 & 2 already validated the *shim's* behavior.
     # This test aims to confirm the *module's* njit symbol is usable.
-    
+
     # For stability, we won't try to *force* numba absence here,
     # but rather ensure the symbol is usable.
     # If numba is present, this symbol should be the actual numba njit.
     # If numba is absent, it should be the project's provided shim.
-    
+
     # We can infer the fallback if the symbol IS NOT from numba's module.
     # However, this requires numba to be installed to check the 'else' condition.
     # A more robust check is to see if our shim (if we inject it) works.
@@ -105,19 +114,20 @@ def test_njit_symbol_uses_fallback_or_numba():
 
     # Re-running tests 1 and 2 within the context of the actual module symbol
     # if we were to do a full integration test.
-    
+
     # Let's refine Test 3 to specifically check the *presence* of a fallback
     # or the correct numba import without forcing numba's absence.
-    
+
     # If numba is installed, m.njit should be the actual numba decorator.
     # If numba is NOT installed, m.njit should be a shim.
-    
+
     # We can check the module of the imported njit.
     try:
         import numba
+
         numba_module_name = numba.core.decorators.njit.__module__
     except ImportError:
-        numba_module_name = None # Numba is not installed
+        numba_module_name = None  # Numba is not installed
 
     # Check the module of the njit symbol from dsl_interpreter_v1
     njit_symbol_module = getattr(m.njit, "__module__", None)
@@ -139,7 +149,9 @@ def test_njit_symbol_uses_fallback_or_numba():
     # Additionally, let's ensure the shim logic itself works when injected.
     # This is covered by tests 1 & 2, but we can re-run one here for clarity.
     with patch("project.strategy.runtime.dsl_interpreter_v1.njit", fallback_njit):
+
         @fallback_njit
         def h(x):
             return x * 2
+
         assert h(5) == 10

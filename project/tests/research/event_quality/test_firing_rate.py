@@ -8,10 +8,12 @@ from project.research.event_quality.firing_rate import compute_firing_rates
 def _make_features(n_bars: int = 500) -> pd.DataFrame:
     """Synthetic feature DataFrame with two event columns."""
     dates = pd.date_range("2023-01-01", periods=n_bars, freq="5min")
-    df = pd.DataFrame({
-        "timestamp": dates,
-        "close": 100.0 + np.cumsum(np.random.normal(0, 0.05, n_bars)),
-    })
+    df = pd.DataFrame(
+        {
+            "timestamp": dates,
+            "close": 100.0 + np.cumsum(np.random.normal(0, 0.05, n_bars)),
+        }
+    )
     # event_alpha fires every 10 bars → 50 fires
     df["event_alpha"] = [i % 10 == 0 for i in range(n_bars)]
     # event_beta fires every 100 bars → 5 fires
@@ -51,6 +53,8 @@ def test_firing_rates_min_n_flag():
 
 
 def test_firing_rates_no_event_columns():
-    df = pd.DataFrame({"timestamp": pd.date_range("2023-01-01", periods=10, freq="5min"), "close": 100.0})
+    df = pd.DataFrame(
+        {"timestamp": pd.date_range("2023-01-01", periods=10, freq="5min"), "close": 100.0}
+    )
     result = compute_firing_rates(df)
     assert result.empty

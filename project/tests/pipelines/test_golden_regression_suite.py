@@ -13,9 +13,11 @@ from project.core.golden_regression import (
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2] / "project"
 
+
 def _write_json(path: Path, payload: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+
 
 def _seed_run_artifacts(data_root: Path, run_id: str) -> None:
     _write_json(
@@ -66,6 +68,7 @@ def _seed_run_artifacts(data_root: Path, run_id: str) -> None:
         },
     )
 
+
 def _load_script_module():
     script_path = PROJECT_ROOT / "scripts" / "run_golden_regression.py"
     spec = importlib.util.spec_from_file_location("run_golden_regression", script_path)
@@ -73,6 +76,7 @@ def _load_script_module():
     assert spec and spec.loader
     spec.loader.exec_module(module)
     return module
+
 
 def test_collect_core_artifact_snapshot_reads_expected_fields(tmp_path):
     run_id = "golden_run_1"
@@ -88,6 +92,7 @@ def test_collect_core_artifact_snapshot_reads_expected_fields(tmp_path):
     assert snapshot["checklist"]["decision"] == "PROMOTE"
     assert snapshot["release_signoff"]["decision"] == "APPROVE_RELEASE"
     assert snapshot["kpi_scorecard"]["net_expectancy_bps"] == 5.0
+
 
 def test_compare_golden_snapshots_honors_tolerance():
     baseline = {"kpi_scorecard": {"net_expectancy_bps": 5.0, "trade_count": 100}}
@@ -119,6 +124,7 @@ def test_compare_golden_snapshots_honors_tolerance():
     assert strict_report["passed"] is False
     assert strict_report["diff_count"] >= 1
 
+
 def test_run_golden_regression_script_compare_mode_fails_on_drift(tmp_path, monkeypatch):
     module = _load_script_module()
     run_id = "golden_run_2"
@@ -140,9 +146,7 @@ def test_run_golden_regression_script_compare_mode_fails_on_drift(tmp_path, monk
     )
     tolerance_path = tmp_path / "tolerances.yaml"
     tolerance_path.write_text(
-        "version: 1\n"
-        "defaults:\n"
-        "  numeric_abs_tolerance: 0.0\n",
+        "version: 1\ndefaults:\n  numeric_abs_tolerance: 0.0\n",
         encoding="utf-8",
     )
     out_dir = tmp_path / "reports" / "golden_regression" / run_id

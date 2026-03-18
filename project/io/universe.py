@@ -8,7 +8,13 @@ from typing import Dict, Iterable, List, Sequence, Set
 import pandas as pd
 
 from project.core.timeframes import bars_dataset_name, normalize_timeframe
-from project.io.utils import choose_partition_dir, list_parquet_files, read_parquet, run_scoped_lake_path
+from project.io.utils import (
+    choose_partition_dir,
+    list_parquet_files,
+    read_parquet,
+    run_scoped_lake_path,
+)
+
 DATA_ROOT = get_data_root()
 DEFAULT_TOP10_SEED = [
     "BTCUSDT",
@@ -23,8 +29,10 @@ DEFAULT_TOP10_SEED = [
     "LTCUSDT",
 ]
 
+
 def parse_symbols_arg(symbols_arg: str) -> List[str]:
     return [s.strip() for s in str(symbols_arg).split(",") if s.strip()]
+
 
 def discover_available_symbols(data_root: Path, run_id: str) -> List[str]:
     run_scoped_root = run_scoped_lake_path(data_root, run_id, "cleaned", "perp")
@@ -39,7 +47,10 @@ def discover_available_symbols(data_root: Path, run_id: str) -> List[str]:
                 symbols.add(path.name)
     return sorted(symbols)
 
-def _load_symbol_cleaned_bars(data_root: Path, run_id: str, symbol: str, timeframe: str = "15m") -> pd.DataFrame:
+
+def _load_symbol_cleaned_bars(
+    data_root: Path, run_id: str, symbol: str, timeframe: str = "15m"
+) -> pd.DataFrame:
     dataset = bars_dataset_name(normalize_timeframe(timeframe))
     candidates = [
         run_scoped_lake_path(data_root, run_id, "cleaned", "perp", symbol, dataset),
@@ -52,7 +63,11 @@ def _load_symbol_cleaned_bars(data_root: Path, run_id: str, symbol: str, timefra
     bars = read_parquet(files)
     if bars.empty:
         return bars
-    if "timestamp" not in bars.columns or "close" not in bars.columns or "volume" not in bars.columns:
+    if (
+        "timestamp" not in bars.columns
+        or "close" not in bars.columns
+        or "volume" not in bars.columns
+    ):
         return pd.DataFrame()
     bars["timestamp"] = pd.to_datetime(bars["timestamp"], utc=True, format="mixed")
     bars = bars.dropna(subset=["timestamp", "close", "volume"]).copy()
@@ -65,6 +80,7 @@ def _load_symbol_cleaned_bars(data_root: Path, run_id: str, symbol: str, timefra
     bars["symbol"] = symbol
     bars["dollar_volume"] = bars["close"] * bars["volume"]
     return bars[["timestamp", "symbol", "dollar_volume"]]
+
 
 def resolve_requested_symbols(
     symbols_arg: str,
@@ -90,6 +106,7 @@ def resolve_requested_symbols(
         if len(prioritized) >= 10:
             break
     return prioritized[:10]
+
 
 def compute_monthly_top_n_symbols(
     *,

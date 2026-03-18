@@ -7,6 +7,7 @@ import pandas as pd
 
 from project.pipelines.features import build_microstructure_rollup as micro_rollup
 
+
 def _synthetic_tob_1s() -> pd.DataFrame:
     ts = pd.date_range("2025-01-01T00:00:00Z", periods=24 * 300, freq="1s")
     base_spread = np.ones(len(ts), dtype=float) * 1.0
@@ -28,6 +29,7 @@ def _synthetic_tob_1s() -> pd.DataFrame:
             "ask_qty": ask_qty,
         }
     )
+
 
 def test_build_microstructure_rollup_emits_expected_columns_and_no_lookahead():
     tob = _synthetic_tob_1s()
@@ -51,6 +53,7 @@ def test_build_microstructure_rollup_emits_expected_columns_and_no_lookahead():
     early_mean = float(out["micro_spread_stress"].iloc[:10].mean())
     late_value = float(out["micro_spread_stress"].iloc[-1])
     assert late_value > early_mean
+
 
 def test_main_applies_requested_time_window(monkeypatch, tmp_path):
     tob = pd.DataFrame(

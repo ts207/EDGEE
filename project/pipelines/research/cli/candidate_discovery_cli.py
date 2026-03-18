@@ -48,7 +48,11 @@ def build_candidate_discovery_parser() -> argparse.ArgumentParser:
     parser.add_argument("--program_id", help="Program ID for campaign tracking.")
     parser.add_argument("--search_budget", type=int, help="Limit total candidate expansions.")
     parser.add_argument("--experiment_config", help="Path to experiment config YAML.")
-    parser.add_argument("--registry_root", default=None, help="Optional registry root for experiment-plan discovery.")
+    parser.add_argument(
+        "--registry_root",
+        default=None,
+        help="Optional registry root for experiment-plan discovery.",
+    )
     parser.add_argument("--min_validation_n_obs", type=int, default=None)
     parser.add_argument("--min_test_n_obs", type=int, default=None)
     parser.add_argument("--min_total_n_obs", type=int, default=None)
@@ -88,17 +92,20 @@ def candidate_discovery_config_from_namespace(args: argparse.Namespace) -> Candi
         cost_calibration_mode=str(args.cost_calibration_mode),
         cost_min_tob_coverage=float(args.cost_min_tob_coverage),
         cost_tob_tolerance_minutes=int(args.cost_tob_tolerance_minutes),
-        candidate_origin_run_id=str(args.candidate_origin_run_id) if args.candidate_origin_run_id else None,
+        candidate_origin_run_id=str(args.candidate_origin_run_id)
+        if args.candidate_origin_run_id
+        else None,
         frozen_spec_hash=str(args.frozen_spec_hash) if args.frozen_spec_hash else None,
         program_id=str(args.program_id) if args.program_id else None,
         search_budget=int(args.search_budget) if args.search_budget is not None else None,
         experiment_config=str(args.experiment_config) if args.experiment_config else None,
         registry_root=Path(args.registry_root) if args.registry_root else None,
-        min_validation_n_obs=None if args.min_validation_n_obs is None else int(args.min_validation_n_obs),
+        min_validation_n_obs=None
+        if args.min_validation_n_obs is None
+        else int(args.min_validation_n_obs),
         min_test_n_obs=None if args.min_test_n_obs is None else int(args.min_test_n_obs),
         min_total_n_obs=None if args.min_total_n_obs is None else int(args.min_total_n_obs),
     )
-
 
 
 def parse_candidate_discovery_argv(argv: Optional[List[str]] = None) -> CandidateDiscoveryConfig:

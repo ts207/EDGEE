@@ -14,7 +14,9 @@ from project.research.search.evaluator import evaluate_hypothesis_batch
 def _first_valid_row(metrics: pd.DataFrame) -> Dict[str, Any]:
     if metrics.empty:
         return {}
-    valid = metrics[metrics.get("valid", pd.Series(False, index=metrics.index)).fillna(False).astype(bool)]
+    valid = metrics[
+        metrics.get("valid", pd.Series(False, index=metrics.index)).fillna(False).astype(bool)
+    ]
     row = valid.iloc[0] if not valid.empty else metrics.iloc[0]
     return row.to_dict()
 
@@ -63,14 +65,23 @@ def compare_context_modes(
         },
         "delta": {
             "n": _get(quality_row, "n") - _get(hard_row, "n"),
-            "validation_n_obs": _get(quality_row, "validation_n_obs") - _get(hard_row, "validation_n_obs"),
+            "validation_n_obs": _get(quality_row, "validation_n_obs")
+            - _get(hard_row, "validation_n_obs"),
             "test_n_obs": _get(quality_row, "test_n_obs") - _get(hard_row, "test_n_obs"),
             "t_stat": _get(quality_row, "t_stat") - _get(hard_row, "t_stat"),
-            "robustness_score": _get(quality_row, "robustness_score") - _get(hard_row, "robustness_score"),
+            "robustness_score": _get(quality_row, "robustness_score")
+            - _get(hard_row, "robustness_score"),
             "stress_score": _get(quality_row, "stress_score") - _get(hard_row, "stress_score"),
         },
-        "selection_changed": bool(hard_hypothesis_id and quality_hypothesis_id and hard_hypothesis_id != quality_hypothesis_id),
-        "selection_outcome_changed": bool((hard_hypothesis_id == quality_hypothesis_id and hard_hypothesis_id) and (hard_valid != quality_valid)),
+        "selection_changed": bool(
+            hard_hypothesis_id
+            and quality_hypothesis_id
+            and hard_hypothesis_id != quality_hypothesis_id
+        ),
+        "selection_outcome_changed": bool(
+            (hard_hypothesis_id == quality_hypothesis_id and hard_hypothesis_id)
+            and (hard_valid != quality_valid)
+        ),
     }
 
 

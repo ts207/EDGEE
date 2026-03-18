@@ -8,15 +8,23 @@ from project.events.detector_contract import DetectorContract
 SPEC_DIR = Path(__file__).resolve().parents[2] / "spec" / "events"
 
 REQUIRED_DETECTOR_KEYS = {
-    "signal_definition", "formula", "required_columns",
-    "lookback_bars", "warmup_bars", "bar_type",
+    "signal_definition",
+    "formula",
+    "required_columns",
+    "lookback_bars",
+    "warmup_bars",
+    "bar_type",
 }
 REQUIRED_CALIBRATION_KEYS = {
-    "default_threshold", "search_range",
-    "calibration_target", "stability_requirement",
+    "default_threshold",
+    "search_range",
+    "calibration_target",
+    "stability_requirement",
 }
 REQUIRED_BEHAVIOR_KEYS = {
-    "false_positive_scenarios", "disabled_regimes", "expected_overlap",
+    "false_positive_scenarios",
+    "disabled_regimes",
+    "expected_overlap",
 }
 
 
@@ -24,7 +32,9 @@ def load_detector_specs():
     specs = []
     for p in sorted(SPEC_DIR.glob("*.yaml")):
         if p.name.startswith("_") or p.name in (
-            "canonical_event_registry.yaml", "event_registry_unified.yaml", "DESIGN.yaml",
+            "canonical_event_registry.yaml",
+            "event_registry_unified.yaml",
+            "DESIGN.yaml",
         ):
             continue
         try:

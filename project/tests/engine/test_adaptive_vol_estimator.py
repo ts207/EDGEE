@@ -4,6 +4,7 @@ E4-T2: Adaptive vol estimator option.
 EWMA mode must respond faster to vol changes than the fixed rolling window.
 The vol window and annualization constant must also be configurable.
 """
+
 from __future__ import annotations
 
 import numpy as np
@@ -21,15 +22,16 @@ def _make_pnl_with_vol_spike(n: int, spike_start: int, spike_magnitude: float = 
     """PnL series that is calm for the first `spike_start` bars then spikes in volatility."""
     ts = _ts(n)
     rng = np.random.default_rng(42)
-    pnl = np.concatenate([
-        rng.normal(0.0, 0.001, spike_start),
-        rng.normal(0.0, 0.001 * spike_magnitude, n - spike_start),
-    ])
+    pnl = np.concatenate(
+        [
+            rng.normal(0.0, 0.001, spike_start),
+            rng.normal(0.0, 0.001 * spike_magnitude, n - spike_start),
+        ]
+    )
     return pd.Series(pnl, index=ts)
 
 
 class TestAdaptiveVolEstimator:
-
     def test_ewma_mode_accepted_by_risk_limits(self):
         """RiskLimits must accept vol_estimator_mode='ewma' without error."""
         limits = RiskLimits(
@@ -67,7 +69,9 @@ class TestAdaptiveVolEstimator:
             vol_ewma_halflife_bars=288,  # 1-day halflife
         )
 
-        scales_rolling, _ = allocate_position_scales(pos, req, limits_rolling, portfolio_pnl_series=pnl)
+        scales_rolling, _ = allocate_position_scales(
+            pos, req, limits_rolling, portfolio_pnl_series=pnl
+        )
         scales_ewma, _ = allocate_position_scales(pos, req, limits_ewma, portfolio_pnl_series=pnl)
 
         # After the spike (last 10% of bars), EWMA should scale down more aggressively
@@ -88,8 +92,8 @@ class TestAdaptiveVolEstimator:
         pos = {"s1": pd.Series(1.0, index=ts)}
         req = {"s1": pd.Series(1.0, index=ts)}
 
-        limits_long = RiskLimits(target_annual_vol=0.2, vol_window_bars=2880)   # 10-day window
-        limits_short = RiskLimits(target_annual_vol=0.2, vol_window_bars=288)   # 1-day window
+        limits_long = RiskLimits(target_annual_vol=0.2, vol_window_bars=2880)  # 10-day window
+        limits_short = RiskLimits(target_annual_vol=0.2, vol_window_bars=288)  # 1-day window
 
         scales_long, _ = allocate_position_scales(pos, req, limits_long, portfolio_pnl_series=pnl)
         scales_short, _ = allocate_position_scales(pos, req, limits_short, portfolio_pnl_series=pnl)

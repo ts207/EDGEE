@@ -8,6 +8,7 @@ For each bar in the feature grid, this produces event-type-level columns:
 Output is a single parquet indexed by (symbol, timestamp) with one column-set per
 event type encountered in the episodes file.
 """
+
 from __future__ import annotations
 from project.core.config import get_data_root
 
@@ -33,13 +34,14 @@ from project.specs.manifest import start_manifest, finalize_manifest
 from project.pipelines.research._timeframes import TIMEFRAME_TO_NS
 
 
-
 def _load_bar_grid(run_id: str, symbol: str, timeframe: str) -> pd.DataFrame:
     """Load the bar timestamp grid for a symbol."""
     DATA_ROOT = get_data_root()
     feature_dataset = feature_dataset_dir_name()
     candidates = [
-        run_scoped_lake_path(DATA_ROOT, run_id, "features", "perp", symbol, timeframe, feature_dataset),
+        run_scoped_lake_path(
+            DATA_ROOT, run_id, "features", "perp", symbol, timeframe, feature_dataset
+        ),
         DATA_ROOT / "lake" / "features" / "perp" / symbol / timeframe / feature_dataset,
     ]
     features_dir = choose_partition_dir(candidates)
@@ -52,6 +54,7 @@ def _load_bar_grid(run_id: str, symbol: str, timeframe: str) -> pd.DataFrame:
     df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True, errors="coerce")
     df = df.dropna(subset=["timestamp"]).sort_values("timestamp").reset_index(drop=True)
     return df[["timestamp"]].copy()
+
 
 def build_episode_state(
     bar_grid: pd.DataFrame,
@@ -85,7 +88,9 @@ def build_episode_state(
     if "event_type" not in episodes.columns:
         # Derive from event_id prefix
         episodes = episodes.copy()
-        episodes["event_type"] = episodes["event_id"].astype(str).str.rsplit("_", n=3).str[0].str.upper()
+        episodes["event_type"] = (
+            episodes["event_id"].astype(str).str.rsplit("_", n=3).str[0].str.upper()
+        )
 
     for event_type in sorted(episodes["event_type"].dropna().unique()):
         prefix = event_type.lower()
@@ -110,14 +115,19 @@ def build_episode_state(
                 continue
 
             out.iloc[idxs, out.columns.get_loc(col_active)] = 1
-            out.iloc[idxs, out.columns.get_loc(col_age)] = np.arange(1, len(idxs) + 1, dtype=np.int32)
+            out.iloc[idxs, out.columns.get_loc(col_age)] = np.arange(
+                1, len(idxs) + 1, dtype=np.int32
+            )
             out.iloc[idxs, out.columns.get_loc(col_eid)] = eid
 
     return out
 
+
 def main() -> int:
     DATA_ROOT = get_data_root()
-    ap = argparse.ArgumentParser(description="Build per-bar episode state parquet from canonicalized episodes.")
+    ap = argparse.ArgumentParser(
+        description="Build per-bar episode state parquet from canonicalized episodes."
+    )
     ap.add_argument("--run_id", required=True)
     ap.add_argument("--symbols", required=True)
     ap.add_argument("--timeframe", default="5m")
@@ -155,7 +165,11 @@ def main() -> int:
                 print(f"No bar grid for {symbol}")
                 continue
 
-            sym_episodes = episodes[episodes["symbol"] == symbol].copy() if "symbol" in episodes.columns else episodes.copy()
+            sym_episodes = (
+                episodes[episodes["symbol"] == symbol].copy()
+                if "symbol" in episodes.columns
+                else episodes.copy()
+            )
             state = build_episode_state(grid, sym_episodes)
 
             sym_out = out_dir / symbol / args.timeframe / "episode_state"
@@ -170,6 +184,7 @@ def main() -> int:
         print(f"Error: {exc}", file=sys.stderr)
         finalize_manifest(manifest, "failed", error=str(exc))
         return 1
+
 
 if __name__ == "__main__":
     raise SystemExit(main())

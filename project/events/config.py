@@ -44,23 +44,25 @@ _UNIFIED_NON_EVENT_PARAMETER_KEYS = {
     "state_overrides",
 }
 
+
 @dataclass(frozen=True)
 class ComposedConfig:
     """Unified configuration for event detection and template discovery."""
+
     event_type: str
     family: str
     reports_dir: str
     events_file: str
     signal_column: str
     parameters: Dict[str, Any]
-    
+
     # Template related fields
     templates: tuple[str, ...] = ()
     horizons: tuple[str, ...] = ()
     conditioning_cols: tuple[str, ...] = ()
     max_candidates_per_run: int = 1000
     state_id: str | None = None
-    
+
     # Metadata
     config_hash: str = ""
     normalized_json: str = ""
@@ -70,9 +72,11 @@ class ComposedConfig:
     def canonical_family(self) -> str:
         return self.family
 
+
 # Re-alias for backward compatibility if needed, though we should migrate
 ComposedEventConfig = ComposedConfig
 ComposedTemplateConfig = ComposedConfig
+
 
 def _load_yaml(path: Path) -> Dict[str, Any]:
     if not path.exists():
@@ -82,6 +86,7 @@ def _load_yaml(path: Path) -> Dict[str, Any]:
 
 def _event_spec_candidates(normalized: str) -> tuple[Path, Path]:
     return SPEC_DIR / f"{normalized}.yaml", RUNTIME_SPEC_DIR / f"{normalized}.yaml"
+
 
 def _to_str_tuple(value: Any) -> tuple[str, ...]:
     if not isinstance(value, Sequence) or isinstance(value, (str, bytes)):
@@ -95,6 +100,7 @@ def _to_str_tuple(value: Any) -> tuple[str, ...]:
             seen.add(token)
     return tuple(out)
 
+
 @lru_cache(maxsize=1)
 def _unified_registry() -> Dict[str, Any]:
     payload = get_domain_registry().unified_payload
@@ -105,7 +111,9 @@ def _unified_registry() -> Dict[str, Any]:
         raise ValueError(f"Malformed unified registry kind at {UNIFIED_REGISTRY_PATH}")
     return payload
 
+
 _registry = _unified_registry
+
 
 @lru_cache(maxsize=1)
 def _family_by_event() -> Dict[str, str]:
@@ -116,13 +124,12 @@ def _family_by_event() -> Dict[str, str]:
         if spec.canonical_family
     }
 
+
 @lru_cache(maxsize=1)
 def _operator_registry() -> Dict[str, Dict[str, Any]]:
     registry = get_domain_registry()
-    return {
-        name: dict(spec.raw)
-        for name, spec in registry.template_operator_definitions.items()
-    }
+    return {name: dict(spec.raw) for name, spec in registry.template_operator_definitions.items()}
+
 
 def compose_config(
     event_type: str,
@@ -139,7 +146,9 @@ def compose_config(
     domain_registry = get_domain_registry()
     unified = _registry()
     events = unified.get("events", {})
-    selected_spec_path = Path(domain_registry.event_spec_path(normalized) or (RUNTIME_SPEC_DIR / f"{normalized}.yaml"))
+    selected_spec_path = Path(
+        domain_registry.event_spec_path(normalized) or (RUNTIME_SPEC_DIR / f"{normalized}.yaml")
+    )
     if isinstance(events, dict) and normalized in events:
         row = dict(events[normalized])
     elif normalized.startswith("TEST_") and not domain_registry.has_event(normalized):
@@ -160,13 +169,19 @@ def compose_config(
         row = dict(event_def.raw)
 
     defaults = unified.get("defaults", {})
-    family_name = str(row.get("canonical_family", _family_by_event().get(normalized, "UNSPECIFIED"))).strip().upper()
+    family_name = (
+        str(row.get("canonical_family", _family_by_event().get(normalized, "UNSPECIFIED")))
+        .strip()
+        .upper()
+    )
     family_defaults_all = unified.get("families", {})
-    family_defaults = family_defaults_all.get(family_name, {}) if isinstance(family_defaults_all, dict) else {}
+    family_defaults = (
+        family_defaults_all.get(family_name, {}) if isinstance(family_defaults_all, dict) else {}
+    )
 
     overrides = dict(runtime_overrides or {})
     normalized_state = str(state_id).strip().upper() if state_id else ""
-    
+
     state_defaults: Dict[str, Any] = {}
     if normalized_state:
         # State overrides from event level
@@ -176,15 +191,23 @@ def compose_config(
         # State overrides from global level
         global_state_overrides = unified.get("state_overrides", {})
         if isinstance(global_state_overrides, dict):
-            state_defaults.update(global_state_overrides.get(normalized, {}).get(normalized_state, {}))
+            state_defaults.update(
+                global_state_overrides.get(normalized, {}).get(normalized_state, {})
+            )
 
     # Compose parameters (Detection related)
     event_parameters = row.get("parameters", {})
     if not isinstance(event_parameters, dict):
         event_parameters = {}
-    
+
     # Extract legacy top-level keys that aren't core or unified
-    legacy_parameters = {k: v for k, v in row.items() if k not in _CORE_KEYS and k not in _META_KEYS and k not in _UNIFIED_NON_EVENT_PARAMETER_KEYS}
+    legacy_parameters = {
+        k: v
+        for k, v in row.items()
+        if k not in _CORE_KEYS
+        and k not in _META_KEYS
+        and k not in _UNIFIED_NON_EVENT_PARAMETER_KEYS
+    }
 
     effective_parameters = {}
     effective_parameters.update(defaults.get("parameters", {}))
@@ -196,10 +219,14 @@ def compose_config(
     # Compose Template fields
     def _get_field(key: str, default: Any = None) -> Any:
         val = defaults.get(key, default)
-        if key in family_defaults: val = family_defaults[key]
-        if key in row: val = row[key]
-        if key in state_defaults: val = state_defaults[key]
-        if key in overrides: val = overrides[key]
+        if key in family_defaults:
+            val = family_defaults[key]
+        if key in row:
+            val = row[key]
+        if key in state_defaults:
+            val = state_defaults[key]
+        if key in overrides:
+            val = overrides[key]
         return val
 
     templates = _to_str_tuple(_get_field("templates", ()))
@@ -245,19 +272,23 @@ def compose_config(
             "unified_registry": str(UNIFIED_REGISTRY_PATH.resolve()),
             "registry": str(UNIFIED_REGISTRY_PATH.resolve()),
             "event_spec": str(selected_spec_path.resolve()),
-        }
+        },
     )
+
 
 def compose_event_config(event_type: str, **kwargs) -> ComposedConfig:
     return compose_config(event_type, **kwargs)
 
+
 def compose_template_config(event_type: str, **kwargs) -> ComposedConfig:
     return compose_config(event_type, **kwargs)
+
 
 def bootstrap_event_registry() -> None:
     _unified_registry.cache_clear()
     _family_by_event.cache_clear()
     _operator_registry.cache_clear()
+
 
 # Internal aliases for backward compatibility with old tests
 _registry = _unified_registry

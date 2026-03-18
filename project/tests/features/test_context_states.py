@@ -17,13 +17,14 @@ from project.features.context_states import (
     encode_context_state_code,
 )
 
+
 def test_calculate_ms_vol_state():
     rv_pct = pd.Series([10.0, 50.0, 80.0, 98.0])
     states = calculate_ms_vol_state(rv_pct)
-    assert states.iloc[0] == 0.0 # LOW
-    assert states.iloc[1] == 1.0 # MID
-    assert states.iloc[2] == 2.0 # HIGH
-    assert states.iloc[3] == 3.0 # SHOCK
+    assert states.iloc[0] == 0.0  # LOW
+    assert states.iloc[1] == 1.0  # MID
+    assert states.iloc[2] == 2.0  # HIGH
+    assert states.iloc[3] == 3.0  # SHOCK
 
 
 def test_calculate_ms_vol_probabilities_sum_to_one_and_expose_confidence():
@@ -37,15 +38,16 @@ def test_calculate_ms_vol_probabilities_sum_to_one_and_expose_confidence():
     assert probs["ms_vol_confidence"].between(0.0, 1.0).all()
     assert probs["ms_vol_entropy"].between(0.0, 1.0).all()
 
+
 def test_calculate_ms_liq_state():
     # Sine wave ensures we hit all quantiles
     vol = pd.Series(np.sin(np.linspace(0, 10, 500)) + 2.0)
     states = calculate_ms_liq_state(vol, window=100)
-    
+
     # Peak of sine is max -> FLUSH (2.0)
     # Trough of sine is min -> THIN (0.0)
     # Somewhere in between -> NORMAL (1.0)
-    
+
     assert 2.0 in states.values
     assert 0.0 in states.values
     assert 1.0 in states.values
@@ -58,16 +60,17 @@ def test_calculate_ms_liq_probabilities_sum_to_one():
     valid = probs[["prob_liq_thin", "prob_liq_normal", "prob_liq_flush"]].dropna()
     assert np.allclose(valid.sum(axis=1), 1.0)
 
+
 def test_calculate_ms_oi_state():
     # Constant OI delta -> z-score will be 0 (STABLE)
     oi_delta = pd.Series([10.0] * 100)
     states = calculate_ms_oi_state(oi_delta, window=50)
     assert states.iloc[-1] == 1.0
-    
+
     # Large spike
     oi_delta.iloc[-1] = 1000.0
     states = calculate_ms_oi_state(oi_delta, window=50)
-    assert states.iloc[-1] == 2.0 # ACCEL
+    assert states.iloc[-1] == 2.0  # ACCEL
 
 
 def test_calculate_ms_oi_probabilities_expose_confidence_and_entropy():
@@ -76,6 +79,7 @@ def test_calculate_ms_oi_probabilities_expose_confidence_and_entropy():
 
     assert probs["ms_oi_confidence"].iloc[-1] >= 0.0
     assert 0.0 <= probs["ms_oi_entropy"].iloc[-1] <= 1.0
+
 
 def test_calculate_ms_funding_state():
     # With insufficient long-window history, state should remain NEUTRAL.
@@ -99,6 +103,7 @@ def test_calculate_ms_funding_probabilities_default_to_neutral_without_long_hist
 
     assert probs["prob_funding_neutral"].iloc[-1] == pytest.approx(1.0)
     assert probs["ms_funding_state"].iloc[-1] == 0.0
+
 
 def test_calculate_ms_trend_state():
     # With insufficient long-window history, state should remain CHOP.
@@ -127,6 +132,7 @@ def test_calculate_ms_trend_probabilities_expose_confidence_and_entropy():
     assert probs["ms_trend_confidence"].iloc[-1] >= 0.0
     assert 0.0 <= probs["ms_trend_entropy"].iloc[-1] <= 1.0
 
+
 def test_calculate_ms_spread_state():
     # Tight
     spread = pd.Series([0.1])
@@ -141,6 +147,7 @@ def test_calculate_ms_spread_probabilities_sum_to_one():
     probs = calculate_ms_spread_probabilities(spread)
 
     assert np.allclose(probs[["prob_spread_tight", "prob_spread_wide"]].sum(axis=1), 1.0)
+
 
 def test_encode_context_state_code():
     vol = pd.Series([3.0])

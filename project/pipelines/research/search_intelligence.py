@@ -54,7 +54,9 @@ def _build_summary(program_id: str, tested_regions: pd.DataFrame, *, top_k: int)
             out[str(key)] = {
                 "sample": int(len(sub)),
                 "promotion_rate": promoted_share,
-                "avg_after_cost_expectancy": float(pd.to_numeric(sub["after_cost_expectancy"], errors="coerce").mean()),
+                "avg_after_cost_expectancy": float(
+                    pd.to_numeric(sub["after_cost_expectancy"], errors="coerce").mean()
+                ),
             }
         return out
 
@@ -65,12 +67,15 @@ def _build_summary(program_id: str, tested_regions: pd.DataFrame, *, top_k: int)
         "by_horizon": _group_stats("horizon"),
         "by_event_type": _group_stats("event_type"),
     }
+
     def _gate_rank(val) -> int:
         val = str(val).strip().lower()
-        if val in ("pass", "true", "1", "1.0"): return 2
-        if val in ("fail", "false", "0", "0.0"): return 1
+        if val in ("pass", "true", "1", "1.0"):
+            return 2
+        if val in ("fail", "false", "0", "0.0"):
+            return 1
         return 0
-        
+
     ranked = evaluated.copy()
     if "gate_promo_statistical" in ranked.columns:
         ranked["_gate_rank"] = ranked["gate_promo_statistical"].apply(_gate_rank)
@@ -115,7 +120,9 @@ def _build_frontier(
 ) -> Dict[str, Any]:
     events = registries.events.get("events", {})
     enabled_events = [eid for eid, meta in events.items() if meta.get("enabled", True)]
-    tested_events = set(tested_regions.get("event_type", pd.Series(dtype="object")).astype(str).unique())
+    tested_events = set(
+        tested_regions.get("event_type", pd.Series(dtype="object")).astype(str).unique()
+    )
     untested_events = sorted(list(set(enabled_events) - tested_events))
 
     exhausted_events: list[str] = []
@@ -143,18 +150,20 @@ def _build_frontier(
 
     repair_candidates = []
     if not failures.empty:
-        for stage, count in failures["stage"].astype(str).value_counts().head(int(repair_top_k)).items():
+        for stage, count in (
+            failures["stage"].astype(str).value_counts().head(int(repair_top_k)).items()
+        ):
             repair_candidates.append(f"repair repeated failure in stage: {stage} ({int(count)})")
 
     next_moves = []
     if untested_events:
-        next_moves.append(f"explore untested events: {untested_events[:int(untested_top_k)]}")
+        next_moves.append(f"explore untested events: {untested_events[: int(untested_top_k)]}")
     if partial_families:
         next_moves.append(f"complete coverage for family: {next(iter(partial_families))}")
-    next_moves.extend(repair_candidates[:int(repair_top_k)])
+    next_moves.extend(repair_candidates[: int(repair_top_k)])
 
     return {
-        "untested_registry_events": untested_events[:int(untested_top_k)],
+        "untested_registry_events": untested_events[: int(untested_top_k)],
         "exhausted_events_to_avoid": exhausted_events,
         "partially_explored_families": partial_families,
         "candidate_next_moves": next_moves,
@@ -192,7 +201,9 @@ def update_search_intelligence(
                     "direction": legacy_ledger.get("direction", pd.Series(dtype="object")),
                     "horizon": legacy_ledger.get("horizon", pd.Series(dtype="object")),
                     "trigger_type": legacy_ledger.get("trigger_type", pd.Series(dtype="object")),
-                    "after_cost_expectancy": legacy_ledger.get("expectancy", pd.Series(dtype=float)),
+                    "after_cost_expectancy": legacy_ledger.get(
+                        "expectancy", pd.Series(dtype=float)
+                    ),
                     "q_value": legacy_ledger.get("q_value", pd.Series(dtype=float)),
                     "eval_status": legacy_ledger.get("eval_status", pd.Series(dtype="object")),
                     "candidate_id": legacy_ledger.get("candidate_id", pd.Series(dtype="object")),
@@ -211,7 +222,9 @@ def update_search_intelligence(
         exhausted_failure_threshold=exhausted_failure_threshold,
     )
     summary_path.write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    frontier_path.write_text(json.dumps(frontier, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    frontier_path.write_text(
+        json.dumps(frontier, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
     _LOG.info("Updated intelligence for %s from campaign memory.", program_id)
     return {"summary": summary, "frontier": frontier}
 

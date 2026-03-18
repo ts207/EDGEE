@@ -7,6 +7,7 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2] / "project"
 
+
 def _load_runner_module():
     script_path = PROJECT_ROOT / "scripts" / "run_benchmark_matrix.py"
     spec = importlib.util.spec_from_file_location("run_benchmark_matrix", script_path)
@@ -14,6 +15,7 @@ def _load_runner_module():
     assert spec and spec.loader
     spec.loader.exec_module(module)
     return module
+
 
 def test_benchmark_matrix_dry_run_writes_manifest(tmp_path, monkeypatch):
     module = _load_runner_module()
@@ -65,6 +67,7 @@ def test_benchmark_matrix_dry_run_writes_manifest(tmp_path, monkeypatch):
     summary = json.loads(summary_path.read_text(encoding="utf-8"))
     assert summary["matrix_id"] == "unit_matrix"
     assert summary["status_counts"]["dry_run"] == 1
+
 
 def test_benchmark_matrix_execute_records_success(tmp_path, monkeypatch):
     module = _load_runner_module()
@@ -147,9 +150,20 @@ def test_benchmark_matrix_execute_emits_post_run_reports(tmp_path, monkeypatch):
     monkeypatch.setattr(module, "DATA_ROOT", data_root)
 
     def fake_live_report(**kwargs):
-        path = data_root / "reports" / "live_foundation" / kwargs["run_id"] / "perp" / kwargs["symbol"] / kwargs["timeframe"] / "live_data_foundation_report.json"
+        path = (
+            data_root
+            / "reports"
+            / "live_foundation"
+            / kwargs["run_id"]
+            / "perp"
+            / kwargs["symbol"]
+            / kwargs["timeframe"]
+            / "live_data_foundation_report.json"
+        )
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps({"schema_version": "live_data_foundation_report_v1"}), encoding="utf-8")
+        path.write_text(
+            json.dumps({"schema_version": "live_data_foundation_report_v1"}), encoding="utf-8"
+        )
         return path
 
     def fake_context_payload(**kwargs):
@@ -159,7 +173,10 @@ def test_benchmark_matrix_execute_emits_post_run_reports(tmp_path, monkeypatch):
             "symbols": kwargs["symbols"],
             "timeframe": kwargs["timeframe"],
             "hard_label": {"evaluated_rows": 4, "selected": {"hypothesis_id": "h1", "valid": True}},
-            "confidence_aware": {"evaluated_rows": 4, "selected": {"hypothesis_id": "h1", "valid": True}},
+            "confidence_aware": {
+                "evaluated_rows": 4,
+                "selected": {"hypothesis_id": "h1", "valid": True},
+            },
             "selection_changed": False,
             "selection_outcome_changed": False,
             "delta": {"n": -5.0},

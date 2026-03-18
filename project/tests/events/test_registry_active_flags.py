@@ -6,6 +6,7 @@ import pandas as pd
 
 from project.events import registry
 
+
 def _symbol_grid() -> pd.Series:
     return pd.Series(
         pd.to_datetime(
@@ -18,6 +19,7 @@ def _symbol_grid() -> pd.Series:
             utc=True,
         )
     )
+
 
 def test_build_event_flags_emits_impulse_and_active_columns(monkeypatch):
     monkeypatch.setattr(registry, "_load_symbol_timestamps", lambda **kwargs: _symbol_grid())
@@ -58,6 +60,7 @@ def test_build_event_flags_emits_impulse_and_active_columns(monkeypatch):
     assert bool(row_0015[impulse_col]) is False
     assert bool(row_0015[active_col]) is True
 
+
 def test_build_event_flags_all_symbol_event_sets_active_for_all_symbols(monkeypatch):
     monkeypatch.setattr(registry, "_load_symbol_timestamps", lambda **kwargs: _symbol_grid())
 
@@ -86,6 +89,7 @@ def test_build_event_flags_all_symbol_event_sets_active_for_all_symbols(monkeypa
     rows = flags[flags["timestamp"] == check_ts]
     assert len(rows) == 2
     assert rows[active_col].all()
+
 
 def test_merge_event_flags_for_selected_event_types_replaces_only_selected_columns():
     timestamps = pd.to_datetime(
@@ -125,6 +129,7 @@ def test_merge_event_flags_for_selected_event_types_replaces_only_selected_colum
     # Selected columns must come from recomputed.
     assert merged["liquidity_vacuum_event"].tolist() == [False, True]
     assert merged["liquidity_vacuum_active"].tolist() == [False, True]
+
 
 def test_merge_event_flags_for_selected_event_types_bootstraps_when_existing_empty():
     timestamps = pd.to_datetime(

@@ -8,6 +8,7 @@ from project.strategy.runtime.registry import (
     is_dsl_strategy,
 )
 
+
 class TestParseStrategyName:
     """Tests for parse_strategy_name function."""
 
@@ -50,6 +51,7 @@ class TestParseStrategyName:
         assert base == "dsl_interpreter_v1"
         assert variant is None
 
+
 class TestGetStrategy:
     """Tests for get_strategy function."""
 
@@ -70,6 +72,7 @@ class TestGetStrategy:
         with pytest.raises(ValueError, match="Unknown strategy"):
             get_strategy("nonexistent_strategy")
 
+
 class TestResolveStrategy:
     """Tests for resolve_strategy function."""
 
@@ -86,6 +89,7 @@ class TestResolveStrategy:
         assert resolved.base == "dsl_interpreter_v1"
         assert resolved.variant == "myblueprint"
         assert resolved.metadata == {"variant": "myblueprint"}
+
 
 class TestIsDslStrategy:
     """Tests for is_dsl_strategy function."""
@@ -107,6 +111,7 @@ class TestIsDslStrategy:
         is_dsl, variant = is_dsl_strategy("nonexistent__variant")
         assert is_dsl is False
         assert variant is None
+
 
 class TestSensitiveParamsContract:
     """Tests verifying that variant cannot change sensitive execution params."""

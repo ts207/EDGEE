@@ -11,12 +11,8 @@ def test_certification_workflow_runs_end_to_end(tmp_path: Path) -> None:
         root=tmp_path,
         config_path=Path("project/configs/golden_certification.yaml"),
     )
-    certification_summary_path = (
-        tmp_path / "reliability" / "golden_certification_summary.json"
-    )
-    certification_manifest_path = (
-        tmp_path / "reliability" / "runtime_certification_manifest.json"
-    )
+    certification_summary_path = tmp_path / "reliability" / "golden_certification_summary.json"
+    certification_manifest_path = tmp_path / "reliability" / "runtime_certification_manifest.json"
     live_state_snapshot_path = tmp_path / "reliability" / "live_state.json"
     workflow_summary_path = tmp_path / "reliability" / "golden_workflow_summary.json"
 
@@ -26,12 +22,8 @@ def test_certification_workflow_runs_end_to_end(tmp_path: Path) -> None:
     assert live_state_snapshot_path.exists()
     assert workflow_summary_path.exists()
 
-    certification_summary = json.loads(
-        certification_summary_path.read_text(encoding="utf-8")
-    )
-    certification_manifest = json.loads(
-        certification_manifest_path.read_text(encoding="utf-8")
-    )
+    certification_summary = json.loads(certification_summary_path.read_text(encoding="utf-8"))
+    certification_manifest = json.loads(certification_manifest_path.read_text(encoding="utf-8"))
     assert certification_summary["runtime_run_id"] == "smoke_run"
     assert certification_manifest["manifest_type"] == "runtime_certification_manifest"
     assert certification_manifest["status"] == "pass"

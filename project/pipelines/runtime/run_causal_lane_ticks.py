@@ -14,6 +14,7 @@ from project.runtime.lane_runner import run_causal_lane_ticks
 from project.runtime.normalized_event import NormalizedEvent
 from project.io.utils import write_parquet
 
+
 def _to_normalized_events(rows: List[Dict[str, object]]) -> List[NormalizedEvent]:
     out: List[NormalizedEvent] = []
     for row in rows:
@@ -35,9 +36,12 @@ def _to_normalized_events(rows: List[Dict[str, object]]) -> List[NormalizedEvent
         )
     return out
 
+
 def main() -> int:
     data_root = get_data_root()
-    parser = argparse.ArgumentParser(description="Run causal lane ticks and watermark/firewall audits.")
+    parser = argparse.ArgumentParser(
+        description="Run causal lane ticks and watermark/firewall audits."
+    )
     parser.add_argument("--run_id", required=True)
     args = parser.parse_args()
 
@@ -76,7 +80,9 @@ def main() -> int:
 
         audit = {
             "run_id": str(args.run_id),
-            "status": "no_runtime_events" if not normalized_events else str(out.get("status", "failed")),
+            "status": "no_runtime_events"
+            if not normalized_events
+            else str(out.get("status", "failed")),
             "tick_count": int(out.get("tick_count", 0)),
             "watermark_violation_count": int(out.get("watermark_violation_count", 0)),
             "watermark_violations_by_type": dict(out.get("watermark_violations_by_type", {})),
@@ -104,6 +110,7 @@ def main() -> int:
     except Exception as exc:
         finalize_manifest(manifest, "failed", error=str(exc), stats={})
         return 1
+
 
 if __name__ == "__main__":
     sys.exit(main())

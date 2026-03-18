@@ -45,6 +45,7 @@ _EVENT_DIRECTION_TEXT_COLS: Tuple[str, ...] = (
     "evt_direction_label",
 )
 
+
 def update_shrinkage_parameters_from_spec(repo_root: Optional[Path] = None) -> None:
     """
     Load statistical parameters from spec/gates.yaml and update local constants.
@@ -66,7 +67,10 @@ def update_shrinkage_parameters_from_spec(repo_root: Optional[Path] = None) -> N
             if "tau_by_family_days" in params:
                 _TAU_BY_FAMILY_DAYS.clear()
                 _TAU_BY_FAMILY_DAYS.update(
-                    {str(k).strip().upper(): float(v) for k, v in params["tau_by_family_days"].items()}
+                    {
+                        str(k).strip().upper(): float(v)
+                        for k, v in params["tau_by_family_days"].items()
+                    }
                 )
             else:
                 raise ValueError("Missing 'tau_by_family_days' in shrinkage_parameters")
@@ -74,13 +78,19 @@ def update_shrinkage_parameters_from_spec(repo_root: Optional[Path] = None) -> N
             if "vol_regime_multiplier" in params:
                 _VOL_REGIME_MULTIPLIER.clear()
                 _VOL_REGIME_MULTIPLIER.update(
-                    {str(k).strip().upper(): float(v) for k, v in params["vol_regime_multiplier"].items()}
+                    {
+                        str(k).strip().upper(): float(v)
+                        for k, v in params["vol_regime_multiplier"].items()
+                    }
                 )
-            
+
             if "liquidity_state_multiplier" in params:
                 _LIQUIDITY_STATE_MULTIPLIER.clear()
                 _LIQUIDITY_STATE_MULTIPLIER.update(
-                    {str(k).strip().upper(): float(v) for k, v in params["liquidity_state_multiplier"].items()}
+                    {
+                        str(k).strip().upper(): float(v)
+                        for k, v in params["liquidity_state_multiplier"].items()
+                    }
                 )
 
             if "directional_asymmetry_by_family" in params:
@@ -97,10 +107,12 @@ def update_shrinkage_parameters_from_spec(repo_root: Optional[Path] = None) -> N
         log.error("CRITICAL: Failed to load mandatory shrinkage parameters: %s", e)
         raise RuntimeError(f"Spec-driven shrinkage initialization failed: {e}") from e
 
+
 def _ensure_shrinkage_parameters_loaded() -> None:
     if _TAU_BY_FAMILY_DAYS and _VOL_REGIME_MULTIPLIER and _LIQUIDITY_STATE_MULTIPLIER:
         return
     update_shrinkage_parameters_from_spec()
+
 
 def _resolve_tau_days(canonical_family: str, override_days: Optional[float]) -> float:
     _ensure_shrinkage_parameters_loaded()
@@ -108,6 +120,7 @@ def _resolve_tau_days(canonical_family: str, override_days: Optional[float]) -> 
         return float(override_days)
     key = str(canonical_family or "").strip().upper()
     return float(_TAU_BY_FAMILY_DAYS.get(key, 60.0))
+
 
 def _normalize_vol_regime(value: Any) -> str:
     text = str(value or "").strip().lower()
@@ -123,17 +136,17 @@ def _normalize_vol_regime(value: Any) -> str:
         return "MID"
     return "MID"
 
+
 def _normalize_liquidity_state(value: Any) -> str:
     text = str(value or "").strip().lower()
     if not text:
         return "NORMAL"
     if "recovery" in text:
         return "RECOVERY"
-    if any(
-        token in text for token in ("low", "absence", "illiquid", "collapse", "vacuum")
-    ):
+    if any(token in text for token in ("low", "absence", "illiquid", "collapse", "vacuum")):
         return "LOW"
     return "NORMAL"
+
 
 def _regime_conditioned_tau_days(
     *,
@@ -149,6 +162,7 @@ def _regime_conditioned_tau_days(
     tau *= float(_VOL_REGIME_MULTIPLIER.get(vol_key, 1.0))
     tau *= float(_LIQUIDITY_STATE_MULTIPLIER.get(liq_key, 1.0))
     return float(tau)
+
 
 def _direction_sign(value: Any) -> Optional[int]:
     if value is None:
@@ -169,6 +183,7 @@ def _direction_sign(value: Any) -> Optional[int]:
         return -1
     return None
 
+
 def _optional_token(value: Any) -> Optional[str]:
     if value is None:
         return None
@@ -183,6 +198,7 @@ def _optional_token(value: Any) -> Optional[str]:
     if token.lower() in {"none", "null", "nan", "na"}:
         return None
     return token
+
 
 def _event_direction_from_joined_row(
     row: pd.Series,
@@ -209,6 +225,7 @@ def _event_direction_from_joined_row(
         if sign is not None:
             return sign
     return 1 if int(fallback_direction) >= 0 else -1
+
 
 def _asymmetric_tau_days(
     *,
@@ -241,6 +258,7 @@ def _asymmetric_tau_days(
     tau_down = float(base_tau_days) * down_mult
     tau_eff = tau_up if int(direction) >= 0 else tau_down
     return float(tau_eff), float(tau_up), float(tau_down), float(ratio)
+
 
 # Initialize constants at module load time
 try:

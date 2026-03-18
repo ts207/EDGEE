@@ -14,26 +14,32 @@ def test_duration_to_bars_scales_with_timeframe() -> None:
 
 
 def test_liquidation_assignment_uses_active_bar_width(tmp_path: Path, monkeypatch) -> None:
-    bars_1m = pd.DataFrame({
-        "timestamp": pd.date_range("2026-01-01 00:00:00", periods=5, freq="1min", tz="UTC"),
-        "open": [1, 1, 1, 1, 1],
-        "high": [1, 1, 1, 1, 1],
-        "low": [1, 1, 1, 1, 1],
-        "close": [1, 1, 1, 1, 1],
-        "volume": [1, 1, 1, 1, 1],
-    })
-    bars_5m = pd.DataFrame({
-        "timestamp": pd.date_range("2026-01-01 00:00:00", periods=2, freq="5min", tz="UTC"),
-        "open": [1, 1],
-        "high": [1, 1],
-        "low": [1, 1],
-        "close": [1, 1],
-        "volume": [1, 1],
-    })
-    liq = pd.DataFrame({
-        "timestamp": [pd.Timestamp("2026-01-01 00:04:00", tz="UTC")],
-        "notional_usd": [50.0],
-    })
+    bars_1m = pd.DataFrame(
+        {
+            "timestamp": pd.date_range("2026-01-01 00:00:00", periods=5, freq="1min", tz="UTC"),
+            "open": [1, 1, 1, 1, 1],
+            "high": [1, 1, 1, 1, 1],
+            "low": [1, 1, 1, 1, 1],
+            "close": [1, 1, 1, 1, 1],
+            "volume": [1, 1, 1, 1, 1],
+        }
+    )
+    bars_5m = pd.DataFrame(
+        {
+            "timestamp": pd.date_range("2026-01-01 00:00:00", periods=2, freq="5min", tz="UTC"),
+            "open": [1, 1],
+            "high": [1, 1],
+            "low": [1, 1],
+            "close": [1, 1],
+            "volume": [1, 1],
+        }
+    )
+    liq = pd.DataFrame(
+        {
+            "timestamp": [pd.Timestamp("2026-01-01 00:04:00", tz="UTC")],
+            "notional_usd": [50.0],
+        }
+    )
 
     def fake_choose_partition_dir(_paths):
         return Path("/tmp/fake")
@@ -55,5 +61,17 @@ def test_liquidation_assignment_uses_active_bar_width(tmp_path: Path, monkeypatc
         bars_5m, symbol="BTCUSDT", market="perp", run_id="r1", data_root=tmp_path, timeframe="5m"
     )
 
-    assert out_1m.loc[out_1m["timestamp"] == pd.Timestamp("2026-01-01 00:04:00", tz="UTC"), "liquidation_count"].iat[0] == 1.0
-    assert out_5m.loc[out_5m["timestamp"] == pd.Timestamp("2026-01-01 00:00:00", tz="UTC"), "liquidation_count"].iat[0] == 1.0
+    assert (
+        out_1m.loc[
+            out_1m["timestamp"] == pd.Timestamp("2026-01-01 00:04:00", tz="UTC"),
+            "liquidation_count",
+        ].iat[0]
+        == 1.0
+    )
+    assert (
+        out_5m.loc[
+            out_5m["timestamp"] == pd.Timestamp("2026-01-01 00:00:00", tz="UTC"),
+            "liquidation_count",
+        ].iat[0]
+        == 1.0
+    )

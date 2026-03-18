@@ -4,25 +4,25 @@ import yaml
 
 from project.eval.cost_model import apply_cost_model
 
+
 class TestCostModel:
     def test_apply_cost_model_basic(self, tmp_path):
         """Test basic cost application from a config file."""
-        df = pd.DataFrame([
-            {"pnl_bps": 20.0},
-            {"pnl_bps": -5.0},
-        ])
-        
+        df = pd.DataFrame(
+            [
+                {"pnl_bps": 20.0},
+                {"pnl_bps": -5.0},
+            ]
+        )
+
         # Create a temporary config file
-        config_data = {
-            "fee_bps_per_side": 5.0,
-            "slippage_bps_per_fill": 2.5
-        }
+        config_data = {"fee_bps_per_side": 5.0, "slippage_bps_per_fill": 2.5}
         config_file = tmp_path / "fees.yaml"
         with open(config_file, "w") as f:
             yaml.dump(config_data, f)
-            
+
         result = apply_cost_model(df, str(config_file))
-        
+
         # Round trip cost = (5.0 + 2.5) * 2 = 15.0 bps
         assert "net_pnl_bps" in result.columns
         assert pytest.approx(result.iloc[0]["net_pnl_bps"]) == 5.0
@@ -40,6 +40,6 @@ class TestCostModel:
         config_file = tmp_path / "fees.yaml"
         with open(config_file, "w") as f:
             yaml.dump({"fee_bps_per_side": 4}, f)
-            
+
         with pytest.raises(ValueError, match="pnl_bps"):
             apply_cost_model(df, str(config_file))

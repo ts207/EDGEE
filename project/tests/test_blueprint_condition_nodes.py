@@ -9,6 +9,7 @@ Verifies:
   5. _condition_routing strict mode marks unknown non-bucket names as 'blocked'.
   6. _condition_routing permissive mode falls back to 'all' for unknowns.
 """
+
 from __future__ import annotations
 
 import pytest
@@ -17,11 +18,13 @@ import pytest
 # Part 1: normalize_entry_condition produces correct condition nodes
 # ---------------------------------------------------------------------------
 
+
 class TestConditionNodeProduction:
     """Verify that known executable conditions produce proper ConditionNodeSpecs."""
 
     def test_vol_regime_high_produces_one_node(self):
         from project.strategy.dsl.contract_v1 import normalize_entry_condition
+
         canonical, nodes, sym = normalize_entry_condition(
             "vol_regime_high",
             event_type="LIQUIDATION_CASCADE",
@@ -36,6 +39,7 @@ class TestConditionNodeProduction:
 
     def test_session_asia_produces_one_node(self):
         from project.strategy.dsl.contract_v1 import normalize_entry_condition
+
         canonical, nodes, sym = normalize_entry_condition(
             "session_asia",
             event_type="LIQUIDATION_CASCADE",
@@ -49,6 +53,7 @@ class TestConditionNodeProduction:
 
     def test_all_produces_zero_nodes(self):
         from project.strategy.dsl.contract_v1 import normalize_entry_condition
+
         canonical, nodes, sym = normalize_entry_condition(
             "all",
             event_type="LIQUIDATION_CASCADE",
@@ -70,9 +75,7 @@ class TestConditionNodeProduction:
 
         # _condition_routing correctly routes severity_bucket → "all"
         condition_str, source = condition_routing("severity_bucket_extreme_5pct")
-        assert condition_str == "all", (
-            f"severity_bucket must route to 'all'; got '{condition_str}'"
-        )
+        assert condition_str == "all", f"severity_bucket must route to 'all'; got '{condition_str}'"
         assert source == "bucket_non_runtime"
 
         # When normalize receives "all", produces 0 nodes
@@ -84,9 +87,11 @@ class TestConditionNodeProduction:
         assert canonical == "all"
         assert nodes == []
 
+
 # ---------------------------------------------------------------------------
 # Part 2: Compiled condition string invariants
 # ---------------------------------------------------------------------------
+
 
 class TestConditionStringInvariants:
     """Verify compile-time guards on condition string format."""
@@ -98,7 +103,10 @@ class TestConditionStringInvariants:
         'all__<name>' prefixed strings are FORBIDDEN and must raise NonExecutableConditionError.
         The legacy format was previously mapped to 'all' but is now strictly rejected.
         """
-        from project.strategy.dsl.contract_v1 import normalize_entry_condition, NonExecutableConditionError
+        from project.strategy.dsl.contract_v1 import (
+            normalize_entry_condition,
+            NonExecutableConditionError,
+        )
 
         bad = [
             "all__vol_regime_high",
@@ -111,6 +119,7 @@ class TestConditionStringInvariants:
 
     def test_rule_template_names_are_not_executable_conditions(self):
         from project.strategy.dsl.contract_v1 import is_executable_condition
+
         for name in self._RULE_TEMPLATES:
             assert not is_executable_condition(name), (
                 f"'{name}' is a rule template, must not be an executable condition"
@@ -124,9 +133,14 @@ class TestConditionStringInvariants:
         from project.research.condition_routing import condition_routing
 
         inputs = [
-            "vol_regime_high", "vol_regime_low", "session_asia",
-            "severity_bucket_extreme_5pct", "severity_bucket_top_10pct",
-            "quantile_95", "all", "",
+            "vol_regime_high",
+            "vol_regime_low",
+            "session_asia",
+            "severity_bucket_extreme_5pct",
+            "severity_bucket_top_10pct",
+            "quantile_95",
+            "all",
+            "",
         ]
         for inp in inputs:
             condition_str, _ = condition_routing(inp)  # strict=True by default
@@ -151,15 +165,18 @@ class TestConditionStringInvariants:
                 f"_condition_routing({name!r}) returned a rule template name: '{condition_str}'"
             )
 
+
 # ---------------------------------------------------------------------------
 # Part 3: _condition_routing strict vs permissive mode
 # ---------------------------------------------------------------------------
+
 
 class TestConditionRoutingModes:
     """Verify strict and permissive mode semantics for _condition_routing."""
 
     def test_strict_runtime_condition_passes_unchanged(self):
         from project.research.condition_routing import condition_routing
+
         cond, source = condition_routing("vol_regime_high", strict=True)
         assert cond == "vol_regime_high"
         assert source == "runtime"
@@ -167,18 +184,21 @@ class TestConditionRoutingModes:
     def test_strict_severity_bucket_routes_to_all_not_blocked(self):
         """Bucket prefixes are unconditionally allowed (non-runtime), never 'blocked'."""
         from project.research.condition_routing import condition_routing
+
         cond, source = condition_routing("severity_bucket_extreme_5pct", strict=True)
         assert cond == "all"
         assert source == "bucket_non_runtime"
 
     def test_strict_unknown_name_returns_blocked(self):
         from project.research.condition_routing import condition_routing
+
         cond, source = condition_routing("some_research_bucket_xyz_v2", strict=True)
         assert cond == "__BLOCKED__"
         assert source == "blocked"
 
     def test_permissive_unknown_name_returns_all(self):
         from project.research.condition_routing import condition_routing
+
         cond, source = condition_routing("some_research_bucket_xyz_v2", strict=False)
         assert cond == "all"
         assert source == "permissive_fallback"
@@ -186,12 +206,14 @@ class TestConditionRoutingModes:
     def test_permissive_severity_bucket_still_non_runtime(self):
         """Bucket prefix early-exit overrides permissive mode — source is always 'bucket_non_runtime'."""
         from project.research.condition_routing import condition_routing
+
         cond, source = condition_routing("severity_bucket_top_10pct", strict=False)
         assert cond == "all"
         assert source == "bucket_non_runtime"  # Not 'permissive_fallback'
 
     def test_empty_and_all_always_unconditional(self):
         from project.research.condition_routing import condition_routing
+
         for name in ("", "all"):
             for strict in (True, False):
                 cond, source = condition_routing(name, strict=strict)
@@ -201,6 +223,7 @@ class TestConditionRoutingModes:
     def test_blocked_condition_is_not_executable(self):
         """__BLOCKED__ sentinel must NOT be executable — prevents compilation."""
         from project.strategy.dsl.contract_v1 import is_executable_condition
+
         assert not is_executable_condition("__BLOCKED__"), (
             "'__BLOCKED__' must not be executable; it is a sentinel for rejected conditions"
         )
@@ -211,10 +234,16 @@ class TestConditionRoutingModes:
         from project.strategy.dsl.contract_v1 import is_executable_condition
 
         test_inputs = [
-            ("vol_regime_high", True), ("session_asia", True), ("bull_bear_bull", True),
-            ("severity_bucket_extreme_5pct", True), ("severity_bucket_top_10pct", False),
-            ("quantile_95", True), ("some_unknown_xyz", True), ("some_unknown_xyz", False),
-            ("all", True), ("", False),
+            ("vol_regime_high", True),
+            ("session_asia", True),
+            ("bull_bear_bull", True),
+            ("severity_bucket_extreme_5pct", True),
+            ("severity_bucket_top_10pct", False),
+            ("quantile_95", True),
+            ("some_unknown_xyz", True),
+            ("some_unknown_xyz", False),
+            ("all", True),
+            ("", False),
         ]
         for name, strict in test_inputs:
             cond, source = condition_routing(name, strict=strict)

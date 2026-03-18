@@ -31,7 +31,9 @@ def _write_registry(reg_dir: Path) -> None:
     (reg_dir / "states.yaml").write_text(yaml.dump({"states": {}}))
     (reg_dir / "features.yaml").write_text(yaml.dump({"features": {}}))
     (reg_dir / "templates.yaml").write_text(
-        yaml.dump({"templates": {"continuation": {"enabled": True, "supports_trigger_types": ["EVENT"]}}})
+        yaml.dump(
+            {"templates": {"continuation": {"enabled": True, "supports_trigger_types": ["EVENT"]}}}
+        )
     )
     (reg_dir / "contexts.yaml").write_text(
         yaml.dump({"context_dimensions": {"session": {"allowed_values": ["open", "close"]}}})

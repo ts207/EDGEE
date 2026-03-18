@@ -5,6 +5,7 @@ import json
 
 from project.apps.pipeline import manifest as run_manifest
 
+
 def test_start_manifest_includes_git_and_spec_hashes():
     manifest = run_manifest.start_manifest(
         stage_name="unit_stage",
@@ -25,6 +26,7 @@ def test_start_manifest_includes_git_and_spec_hashes():
     assert "platform" in manifest
     assert "env_snapshot" in manifest
 
+
 def test_finalize_manifest_hashes_input_parquets(monkeypatch, tmp_path):
     parquet_path = tmp_path / "input.parquet"
     payload = b"fake parquet payload"
@@ -32,7 +34,9 @@ def test_finalize_manifest_hashes_input_parquets(monkeypatch, tmp_path):
     expected_hash = hashlib.sha256(payload).hexdigest()
 
     out_manifest = tmp_path / "unit_stage.json"
-    monkeypatch.setattr(run_manifest, "_manifest_path", lambda run_id, stage, stage_instance_id=None: out_manifest)
+    monkeypatch.setattr(
+        run_manifest, "_manifest_path", lambda run_id, stage, stage_instance_id=None: out_manifest
+    )
 
     manifest = run_manifest.start_manifest(
         stage_name="unit_stage",

@@ -3,9 +3,11 @@
 Shuffles trade returns to verify the observed mean exceeds random chance
 at a configurable percentile threshold.
 """
+
 from __future__ import annotations
 
 import numpy as np
+
 
 def permutation_test_expectancy(
     returns: np.ndarray,

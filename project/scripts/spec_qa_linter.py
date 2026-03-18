@@ -29,6 +29,7 @@ KNOWN_DATASETS = {
     "cleaned_bars",
 }
 
+
 def load_specs(spec_dir: Path) -> Dict[str, dict]:
     specs = {}
     for yaml_file in spec_dir.glob("*.yaml"):
@@ -36,6 +37,7 @@ def load_specs(spec_dir: Path) -> Dict[str, dict]:
             spec = yaml.safe_load(f)
             specs[spec["concept_id"]] = spec
     return specs
+
 
 def check_cycles(specs: Dict[str, dict]):
     graph = {cid: spec.get("dependencies", []) for cid, spec in specs.items()}
@@ -48,7 +50,7 @@ def check_cycles(specs: Dict[str, dict]):
             return False
         if node in visited:
             return True
-        
+
         visited.add(node)
         path.append(node)
         for neighbor in graph.get(node, []):
@@ -63,6 +65,7 @@ def check_cycles(specs: Dict[str, dict]):
                 sys.exit(1)
     print("SUCCESS: No cycles in dependency DAG.")
 
+
 def check_datasets(specs: Dict[str, dict]):
     errors = 0
     for cid, spec in specs.items():
@@ -75,6 +78,7 @@ def check_datasets(specs: Dict[str, dict]):
         print("SUCCESS: All dataset contracts valid.")
     else:
         sys.exit(1)
+
 
 def check_tests(specs: Dict[str, dict]):
     test_ids = set()
@@ -91,25 +95,28 @@ def check_tests(specs: Dict[str, dict]):
     else:
         sys.exit(1)
 
+
 def check_artifacts(specs: Dict[str, dict], project_root: Path):
     missing = []
     for cid, spec in specs.items():
         for art in spec.get("artifacts", []):
             path_str = art.get("path")
-            if not path_str: continue
-            
+            if not path_str:
+                continue
+
             # Handle {symbol} placeholders
             path_str = path_str.replace("{symbol}", "BTCUSDT")
             path = project_root / path_str
             if not path.exists():
                 missing.append(f"{cid}: {path_str}")
-    
+
     if missing:
         print("REPORT: Missing artifacts:")
         for m in missing:
             print(f"  - {m}")
     else:
         print("SUCCESS: All referenced artifacts exist.")
+
 
 def _check_detector_contract_completeness(data: dict, fname: str, errors: list) -> None:
     """If detector_contract is declared, enforce required sections are present."""
@@ -150,6 +157,7 @@ def main():
     check_tests(specs)
     check_artifacts(specs, project_root)
     check_detector_contracts(specs)
+
 
 if __name__ == "__main__":
     main()

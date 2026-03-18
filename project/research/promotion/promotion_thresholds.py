@@ -22,8 +22,8 @@ def _build_bundle_policy(
     enforce_placebo_controls: bool,
     enforce_timeframe_consensus: bool,
     enforce_regime_stability: bool = True,
-    policy_version: str = 'phase4_pr5_v1',
-    bundle_version: str = 'phase4_bundle_v1',
+    policy_version: str = "phase4_pr5_v1",
+    bundle_version: str = "phase4_bundle_v1",
 ) -> PromotionPolicy:
     return PromotionPolicy(
         promotion_profile=str(promotion_profile),

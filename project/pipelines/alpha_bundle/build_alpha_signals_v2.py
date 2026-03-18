@@ -16,6 +16,7 @@ from project.io.utils import ensure_dir, list_parquet_files, read_parquet, write
 from project.specs.manifest import finalize_manifest, start_manifest
 from project.core.validation import ensure_utc_timestamp
 
+
 def robust_z(series: pd.Series, window: int, eps: float = 1e-12) -> pd.Series:
     # Winsorize to 1%/99% then MAD-z over rolling window ending at t (PIT).
     def _rz(x: np.ndarray) -> float:
@@ -25,31 +26,51 @@ def robust_z(series: pd.Series, window: int, eps: float = 1e-12) -> pd.Series:
         med = np.median(x)
         mad = np.median(np.abs(x - med))
         return float((x[-1] - med) / (1.4826 * mad + eps))
+
     return series.rolling(window=window, min_periods=window).apply(_rz, raw=True)
+
 
 def _safe_log_ratio(a: pd.Series, b: pd.Series, eps: float = 1e-12) -> pd.Series:
     """PIT-safe log(a/b) with small eps handling."""
     return np.log((a.astype(float) + eps) / (b.astype(float) + eps))
+
 
 def main() -> int:
     p = argparse.ArgumentParser(description="Build alpha signals v2 (Model1 depth, PIT-safe)")
     p.add_argument("--run_id", required=True)
     # Backwards compatible single-symbol mode
     p.add_argument("--symbol", required=False, default=None)
-    p.add_argument("--bars_path", required=False, default=None, help="Parquet with timestamp + mid/close")
-    p.add_argument("--funding_path", required=False, default=None, help="Parquet with timestamp + funding_rate_scaled")
-    p.add_argument("--oi_path", required=False, default=None, help="Parquet with timestamp + oi_usd")
+    p.add_argument(
+        "--bars_path", required=False, default=None, help="Parquet with timestamp + mid/close"
+    )
+    p.add_argument(
+        "--funding_path",
+        required=False,
+        default=None,
+        help="Parquet with timestamp + funding_rate_scaled",
+    )
+    p.add_argument(
+        "--oi_path", required=False, default=None, help="Parquet with timestamp + oi_usd"
+    )
 
     # Multi-universe mode
-    p.add_argument("--symbols", required=False, default=None, help="Comma-separated symbols (multi-universe)")
+    p.add_argument(
+        "--symbols", required=False, default=None, help="Comma-separated symbols (multi-universe)"
+    )
     p.add_argument(
         "--cleaned_root",
         required=False,
         default=None,
         help="Root of cleaned lake (defaults to $BACKTEST_DATA_ROOT/lake/cleaned). Expected layout: cleaned/perp/<symbol>/{bars_15m,funding_15m,open_interest}/*.parquet",
     )
-    p.add_argument("--bar_interval", default="15m", help="Bar interval used in cleaned lake (default: 15m)")
-    p.add_argument("--oi_subdir", default="open_interest", help="Subdir under cleaned/perp/<symbol>/ for open interest parquet")
+    p.add_argument(
+        "--bar_interval", default="15m", help="Bar interval used in cleaned lake (default: 15m)"
+    )
+    p.add_argument(
+        "--oi_subdir",
+        default="open_interest",
+        help="Subdir under cleaned/perp/<symbol>/ for open interest parquet",
+    )
     p.add_argument("--out_dir", default=None)
     args = p.parse_args()
 
@@ -61,7 +82,9 @@ def main() -> int:
 
     stage = "alpha_signals_v2"
 
-    cleaned_root = Path(args.cleaned_root) if args.cleaned_root else (data_root / "lake" / "cleaned")
+    cleaned_root = (
+        Path(args.cleaned_root) if args.cleaned_root else (data_root / "lake" / "cleaned")
+    )
 
     # Resolve symbols
     if args.symbols:
@@ -77,9 +100,19 @@ def main() -> int:
 
     for symbol in symbols:
         # Resolve input paths
-        bars_path = Path(args.bars_path) if (args.bars_path and args.symbol and symbol == args.symbol) else None
-        funding_path = Path(args.funding_path) if (args.funding_path and args.symbol and symbol == args.symbol) else None
-        oi_path = Path(args.oi_path) if (args.oi_path and args.symbol and symbol == args.symbol) else None
+        bars_path = (
+            Path(args.bars_path)
+            if (args.bars_path and args.symbol and symbol == args.symbol)
+            else None
+        )
+        funding_path = (
+            Path(args.funding_path)
+            if (args.funding_path and args.symbol and symbol == args.symbol)
+            else None
+        )
+        oi_path = (
+            Path(args.oi_path) if (args.oi_path and args.symbol and symbol == args.symbol) else None
+        )
 
         if bars_path is None:
             bdir = cleaned_root / "perp" / symbol / f"bars_{args.bar_interval}"
@@ -108,7 +141,9 @@ def main() -> int:
         bars = read_parquet([Path(p) for p in bars_files])
         tcol = "ts_event" if "ts_event" in bars.columns else "timestamp"
         bars[tcol] = ensure_utc_timestamp(bars[tcol], tcol)
-        price_col = "mid" if "mid" in bars.columns else ("close" if "close" in bars.columns else None)
+        price_col = (
+            "mid" if "mid" in bars.columns else ("close" if "close" in bars.columns else None)
+        )
         if price_col is None:
             raise ValueError("bars must contain 'mid' or 'close'")
         bars = bars.sort_values(tcol).reset_index(drop=True)
@@ -158,7 +193,12 @@ def main() -> int:
             fund = fund[[ftcol, "funding_rate_scaled"]].rename(
                 columns={ftcol: tcol, "funding_rate_scaled": "funding_rate_scaled"}
             )
-            merged = pd.merge_asof(bars[[tcol]].sort_values(tcol), fund.sort_values(tcol), on=tcol, direction="backward")
+            merged = pd.merge_asof(
+                bars[[tcol]].sort_values(tcol),
+                fund.sort_values(tcol),
+                on=tcol,
+                direction="backward",
+            )
             bars["funding_rate_scaled"] = merged["funding_rate_scaled"].astype(float)
             bars["funding_rate"] = bars["funding_rate_scaled"]
             bars["funding_z"] = robust_z(bars["funding_rate_scaled"], window=60)
@@ -173,10 +213,23 @@ def main() -> int:
             otcol = "ts_event" if "ts_event" in oi.columns else "timestamp"
             oi[otcol] = ensure_utc_timestamp(oi[otcol], otcol)
             oi = oi.sort_values(otcol)
-            ocol = "oi_usd" if "oi_usd" in oi.columns else ("oi" if "oi" in oi.columns else ("open_interest" if "open_interest" in oi.columns else None))
+            ocol = (
+                "oi_usd"
+                if "oi_usd" in oi.columns
+                else (
+                    "oi"
+                    if "oi" in oi.columns
+                    else ("open_interest" if "open_interest" in oi.columns else None)
+                )
+            )
             if ocol:
                 oi = oi[[otcol, ocol]].rename(columns={otcol: tcol, ocol: "oi_usd"})
-                merged = pd.merge_asof(bars[[tcol]].sort_values(tcol), oi.sort_values(tcol), on=tcol, direction="backward")
+                merged = pd.merge_asof(
+                    bars[[tcol]].sort_values(tcol),
+                    oi.sort_values(tcol),
+                    on=tcol,
+                    direction="backward",
+                )
                 bars["oi_usd"] = merged["oi_usd"].astype(float)
                 bars["dOI"] = np.log(bars["oi_usd"] / (bars["oi_usd"].shift(1) + 1e-12))
             else:
@@ -208,10 +261,19 @@ def main() -> int:
                 stcol = "ts_event" if "ts_event" in spot.columns else "timestamp"
                 spot[stcol] = ensure_utc_timestamp(spot[stcol], stcol)
                 spot = spot.sort_values(stcol).reset_index(drop=True)
-                sp_col = "mid" if "mid" in spot.columns else ("close" if "close" in spot.columns else None)
+                sp_col = (
+                    "mid"
+                    if "mid" in spot.columns
+                    else ("close" if "close" in spot.columns else None)
+                )
                 if sp_col is not None:
                     spot = spot[[stcol, sp_col]].rename(columns={stcol: tcol, sp_col: "spot_price"})
-                    merged_spot = pd.merge_asof(bars[[tcol]].sort_values(tcol), spot.sort_values(tcol), on=tcol, direction="backward")
+                    merged_spot = pd.merge_asof(
+                        bars[[tcol]].sort_values(tcol),
+                        spot.sort_values(tcol),
+                        on=tcol,
+                        direction="backward",
+                    )
                     basis = _safe_log_ratio(pser, merged_spot["spot_price"].astype(float))
                     basis_z = robust_z(basis, window=60)
         except Exception:
@@ -228,13 +290,17 @@ def main() -> int:
         dOI_clip = bars["dOI"].clip(-dOI_cap, dOI_cap)
         zf = bars["funding_z"].clip(-fund_cap, fund_cap)
         zb = bars["basis_z"].clip(-fund_cap, fund_cap)
-        bars["funding_carry_adjusted"] = (-zf - k_b * zb - k_oi * dOI_clip).clip(-fund_cap, fund_cap)
+        bars["funding_carry_adjusted"] = (-zf - k_b * zb - k_oi * dOI_clip).clip(
+            -fund_cap, fund_cap
+        )
         # Back-compat
         bars["z_fund_carry"] = bars["funding_carry_adjusted"]
 
         # ---- Signal 6 proxy: Orderflow imbalance (PIT-safe proxy using signed volume)
         # If true L2/L3 data is available, replace this in a dedicated microstructure pipeline.
-        signed_vol = np.sign(bars["logret"].fillna(0.0)) * (pser * bars.get("volume", 0.0).astype(float))
+        signed_vol = np.sign(bars["logret"].fillna(0.0)) * (
+            pser * bars.get("volume", 0.0).astype(float)
+        )
         bars["orderflow_imbalance"] = robust_z(pd.Series(signed_vol), window=60).clip(-4.0, 4.0)
 
         out_cols = [
@@ -262,9 +328,14 @@ def main() -> int:
         outputs_written.append(str(out_path))
         total_rows += int(len(out))
 
-    manifest = start_manifest(stage, run_id, params={"symbols": symbols}, inputs=inputs, outputs=[{"path": str(out_dir)}])
-    finalize_manifest(manifest, status="success", stats={"rows": total_rows, "outs": outputs_written})
+    manifest = start_manifest(
+        stage, run_id, params={"symbols": symbols}, inputs=inputs, outputs=[{"path": str(out_dir)}]
+    )
+    finalize_manifest(
+        manifest, status="success", stats={"rows": total_rows, "outs": outputs_written}
+    )
     return 0
+
 
 if __name__ == "__main__":
     raise SystemExit(main())

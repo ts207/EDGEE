@@ -8,45 +8,65 @@ from project.pipelines.research.direction_semantics import (  # noqa: E402
     resolve_effect_sign,
 )
 
+
 def test_normalize_side_policy_rejects_unknown_values():
     with pytest.raises(ValueError):
         normalize_side_policy("long_only")
 
+
 def test_resolve_effect_sign_directional_tracks_event_direction():
-    assert resolve_effect_sign(
-        template_verb="continuation",
-        side_policy="directional",
-        event_direction=1,
-        label_target="fwd_return_h",
-    ) == 1
-    assert resolve_effect_sign(
-        template_verb="continuation",
-        side_policy="directional",
-        event_direction=-1,
-        label_target="fwd_return_h",
-    ) == -1
+    assert (
+        resolve_effect_sign(
+            template_verb="continuation",
+            side_policy="directional",
+            event_direction=1,
+            label_target="fwd_return_h",
+        )
+        == 1
+    )
+    assert (
+        resolve_effect_sign(
+            template_verb="continuation",
+            side_policy="directional",
+            event_direction=-1,
+            label_target="fwd_return_h",
+        )
+        == -1
+    )
+
 
 def test_resolve_effect_sign_contrarian_flips_event_direction():
-    assert resolve_effect_sign(
-        template_verb="mean_reversion",
-        side_policy="contrarian",
-        event_direction=1,
-        label_target="fwd_return_h",
-    ) == -1
-    assert resolve_effect_sign(
-        template_verb="mean_reversion",
-        side_policy="contrarian",
-        event_direction=-1,
-        label_target="fwd_return_h",
-    ) == 1
+    assert (
+        resolve_effect_sign(
+            template_verb="mean_reversion",
+            side_policy="contrarian",
+            event_direction=1,
+            label_target="fwd_return_h",
+        )
+        == -1
+    )
+    assert (
+        resolve_effect_sign(
+            template_verb="mean_reversion",
+            side_policy="contrarian",
+            event_direction=-1,
+            label_target="fwd_return_h",
+        )
+        == 1
+    )
+
 
 def test_resolve_effect_sign_gate_templates_are_nondirectional():
-    assert resolve_effect_sign(
-        template_verb="only_if_regime",
-        side_policy="both",
-        event_direction=1,
-        label_target="gate",
-    ) == 0
+    assert (
+        resolve_effect_sign(
+            template_verb="only_if_regime",
+            side_policy="both",
+            event_direction=1,
+            label_target="gate",
+        )
+        == 0
+    )
+
 
 def test_resolve_candidate_action_uses_entry_gate_skip_for_gate_templates():
     assert (

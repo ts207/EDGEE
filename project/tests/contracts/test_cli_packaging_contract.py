@@ -20,8 +20,8 @@ REMOVED_ALIASES = [
 
 
 def test_canonical_commands_packaged_and_extended_detectors_removed():
-    data = tomllib.loads(Path('pyproject.toml').read_text(encoding='utf-8'))
-    scripts = data['project']['scripts']
+    data = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))
+    scripts = data["project"]["scripts"]
     for cmd in CANONICAL_COMMANDS:
         assert cmd in scripts
     for cmd in REMOVED_ALIASES:

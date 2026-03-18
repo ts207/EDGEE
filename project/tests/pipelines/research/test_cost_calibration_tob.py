@@ -6,6 +6,7 @@ import pandas as pd
 
 from project.pipelines.research.cost_calibration import ToBRegimeCostCalibrator
 
+
 def _write_tob_agg(root: Path, symbol: str) -> None:
     out_dir = root / "lake" / "cleaned" / "perp" / symbol / "tob_5m_agg" / "year=2024" / "month=01"
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -19,6 +20,7 @@ def _write_tob_agg(root: Path, symbol: str) -> None:
         }
     )
     frame.to_parquet(out_dir / "tob_agg_BTCUSDT_5m_2024-01.parquet", index=False)
+
 
 def test_tob_regime_calibration_increases_cost_in_wider_spread_regime(tmp_path: Path) -> None:
     data_root = tmp_path / "data"
@@ -46,6 +48,7 @@ def test_tob_regime_calibration_increases_cost_in_wider_spread_regime(tmp_path: 
     assert est.cost_input_coverage >= 0.99
     assert est.regime_multiplier > 1.0
     assert est.cost_bps > 6.0
+
 
 def test_tob_regime_calibration_falls_back_to_static_when_coverage_low(tmp_path: Path) -> None:
     data_root = tmp_path / "data"

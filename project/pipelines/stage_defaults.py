@@ -7,5 +7,6 @@ STAGE_DEFAULT_PARAMS: Dict[str, Dict[str, Any]] = {
     "build_features": {"version": "v2"},
 }
 
+
 def get_stage_defaults(stage_name: str) -> Dict[str, Any]:
     return STAGE_DEFAULT_PARAMS.get(stage_name, {})

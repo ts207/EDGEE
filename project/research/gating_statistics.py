@@ -5,6 +5,7 @@ from typing import Dict, List, Any
 
 from project.core.stats import canonical_bh_group_key
 
+
 def apply_statistical_gates(
     candidates: pd.DataFrame,
     gate_spec: Dict[str, Any],
@@ -15,6 +16,7 @@ def apply_statistical_gates(
     out = candidates.copy()
     # logic for p-value calculation and BH correction
     return out
+
 
 def calculate_quality_scores(
     candidates: pd.DataFrame,

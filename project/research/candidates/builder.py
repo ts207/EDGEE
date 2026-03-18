@@ -23,6 +23,7 @@ from project.research.candidates.shaping import (
 
 _LOG = logging.getLogger(__name__)
 
+
 def build_promoted_strategy_candidate(
     blueprint: Dict[str, Any],
     promotion: Dict[str, Any],
@@ -35,8 +36,14 @@ def build_promoted_strategy_candidate(
     action = infer_action_from_blueprint(blueprint)
     controls = risk_controls_from_action(action)
 
-    stressed_split = promotion.get("stressed_split_pnl", {}) if isinstance(promotion.get("stressed_split_pnl"), dict) else {}
-    split_pnl = promotion.get("split_pnl", {}) if isinstance(promotion.get("split_pnl"), dict) else {}
+    stressed_split = (
+        promotion.get("stressed_split_pnl", {})
+        if isinstance(promotion.get("stressed_split_pnl"), dict)
+        else {}
+    )
+    split_pnl = (
+        promotion.get("split_pnl", {}) if isinstance(promotion.get("split_pnl"), dict) else {}
+    )
     selection_score = safe_float(
         stressed_split.get("validation"),
         safe_float(split_pnl.get("validation"), np.nan),
@@ -54,10 +61,14 @@ def build_promoted_strategy_candidate(
     route = route_event_family(event)
     execution_family = route["execution_family"] if route else "unmapped"
     base_strategy = route["base_strategy"] if route else "unmapped"
-    routing_reason = "" if route else f"Unknown event family `{event}`; no strategy routing is defined."
+    routing_reason = (
+        "" if route else f"Unknown event family `{event}`; no strategy routing is defined."
+    )
 
     run_symbols = [str(symbol).strip().upper() for symbol in symbols if str(symbol).strip()]
-    candidate_symbol, rollout_eligible = _candidate_symbol_from_blueprint(blueprint=blueprint, symbols=run_symbols)
+    candidate_symbol, rollout_eligible = _candidate_symbol_from_blueprint(
+        blueprint=blueprint, symbols=run_symbols
+    )
     deployment_scope = _resolve_deployment_scope(
         candidate_symbol=candidate_symbol,
         run_symbols=run_symbols,
@@ -78,7 +89,9 @@ def build_promoted_strategy_candidate(
             reasons.append(f"Non-executable condition per DSL contract: `{condition}`")
         if not executable_action:
             reasons.append(f"Non-executable action per DSL contract: `{action}`")
-        routing_reason = (routing_reason + ("; " if routing_reason else "") + "; ".join(reasons)).strip()
+        routing_reason = (
+            routing_reason + ("; " if routing_reason else "") + "; ".join(reasons)
+        ).strip()
 
     strategy_instances = [
         {
@@ -127,7 +140,12 @@ def build_promoted_strategy_candidate(
         "rollout_eligible": deployment_scope["rollout_eligible"],
         "deployment_type": deployment_scope["deployment_type"],
         "deployment_symbols": deployment_symbols,
-        "allocation_policy": {"mode": "full", "signal_take_rate": 1.0, "max_participation_rate": 1.0, "allocation_viable": True},
+        "allocation_policy": {
+            "mode": "full",
+            "signal_take_rate": 1.0,
+            "max_participation_rate": 1.0,
+            "allocation_viable": True,
+        },
         "fractional_allocation_applied": False,
         "strategy_instances": strategy_instances,
         "risk_controls": controls,
@@ -195,8 +213,12 @@ def build_compiled_blueprint_strategy_candidate(
 
     candidate["n_events"] = n_events
     candidate["status"] = promotion["status"]
-    candidate["selection_score"] = safe_float(metrics.get("selection_score"), candidate.get("selection_score"))
-    candidate["quality_score"] = safe_float(metrics.get("quality_score"), candidate.get("quality_score"))
+    candidate["selection_score"] = safe_float(
+        metrics.get("selection_score"), candidate.get("selection_score")
+    )
+    candidate["quality_score"] = safe_float(
+        metrics.get("quality_score"), candidate.get("quality_score")
+    )
     candidate["edge_score"] = safe_float(metrics.get("edge_score"), candidate.get("edge_score"))
     candidate["expectancy_per_trade"] = safe_float(
         metrics.get("expectancy_per_trade"),
@@ -206,8 +228,12 @@ def build_compiled_blueprint_strategy_candidate(
         metrics.get("expectancy_after_multiplicity"),
         candidate.get("expectancy_after_multiplicity"),
     )
-    candidate["stability_proxy"] = safe_float(metrics.get("stability_proxy"), candidate.get("stability_proxy"))
-    candidate["robustness_score"] = safe_float(metrics.get("robustness_score"), candidate.get("robustness_score"))
+    candidate["stability_proxy"] = safe_float(
+        metrics.get("stability_proxy"), candidate.get("stability_proxy")
+    )
+    candidate["robustness_score"] = safe_float(
+        metrics.get("robustness_score"), candidate.get("robustness_score")
+    )
     candidate["oos_sign_consistency"] = safe_float(
         metrics.get("oos_sign_consistency"),
         safe_float(metrics.get("sign_consistency"), candidate.get("oos_sign_consistency")),
@@ -216,8 +242,13 @@ def build_compiled_blueprint_strategy_candidate(
         candidate["notes"].append("Derived from compiled blueprint artifact.")
     return candidate
 
-def _candidate_symbol_from_blueprint(blueprint: Dict[str, Any], symbols: List[str]) -> Tuple[str, bool]:
-    scope = blueprint.get("symbol_scope", {}) if isinstance(blueprint.get("symbol_scope"), dict) else {}
+
+def _candidate_symbol_from_blueprint(
+    blueprint: Dict[str, Any], symbols: List[str]
+) -> Tuple[str, bool]:
+    scope = (
+        blueprint.get("symbol_scope", {}) if isinstance(blueprint.get("symbol_scope"), dict) else {}
+    )
     mode = str(scope.get("mode", "")).strip().lower()
     run_symbols = [str(symbol).strip().upper() for symbol in symbols if str(symbol).strip()]
     if mode == "single_symbol":
@@ -237,23 +268,42 @@ def _candidate_symbol_from_blueprint(blueprint: Dict[str, Any], symbols: List[st
     rollout = mode == "multi_symbol" and len(run_symbols) > 1
     return "ALL" if rollout else (run_symbols[0] if run_symbols else "ALL"), rollout
 
+
 def _resolve_deployment_scope(
     candidate_symbol: str,
     run_symbols: List[str],
     symbol_scores: Dict[str, float],
     rollout_eligible: bool,
 ) -> Dict[str, Any]:
-    normalized_run_symbols = [str(symbol).strip().upper() for symbol in run_symbols if str(symbol).strip()]
+    normalized_run_symbols = [
+        str(symbol).strip().upper() for symbol in run_symbols if str(symbol).strip()
+    ]
     if not normalized_run_symbols:
-        return {"deployment_type": "single_symbol", "deployment_symbols": [], "rollout_eligible": False}
+        return {
+            "deployment_type": "single_symbol",
+            "deployment_symbols": [],
+            "rollout_eligible": False,
+        }
 
     candidate_symbol = str(candidate_symbol).strip().upper()
     if candidate_symbol and candidate_symbol != "ALL":
-        target = candidate_symbol if candidate_symbol in normalized_run_symbols else normalized_run_symbols[0]
-        return {"deployment_type": "single_symbol", "deployment_symbols": [target], "rollout_eligible": False}
+        target = (
+            candidate_symbol
+            if candidate_symbol in normalized_run_symbols
+            else normalized_run_symbols[0]
+        )
+        return {
+            "deployment_type": "single_symbol",
+            "deployment_symbols": [target],
+            "rollout_eligible": False,
+        }
 
     if len(normalized_run_symbols) == 1:
-        return {"deployment_type": "single_symbol", "deployment_symbols": normalized_run_symbols, "rollout_eligible": False}
+        return {
+            "deployment_type": "single_symbol",
+            "deployment_symbols": normalized_run_symbols,
+            "rollout_eligible": False,
+        }
 
     if rollout_eligible:
         return {
@@ -265,13 +315,22 @@ def _resolve_deployment_scope(
     best_symbol = normalized_run_symbols[0]
     if symbol_scores:
         ranked = sorted(
-            ((symbol, score) for symbol, score in symbol_scores.items() if symbol in normalized_run_symbols),
+            (
+                (symbol, score)
+                for symbol, score in symbol_scores.items()
+                if symbol in normalized_run_symbols
+            ),
             key=lambda item: item[1],
             reverse=True,
         )
         if ranked:
             best_symbol = ranked[0][0]
-    return {"deployment_type": "single_symbol", "deployment_symbols": [best_symbol], "rollout_eligible": False}
+    return {
+        "deployment_type": "single_symbol",
+        "deployment_symbols": [best_symbol],
+        "rollout_eligible": False,
+    }
+
 
 def build_edge_strategy_candidate(
     row: Dict[str, Any],
@@ -282,8 +341,12 @@ def build_edge_strategy_candidate(
     candidate_id = str(row.get("candidate_id", "")).strip()
     edge_score = safe_float(row.get("edge_score"), 0.0)
     stability_proxy = safe_float(row.get("stability_proxy"), 0.0)
-    expectancy_per_trade = safe_float(row.get("expectancy_per_trade"), safe_float(row.get("expected_return_proxy"), 0.0))
-    expectancy_after_multiplicity = safe_float(row.get("expectancy_after_multiplicity"), expectancy_per_trade)
+    expectancy_per_trade = safe_float(
+        row.get("expectancy_per_trade"), safe_float(row.get("expected_return_proxy"), 0.0)
+    )
+    expectancy_after_multiplicity = safe_float(
+        row.get("expectancy_after_multiplicity"), expectancy_per_trade
+    )
     robustness_score = safe_float(row.get("robustness_score"), stability_proxy)
     event_frequency = safe_float(row.get("event_frequency"), 0.0)
     capacity_proxy = safe_float(row.get("capacity_proxy"), 0.0)
@@ -299,14 +362,14 @@ def build_edge_strategy_candidate(
             selection_score_executed
             if selection_score_executed > 0.0
             else (
-            profit_density_score
-            if profit_density_score > 0.0
-            else (
-                0.35 * max(0.0, expectancy_after_multiplicity)
-                + 0.25 * max(0.0, robustness_score)
-                + 0.20 * delay_robustness_score
-                + 0.20 * profit_density_score
-            )
+                profit_density_score
+                if profit_density_score > 0.0
+                else (
+                    0.35 * max(0.0, expectancy_after_multiplicity)
+                    + 0.25 * max(0.0, robustness_score)
+                    + 0.20 * delay_robustness_score
+                    + 0.20 * profit_density_score
+                )
             )
         ),
     )
@@ -322,7 +385,7 @@ def build_edge_strategy_candidate(
     route = route_event_family(event)
     execution_family = route["execution_family"] if route else "unmapped"
     base_strategy = route["base_strategy"] if route else "unmapped"
-    
+
     executable_condition = bool(is_executable_condition(condition, run_symbols=symbols))
     executable_action = bool(is_executable_action(action))
 
@@ -337,7 +400,7 @@ def build_edge_strategy_candidate(
         rollout_eligible=rollout_eligible,
     )
     deployment_symbols = deployment_scope["deployment_symbols"]
-    
+
     allocation_policy: Dict[str, Any]
     raw_policy = str(row.get("allocation_policy_json", "")).strip()
     if raw_policy:
@@ -347,7 +410,7 @@ def build_edge_strategy_candidate(
             allocation_policy = {}
     else:
         allocation_policy = {}
-    
+
     if not allocation_policy:
         allocation_policy = {
             "mode": "full",
@@ -363,9 +426,13 @@ def build_edge_strategy_candidate(
     )
     if fractional_applied:
         controls = dict(controls)
-        controls["size_scale"] = float(safe_float(allocation_policy.get("signal_take_rate"), controls.get("size_scale", 1.0)))
-        controls["max_participation_rate"] = float(safe_float(allocation_policy.get("max_participation_rate"), 0.25))
-    
+        controls["size_scale"] = float(
+            safe_float(allocation_policy.get("signal_take_rate"), controls.get("size_scale", 1.0))
+        )
+        controls["max_participation_rate"] = float(
+            safe_float(allocation_policy.get("max_participation_rate"), 0.25)
+        )
+
     strategy_instances = [
         {
             "strategy_id": f"{base_strategy}_{symbol}",
@@ -427,6 +494,7 @@ def build_edge_strategy_candidate(
         "risk_controls": controls,
         "notes": [f"Derived from promoted edge candidate {candidate_id} ({event})."],
     }
+
 
 def _parse_symbol_scores(value: Any) -> Dict[str, float]:
     if isinstance(value, dict):

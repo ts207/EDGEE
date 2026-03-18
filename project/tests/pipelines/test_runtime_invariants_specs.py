@@ -6,6 +6,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2] / "project"
 
 from project.specs import invariants as runtime_invariants
 
+
 def test_runtime_invariants_specs_validate_for_repo_contract():
     repo_root = PROJECT_ROOT.parent
     issues = runtime_invariants.validate_runtime_invariants_specs(repo_root)
@@ -20,6 +21,7 @@ def test_runtime_invariants_specs_validate_for_repo_contract():
 
     spec_hash = runtime_invariants.runtime_spec_hash(repo_root)
     assert spec_hash.startswith("sha256:")
+
 
 def test_runtime_invariants_validation_reports_duplicate_lane_ids(tmp_path):
     runtime_dir = tmp_path / "spec" / "runtime"

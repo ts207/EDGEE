@@ -63,8 +63,11 @@ def _extract_row_series(row: pd.Series, candidates: List[str]) -> pd.Series:
 
 def _extract_repeated_fold_consistency(row: pd.Series) -> float:
     fold_candidates = [
-        "fold_scores", "validation_fold_scores", "bridge_fold_scores",
-        "bridge_validation_fold_scores", "walkforward_fold_scores",
+        "fold_scores",
+        "validation_fold_scores",
+        "bridge_fold_scores",
+        "bridge_validation_fold_scores",
+        "walkforward_fold_scores",
     ]
     folds = _extract_row_series(row, fold_candidates)
     if folds.empty or len(folds) < 2:
@@ -77,12 +80,23 @@ def _extract_repeated_fold_consistency(row: pd.Series) -> float:
 
 
 def _build_bridge_diagnostics(row: pd.Series, stressed_cost_multiplier: float) -> Dict[str, Any]:
-    from project.research.robustness import evaluate_structural_breaks, evaluate_structural_robustness
+    from project.research.robustness import (
+        evaluate_structural_breaks,
+        evaluate_structural_robustness,
+    )
 
-    pnl_series = _extract_row_series(row, ["bridge_pnl_series", "validation_pnl_series", "pnl_series", "pnl_path"])
-    returns_raw = _extract_row_series(row, ["bridge_returns_raw", "returns_raw", "gross_returns_series"])
-    costs_bps = _extract_row_series(row, ["bridge_costs_bps_series", "costs_bps_series", "dynamic_cost_bps_series"])
-    entry_delay_pnl = _extract_row_series(row, ["bridge_entry_delay_pnl_series", "entry_delay_pnl_series"])
+    pnl_series = _extract_row_series(
+        row, ["bridge_pnl_series", "validation_pnl_series", "pnl_series", "pnl_path"]
+    )
+    returns_raw = _extract_row_series(
+        row, ["bridge_returns_raw", "returns_raw", "gross_returns_series"]
+    )
+    costs_bps = _extract_row_series(
+        row, ["bridge_costs_bps_series", "costs_bps_series", "dynamic_cost_bps_series"]
+    )
+    entry_delay_pnl = _extract_row_series(
+        row, ["bridge_entry_delay_pnl_series", "entry_delay_pnl_series"]
+    )
     timestamps = _extract_row_series(row, [])
     for key in ["bridge_timestamps", "timestamps", "validation_timestamps", "ts_path"]:
         if key in row and row.get(key) is not None:
@@ -99,28 +113,34 @@ def _build_bridge_diagnostics(row: pd.Series, stressed_cost_multiplier: float) -
 
     diagnostics: Dict[str, Any] = {}
     if not pnl_series.empty:
-        diagnostics.update(evaluate_structural_robustness(
-            pnl_series,
-            returns_raw=returns_raw if not returns_raw.empty else None,
-            costs_bps=costs_bps if not costs_bps.empty else None,
-            entry_delay_pnl=entry_delay_pnl if not entry_delay_pnl.empty else None,
-            cost_multiplier=stressed_cost_multiplier,
-        ))
+        diagnostics.update(
+            evaluate_structural_robustness(
+                pnl_series,
+                returns_raw=returns_raw if not returns_raw.empty else None,
+                costs_bps=costs_bps if not costs_bps.empty else None,
+                entry_delay_pnl=entry_delay_pnl if not entry_delay_pnl.empty else None,
+                cost_multiplier=stressed_cost_multiplier,
+            )
+        )
         if not timestamps.empty and len(timestamps) == len(pnl_series):
             break_results = evaluate_structural_breaks(pnl_series, timestamps)
             diagnostics["gate_structural_break"] = bool(break_results.get("pass", False))
-            diagnostics["structural_break_detected"] = break_results.get("structural_break_detected", False)
+            diagnostics["structural_break_detected"] = break_results.get(
+                "structural_break_detected", False
+            )
         else:
             diagnostics["gate_structural_break"] = False
             diagnostics["structural_break_detected"] = np.nan
     else:
-        diagnostics.update({
-            "structural_robustness_score": np.nan,
-            "sign_retention_rate": np.nan,
-            "robustness_panel_complete": False,
-            "gate_structural_break": False,
-            "structural_break_detected": np.nan,
-        })
+        diagnostics.update(
+            {
+                "structural_robustness_score": np.nan,
+                "sign_retention_rate": np.nan,
+                "robustness_panel_complete": False,
+                "gate_structural_break": False,
+                "structural_break_detected": np.nan,
+            }
+        )
 
     diagnostics["repeated_fold_consistency"] = _extract_repeated_fold_consistency(row)
     return diagnostics
@@ -147,7 +167,9 @@ def evaluate_microstructure_gate(
     imbalance_pass = (not np.isfinite(imbalance)) or (abs(imbalance) <= max_abs_imbalance)
     coverage_pass = (not np.isfinite(coverage)) or (coverage >= min_feature_coverage)
 
-    gate_micro = bool(spread_pass and depth_pass and sweep_pass and imbalance_pass and coverage_pass)
+    gate_micro = bool(
+        spread_pass and depth_pass and sweep_pass and imbalance_pass and coverage_pass
+    )
     return {
         "gate_bridge_microstructure": gate_micro,
         "gate_bridge_micro_spread_stress": spread_pass,
@@ -157,10 +179,12 @@ def evaluate_microstructure_gate(
         "gate_bridge_micro_feature_coverage": coverage_pass,
     }
 
+
 def effective_cost_bps(row: pd.Series) -> float:
     avg_dynamic = max(0.0, _row_float(row, "avg_dynamic_cost_bps", np.nan))
     turnover = max(0.0, _row_float(row, "turnover_proxy_mean", np.nan))
-    if avg_dynamic > 0.0: return float(avg_dynamic * max(turnover, 0.10))
+    if avg_dynamic > 0.0:
+        return float(avg_dynamic * max(turnover, 0.10))
     cost_ratio = max(0.0, _row_float(row, "cost_ratio", 0.0))
     after_cost = _row_float(
         row,
@@ -169,6 +193,7 @@ def effective_cost_bps(row: pd.Series) -> float:
     )
     gross_proxy_bps = abs(after_cost) * 10_000.0
     return float(max(0.0, gross_proxy_bps * min(1.0, cost_ratio))) if cost_ratio > 0.0 else 0.0
+
 
 def bridge_metrics_for_row(row: pd.Series, stressed_cost_multiplier: float) -> Dict[str, Any]:
     eff_aft = _row_float(
@@ -185,8 +210,8 @@ def bridge_metrics_for_row(row: pd.Series, stressed_cost_multiplier: float) -> D
         str_aft = eff_aft = -999.0
     elif entry_lag == 1:
         miss_prob = 1.0 - maker_fill_prob
-        eff_aft -= (miss_prob * 2.0 / 10000.0)
-        str_aft -= (miss_prob * 3.0 / 10000.0)
+        eff_aft -= miss_prob * 2.0 / 10000.0
+        str_aft -= miss_prob * 3.0 / 10000.0
     fb_val_aft = float(eff_aft * 10_000.0)
     fb_val_str = float(str_aft * 10_000.0)
     if np.isfinite(fb_val_str) and fb_val_str != -9990000.0:
@@ -207,12 +232,15 @@ def bridge_metrics_for_row(row: pd.Series, stressed_cost_multiplier: float) -> D
             pnl_series_raw = []
     pnl_series = [v for v in pnl_series_raw if isinstance(v, (int, float))]
     has_pnl_path = bool(len(pnl_series) > 0 and not all(v == 0 for v in pnl_series))
-    
+
     metrics_dict = {
         "bridge_train_after_cost_bps": train_aft,
         "bridge_validation_after_cost_bps": val_aft,
         "bridge_validation_stressed_after_cost_bps": val_str,
-        "exp_costed_x0_5": val_aft + (0.0 * eff_cost), # fix: was 0.5 but logically we use 0, 1.0, 1.5, 2.0 based on common patterns
+        "exp_costed_x0_5": val_aft
+        + (
+            0.0 * eff_cost
+        ),  # fix: was 0.5 but logically we use 0, 1.0, 1.5, 2.0 based on common patterns
         "exp_costed_x1_0": val_aft,
         "exp_costed_x1_5": val_aft - (0.5 * eff_cost),
         "exp_costed_x2_0": val_aft - eff_cost,
@@ -220,11 +248,12 @@ def bridge_metrics_for_row(row: pd.Series, stressed_cost_multiplier: float) -> D
         "bridge_effective_cost_bps_per_trade": eff_cost,
         "bridge_gross_edge_bps_per_trade": gross_edge,
         "bridge_edge_to_cost_ratio": gross_edge / max(eff_cost, 1e-9),
-        "bridge_certified": bool(has_pnl_path), # Strict check
+        "bridge_certified": bool(has_pnl_path),  # Strict check
         "bridge_has_path_evidence": has_pnl_path,
         **diagnostics,
     }
     return metrics_dict
+
 
 def evaluate_bridge_performance(
     survivors: pd.DataFrame,
@@ -254,31 +283,85 @@ def evaluate_bridge_performance(
             base_key = overlay_base_id or f"BASE_TEMPLATE::{event_type.lower()}"
             base_metrics = base_lookup.get(base_key)
             if base_metrics is None:
-                metrics_rows.append({"candidate_id": candidate_id, "bridge_eval_status": "rejected:missing_overlay_base", "gate_bridge_tradable": False})
+                metrics_rows.append(
+                    {
+                        "candidate_id": candidate_id,
+                        "bridge_eval_status": "rejected:missing_overlay_base",
+                        "gate_bridge_tradable": False,
+                    }
+                )
                 continue
             base_turnover = float(base_metrics.get("turnover_proxy_mean", np.nan))
-            metrics["bridge_train_after_cost_bps"] -= float(base_metrics.get("bridge_train_after_cost_bps", 0.0) or 0.0)
-            metrics["bridge_validation_after_cost_bps"] -= float(base_metrics.get("bridge_validation_after_cost_bps", 0.0) or 0.0)
-            metrics["bridge_validation_stressed_after_cost_bps"] -= float(base_metrics.get("bridge_validation_stressed_after_cost_bps", 0.0) or 0.0)
-            metrics["bridge_gross_edge_bps_per_trade"] = max(0.0, metrics["bridge_validation_after_cost_bps"] + metrics["bridge_effective_cost_bps_per_trade"])
-            metrics["bridge_edge_to_cost_ratio"] = metrics["bridge_gross_edge_bps_per_trade"] / max(metrics["bridge_effective_cost_bps_per_trade"], 1e-9)
-            overlay_delta = {"candidate_id": candidate_id, "overlay_base_candidate_id": base_key, "delta_validation_after_cost_bps": metrics["bridge_validation_after_cost_bps"], "delta_validation_stressed_after_cost_bps": metrics["bridge_validation_stressed_after_cost_bps"]}
-        
+            metrics["bridge_train_after_cost_bps"] -= float(
+                base_metrics.get("bridge_train_after_cost_bps", 0.0) or 0.0
+            )
+            metrics["bridge_validation_after_cost_bps"] -= float(
+                base_metrics.get("bridge_validation_after_cost_bps", 0.0) or 0.0
+            )
+            metrics["bridge_validation_stressed_after_cost_bps"] -= float(
+                base_metrics.get("bridge_validation_stressed_after_cost_bps", 0.0) or 0.0
+            )
+            metrics["bridge_gross_edge_bps_per_trade"] = max(
+                0.0,
+                metrics["bridge_validation_after_cost_bps"]
+                + metrics["bridge_effective_cost_bps_per_trade"],
+            )
+            metrics["bridge_edge_to_cost_ratio"] = metrics["bridge_gross_edge_bps_per_trade"] / max(
+                metrics["bridge_effective_cost_bps_per_trade"], 1e-9
+            )
+            overlay_delta = {
+                "candidate_id": candidate_id,
+                "overlay_base_candidate_id": base_key,
+                "delta_validation_after_cost_bps": metrics["bridge_validation_after_cost_bps"],
+                "delta_validation_stressed_after_cost_bps": metrics[
+                    "bridge_validation_stressed_after_cost_bps"
+                ],
+            }
+
         has_trades = metrics["bridge_validation_trades"] >= min_validation_trades
-        aft_pos, str_pos = metrics["bridge_validation_after_cost_bps"] > 0.0, metrics["bridge_validation_stressed_after_cost_bps"] > 0.0
-        edge_ratio_gate = metrics["bridge_gross_edge_bps_per_trade"] >= (edge_cost_k * metrics["bridge_effective_cost_bps_per_trade"])
+        aft_pos, str_pos = (
+            metrics["bridge_validation_after_cost_bps"] > 0.0,
+            metrics["bridge_validation_stressed_after_cost_bps"] > 0.0,
+        )
+        edge_ratio_gate = metrics["bridge_gross_edge_bps_per_trade"] >= (
+            edge_cost_k * metrics["bridge_effective_cost_bps_per_trade"]
+        )
         turnover_proxy = max(0.0, _row_float(row, "turnover_proxy_mean", 0.0))
-        gate_turnover = (np.isnan(base_turnover) or turnover_proxy <= (base_turnover + 1e-9)) and turnover_proxy <= 1.0 and str_pos
-        retail_eval = evaluate_retail_constraints(row, min_tob_coverage=0.0, min_net_expectancy_bps=min_net_expectancy_bps, max_fee_plus_slippage_bps=max_fee_plus_slippage_bps, max_daily_turnover_multiple=max_daily_turnover_multiple)
+        gate_turnover = (
+            (np.isnan(base_turnover) or turnover_proxy <= (base_turnover + 1e-9))
+            and turnover_proxy <= 1.0
+            and str_pos
+        )
+        retail_eval = evaluate_retail_constraints(
+            row,
+            min_tob_coverage=0.0,
+            min_net_expectancy_bps=min_net_expectancy_bps,
+            max_fee_plus_slippage_bps=max_fee_plus_slippage_bps,
+            max_daily_turnover_multiple=max_daily_turnover_multiple,
+        )
         gate_retail = bool(retail_eval.get("gate_retail_viability", False))
-        low_cap_eval = evaluate_low_capital_viability(row, low_capital_contract=low_capital_contract or {}, baseline_after_cost_bps=metrics["bridge_validation_after_cost_bps"], effective_cost_bps=metrics["bridge_effective_cost_bps_per_trade"], turnover_proxy_mean=turnover_proxy)
+        low_cap_eval = evaluate_low_capital_viability(
+            row,
+            low_capital_contract=low_capital_contract or {},
+            baseline_after_cost_bps=metrics["bridge_validation_after_cost_bps"],
+            effective_cost_bps=metrics["bridge_effective_cost_bps_per_trade"],
+            turnover_proxy_mean=turnover_proxy,
+        )
         gate_low_cap = bool(low_cap_eval.get("gate_low_capital_viability", True))
-        
+
         micro_gates = evaluate_microstructure_gate(row, **micro_thresholds)
         gate_micro = micro_gates["gate_bridge_microstructure"]
-        gate_tradable_wo_micro = has_trades and aft_pos and str_pos and edge_ratio_gate and gate_turnover and (gate_retail if require_retail_viability else True) and (gate_low_cap if enforce_low_capital_viability else True)
+        gate_tradable_wo_micro = (
+            has_trades
+            and aft_pos
+            and str_pos
+            and edge_ratio_gate
+            and gate_turnover
+            and (gate_retail if require_retail_viability else True)
+            and (gate_low_cap if enforce_low_capital_viability else True)
+        )
         gate_tradable = gate_tradable_wo_micro and gate_micro
-        
+
         fail_reasons = []
         if not has_trades:
             fail_reasons.append("gate_bridge_has_trades_validation")
@@ -290,7 +373,7 @@ def evaluate_bridge_performance(
             fail_reasons.append("gate_bridge_edge_cost_ratio")
         if not gate_turnover:
             fail_reasons.append("gate_bridge_turnover_controls")
-        
+
         if not gate_micro:
             fail_reasons.append("gate_bridge_microstructure")
             for k, v in micro_gates.items():
@@ -312,27 +395,56 @@ def evaluate_bridge_performance(
             fail_reasons.append("gate_bridge_low_capital_viability")
 
         primary_fail = fail_reasons[0] if fail_reasons else ""
-        metrics_rows.append({
-            "candidate_id": candidate_id, "symbol": str(row.get("symbol", "")).strip().upper(), "candidate_type": candidate_type, "overlay_base_candidate_id": overlay_base_id,
-            "bridge_eval_status": "tradable" if gate_tradable else ("rejected:" + ",".join(fail_reasons)), **metrics,
-            "gate_bridge_has_trades_validation": has_trades, "gate_bridge_after_cost_positive_validation": aft_pos, "gate_bridge_after_cost_stressed_positive_validation": str_pos,
-            "gate_bridge_edge_cost_ratio": edge_ratio_gate, "gate_bridge_turnover_controls": gate_turnover,
-            "gate_bridge_retail_viability": gate_retail,
-            "gate_bridge_retail_net_expectancy": bool(retail_eval.get("gate_net_expectancy", True)),
-            "gate_bridge_retail_cost_budget": bool(retail_eval.get("gate_cost_budget", True)),
-            "gate_bridge_retail_turnover": bool(retail_eval.get("gate_turnover", True)),
-            "gate_bridge_retail_tob_coverage": bool(retail_eval.get("gate_tob_coverage", True)),
-            "gate_bridge_low_capital_viability": gate_low_cap, 
-            "low_capital_viability_score": safe_float(low_cap_eval.get("low_capital_viability_score"), np.nan),
-            "low_capital_reject_reason_codes": ",".join(low_cap_eval.get("low_capital_reject_reason_codes", [])),
-            "low_capital_estimated_position_notional_usd": safe_float(low_cap_eval.get("low_capital_estimated_position_notional_usd"), np.nan),
-            "low_capital_required_min_notional_usd": safe_float(low_cap_eval.get("low_capital_required_min_notional_usd"), np.nan),
-            "low_capital_min_order_ratio": safe_float(low_cap_eval.get("low_capital_min_order_ratio"), np.nan),
-            "low_capital_estimated_position_notional_source": str(low_cap_eval.get("low_capital_estimated_position_notional_source", "")),
-            "gate_bridge_tradable_without_microstructure": gate_tradable_wo_micro, "gate_bridge_tradable": gate_tradable,
-            "bridge_fail_reasons": ",".join(fail_reasons),
-            "selection_score_executed": metrics["bridge_validation_after_cost_bps"], "bridge_fail_gate_primary": primary_fail, "bridge_fail_reason_primary": f"failed_{primary_fail}" if primary_fail else "",
-            **micro_gates
-        })
-        if overlay_delta: overlay_rows.append(overlay_delta)
+        metrics_rows.append(
+            {
+                "candidate_id": candidate_id,
+                "symbol": str(row.get("symbol", "")).strip().upper(),
+                "candidate_type": candidate_type,
+                "overlay_base_candidate_id": overlay_base_id,
+                "bridge_eval_status": "tradable"
+                if gate_tradable
+                else ("rejected:" + ",".join(fail_reasons)),
+                **metrics,
+                "gate_bridge_has_trades_validation": has_trades,
+                "gate_bridge_after_cost_positive_validation": aft_pos,
+                "gate_bridge_after_cost_stressed_positive_validation": str_pos,
+                "gate_bridge_edge_cost_ratio": edge_ratio_gate,
+                "gate_bridge_turnover_controls": gate_turnover,
+                "gate_bridge_retail_viability": gate_retail,
+                "gate_bridge_retail_net_expectancy": bool(
+                    retail_eval.get("gate_net_expectancy", True)
+                ),
+                "gate_bridge_retail_cost_budget": bool(retail_eval.get("gate_cost_budget", True)),
+                "gate_bridge_retail_turnover": bool(retail_eval.get("gate_turnover", True)),
+                "gate_bridge_retail_tob_coverage": bool(retail_eval.get("gate_tob_coverage", True)),
+                "gate_bridge_low_capital_viability": gate_low_cap,
+                "low_capital_viability_score": safe_float(
+                    low_cap_eval.get("low_capital_viability_score"), np.nan
+                ),
+                "low_capital_reject_reason_codes": ",".join(
+                    low_cap_eval.get("low_capital_reject_reason_codes", [])
+                ),
+                "low_capital_estimated_position_notional_usd": safe_float(
+                    low_cap_eval.get("low_capital_estimated_position_notional_usd"), np.nan
+                ),
+                "low_capital_required_min_notional_usd": safe_float(
+                    low_cap_eval.get("low_capital_required_min_notional_usd"), np.nan
+                ),
+                "low_capital_min_order_ratio": safe_float(
+                    low_cap_eval.get("low_capital_min_order_ratio"), np.nan
+                ),
+                "low_capital_estimated_position_notional_source": str(
+                    low_cap_eval.get("low_capital_estimated_position_notional_source", "")
+                ),
+                "gate_bridge_tradable_without_microstructure": gate_tradable_wo_micro,
+                "gate_bridge_tradable": gate_tradable,
+                "bridge_fail_reasons": ",".join(fail_reasons),
+                "selection_score_executed": metrics["bridge_validation_after_cost_bps"],
+                "bridge_fail_gate_primary": primary_fail,
+                "bridge_fail_reason_primary": f"failed_{primary_fail}" if primary_fail else "",
+                **micro_gates,
+            }
+        )
+        if overlay_delta:
+            overlay_rows.append(overlay_delta)
     return metrics_rows, overlay_rows

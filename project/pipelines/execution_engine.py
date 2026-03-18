@@ -37,15 +37,18 @@ _RUNNING_STAGE_PROCS: Dict[Tuple[str, str], subprocess.Popen[str]] = {}
 _RUNNING_STAGE_PROCS_LOCK = threading.Lock()
 _STAGE_OUTPUT_LOCK = threading.Lock()
 
+
 def _register_running_stage_proc(
     run_id: str, stage_instance_id: str, proc: subprocess.Popen[str]
 ) -> None:
     with _RUNNING_STAGE_PROCS_LOCK:
         _RUNNING_STAGE_PROCS[(run_id, stage_instance_id)] = proc
 
+
 def _unregister_running_stage_proc(run_id: str, stage_instance_id: str) -> None:
     with _RUNNING_STAGE_PROCS_LOCK:
         _RUNNING_STAGE_PROCS.pop((run_id, stage_instance_id), None)
+
 
 def _terminate_stage_process(
     run_id: str, stage_instance_id: str, proc: subprocess.Popen[str], grace_sec: float = 5.0
@@ -76,6 +79,7 @@ def _terminate_stage_process(
     except subprocess.TimeoutExpired:
         pass
 
+
 def terminate_stage_instances(run_id: str, stage_instance_ids: Sequence[str]) -> None:
     with _RUNNING_STAGE_PROCS_LOCK:
         proc_items = [
@@ -97,6 +101,7 @@ def _emit_buffered_stage_output(stage_instance_id: str, stage: str, text: str) -
         print(f"{prefix} buffered output ({stage})")
         for line in payload.splitlines():
             print(f"{prefix} {line}")
+
 
 def run_stage(
     stage: str,
@@ -157,7 +162,14 @@ def run_stage(
                         "cache_reason": "input_hash_match",
                     }
                     return True
-            except (OSError, UnicodeDecodeError, JSONDecodeError, AttributeError, TypeError, ValueError):
+            except (
+                OSError,
+                UnicodeDecodeError,
+                JSONDecodeError,
+                AttributeError,
+                TypeError,
+                ValueError,
+            ):
                 pass
         stage_cache_meta[stage_instance_id] = {
             "cache_enabled": True,
@@ -215,9 +227,7 @@ def run_stage(
             # every subprocess spawned by a stage worker.
             popen_kwargs["start_new_session"] = True
         elif os.name == "nt" and hasattr(subprocess, "CREATE_NEW_PROCESS_GROUP"):
-            popen_kwargs["creationflags"] = getattr(
-                subprocess, "CREATE_NEW_PROCESS_GROUP"
-            )
+            popen_kwargs["creationflags"] = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP")
         proc = subprocess.Popen(cmd, **popen_kwargs)  # type: ignore[arg-type]
         _register_running_stage_proc(run_id, stage_instance_id, proc)
         stage_output = ""
@@ -248,8 +258,7 @@ def run_stage(
             if not manifest_path.exists():
                 if require_manifest:
                     error = (
-                        "stage manifest missing on success while "
-                        "BACKTEST_REQUIRE_STAGE_MANIFEST=1"
+                        "stage manifest missing on success while BACKTEST_REQUIRE_STAGE_MANIFEST=1"
                     )
                     _synthesize_stage_manifest_if_missing(
                         manifest_path=manifest_path,
@@ -305,7 +314,10 @@ def run_stage(
                     if isinstance(mdata, dict):
                         manifest_payload = mdata
                 except (OSError, UnicodeDecodeError, JSONDecodeError, TypeError, ValueError) as exc:
-                    print(f"[WARN] Failed to stamp input_hash into {manifest_path}: {exc}", file=sys.stderr)
+                    print(
+                        f"[WARN] Failed to stamp input_hash into {manifest_path}: {exc}",
+                        file=sys.stderr,
+                    )
 
             if manifest_payload is None and manifest_path.exists():
                 try:
@@ -316,11 +328,9 @@ def run_stage(
                     print(f"[WARN] Failed to load manifest {manifest_path}: {exc}", file=sys.stderr)
                     manifest_payload = None
 
-            if (
-                manifest_payload is not None
-                and str(os.environ.get("BACKTEST_EXPERIMENT_STORE", "0")).strip()
-                in {"1", "true", "TRUE"}
-            ):
+            if manifest_payload is not None and str(
+                os.environ.get("BACKTEST_EXPERIMENT_STORE", "0")
+            ).strip() in {"1", "true", "TRUE"}:
                 try:
                     from project.io.experiment_store import upsert_stage_manifest
 
@@ -361,6 +371,7 @@ def run_stage(
     print(f"Stage manifest: {manifest_path}", file=sys.stderr)
     return False
 
+
 def partition_items(
     items: Sequence[object],
     *,
@@ -375,6 +386,7 @@ def partition_items(
         key = str(key_fn(item))
         out.setdefault(key, []).append(item)
     return out
+
 
 def run_partition_map_reduce(
     partitions: Dict[str, Sequence[object]],
@@ -397,16 +409,14 @@ def run_partition_map_reduce(
             results[key] = map_fn(key, list(partitions.get(key, ())))
     else:
         with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as pool:
-            futures = {
-                pool.submit(map_fn, key, list(partitions.get(key, ()))): key
-                for key in keys
-            }
+            futures = {pool.submit(map_fn, key, list(partitions.get(key, ()))): key for key in keys}
             for fut in concurrent.futures.as_completed(futures):
                 key = futures[fut]
                 results[key] = fut.result()
     ordered_results = [results[key] for key in sorted(results.keys())]
     reduced = reduce_fn(ordered_results)
     return reduced, results
+
 
 def run_stages_parallel(
     stages: Sequence[StageLaunch],
@@ -471,6 +481,7 @@ def run_stages_parallel(
                     break
     return all_ok, timings
 
+
 def run_dag(
     plan: Mapping[str, StageDefinition],
     run_id: str,
@@ -482,30 +493,35 @@ def run_dag(
 ) -> Tuple[bool, List[StageTiming]]:
     """
     Execute a pipeline DAG in parallel.
-    
+
     Returns (all_ok, timings)
     """
     timings: List[StageTiming] = []
     completed = set(completed_already or [])
     failed: set[str] = set()
     running: Dict[concurrent.futures.Future, str] = {}
-    
+
     all_ok = True
-    
+
     # Task execution router
-    def _execute_task_or_subprocess(stage_name: str, script: Union[str, Path], args: List[str], rid: str) -> bool:
+    def _execute_task_or_subprocess(
+        stage_name: str, script: Union[str, Path], args: List[str], rid: str
+    ) -> bool:
         path_str = str(script)
         if ":" in path_str or (path_str.startswith("project.") and not path_str.endswith(".py")):
             import importlib
+
             try:
-                mod_name, func_name = path_str.rsplit(":", 1) if ":" in path_str else (path_str, "run_task")
+                mod_name, func_name = (
+                    path_str.rsplit(":", 1) if ":" in path_str else (path_str, "run_task")
+                )
                 mod = importlib.import_module(mod_name)
                 func = getattr(mod, func_name)
                 return func(rid, args) == 0
             except (ImportError, AttributeError, TypeError, ValueError) as e:
                 print(f"[DAG] Task {stage_name} failed: {e}")
                 return False
-        
+
         # Fallback to subprocess using the execution engine directly.
         return run_stage(
             stage=stage_name,
@@ -514,18 +530,25 @@ def run_dag(
             run_id=rid,
             data_root=DATA_ROOT,
             strict_recommendations_checklist=False,
-            feature_schema_version=str(os.environ.get("BACKTEST_FEATURE_SCHEMA_VERSION", "v2") or "v2"),
-            current_pipeline_session_id=str(os.environ.get("BACKTEST_PIPELINE_SESSION_ID", "")).strip() or None,
+            feature_schema_version=str(
+                os.environ.get("BACKTEST_FEATURE_SCHEMA_VERSION", "v2") or "v2"
+            ),
+            current_pipeline_session_id=str(
+                os.environ.get("BACKTEST_PIPELINE_SESSION_ID", "")
+            ).strip()
+            or None,
             current_stage_instance_id=stage_name,
             stage_cache_meta={},
         )
 
     if worker_fn is None:
+
         def default_worker(args_tuple: WorkerArgs) -> WorkerResult:
             inst_id, name, script, args, rid = args_tuple
             start_ts = time.time()
             ok = _execute_task_or_subprocess(name, script, args, rid)
             return inst_id, name, ok, time.time() - start_ts, {}
+
         worker_fn = default_worker
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as pool:
@@ -535,25 +558,27 @@ def run_dag(
             for name, stage in plan.items():
                 if name in completed or name in failed:
                     continue
-                
+
                 # Check if already running (by stage name)
                 if any(stage_name == name for stage_name in running.values()):
                     continue
-                
+
                 # Check dependencies
                 if all(dep in completed for dep in stage.depends_on):
                     ready.append(stage)
-            
+
             # 2. Launch ready stages
             for stage in ready:
                 if len(running) >= max_workers:
                     break
                 print(f"[DAG] Launching {stage.name} (deps={stage.depends_on})")
-                
+
                 # Use a unique key for the future to stage name mapping
-                fut = pool.submit(worker_fn, (stage.name, stage.name, stage.script_path, stage.args, run_id))
+                fut = pool.submit(
+                    worker_fn, (stage.name, stage.name, stage.script_path, stage.args, run_id)
+                )
                 running[fut] = stage.name
-            
+
             if not running:
                 if len(completed) + len(failed) < len(plan):
                     unmet = [n for n in plan if n not in completed and n not in failed]
@@ -565,7 +590,7 @@ def run_dag(
             done, _ = concurrent.futures.wait(
                 running.keys(), return_when=concurrent.futures.FIRST_COMPLETED
             )
-            
+
             for fut in done:
                 stage_instance_id = running.pop(fut)
                 try:
@@ -593,5 +618,5 @@ def run_dag(
                     all_ok = False
                     if not continue_on_failure:
                         return False, timings
-                        
+
     return all_ok, timings

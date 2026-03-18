@@ -12,9 +12,12 @@ from project.runtime.normalized_event import events_to_records, normalize_event_
 from project.io.runtime_adapter import read_raw_event_rows
 from project.io.utils import write_parquet
 
+
 def main() -> int:
     data_root = get_data_root()
-    parser = argparse.ArgumentParser(description="Normalize runtime events into deterministic replay records.")
+    parser = argparse.ArgumentParser(
+        description="Normalize runtime events into deterministic replay records."
+    )
     parser.add_argument("--run_id", required=True)
     parser.add_argument("--max_events", type=int, default=250_000)
     args = parser.parse_args()
@@ -44,7 +47,9 @@ def main() -> int:
     try:
         rows, source_path = read_raw_event_rows(data_root=data_root, run_id=str(args.run_id))
         if source_path:
-            inputs.append({"path": str(source_path), "rows": int(len(rows)), "start_ts": None, "end_ts": None})
+            inputs.append(
+                {"path": str(source_path), "rows": int(len(rows)), "start_ts": None, "end_ts": None}
+            )
 
         normalized, issues = normalize_event_rows(rows, max_events=int(args.max_events))
         normalized_records = events_to_records(normalized)
@@ -75,6 +80,7 @@ def main() -> int:
     except Exception as exc:
         finalize_manifest(manifest, "failed", error=str(exc), stats={})
         return 1
+
 
 if __name__ == "__main__":
     sys.exit(main())

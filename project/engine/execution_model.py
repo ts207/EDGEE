@@ -14,6 +14,7 @@ from project.engine.slippage import calculate_slippage_bps, calculate_fill_price
 
 _LOG = logging.getLogger(__name__)
 
+
 def get_comprehensive_execution_estimate(
     order_size: float,
     base_price: float,
@@ -31,12 +32,12 @@ def get_comprehensive_execution_estimate(
     spread_bps = float(market_data.get("spread_bps", 1.0))
     liquidity_available = float(market_data.get("liquidity_available", 1e6))
     vol_regime_bps = float(market_data.get("vol_regime_bps", 10.0))
-    
+
     fill_prob = calculate_fill_probability(
         order_size=order_size,
         liquidity_available=liquidity_available,
         spread_bps=spread_bps,
-        vol_regime=vol_regime_bps / 10000.0, # scaled for fills.py
+        vol_regime=vol_regime_bps / 10000.0,  # scaled for fills.py
         urgency=urgency_enum,
         profile=profile_enum,
     )
@@ -62,6 +63,7 @@ def get_comprehensive_execution_estimate(
         "expected_slippage_bps": slippage_bps,
         "residual_unfilled_quantity": order_size * (1.0 - fill_prob),
     }
+
 
 def load_calibration_config(
     symbol: str,

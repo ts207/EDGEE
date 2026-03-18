@@ -3,7 +3,10 @@ import pandas as pd
 import numpy as np
 import pytest
 from project.domain.compiled_registry import get_domain_registry
-from project.research.robustness.kill_switch import detect_kill_switches, KILL_SWITCH_CANDIDATE_FEATURES
+from project.research.robustness.kill_switch import (
+    detect_kill_switches,
+    KILL_SWITCH_CANDIDATE_FEATURES,
+)
 from project.domain.hypotheses import HypothesisSpec, TriggerSpec
 
 
@@ -21,7 +24,7 @@ def _make_kill_switch_features(n_bars: int = 800) -> pd.DataFrame:
     for i in range(1, n_bars):
         # Positive drift when rv low, negative when rv high
         sign = 1 if rv[i] < 0.7 else -1
-        close[i] = close[i-1] * (1 + sign * np.abs(np.random.normal(0.001, 0.0005)))
+        close[i] = close[i - 1] * (1 + sign * np.abs(np.random.normal(0.001, 0.0005)))
 
     df = pd.DataFrame({"timestamp": dates, "close": close})
     df["event_vol_shock"] = [i % 8 == 0 for i in range(n_bars)]

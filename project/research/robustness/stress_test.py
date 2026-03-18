@@ -9,6 +9,7 @@ Each scenario is a feature condition (feature_predicate) that identifies
 A hypothesis that survives (positive t-stat) across multiple stress scenarios
 is more robust than one that relies entirely on benign market conditions.
 """
+
 from __future__ import annotations
 
 import logging
@@ -25,6 +26,7 @@ from project.core.column_registry import ColumnRegistry
 log = logging.getLogger(__name__)
 _BPS = 10_000.0
 
+
 # Predefined stress scenarios as feature_predicate conditions.
 # Features listed here must be present in the wide features table.
 # If a feature column is missing, the scenario is skipped (valid=False).
@@ -39,9 +41,7 @@ def _load_stress_scenarios() -> list[dict]:
 STRESS_SCENARIOS: list[dict] = _load_stress_scenarios()
 
 
-def _apply_stress_mask(
-    scenario: dict, features: pd.DataFrame
-) -> pd.Series | None:
+def _apply_stress_mask(scenario: dict, features: pd.DataFrame) -> pd.Series | None:
     """Return boolean mask for scenario, or None if feature column not found."""
     feat_name = scenario["feature"]
     # Try ColumnRegistry first, then direct name
@@ -54,11 +54,16 @@ def _apply_stress_mask(
 
     vals = pd.to_numeric(features[col], errors="coerce")
     op, thr = scenario["operator"], scenario["threshold"]
-    if op == ">":  return vals > thr
-    if op == ">=": return vals >= thr
-    if op == "<":  return vals < thr
-    if op == "<=": return vals <= thr
-    if op == "==": return vals == thr
+    if op == ">":
+        return vals > thr
+    if op == ">=":
+        return vals >= thr
+    if op == "<":
+        return vals < thr
+    if op == "<=":
+        return vals <= thr
+    if op == "==":
+        return vals == thr
     return None
 
 
@@ -91,7 +96,7 @@ def evaluate_stress_scenarios(
     """
     if scenarios is None:
         scenarios = STRESS_SCENARIOS
-    
+
     if stress_masks is None:
         stress_masks = {s["name"]: _apply_stress_mask(s, features) for s in scenarios}
 
@@ -106,7 +111,6 @@ def evaluate_stress_scenarios(
         mask = mask_raw.astype("boolean").shift(spec.entry_lag, fill_value=False).astype(bool)
     else:
         mask = mask_raw
-
 
     if spec.feature_condition is not None:
         fc_spec = HypothesisSpec(
@@ -128,17 +132,19 @@ def evaluate_stress_scenarios(
         stress_mask = stress_masks.get(scenario["name"])
 
         if stress_mask is None:
-            rows.append({
-                "scenario": scenario["name"],
-                "description": scenario.get("description", ""),
-                "n": 0,
-                "mean_return_bps": float("nan"),
-                "t_stat": float("nan"),
-                "hit_rate": float("nan"),
-                "pct_of_base_n": float("nan"),
-                "valid": False,
-                "skip_reason": "feature_column_missing",
-            })
+            rows.append(
+                {
+                    "scenario": scenario["name"],
+                    "description": scenario.get("description", ""),
+                    "n": 0,
+                    "mean_return_bps": float("nan"),
+                    "t_stat": float("nan"),
+                    "hit_rate": float("nan"),
+                    "pct_of_base_n": float("nan"),
+                    "valid": False,
+                    "skip_reason": "feature_column_missing",
+                }
+            )
             continue
 
         combined = mask & stress_mask
@@ -147,17 +153,19 @@ def evaluate_stress_scenarios(
         n = len(event_returns)
 
         if n < min_n:
-            rows.append({
-                "scenario": scenario["name"],
-                "description": scenario.get("description", ""),
-                "n": n,
-                "mean_return_bps": float("nan"),
-                "t_stat": float("nan"),
-                "hit_rate": float("nan"),
-                "pct_of_base_n": round(n / base_n, 4) if base_n > 0 else float("nan"),
-                "valid": False,
-                "skip_reason": f"n={n} < min_n={min_n}",
-            })
+            rows.append(
+                {
+                    "scenario": scenario["name"],
+                    "description": scenario.get("description", ""),
+                    "n": n,
+                    "mean_return_bps": float("nan"),
+                    "t_stat": float("nan"),
+                    "hit_rate": float("nan"),
+                    "pct_of_base_n": round(n / base_n, 4) if base_n > 0 else float("nan"),
+                    "valid": False,
+                    "skip_reason": f"n={n} < min_n={min_n}",
+                }
+            )
             continue
 
         signed = event_returns * direction_sign
@@ -165,16 +173,18 @@ def evaluate_stress_scenarios(
         std_r = float(signed.std(ddof=1))
         t = mean_r / (std_r / np.sqrt(n)) if std_r > 1e-10 else 0.0
 
-        rows.append({
-            "scenario": scenario["name"],
-            "description": scenario.get("description", ""),
-            "n": n,
-            "mean_return_bps": round(mean_r * _BPS, 4),
-            "t_stat": round(t, 4),
-            "hit_rate": round(float((signed > 0).mean()), 4),
-            "pct_of_base_n": round(n / base_n, 4) if base_n > 0 else float("nan"),
-            "valid": True,
-            "skip_reason": None,
-        })
+        rows.append(
+            {
+                "scenario": scenario["name"],
+                "description": scenario.get("description", ""),
+                "n": n,
+                "mean_return_bps": round(mean_r * _BPS, 4),
+                "t_stat": round(t, 4),
+                "hit_rate": round(float((signed > 0).mean()), 4),
+                "pct_of_base_n": round(n / base_n, 4) if base_n > 0 else float("nan"),
+                "valid": True,
+                "skip_reason": None,
+            }
+        )
 
     return pd.DataFrame(rows) if rows else pd.DataFrame()

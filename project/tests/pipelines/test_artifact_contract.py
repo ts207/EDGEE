@@ -16,6 +16,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2] / "project"
 
 from project.io.utils import HAS_PYARROW, write_parquet
 
+
 def _read_table(path: Path) -> pd.DataFrame:
     """Read a parquet/csv table, tolerating parquet engine absence."""
     if path.exists():
@@ -28,10 +29,15 @@ def _read_table(path: Path) -> pd.DataFrame:
             return pd.read_csv(alt)
         raise ImportError("pyarrow/fastparquet required to read parquet")
     # Try alternate suffix.
-    alt = path.with_suffix(".csv") if path.suffix.lower() == ".parquet" else path.with_suffix(".parquet")
+    alt = (
+        path.with_suffix(".csv")
+        if path.suffix.lower() == ".parquet"
+        else path.with_suffix(".parquet")
+    )
     if alt.exists():
         return _read_table(alt)
     return pd.DataFrame()
+
 
 @pytest.fixture
 def mock_data_root(tmp_path):
@@ -41,59 +47,77 @@ def mock_data_root(tmp_path):
     np.random.seed(42)
     data_root = tmp_path / "data"
     data_root.mkdir()
-    
+
     symbols = ["BTCUSDT"]
     start_ts = pd.Timestamp("2024-01-01", tz="UTC")
     n_bars = 500
-    
+
     # 1. Create fake features and bars
     for sym in symbols:
-        feat_dir = data_root / "lake" / "features" / "perp" / sym / "5m" / feature_dataset_dir_name()
+        feat_dir = (
+            data_root / "lake" / "features" / "perp" / sym / "5m" / feature_dataset_dir_name()
+        )
         feat_dir.mkdir(parents=True)
         bar_dir = data_root / "lake" / "cleaned" / "perp" / sym / "bars_5m"
         bar_dir.mkdir(parents=True)
-        
+
         timestamps = pd.date_range(start_ts, periods=n_bars, freq="5min", tz="UTC")
         price = np.linspace(100.0, 150.0, n_bars)
-        
-        df = pd.DataFrame({
-            "timestamp": timestamps,
-            "open": price,
-            "high": price + 0.1,
-            "low": price - 0.1,
-            "close": price,
-            "volume": 100.0,
-            "quote_volume": 1000.0,
-            "is_gap": False,
-        })
-        
+
+        df = pd.DataFrame(
+            {
+                "timestamp": timestamps,
+                "open": price,
+                "high": price + 0.1,
+                "low": price - 0.1,
+                "close": price,
+                "volume": 100.0,
+                "quote_volume": 1000.0,
+                "is_gap": False,
+            }
+        )
+
         write_parquet(df, feat_dir / "slice.parquet")
-        write_parquet(df[["timestamp", "open", "high", "low", "close", "volume", "quote_volume", "is_gap"]], bar_dir / "slice.parquet")
+        write_parquet(
+            df[["timestamp", "open", "high", "low", "close", "volume", "quote_volume", "is_gap"]],
+            bar_dir / "slice.parquet",
+        )
 
         # 2. Market state
         ms_dir = data_root / "lake" / "context" / "market_state" / sym
         ms_dir.mkdir(parents=True)
-        write_parquet(pd.DataFrame({
-            "timestamp": timestamps,
-            "vol_regime_code": [0] * n_bars,
-            "vol_regime": ["high"] * n_bars,
-        }), ms_dir / "5m.parquet")
+        write_parquet(
+            pd.DataFrame(
+                {
+                    "timestamp": timestamps,
+                    "vol_regime_code": [0] * n_bars,
+                    "vol_regime": ["high"] * n_bars,
+                }
+            ),
+            ms_dir / "5m.parquet",
+        )
 
     # 3. Universe
     univ_dir = data_root / "lake" / "metadata" / "universe_snapshots"
     univ_dir.mkdir(parents=True)
-    write_parquet(pd.DataFrame({
-        "symbol": symbols,
-        "listing_start": [pd.Timestamp("2020-01-01", tz="UTC")] * len(symbols),
-        "listing_end": [pd.Timestamp("2025-01-01", tz="UTC")] * len(symbols)
-    }), univ_dir / "univ.parquet")
-    
+    write_parquet(
+        pd.DataFrame(
+            {
+                "symbol": symbols,
+                "listing_start": [pd.Timestamp("2020-01-01", tz="UTC")] * len(symbols),
+                "listing_end": [pd.Timestamp("2025-01-01", tz="UTC")] * len(symbols),
+            }
+        ),
+        univ_dir / "univ.parquet",
+    )
+
     # 4. Mock fees
     (data_root / "lake" / "metadata").mkdir(parents=True, exist_ok=True)
     with open(data_root / "lake" / "metadata" / "fees.yaml", "w") as f:
         f.write("standard:\n  taker_fee_bps: 2.0\n  maker_fee_bps: 1.0\n")
 
     return data_root
+
 
 def run_script(script_path, args, data_root):
     env = os.environ.copy()
@@ -110,6 +134,7 @@ def run_script(script_path, args, data_root):
     if result.stderr:
         print(f"--- STDERR ({script_path.name}) ---\n{result.stderr}", file=sys.stderr)
     return result
+
 
 @pytest.mark.contract
 def test_e2e_artifact_contract_directional_and_multi(mock_data_root, tmp_path):
@@ -183,21 +208,25 @@ def test_e2e_artifact_contract_directional_and_multi(mock_data_root, tmp_path):
     """)
     custom_analyzer_path = tmp_path / "custom_analyzer.py"
     custom_analyzer_path.write_text(custom_analyzer_content)
-    
+
     res = run_script(custom_analyzer_path, [], mock_data_root)
     assert res.returncode in {0, 1}
     if res.returncode != 0:
         assert "no_candidates_found" in res.stderr or "No candidates found" in res.stderr
         return
-    
+
     # 1. Multi-type filtering
-    res = run_script(registry_script, ["--run_id", run_id, "--symbols", symbols, "--event_type", "LIQUIDITY_VACUUM"], mock_data_root)
+    res = run_script(
+        registry_script,
+        ["--run_id", run_id, "--symbols", symbols, "--event_type", "LIQUIDITY_VACUUM"],
+        mock_data_root,
+    )
     assert res.returncode == 0
-    
+
     df_reg = _read_table(mock_data_root / "events" / run_id / "events.parquet")
     assert (df_reg["event_type"] == "LIQUIDITY_VACUUM").all()
     assert "direction" in df_reg.columns
-    
+
     # 2. Directional Sign Flip
     def run_directional_test(sign_val, run_suffix):
         rid = f"run_dir_{run_suffix}"
@@ -210,7 +239,7 @@ def test_e2e_artifact_contract_directional_and_multi(mock_data_root, tmp_path):
                 "direction": float(sign_val),
                 "severity": 10.0,
                 "severity_bucket": "extreme_5pct",
-                "split_label": "train"
+                "split_label": "train",
             },
             {
                 "event_id": "ev_val",
@@ -220,28 +249,51 @@ def test_e2e_artifact_contract_directional_and_multi(mock_data_root, tmp_path):
                 "direction": float(sign_val),
                 "severity": 10.0,
                 "severity_bucket": "extreme_5pct",
-                "split_label": "validation"
-            }
+                "split_label": "validation",
+            },
         ]
         out_dir = mock_data_root / "reports" / "liquidity_vacuum" / rid
         out_dir.mkdir(parents=True, exist_ok=True)
         write_parquet(pd.DataFrame(events), out_dir / "liquidity_vacuum_events.parquet")
-        
-        run_script(registry_script, ["--run_id", rid, "--symbols", symbols, "--event_type", "LIQUIDITY_VACUUM"], mock_data_root)
-        
-        res_p2 = run_script(discovery_script, [
-            "--run_id", rid, 
-            "--event_type", "LIQUIDITY_VACUUM", 
-            "--symbols", symbols, 
-            "--mode", "research",
-            "--min_samples", "1",
-            "--adaptive_lambda_max", "1.0",
-            "--adaptive_shrinkage_lambda", "0",
-            "--gate_profile", "discovery"
-        ], mock_data_root)
+
+        run_script(
+            registry_script,
+            ["--run_id", rid, "--symbols", symbols, "--event_type", "LIQUIDITY_VACUUM"],
+            mock_data_root,
+        )
+
+        res_p2 = run_script(
+            discovery_script,
+            [
+                "--run_id",
+                rid,
+                "--event_type",
+                "LIQUIDITY_VACUUM",
+                "--symbols",
+                symbols,
+                "--mode",
+                "research",
+                "--min_samples",
+                "1",
+                "--adaptive_lambda_max",
+                "1.0",
+                "--adaptive_shrinkage_lambda",
+                "0",
+                "--gate_profile",
+                "discovery",
+            ],
+            mock_data_root,
+        )
         assert res_p2.returncode == 0
-        
-        df = _read_table(mock_data_root / "reports" / "phase2" / rid / "LIQUIDITY_VACUUM" / "phase2_candidates_raw.parquet")
+
+        df = _read_table(
+            mock_data_root
+            / "reports"
+            / "phase2"
+            / rid
+            / "LIQUIDITY_VACUUM"
+            / "phase2_candidates_raw.parquet"
+        )
         if df.empty or "rule_template" not in df.columns:
             return None
         return df[df["rule_template"] == "continuation"]["expectancy"].iloc[0]
@@ -250,10 +302,11 @@ def test_e2e_artifact_contract_directional_and_multi(mock_data_root, tmp_path):
     exp_neg = run_directional_test(-1.0, "neg")
     if exp_pos is None or exp_neg is None:
         return
-    
+
     assert exp_pos > 0
     assert exp_neg < 0
     assert np.sign(exp_pos) != np.sign(exp_neg)
+
 
 @pytest.mark.contract
 def test_e2e_artifact_contract_deterministic(mock_data_root, tmp_path):
@@ -263,7 +316,7 @@ def test_e2e_artifact_contract_deterministic(mock_data_root, tmp_path):
     run_id = "test_contract_e2e"
     symbols = "BTCUSDT"
     entry_lag_bars = 2
-    
+
     registry_script = PROJECT_ROOT / "pipelines" / "research" / "build_event_registry.py"
     discovery_script = PROJECT_ROOT / "pipelines" / "research" / "phase2_candidate_discovery.py"
     bridge_script = PROJECT_ROOT / "pipelines" / "research" / "bridge_evaluate_phase2.py"
@@ -303,7 +356,7 @@ def test_e2e_artifact_contract_deterministic(mock_data_root, tmp_path):
             "direction": 1.0,
             "severity": 10.0,
             "severity_bucket": "extreme_5pct",
-            "split_label": "train"
+            "split_label": "train",
         },
         {
             "event_id": "ev_val",
@@ -314,93 +367,155 @@ def test_e2e_artifact_contract_deterministic(mock_data_root, tmp_path):
             "direction": 1.0,
             "severity": 10.0,
             "severity_bucket": "extreme_5pct",
-            "split_label": "validation"
-        }
+            "split_label": "validation",
+        },
     ]
     out_dir = mock_data_root / "reports" / "liquidity_vacuum" / run_id
     out_dir.mkdir(parents=True, exist_ok=True)
     write_parquet(pd.DataFrame(events), out_dir / "liquidity_vacuum_events.parquet")
 
     # 1. Build Registry
-    res = run_script(registry_script, ["--run_id", run_id, "--symbols", symbols, "--event_type", "LIQUIDITY_VACUUM"], mock_data_root)
+    res = run_script(
+        registry_script,
+        ["--run_id", run_id, "--symbols", symbols, "--event_type", "LIQUIDITY_VACUUM"],
+        mock_data_root,
+    )
     assert res.returncode in {0, 1}
     if res.returncode != 0:
         assert "no_candidates_found" in res.stderr or "No candidates found" in res.stderr
         return
-    
+
     # 2. Run Phase 2
-    res = run_script(discovery_script, [
-        "--run_id", run_id, 
-        "--event_type", "LIQUIDITY_VACUUM", 
-        "--symbols", symbols, 
-        "--mode", "research",
-        "--min_samples", "1",
-        "--entry_lag_bars", str(entry_lag_bars),
-        "--adaptive_lambda_max", "1.0",
-        "--adaptive_shrinkage_lambda", "0",
-        "--gate_profile", "discovery"
-    ], mock_data_root)
+    res = run_script(
+        discovery_script,
+        [
+            "--run_id",
+            run_id,
+            "--event_type",
+            "LIQUIDITY_VACUUM",
+            "--symbols",
+            symbols,
+            "--mode",
+            "research",
+            "--min_samples",
+            "1",
+            "--entry_lag_bars",
+            str(entry_lag_bars),
+            "--adaptive_lambda_max",
+            "1.0",
+            "--adaptive_shrinkage_lambda",
+            "0",
+            "--gate_profile",
+            "discovery",
+        ],
+        mock_data_root,
+    )
     assert res.returncode == 0
 
     # 3. Bridge Evaluation
-    res = run_script(bridge_script, [
-        "--run_id", run_id,
-        "--event_type", "LIQUIDITY_VACUUM",
-        "--symbols", symbols,
-        "--start", "2024-01-01",
-        "--end", "2024-01-02",
-        "--mode", "research",
-        "--min_validation_trades", "1",
-        "--micro_min_feature_coverage", "0.0",
-        "--objective_name", "objective_relaxed_contract",
-        "--objective_spec", str(objective_spec_path),
-        "--retail_profile", "relaxed_contract",
-        "--retail_profiles_spec", str(retail_profiles_spec_path),
-    ], mock_data_root)
+    res = run_script(
+        bridge_script,
+        [
+            "--run_id",
+            run_id,
+            "--event_type",
+            "LIQUIDITY_VACUUM",
+            "--symbols",
+            symbols,
+            "--start",
+            "2024-01-01",
+            "--end",
+            "2024-01-02",
+            "--mode",
+            "research",
+            "--min_validation_trades",
+            "1",
+            "--micro_min_feature_coverage",
+            "0.0",
+            "--objective_name",
+            "objective_relaxed_contract",
+            "--objective_spec",
+            str(objective_spec_path),
+            "--retail_profile",
+            "relaxed_contract",
+            "--retail_profiles_spec",
+            str(retail_profiles_spec_path),
+        ],
+        mock_data_root,
+    )
     assert res.returncode in {0, 1}
     if res.returncode != 0:
         assert "no_candidates_found" in res.stderr or "No candidates found" in res.stderr
         return
 
     # 4. Promote Candidates
-    res = run_script(promote_script, [
-        "--run_id", run_id,
-        "--min_events", "1",
-        "--min_stability_score", "0.0",
-        "--min_sign_consistency", "0.0",
-        "--min_cost_survival_ratio", "0.0",
-        "--min_tob_coverage", "0.0",
-        "--allow_discovery_promotion", "1",
-        "--max_q_value", "1.0",
-        "--objective_name", "objective_relaxed_contract",
-        "--objective_spec", str(objective_spec_path),
-        "--retail_profile", "relaxed_contract",
-        "--retail_profiles_spec", str(retail_profiles_spec_path),
-    ], mock_data_root)
+    res = run_script(
+        promote_script,
+        [
+            "--run_id",
+            run_id,
+            "--min_events",
+            "1",
+            "--min_stability_score",
+            "0.0",
+            "--min_sign_consistency",
+            "0.0",
+            "--min_cost_survival_ratio",
+            "0.0",
+            "--min_tob_coverage",
+            "0.0",
+            "--allow_discovery_promotion",
+            "1",
+            "--max_q_value",
+            "1.0",
+            "--objective_name",
+            "objective_relaxed_contract",
+            "--objective_spec",
+            str(objective_spec_path),
+            "--retail_profile",
+            "relaxed_contract",
+            "--retail_profiles_spec",
+            str(retail_profiles_spec_path),
+        ],
+        mock_data_root,
+    )
     assert res.returncode == 0
-    
-    promoted_path = mock_data_root / "reports" / "promotions" / run_id / "promoted_candidates.parquet"
+
+    promoted_path = (
+        mock_data_root / "reports" / "promotions" / run_id / "promoted_candidates.parquet"
+    )
     if not promoted_path.exists():
         promoted_path = promoted_path.with_suffix(".csv")
     assert promoted_path.exists()
     df_promoted = _read_table(promoted_path)
     assert not df_promoted.empty
-    
+
     # ASSERT: Authoritative OOS Split usage
     for _, row in df_promoted.iterrows():
         assert int(row["validation_samples"]) > 0
         assert pd.notna(row["selection_score"])
 
     # 5. Compile Strategy Blueprints
-    res = run_script(compile_script, [
-        "--run_id", run_id,
-        "--symbols", symbols,
-        "--ignore_checklist", "1",
-        "--allow_naive_entry_fail", "1",
-        "--allow_fallback_blueprints", "1",
-        "--strict_cost_fields", "0",
-        "--quality_floor_fallback", "0.0"
-    ], mock_data_root)
+    res = run_script(
+        compile_script,
+        [
+            "--run_id",
+            run_id,
+            "--symbols",
+            symbols,
+            "--ignore_checklist",
+            "1",
+            "--allow_naive_entry_fail",
+            "1",
+            "--allow_fallback_blueprints",
+            "1",
+            "--strict_cost_fields",
+            "0",
+            "--quality_floor_fallback",
+            "0.0",
+        ],
+        mock_data_root,
+    )
     assert res.returncode == 0
 
     blueprint_path = mock_data_root / "runs" / run_id / "blueprints.jsonl"

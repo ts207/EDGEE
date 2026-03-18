@@ -11,6 +11,7 @@ from project.core.stats import (
 )
 from project.core.coercion import safe_float, safe_int
 
+
 def distribution_stats(returns: pd.Series) -> Dict[str, float]:
     clean = returns.dropna().astype(float)
     n = int(len(clean))
@@ -40,7 +41,10 @@ def distribution_stats(returns: pd.Series) -> Dict[str, float]:
         "t_stat": t_stat,
     }
 
-def circular_block_bootstrap_pvalue(values: pd.Series, *, block_size: int, n_boot: int, seed: int) -> float:
+
+def circular_block_bootstrap_pvalue(
+    values: pd.Series, *, block_size: int, n_boot: int, seed: int
+) -> float:
     clean = pd.to_numeric(values, errors="coerce").dropna().astype(float).to_numpy()
     n = int(len(clean))
     if n < 2 or n_boot <= 0:
@@ -65,6 +69,7 @@ def circular_block_bootstrap_pvalue(values: pd.Series, *, block_size: int, n_boo
         if abs(draw_mean) >= abs(observed):
             exceed += 1
     return float((exceed + 1) / (int(n_boot) + 1))
+
 
 def oos_diagnostics(
     event_frame: pd.DataFrame,
@@ -123,6 +128,7 @@ def oos_diagnostics(
         "oos_pass": oos_pass,
     }
 
+
 def apply_robust_survivor_gates(
     trap_df: pd.DataFrame,
     *,
@@ -151,7 +157,7 @@ def apply_robust_survivor_gates(
         if col not in out.columns:
             out[col] = default
         out[col] = pd.to_numeric(out[col], errors="coerce").fillna(default)
-    
+
     if "oos_sign_consistent" not in out.columns:
         out["oos_sign_consistent"] = False
     out["oos_sign_consistent"] = out["oos_sign_consistent"].astype(bool)
@@ -162,7 +168,9 @@ def apply_robust_survivor_gates(
         out["oos_pass"] = False
     out["oos_pass"] = out["oos_pass"].astype(bool)
 
-    out["composite_p_value"] = np.maximum(out["hac_p"], out["bootstrap_p"]).clip(lower=0.0, upper=1.0)
+    out["composite_p_value"] = np.maximum(out["hac_p"], out["bootstrap_p"]).clip(
+        lower=0.0, upper=1.0
+    )
     out["fdr_q_value"] = bh_adjust(out["composite_p_value"]).astype(float)
 
     out["gate_legacy_survivor"] = (
@@ -186,6 +194,7 @@ def apply_robust_survivor_gates(
         & ((not int(require_oos_sign_consistency)) | out["oos_sign_consistent"])
     )
     return out
+
 
 def tail_report(returns: pd.Series) -> Dict[str, float]:
     clean = returns.dropna().astype(float)
@@ -213,7 +222,10 @@ def tail_report(returns: pd.Series) -> Dict[str, float]:
         "top_5pct_contribution": float(top5 / denom) if np.isfinite(denom) else 0.0,
     }
 
-def capacity_diagnostics(events_df: pd.DataFrame, symbols: List[str], min_events_per_day: float) -> Dict[str, object]:
+
+def capacity_diagnostics(
+    events_df: pd.DataFrame, symbols: List[str], min_events_per_day: float
+) -> Dict[str, object]:
     if events_df.empty:
         return {"pass": False, "estimated_events_per_day": 0.0, "symbol_details": []}
     frame = events_df.copy()

@@ -12,16 +12,20 @@ from project.pipelines.alpha_bundle import fit_orth_and_ridge as fit_script
 def _mock_training_frames(n_rows: int) -> tuple[pd.DataFrame, pd.DataFrame]:
     ts = pd.date_range("2024-01-01", periods=n_rows, freq="5min", tz="UTC")
     signal = np.linspace(-1.0, 1.0, n_rows)
-    signals = pd.DataFrame({
-        "ts_event": ts,
-        "symbol": ["BTCUSDT"] * n_rows,
-        "signal_a": signal,
-    })
-    labels = pd.DataFrame({
-        "ts_event": ts,
-        "symbol": ["BTCUSDT"] * n_rows,
-        "y": 0.25 * signal + 0.01,
-    })
+    signals = pd.DataFrame(
+        {
+            "ts_event": ts,
+            "symbol": ["BTCUSDT"] * n_rows,
+            "signal_a": signal,
+        }
+    )
+    labels = pd.DataFrame(
+        {
+            "ts_event": ts,
+            "symbol": ["BTCUSDT"] * n_rows,
+            "y": 0.25 * signal + 0.01,
+        }
+    )
     return signals, labels
 
 
@@ -38,19 +42,27 @@ def test_fit_orth_and_ridge_lambda_grid_path_succeeds(monkeypatch, tmp_path):
         "read_parquet",
         lambda paths: payloads[paths[0].name].copy(),
     )
-    monkeypatch.setattr(fit_script, "start_manifest", lambda *args, **kwargs: {"stage": "alpha_fit_orth_ridge"})
+    monkeypatch.setattr(
+        fit_script, "start_manifest", lambda *args, **kwargs: {"stage": "alpha_fit_orth_ridge"}
+    )
     monkeypatch.setattr(fit_script, "finalize_manifest", lambda *args, **kwargs: None)
     monkeypatch.setattr(
         sys,
         "argv",
         [
             "fit_orth_and_ridge.py",
-            "--run_id", "ridge_cv",
-            "--signals_path", "signals.parquet",
-            "--label_path", "labels.parquet",
-            "--signal_cols", "signal_a",
-            "--lambda_grid", "0.01,0.1",
-            "--cv_blocks", "4",
+            "--run_id",
+            "ridge_cv",
+            "--signals_path",
+            "signals.parquet",
+            "--label_path",
+            "labels.parquet",
+            "--signal_cols",
+            "signal_a",
+            "--lambda_grid",
+            "0.01,0.1",
+            "--cv_blocks",
+            "4",
         ],
     )
 
@@ -77,20 +89,29 @@ def test_fit_orth_and_ridge_lambda_grid_falls_back_when_no_valid_splits(monkeypa
         "read_parquet",
         lambda paths: payloads[paths[0].name].copy(),
     )
-    monkeypatch.setattr(fit_script, "start_manifest", lambda *args, **kwargs: {"stage": "alpha_fit_orth_ridge"})
+    monkeypatch.setattr(
+        fit_script, "start_manifest", lambda *args, **kwargs: {"stage": "alpha_fit_orth_ridge"}
+    )
     monkeypatch.setattr(fit_script, "finalize_manifest", lambda *args, **kwargs: None)
     monkeypatch.setattr(
         sys,
         "argv",
         [
             "fit_orth_and_ridge.py",
-            "--run_id", "ridge_cv_small",
-            "--signals_path", "signals.parquet",
-            "--label_path", "labels.parquet",
-            "--signal_cols", "signal_a",
-            "--lambda_", "0.25",
-            "--lambda_grid", "0.01,0.1",
-            "--cv_blocks", "4",
+            "--run_id",
+            "ridge_cv_small",
+            "--signals_path",
+            "signals.parquet",
+            "--label_path",
+            "labels.parquet",
+            "--signal_cols",
+            "signal_a",
+            "--lambda_",
+            "0.25",
+            "--lambda_grid",
+            "0.01,0.1",
+            "--cv_blocks",
+            "4",
         ],
     )
 

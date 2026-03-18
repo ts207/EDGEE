@@ -1,4 +1,5 @@
 """Direct-call test for exits.py. Guards against NameError from missing imports."""
+
 import pandas as pd
 import pytest
 
@@ -14,6 +15,7 @@ def test_exits_module_imports_cleanly():
 
 def test_check_exit_conditions_time_stop():
     from project.strategy.runtime.exits import check_exit_conditions
+
     bar = _make_bar()
     exited, reason = check_exit_conditions(
         bar=bar,
@@ -28,6 +30,7 @@ def test_check_exit_conditions_time_stop():
 
 def test_check_exit_conditions_no_exit():
     from project.strategy.runtime.exits import check_exit_conditions
+
     bar = _make_bar(close=100.5)
     exited, reason = check_exit_conditions(
         bar=bar,
@@ -42,6 +45,7 @@ def test_check_exit_conditions_no_exit():
 
 def test_check_exit_conditions_stop_hit():
     from project.strategy.runtime.exits import check_exit_conditions
+
     bar = _make_bar(close=96.0)  # 4% down from 100 → exceeds 3% stop
     exited, reason = check_exit_conditions(
         bar=bar,

@@ -42,11 +42,15 @@ def build_shadow_playbook_payload(
     confirmatory_report_path: Path | None = None,
     adjacent_survivorship_report_path: Path | None = None,
 ) -> Dict[str, Any]:
-    edge_path = data_root / "reports" / "edge_candidates" / run_id / "edge_candidates_normalized.parquet"
+    edge_path = (
+        data_root / "reports" / "edge_candidates" / run_id / "edge_candidates_normalized.parquet"
+    )
     naive_path = data_root / "reports" / "phase2" / run_id / "naive_evaluation.parquet"
     edge = _read_parquet(edge_path)
     naive = _read_parquet(naive_path)
-    confirmatory = _read_json(confirmatory_report_path) if confirmatory_report_path is not None else {}
+    confirmatory = (
+        _read_json(confirmatory_report_path) if confirmatory_report_path is not None else {}
+    )
     adjacent_survivorship = (
         _read_json(adjacent_survivorship_report_path)
         if adjacent_survivorship_report_path is not None
@@ -62,15 +66,26 @@ def build_shadow_playbook_payload(
         }
 
     merged = edge.merge(
-        naive[["candidate_id", "naive_expectancy", "event_count"]] if not naive.empty else pd.DataFrame(columns=["candidate_id", "naive_expectancy", "event_count"]),
+        naive[["candidate_id", "naive_expectancy", "event_count"]]
+        if not naive.empty
+        else pd.DataFrame(columns=["candidate_id", "naive_expectancy", "event_count"]),
         on="candidate_id",
         how="left",
     )
     merged["strict_pass"] = _bool_col(merged, "gate_multiplicity_strict")
-    merged["bridge_pass"] = merged.get("gate_bridge_tradable", pd.Series("fail", index=merged.index)).astype(str).str.lower().eq("pass")
-    merged["naive_positive"] = pd.to_numeric(merged.get("naive_expectancy", 0.0), errors="coerce").fillna(0.0) > 0.0
+    merged["bridge_pass"] = (
+        merged.get("gate_bridge_tradable", pd.Series("fail", index=merged.index))
+        .astype(str)
+        .str.lower()
+        .eq("pass")
+    )
+    merged["naive_positive"] = (
+        pd.to_numeric(merged.get("naive_expectancy", 0.0), errors="coerce").fillna(0.0) > 0.0
+    )
     merged["q_value_sort"] = pd.to_numeric(merged.get("q_value", 1.0), errors="coerce").fillna(1.0)
-    merged["expectancy_sort"] = pd.to_numeric(merged.get("after_cost_expectancy_per_trade", 0.0), errors="coerce").fillna(0.0)
+    merged["expectancy_sort"] = pd.to_numeric(
+        merged.get("after_cost_expectancy_per_trade", 0.0), errors="coerce"
+    ).fillna(0.0)
 
     confirmatory_index: Dict[tuple[str, str, str, str], Dict[str, Any]] = {}
     for row in confirmatory.get("matched_candidates", []) if isinstance(confirmatory, dict) else []:
@@ -85,7 +100,11 @@ def build_shadow_playbook_payload(
         confirmatory_index[key] = row
 
     adjacent_index: Dict[tuple[str, str, str, str], Dict[str, Any]] = {}
-    for row in adjacent_survivorship.get("candidate_rows", []) if isinstance(adjacent_survivorship, dict) else []:
+    for row in (
+        adjacent_survivorship.get("candidate_rows", [])
+        if isinstance(adjacent_survivorship, dict)
+        else []
+    ):
         if not isinstance(row, dict):
             continue
         key = (
@@ -135,14 +154,20 @@ def build_shadow_playbook_payload(
                     "candidate_id": rep.get("candidate_id"),
                     "rule_template": rep.get("rule_template"),
                     "q_value": float(rep.get("q_value_sort", 1.0)),
-                    "after_cost_expectancy_per_trade": float(rep.get("after_cost_expectancy_per_trade", 0.0) or 0.0),
-                    "stressed_after_cost_expectancy_per_trade": float(rep.get("stressed_after_cost_expectancy_per_trade", 0.0) or 0.0),
+                    "after_cost_expectancy_per_trade": float(
+                        rep.get("after_cost_expectancy_per_trade", 0.0) or 0.0
+                    ),
+                    "stressed_after_cost_expectancy_per_trade": float(
+                        rep.get("stressed_after_cost_expectancy_per_trade", 0.0) or 0.0
+                    ),
                     "naive_expectancy": float(rep.get("naive_expectancy", 0.0) or 0.0),
                     "event_count": int(rep.get("event_count", 0) or 0),
                     "strict_pass": bool(rep.get("strict_pass", False)),
                     "bridge_pass": bool(rep.get("bridge_pass", False)),
                 },
-                "alternate_templates": [str(x) for x in ranked["rule_template"].astype(str).tolist()[1:]],
+                "alternate_templates": [
+                    str(x) for x in ranked["rule_template"].astype(str).tolist()[1:]
+                ],
                 "confirmatory_match": {
                     "matched": bool(confirm_row),
                     "target_candidate_id": confirm_row.get("candidate_id_target"),
@@ -152,10 +177,16 @@ def build_shadow_playbook_payload(
                 },
                 "adjacent_survivorship": {
                     "matched": bool(adjacent_row),
-                    "survived_adjacent_window": bool(adjacent_row.get("survived_adjacent_window", False)),
+                    "survived_adjacent_window": bool(
+                        adjacent_row.get("survived_adjacent_window", False)
+                    ),
                     "target_candidate_id": adjacent_row.get("target_candidate_id"),
-                    "failure_reasons": list(adjacent_row.get("failure_reasons", [])) if adjacent_row else [],
-                    "target_after_cost_expectancy_per_trade": adjacent_row.get("target_after_cost_expectancy_per_trade"),
+                    "failure_reasons": list(adjacent_row.get("failure_reasons", []))
+                    if adjacent_row
+                    else [],
+                    "target_after_cost_expectancy_per_trade": adjacent_row.get(
+                        "target_after_cost_expectancy_per_trade"
+                    ),
                 },
                 "status": status,
                 "deploy_blockers": deploy_blockers,
@@ -180,9 +211,13 @@ def build_shadow_playbook_payload(
         "source_paths": {
             "edge_candidates": str(edge_path),
             "naive_evaluation": str(naive_path),
-            "confirmatory_report": str(confirmatory_report_path) if confirmatory_report_path is not None else None,
+            "confirmatory_report": str(confirmatory_report_path)
+            if confirmatory_report_path is not None
+            else None,
             "adjacent_survivorship_report": (
-                str(adjacent_survivorship_report_path) if adjacent_survivorship_report_path is not None else None
+                str(adjacent_survivorship_report_path)
+                if adjacent_survivorship_report_path is not None
+                else None
             ),
         },
     }
@@ -201,7 +236,9 @@ def render_shadow_playbook_summary(payload: Dict[str, Any]) -> str:
         )
         lines.append(f"- status: `{primary['status']}`")
         lines.append(f"- q_value: `{rep['q_value']:.6f}`")
-        lines.append(f"- after_cost_expectancy_per_trade: `{rep['after_cost_expectancy_per_trade']:.6f}`")
+        lines.append(
+            f"- after_cost_expectancy_per_trade: `{rep['after_cost_expectancy_per_trade']:.6f}`"
+        )
         lines.append(f"- naive_expectancy: `{rep['naive_expectancy']:.6f}`")
         if primary.get("deploy_blockers"):
             lines.append(f"- blockers: `{', '.join(primary['deploy_blockers'])}`")
@@ -231,7 +268,9 @@ def write_shadow_playbook_report(
         confirmatory_report_path=confirmatory_report_path,
         adjacent_survivorship_report_path=adjacent_survivorship_report_path,
     )
-    report_dir = out_dir if out_dir is not None else data_root / "reports" / "shadow_playbook" / run_id
+    report_dir = (
+        out_dir if out_dir is not None else data_root / "reports" / "shadow_playbook" / run_id
+    )
     report_dir.mkdir(parents=True, exist_ok=True)
     json_path = report_dir / "shadow_playbook.json"
     md_path = report_dir / "shadow_playbook_summary.md"

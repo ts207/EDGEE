@@ -3,7 +3,10 @@ from __future__ import annotations
 import json
 import inspect
 
-from project.events.detectors.exhaustion import FlowExhaustionDetector, PostDeleveragingReboundDetector
+from project.events.detectors.exhaustion import (
+    FlowExhaustionDetector,
+    PostDeleveragingReboundDetector,
+)
 from project.events.detectors.funding import (
     FundingExtremeOnsetDetector,
     FundingNormalizationDetector,
@@ -27,7 +30,10 @@ def test_run_audit_returns_structured_report() -> None:
     assert isinstance(report["issues"], list)
     assert report["summary"]["active_event_count"] == len(report["detectors"])
     assert report["summary"]["registered_event_count"] == len(report["detectors"])
-    assert report["summary"]["registered_detector_entry_count"] >= report["summary"]["registered_event_count"]
+    assert (
+        report["summary"]["registered_detector_entry_count"]
+        >= report["summary"]["registered_event_count"]
+    )
     assert "maturity_counts" in report["summary"]
 
 
@@ -79,8 +85,14 @@ def test_main_writes_json_and_markdown_outputs(tmp_path) -> None:
 
 
 def test_registered_alias_without_spec_is_not_reported_as_gap() -> None:
-    assert audit._is_registered_alias_without_spec("VOL_REGIME_SHIFT", {"VOL_REGIME_SHIFT_EVENT"}) is True
-    assert audit._is_registered_alias_without_spec("LIQUIDITY_STRESS_DIRECT", {"LIQUIDITY_SHOCK"}) is False
+    assert (
+        audit._is_registered_alias_without_spec("VOL_REGIME_SHIFT", {"VOL_REGIME_SHIFT_EVENT"})
+        is True
+    )
+    assert (
+        audit._is_registered_alias_without_spec("LIQUIDITY_STRESS_DIRECT", {"LIQUIDITY_SHOCK"})
+        is False
+    )
 
 
 def test_parameterized_detector_families_are_not_flagged_as_hardcoded() -> None:

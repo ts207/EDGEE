@@ -51,6 +51,7 @@ def _evaluate_row(*args, **kwargs):
         }
     return result
 
+
 def _eval_row(**overrides):
     row = {
         "event_type": "VOL_SHOCK",
@@ -96,6 +97,7 @@ def _eval_row(**overrides):
         allow_missing_negative_controls=False,
     )
 
+
 def test_promote_candidate_happy_path():
     out = _eval_row()
     assert out["promotion_decision"] == "promoted"
@@ -105,6 +107,7 @@ def test_promote_candidate_happy_path():
     assert out["gate_promo_cost_survival"] == "pass"
     assert out["gate_promo_negative_control"] == "pass"
     assert out["gate_promo_hypothesis_audit"] == "pass"
+
 
 def test_load_bridge_metrics_prefers_versioned_enriched_snapshot(tmp_path):
     bridge_root = tmp_path / "bridge_eval"
@@ -146,6 +149,7 @@ def test_load_bridge_metrics_reads_bridge_evaluation_parquet(tmp_path):
     assert bool(out.iloc[0]["gate_bridge_tradable"]) is True
     assert float(out.iloc[0]["bridge_validation_after_cost_bps"]) == 9.5
 
+
 def test_merge_bridge_metrics_overrides_phase2_bridge_fields():
     phase2_df = pd.DataFrame(
         [
@@ -169,6 +173,7 @@ def test_merge_bridge_metrics_overrides_phase2_bridge_fields():
     merged = _merge_bridge_metrics(phase2_df=phase2_df, bridge_df=bridge_df)
     assert bool(merged.iloc[0]["gate_bridge_tradable"]) is True
     assert float(merged.iloc[0]["bridge_validation_after_cost_bps"]) == 7.0
+
 
 def test_stabilize_promoted_output_schema_keeps_contract_columns_when_empty():
     audit_df = pd.DataFrame(
@@ -201,6 +206,7 @@ def test_stabilize_promoted_output_schema_keeps_contract_columns_when_empty():
     ]:
         assert col in out.columns
 
+
 def test_load_dynamic_min_events_by_event_uses_source_event_and_max_threshold(tmp_path):
     spec_dir = tmp_path / "spec" / "states"
     spec_dir.mkdir(parents=True, exist_ok=True)
@@ -230,6 +236,7 @@ def test_load_dynamic_min_events_by_event_uses_source_event_and_max_threshold(tm
     assert out["VOL_SHOCK"] == 300
     assert out["LIQUIDITY_VACUUM"] == 200
 
+
 def test_load_dynamic_min_events_by_event_logs_warning_on_invalid_yaml(tmp_path, caplog):
     spec_dir = tmp_path / "spec" / "states"
     spec_dir.mkdir(parents=True, exist_ok=True)
@@ -241,6 +248,7 @@ def test_load_dynamic_min_events_by_event_logs_warning_on_invalid_yaml(tmp_path,
         out = _load_dynamic_min_events_by_event(tmp_path)
     assert out == {}
     assert any("Failed loading state_registry" in rec.message for rec in caplog.records)
+
 
 def test_promote_candidate_rejects_cost_and_controls():
     out = _eval_row(
@@ -289,7 +297,9 @@ def test_promote_candidate_research_profile_softens_baseline_placebo_and_timefra
             "event_is_trade_trigger": True,
         },
         "hypothesis_index": {"p1": {"statuses": ["executed"], "executed": True}},
-        "negative_control_summary": {"by_event": {"BASIS_DISLOCATION": {"pass_rate_after_bh": 0.0}}},
+        "negative_control_summary": {
+            "by_event": {"BASIS_DISLOCATION": {"pass_rate_after_bh": 0.0}}
+        },
         "max_q_value": 0.10,
         "min_events": 50,
         "min_stability_score": 0.05,
@@ -323,6 +333,7 @@ def test_promote_candidate_research_profile_softens_baseline_placebo_and_timefra
     assert deploy_out["gate_promo_placebo_controls"] == "fail"
     assert deploy_out["gate_promo_timeframe_consensus"] == "fail"
 
+
 def test_promote_candidate_rejects_missing_hypothesis_audit():
     out = _evaluate_row(
         row={
@@ -354,6 +365,7 @@ def test_promote_candidate_rejects_missing_hypothesis_audit():
     )
     assert out["promotion_decision"] == "rejected"
     assert "hypothesis_missing_audit" in out["reject_reason"]
+
 
 def test_promote_candidate_rejects_retail_viability_when_required():
     out = _evaluate_row(
@@ -401,6 +413,7 @@ def test_promote_candidate_rejects_retail_viability_when_required():
     assert "retail_cost_budget" in out["reject_reason"]
     assert "retail_turnover" in out["reject_reason"]
 
+
 def test_promote_candidate_rejects_low_capital_viability_when_required():
     out = _evaluate_row(
         row={
@@ -443,6 +456,7 @@ def test_promote_candidate_rejects_low_capital_viability_when_required():
     assert "low_capital_viability" in out["reject_reason"]
     assert "low_cap_cost_survival_2x" in out["reject_reason"]
 
+
 def test_negative_control_diagnostics_reports_event_coverage():
     audit_df = pd.DataFrame(
         [
@@ -480,6 +494,7 @@ def test_negative_control_diagnostics_reports_event_coverage():
     assert diagnostics["audit"]["control_rate_missing_count"] == 1
     assert diagnostics["by_event"]["VOL_SHOCK"]["candidate_count"] == 2
     assert diagnostics["by_event"]["VOL_SHOCK"]["promoted_count"] == 1
+
 
 def test_build_promotion_statistical_audit_populates_primary_fail_gate_and_trace():
     audit_df = pd.DataFrame(
@@ -651,6 +666,7 @@ def test_build_promotion_statistical_audit_avoids_warning_spam_for_missing_optio
     assert "safe_float: failed to convert None" not in caplog.text
     assert "safe_int: failed to convert None" not in caplog.text
 
+
 def test_build_promotion_capital_footprint_report():
     promoted_df = pd.DataFrame(
         [
@@ -689,6 +705,7 @@ def test_build_promotion_capital_footprint_report():
     assert c2["usage_signal_source"] == "turnover_ratio"
     assert abs(float(c2["slot_pressure_fraction"]) - 2.0) < 1e-9
     assert summary["slot_pressure_over_limit_count"] == 1
+
 
 def test_apply_portfolio_overlap_gate_drops_high_overlap_candidates():
     promoted_df = pd.DataFrame(
@@ -737,6 +754,7 @@ def test_apply_portfolio_overlap_gate_drops_high_overlap_candidates():
     assert dropped["overlap_with_candidate_id"] == "cand_a"
     assert float(dropped["overlap_score"]) >= 0.80
 
+
 def test_portfolio_diversification_violations_detect_overlap_and_correlation():
     promoted_df = pd.DataFrame(
         [
@@ -748,7 +766,7 @@ def test_portfolio_diversification_violations_detect_overlap_and_correlation():
                 "action": "long",
                 "direction_rule": "long_only",
                 "horizon": 5,
-                "delay_expectancy_map": "{\"0\": 0.10, \"4\": 0.20, \"8\": 0.30}",
+                "delay_expectancy_map": '{"0": 0.10, "4": 0.20, "8": 0.30}',
             },
             {
                 "candidate_id": "cand_b",
@@ -758,7 +776,7 @@ def test_portfolio_diversification_violations_detect_overlap_and_correlation():
                 "action": "long",
                 "direction_rule": "long_only",
                 "horizon": 5,
-                "delay_expectancy_map": "{\"0\": 0.11, \"4\": 0.21, \"8\": 0.31}",
+                "delay_expectancy_map": '{"0": 0.11, "4": 0.21, "8": 0.31}',
             },
             {
                 "candidate_id": "cand_c",
@@ -768,7 +786,7 @@ def test_portfolio_diversification_violations_detect_overlap_and_correlation():
                 "action": "short",
                 "direction_rule": "short_only",
                 "horizon": 15,
-                "delay_expectancy_map": "{\"0\": -0.05, \"4\": 0.01, \"8\": -0.02}",
+                "delay_expectancy_map": '{"0": -0.05, "4": 0.01, "8": -0.02}',
             },
         ]
     )
@@ -782,6 +800,7 @@ def test_portfolio_diversification_violations_detect_overlap_and_correlation():
     assert diagnostics["pair_count_total"] == 3
     assert diagnostics["correlation_violation_count"] >= 1
     assert diagnostics["overlap_violation_count"] >= 1
+
 
 def test_assign_and_validate_promotion_tiers_maps_expected_tiers():
     audit_df = pd.DataFrame(
@@ -852,6 +871,7 @@ def test_assign_and_validate_promotion_tiers_maps_expected_tiers():
         "shadow",
     ]
     assert tier_counts == {"deployable": 1, "shadow": 1, "research": 1}
+
 
 def test_assign_and_validate_promotion_tiers_rejects_research_rows_in_promoted_output():
     audit_df = pd.DataFrame(

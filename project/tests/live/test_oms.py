@@ -3,6 +3,7 @@ E6-T2: Live OMS state machine.
 
 Verify order status transitions and fill accounting.
 """
+
 from __future__ import annotations
 
 import pandas as pd
@@ -23,7 +24,9 @@ from project.engine.exchange_constraints import SymbolConstraints
 
 
 class _DummyStrategy:
-    def generate_positions(self, bars: pd.DataFrame, features: pd.DataFrame, params: dict) -> pd.Series:
+    def generate_positions(
+        self, bars: pd.DataFrame, features: pd.DataFrame, params: dict
+    ) -> pd.Series:
         out = pd.Series([0.0, 1.0, 1.0], index=pd.DatetimeIndex(bars["timestamp"]), dtype=float)
         out.attrs["strategy_metadata"] = {"family": "test"}
         return out
@@ -64,29 +67,29 @@ def test_order_lifecycle_fill():
         side=OrderSide.BUY,
         order_type=OrderType.LIMIT,
         quantity=1.0,
-        price=60000.0
+        price=60000.0,
     )
     mgr.add_order(order)
-    
+
     # 1. Update to NEW
     mgr.on_order_update("order1", OrderStatus.NEW, exchange_order_id="ex1")
     assert mgr.active_orders["order1"].status == OrderStatus.NEW
     assert mgr.active_orders["order1"].exchange_order_id == "ex1"
-    
+
     # 2. Partial fill
     mgr.on_fill("order1", fill_qty=0.4, fill_price=60005.0)
     assert mgr.active_orders["order1"].status == OrderStatus.PARTIALLY_FILLED
     assert mgr.active_orders["order1"].filled_quantity == 0.4
     assert mgr.active_orders["order1"].remaining_quantity == 0.6
-    
+
     # 3. Final fill
     mgr.on_fill("order1", fill_qty=0.6, fill_price=59995.0)
-    
+
     # Order should now be in history, not active
     assert "order1" not in mgr.active_orders
     assert len(mgr.order_history) == 1
     assert mgr.order_history[0].status == OrderStatus.FILLED
-    assert mgr.order_history[0].avg_fill_price == 59999.0 # (0.4*60005 + 0.6*59995) / 1.0
+    assert mgr.order_history[0].avg_fill_price == 59999.0  # (0.4*60005 + 0.6*59995) / 1.0
 
 
 def test_order_fill_records_execution_attribution_when_metadata_present():
@@ -131,9 +134,9 @@ def test_order_cancellation():
     mgr = OrderManager()
     order = LiveOrder("order2", "ETHUSDT", OrderSide.SELL, OrderType.LIMIT, 10.0, 3000.0)
     mgr.add_order(order)
-    
+
     mgr.on_order_update("order2", OrderStatus.CANCELLED)
-    
+
     assert "order2" not in mgr.active_orders
     assert mgr.order_history[0].status == OrderStatus.CANCELLED
 
@@ -157,11 +160,15 @@ def test_submit_order_accepts_safe_microstructure():
     assert kill_switch.status.is_active is False
 
 
-def test_build_live_order_from_strategy_result_attaches_execution_metadata(monkeypatch, tmp_path) -> None:
+def test_build_live_order_from_strategy_result_attaches_execution_metadata(
+    monkeypatch, tmp_path
+) -> None:
     monkeypatch.setattr("project.engine.strategy_executor.get_strategy", lambda _: _DummyStrategy())
     monkeypatch.setattr(
         "project.engine.strategy_executor.load_symbol_constraints",
-        lambda symbol, meta_dir: SymbolConstraints(tick_size=None, step_size=None, min_notional=None),
+        lambda symbol, meta_dir: SymbolConstraints(
+            tick_size=None, step_size=None, min_notional=None
+        ),
     )
 
     result = calculate_strategy_returns(
@@ -174,7 +181,11 @@ def test_build_live_order_from_strategy_result_attaches_execution_metadata(monke
             "execution_lag_bars": 0,
             "expected_return_bps": 25.0,
             "expected_adverse_bps": 5.0,
-            "execution_model": {"cost_model": "static", "base_fee_bps": 2.0, "base_slippage_bps": 1.0},
+            "execution_model": {
+                "cost_model": "static",
+                "base_fee_bps": 2.0,
+                "base_slippage_bps": 1.0,
+            },
         },
         0.0,
         tmp_path,
@@ -236,7 +247,9 @@ def test_submit_order_blocks_on_microstructure_breakdown():
     kill_switch = KillSwitchManager(LiveStateStore())
     order = LiveOrder("order4", "BTCUSDT", OrderSide.BUY, OrderType.MARKET, 1.0)
 
-    with pytest.raises(OrderSubmissionBlocked, match="spread_blowout,depth_collapse,cost_model_invalid"):
+    with pytest.raises(
+        OrderSubmissionBlocked, match="spread_blowout,depth_collapse,cost_model_invalid"
+    ):
         mgr.submit_order(
             order,
             kill_switch_manager=kill_switch,

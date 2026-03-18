@@ -59,14 +59,10 @@ def survivor_quality_summary(df: pd.DataFrame) -> dict[str, Any]:
             pd.to_numeric(survivors.get("q_value", 1.0), errors="coerce").fillna(1.0).median()
         ),
         "median_q_value_by": float(
-            pd.to_numeric(survivors.get("q_value_by", 1.0), errors="coerce")
-            .fillna(1.0)
-            .median()
+            pd.to_numeric(survivors.get("q_value_by", 1.0), errors="coerce").fillna(1.0).median()
         ),
         "median_estimate_bps": float(
-            pd.to_numeric(survivors.get("estimate_bps", 0.0), errors="coerce")
-            .fillna(0.0)
-            .median()
+            pd.to_numeric(survivors.get("estimate_bps", 0.0), errors="coerce").fillna(0.0).median()
         ),
         "median_cost_bps": float(
             pd.to_numeric(survivors.get("resolved_cost_bps", 0.0), errors="coerce")
@@ -80,16 +76,27 @@ def survivor_quality_summary(df: pd.DataFrame) -> dict[str, Any]:
 
 
 def build_false_discovery_diagnostics(combined: pd.DataFrame) -> dict[str, Any]:
-    gate_rejections = pd.to_numeric(
-        combined.get("rejected_by_sample_quality", pd.Series(False, index=combined.index)),
-        errors="coerce",
-    ).fillna(0).astype(bool)
-    survivors_before_gate = pd.to_numeric(
-        combined.get("is_discovery_pre_sample_quality", pd.Series(False, index=combined.index)),
-        errors="coerce",
-    ).fillna(0).astype(bool)
+    gate_rejections = (
+        pd.to_numeric(
+            combined.get("rejected_by_sample_quality", pd.Series(False, index=combined.index)),
+            errors="coerce",
+        )
+        .fillna(0)
+        .astype(bool)
+    )
+    survivors_before_gate = (
+        pd.to_numeric(
+            combined.get("is_discovery_pre_sample_quality", pd.Series(False, index=combined.index)),
+            errors="coerce",
+        )
+        .fillna(0)
+        .astype(bool)
+    )
     fail_reason_counts = (
-        combined.loc[gate_rejections, "sample_quality_fail_reason"].astype(str).value_counts().to_dict()
+        combined.loc[gate_rejections, "sample_quality_fail_reason"]
+        .astype(str)
+        .value_counts()
+        .to_dict()
         if "sample_quality_fail_reason" in combined.columns and bool(gate_rejections.any())
         else {}
     )
@@ -119,7 +126,9 @@ def build_false_discovery_diagnostics(combined: pd.DataFrame) -> dict[str, Any]:
             "sample_quality_gate": {
                 "survivors_before_gate": int(
                     pd.to_numeric(
-                        sym_df.get("is_discovery_pre_sample_quality", pd.Series(False, index=sym_df.index)),
+                        sym_df.get(
+                            "is_discovery_pre_sample_quality", pd.Series(False, index=sym_df.index)
+                        ),
                         errors="coerce",
                     )
                     .fillna(0)
@@ -134,7 +143,9 @@ def build_false_discovery_diagnostics(combined: pd.DataFrame) -> dict[str, Any]:
                 ),
                 "rejected_by_sample_quality_gate": int(
                     pd.to_numeric(
-                        sym_df.get("rejected_by_sample_quality", pd.Series(False, index=sym_df.index)),
+                        sym_df.get(
+                            "rejected_by_sample_quality", pd.Series(False, index=sym_df.index)
+                        ),
                         errors="coerce",
                     )
                     .fillna(0)
@@ -144,7 +155,9 @@ def build_false_discovery_diagnostics(combined: pd.DataFrame) -> dict[str, Any]:
                 "fail_reason_counts": (
                     sym_df.loc[
                         pd.to_numeric(
-                            sym_df.get("rejected_by_sample_quality", pd.Series(False, index=sym_df.index)),
+                            sym_df.get(
+                                "rejected_by_sample_quality", pd.Series(False, index=sym_df.index)
+                            ),
                             errors="coerce",
                         )
                         .fillna(0)
@@ -164,7 +177,9 @@ def build_false_discovery_diagnostics(combined: pd.DataFrame) -> dict[str, Any]:
     return {
         "global": {
             "candidates_total": int(len(combined)),
-            "symbols_total": int(combined["symbol"].nunique()) if "symbol" in combined.columns else 0,
+            "symbols_total": int(combined["symbol"].nunique())
+            if "symbol" in combined.columns
+            else 0,
             "survivors_total": int(
                 pd.to_numeric(combined.get("is_discovery", False), errors="coerce")
                 .fillna(0)
@@ -185,7 +200,9 @@ def build_false_discovery_diagnostics(combined: pd.DataFrame) -> dict[str, Any]:
                 .sum()
             ),
             "rejected_by_sample_quality_gate": int(gate_rejections.sum()),
-            "fail_reason_counts": {str(key): int(value) for key, value in fail_reason_counts.items()},
+            "fail_reason_counts": {
+                str(key): int(value) for key, value in fail_reason_counts.items()
+            },
         },
         "survivor_quality": survivor_quality_summary(combined),
         "by_symbol": by_symbol,
@@ -205,7 +222,9 @@ def apply_sample_quality_gates(
     validation = pd.to_numeric(out.get("validation_n_obs", 0), errors="coerce").fillna(0)
     test = pd.to_numeric(out.get("test_n_obs", 0), errors="coerce").fillna(0)
     total = pd.to_numeric(out.get("n_obs", 0), errors="coerce").fillna(0)
-    multiplicity_survivor = pd.to_numeric(out.get("is_discovery", False), errors="coerce").fillna(0).astype(bool)
+    multiplicity_survivor = (
+        pd.to_numeric(out.get("is_discovery", False), errors="coerce").fillna(0).astype(bool)
+    )
 
     gate_validation = validation >= int(min_validation_n_obs)
     gate_test = test >= int(min_test_n_obs)

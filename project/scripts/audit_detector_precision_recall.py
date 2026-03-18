@@ -8,6 +8,7 @@ Usage:
   python -m project.scripts.audit_detector_precision_recall --event_type VOL_SPIKE
   python -m project.scripts.audit_detector_precision_recall --out_dir /tmp/my_audit
 """
+
 from __future__ import annotations
 
 import argparse
@@ -81,15 +82,25 @@ def _print_table(all_metrics: list, *, skipped_event_types: list[str] | None = N
     print("\n" + "=" * len(header))
     total = len(all_metrics)
     stable = len(by_class.get("stable", []))
-    broken = len(by_class.get("broken", [])) + len(by_class.get("noisy", [])) + len(by_class.get("silent", []))
-    print(f"TOTAL: {total}  STABLE: {stable}  NEED WORK: {broken}  ERROR: {len(by_class.get('error', []))}  UNCOVERED: {len(by_class.get('uncovered', []))}")
+    broken = (
+        len(by_class.get("broken", []))
+        + len(by_class.get("noisy", []))
+        + len(by_class.get("silent", []))
+    )
+    print(
+        f"TOTAL: {total}  STABLE: {stable}  NEED WORK: {broken}  ERROR: {len(by_class.get('error', []))}  UNCOVERED: {len(by_class.get('uncovered', []))}"
+    )
     if skipped_event_types:
         print(f"SKIPPED LIVE-ONLY SYNTHETIC EVENTS: {', '.join(sorted(skipped_event_types))}")
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Audit detector precision/recall across synthetic datasets.")
-    parser.add_argument("--run_id", default=None, help="Run a single run_id (e.g. synthetic_2021_bull)")
+    parser = argparse.ArgumentParser(
+        description="Audit detector precision/recall across synthetic datasets."
+    )
+    parser.add_argument(
+        "--run_id", default=None, help="Run a single run_id (e.g. synthetic_2021_bull)"
+    )
     parser.add_argument("--event_type", default=None, help="Audit only this event type")
     parser.add_argument(
         "--include_live_only_synthetic",
@@ -156,7 +167,9 @@ def main(argv: list[str] | None = None) -> int:
     print(f"\nReport saved to: {report_path}")
 
     # Non-zero exit if any detector is broken/noisy/silent
-    needs_work = [m for m in all_metrics if m["classification"] in ("broken", "noisy", "silent", "error")]
+    needs_work = [
+        m for m in all_metrics if m["classification"] in ("broken", "noisy", "silent", "error")
+    ]
     return 1 if needs_work else 0
 
 

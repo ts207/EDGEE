@@ -46,4 +46,3 @@ def test_prepare_events_dataframe_attaches_diagnostics(monkeypatch, tmp_path):
     assert diag["returned_empty_due_to_holdout"] is False
     assert diag["split_counts"]["validation"] > 0
     assert diag["split_counts"]["test"] > 0
-

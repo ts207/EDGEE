@@ -8,6 +8,7 @@ Sequence:
   4. Write hypothesis_metrics.parquet and hypothesis_search_summary.json.
   5. Optionally write bridge_candidates.parquet (--run_bridge_adapter flag).
 """
+
 from __future__ import annotations
 
 import argparse
@@ -21,7 +22,10 @@ import pandas as pd
 from project.core.config import get_data_root
 from project.research.search.generator import generate_hypotheses_with_audit
 from project.research.search.distributed_runner import run_distributed_search
-from project.research.search.bridge_adapter import hypotheses_to_bridge_candidates, split_bridge_candidates
+from project.research.search.bridge_adapter import (
+    hypotheses_to_bridge_candidates,
+    split_bridge_candidates,
+)
 from project.research.search.evaluator import evaluated_records_from_metrics
 from project.research.phase2 import load_features
 from project.io.utils import write_parquet
@@ -47,20 +51,33 @@ def _normalize_audit_frame(rows: list[dict]) -> pd.DataFrame:
         )
         if isinstance(sample, (dict, list, tuple)):
             frame[column] = frame[column].map(
-                lambda value: json.dumps(value, sort_keys=True)
-                if isinstance(value, (dict, list, tuple))
-                else value
+                lambda value: (
+                    json.dumps(value, sort_keys=True)
+                    if isinstance(value, (dict, list, tuple))
+                    else value
+                )
             )
     return frame
 
 
 def _write_hypothesis_audit_artifacts(out_dir: Path, audit: dict) -> None:
-    write_parquet(_normalize_audit_frame(audit.get("generated_rows", [])), out_dir / "generated_hypotheses.parquet")
-    write_parquet(_normalize_audit_frame(audit.get("rejected_rows", [])), out_dir / "rejected_hypotheses.parquet")
-    write_parquet(_normalize_audit_frame(audit.get("feasible_rows", [])), out_dir / "feasible_hypotheses.parquet")
+    write_parquet(
+        _normalize_audit_frame(audit.get("generated_rows", [])),
+        out_dir / "generated_hypotheses.parquet",
+    )
+    write_parquet(
+        _normalize_audit_frame(audit.get("rejected_rows", [])),
+        out_dir / "rejected_hypotheses.parquet",
+    )
+    write_parquet(
+        _normalize_audit_frame(audit.get("feasible_rows", [])),
+        out_dir / "feasible_hypotheses.parquet",
+    )
 
 
-def _write_evaluation_artifacts(out_dir: Path, metrics: pd.DataFrame, gate_failures: pd.DataFrame) -> None:
+def _write_evaluation_artifacts(
+    out_dir: Path, metrics: pd.DataFrame, gate_failures: pd.DataFrame
+) -> None:
     write_parquet(evaluated_records_from_metrics(metrics), out_dir / "evaluated_hypotheses.parquet")
     write_parquet(gate_failures, out_dir / "gate_failures.parquet")
 
@@ -128,8 +145,10 @@ def main() -> int:
     args = parser.parse_args()
 
     data_root = Path(args.data_root) if args.data_root else get_data_root()
-    out_dir = Path(args.out_dir) if args.out_dir else (
-        data_root / "reports" / "hypothesis_search" / args.run_id
+    out_dir = (
+        Path(args.out_dir)
+        if args.out_dir
+        else (data_root / "reports" / "hypothesis_search" / args.run_id)
     )
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -183,15 +202,21 @@ def main() -> int:
     )
     _write_evaluation_artifacts(out_dir, metrics, gate_failures)
 
-    passing = int(
-        (metrics["t_stat"].abs() >= args.min_t_stat).sum()
-    ) if (not metrics.empty and "t_stat" in metrics.columns) else 0
+    passing = (
+        int((metrics["t_stat"].abs() >= args.min_t_stat).sum())
+        if (not metrics.empty and "t_stat" in metrics.columns)
+        else 0
+    )
     summary = {
         "run_id": args.run_id,
         "symbols": symbols,
         "timeframe": args.timeframe,
-        "total_hypotheses": int(generation_audit.get("counts", {}).get("generated", len(hypotheses))),
-        "feasible_hypotheses": int(generation_audit.get("counts", {}).get("feasible", len(hypotheses))),
+        "total_hypotheses": int(
+            generation_audit.get("counts", {}).get("generated", len(hypotheses))
+        ),
+        "feasible_hypotheses": int(
+            generation_audit.get("counts", {}).get("feasible", len(hypotheses))
+        ),
         "rejected_hypotheses": int(generation_audit.get("counts", {}).get("rejected", 0)),
         "rejection_reason_counts": dict(generation_audit.get("rejection_reason_counts", {})),
         "evaluated": int(len(metrics)) if not metrics.empty else 0,

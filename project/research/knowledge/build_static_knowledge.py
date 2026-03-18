@@ -108,7 +108,9 @@ def build_static_knowledge(
     domain_registry: Any | None = None,
 ) -> Dict[str, Any]:
     resolved_data_root = Path(data_root) if data_root is not None else get_data_root()
-    resolved_registry_root = Path(registry_root) if registry_root is not None else (Path("project/configs/registries"))
+    resolved_registry_root = (
+        Path(registry_root) if registry_root is not None else (Path("project/configs/registries"))
+    )
     if not resolved_registry_root.is_absolute():
         resolved_registry_root = (Path.cwd() / resolved_registry_root).resolve()
     domain = domain_registry or get_domain_registry()
@@ -198,7 +200,9 @@ def build_static_knowledge(
                 source_path=source_path,
             )
 
-    for state_id, row in sorted((states_payload.get("states", {}) if isinstance(states_payload, dict) else {}).items()):
+    for state_id, row in sorted(
+        (states_payload.get("states", {}) if isinstance(states_payload, dict) else {}).items()
+    ):
         if not isinstance(row, dict):
             continue
         family = str(row.get("family", "")).strip().upper()
@@ -221,7 +225,9 @@ def build_static_knowledge(
                 entity_type="state",
                 name=str(state_id),
                 title=f"State {state_id}",
-                content=str(row.get("description", f"State {state_id} in family {family or 'UNKNOWN'}.")),
+                content=str(
+                    row.get("description", f"State {state_id} in family {family or 'UNKNOWN'}.")
+                ),
                 source_path=source_path,
                 metadata=row,
             )
@@ -238,11 +244,19 @@ def build_static_knowledge(
                 source_path=source_path,
             )
 
-    for template_id, row in sorted((templates_payload.get("templates", {}) if isinstance(templates_payload, dict) else {}).items()):
+    for template_id, row in sorted(
+        (
+            templates_payload.get("templates", {}) if isinstance(templates_payload, dict) else {}
+        ).items()
+    ):
         if not isinstance(row, dict):
             continue
         source_path = str(_registry_path(resolved_registry_root, "templates"))
-        trigger_types = tuple(str(v).strip().upper() for v in row.get("supports_trigger_types", []) or [] if str(v).strip())
+        trigger_types = tuple(
+            str(v).strip().upper()
+            for v in row.get("supports_trigger_types", []) or []
+            if str(v).strip()
+        )
         entities.append(
             {
                 "entity_id": entity_id("template", template_id),
@@ -281,7 +295,11 @@ def build_static_knowledge(
     for detector_name in sorted(
         {
             *(str(v).strip() for v in detector_ownership.values()),
-            *(str(row.get("detector", "")).strip() for row in event_rows.values() if isinstance(row, dict)),
+            *(
+                str(row.get("detector", "")).strip()
+                for row in event_rows.values()
+                if isinstance(row, dict)
+            ),
         }
     ):
         if not detector_name:
@@ -317,9 +335,7 @@ def build_static_knowledge(
         )
 
     context_dimensions = (
-        contexts_payload.get("context_dimensions", {})
-        if isinstance(contexts_payload, dict)
-        else {}
+        contexts_payload.get("context_dimensions", {}) if isinstance(contexts_payload, dict) else {}
     )
     for family_name, row in sorted(context_dimensions.items()):
         if not isinstance(row, dict):
@@ -365,7 +381,9 @@ def build_static_knowledge(
                     source_path=source_path,
                 )
 
-    for feature_name, row in sorted((features_payload.get("features", {}) if isinstance(features_payload, dict) else {}).items()):
+    for feature_name, row in sorted(
+        (features_payload.get("features", {}) if isinstance(features_payload, dict) else {}).items()
+    ):
         if not isinstance(row, dict):
             continue
         source_path = str(_registry_path(resolved_registry_root, "features"))
@@ -407,12 +425,26 @@ def build_static_knowledge(
                 relation_type="compatible_with_template",
                 to_type="template",
                 to_name=template_id,
-                source_path=str(spec.spec_path or _registry_path(resolved_registry_root, "templates")),
+                source_path=str(
+                    spec.spec_path or _registry_path(resolved_registry_root, "templates")
+                ),
             )
 
-    entities_df = _to_df(entities, STATIC_ENTITY_COLUMNS).drop_duplicates(subset=["entity_id"]).reset_index(drop=True)
-    relations_df = _to_df(relations, STATIC_RELATION_COLUMNS).drop_duplicates(subset=["relation_id"]).reset_index(drop=True)
-    documents_df = _to_df(documents, STATIC_DOCUMENT_COLUMNS).drop_duplicates(subset=["document_id"]).reset_index(drop=True)
+    entities_df = (
+        _to_df(entities, STATIC_ENTITY_COLUMNS)
+        .drop_duplicates(subset=["entity_id"])
+        .reset_index(drop=True)
+    )
+    relations_df = (
+        _to_df(relations, STATIC_RELATION_COLUMNS)
+        .drop_duplicates(subset=["relation_id"])
+        .reset_index(drop=True)
+    )
+    documents_df = (
+        _to_df(documents, STATIC_DOCUMENT_COLUMNS)
+        .drop_duplicates(subset=["document_id"])
+        .reset_index(drop=True)
+    )
 
     entities_path = out_root / "entities.parquet"
     relations_path = out_root / "relations.parquet"
@@ -431,7 +463,9 @@ def build_static_knowledge(
         "document_count": int(len(documents_df)),
         "knob_count": int(len(build_agent_knob_rows())),
         "entity_types": sorted(entities_df["entity_type"].dropna().astype(str).unique().tolist()),
-        "relation_types": sorted(relations_df["relation_type"].dropna().astype(str).unique().tolist()),
+        "relation_types": sorted(
+            relations_df["relation_type"].dropna().astype(str).unique().tolist()
+        ),
         "sources": {
             "registry_root": str(resolved_registry_root),
             "events": str(_registry_path(resolved_registry_root, "events")),
@@ -442,7 +476,9 @@ def build_static_knowledge(
             "features": str(_registry_path(resolved_registry_root, "features")),
         },
     }
-    index_path.write_text(json.dumps(index_payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    index_path.write_text(
+        json.dumps(index_payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
     return {
         "out_root": out_root,
         "entities_path": entities_path,

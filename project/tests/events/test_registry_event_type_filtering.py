@@ -4,6 +4,7 @@ import pandas as pd
 
 from project.events.registry import EVENT_REGISTRY_SPECS, normalize_phase1_events
 
+
 def _base_events() -> pd.DataFrame:
     # normalize_phase1_events requires an explicit PIT-safe signal timestamp column.
     # For these tests, we treat the event timestamp itself as the detected/signal time.
@@ -38,6 +39,7 @@ def _base_events() -> pd.DataFrame:
         }
     )
 
+
 def test_normalize_phase1_events_subtype_filters_to_exact_event_type():
     events = _base_events()
     spec = EVENT_REGISTRY_SPECS["FUNDING_EXTREME_ONSET"]
@@ -46,11 +48,13 @@ def test_normalize_phase1_events_subtype_filters_to_exact_event_type():
     assert normalized["event_type"].iloc[0] == "FUNDING_EXTREME_ONSET"
     assert normalized["event_id"].iloc[0] == "e0"
 
+
 def test_normalize_phase1_events_without_event_type_column_keeps_rows():
     events = _base_events().drop(columns=["event_type"])
     spec = EVENT_REGISTRY_SPECS["FUNDING_EXTREME_ONSET"]
     normalized = normalize_phase1_events(events=events, spec=spec, run_id="r1")
     assert len(normalized) == len(events)
+
 
 def test_registry_uses_canonical_funding_specs():
     assert "FUNDING_PERSISTENCE_TRIGGER" in EVENT_REGISTRY_SPECS

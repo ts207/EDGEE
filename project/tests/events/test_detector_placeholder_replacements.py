@@ -46,7 +46,12 @@ def test_replacement_detectors_emit_events() -> None:
     climax_df.loc[470, "low"] = climax_df.loc[470, "close"] - 2.5
     cases["CLIMAX_VOLUME_BAR"] = (
         climax_df,
-        {"volume_quantile": 0.95, "return_quantile": 0.75, "range_quantile": 0.90, "wick_ratio_min": 0.20},
+        {
+            "volume_quantile": 0.95,
+            "return_quantile": 0.75,
+            "range_quantile": 0.90,
+            "wick_ratio_min": 0.20,
+        },
     )
 
     failed_df = _base_frame()
@@ -67,15 +72,29 @@ def test_replacement_detectors_emit_events() -> None:
     rebound_df.loc[450:454, "liquidation_notional"] = np.array([160.0, 220.0, 260.0, 210.0, 150.0])
     rebound_df.loc[450:454, "rv_96"] = np.array([3.2, 4.0, 4.8, 4.2, 3.6])
     rebound_df.loc[455:461, "close"] = np.array([104.8, 105.7, 106.9, 108.0, 108.8, 109.4, 110.0])
-    rebound_df.loc[455:461, "high"] = rebound_df.loc[455:461, "close"] + np.array([0.9, 1.0, 1.1, 1.0, 0.9, 0.8, 0.8])
-    rebound_df.loc[455:461, "low"] = rebound_df.loc[455:461, "close"] - np.array([0.1, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2])
+    rebound_df.loc[455:461, "high"] = rebound_df.loc[455:461, "close"] + np.array(
+        [0.9, 1.0, 1.1, 1.0, 0.9, 0.8, 0.8]
+    )
+    rebound_df.loc[455:461, "low"] = rebound_df.loc[455:461, "close"] - np.array(
+        [0.1, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2]
+    )
     rebound_df.loc[455:461, "oi_delta_1h"] = np.array([-6.0, -3.0, -1.0, 0.0, 1.0, 1.0, 1.0])
-    rebound_df.loc[455:461, "liquidation_notional"] = np.array([40.0, 12.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+    rebound_df.loc[455:461, "liquidation_notional"] = np.array(
+        [40.0, 12.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    )
     rebound_df.loc[455:461, "rv_96"] = np.array([2.9, 2.2, 1.7, 1.5, 1.35, 1.3, 1.25])
-    rebound_df.loc[450:461, "spread_bps"] = np.array([12.0, 14.0, 16.0, 13.0, 10.0, 8.0, 6.0, 4.5, 3.8, 3.3, 3.0, 3.0])
+    rebound_df.loc[450:461, "spread_bps"] = np.array(
+        [12.0, 14.0, 16.0, 13.0, 10.0, 8.0, 6.0, 4.5, 3.8, 3.3, 3.0, 3.0]
+    )
     cases["POST_DELEVERAGING_REBOUND"] = (
         rebound_df,
-        {"cluster_window": 6, "rebound_window_bars": 6, "rebound_window": 3, "cooldown_bars": 6, "post_cluster_lookback": 24},
+        {
+            "cluster_window": 6,
+            "rebound_window_bars": 6,
+            "rebound_window": 3,
+            "cooldown_bars": 6,
+            "post_cluster_lookback": 24,
+        },
     )
 
     spread_df = _base_frame()

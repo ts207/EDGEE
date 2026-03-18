@@ -129,7 +129,12 @@ def test_build_context_mode_comparison_payload_uses_prepared_search_frame(monkey
         assert hypotheses == ["dummy_hypothesis"]
         assert "event_vol_shock" in features.columns
         assert min_sample_size == 30
-        return {"schema_version": "context_mode_comparison_v1", "hard_label": {}, "confidence_aware": {}, "delta": {}}
+        return {
+            "schema_version": "context_mode_comparison_v1",
+            "hard_label": {},
+            "confidence_aware": {},
+            "delta": {},
+        }
 
     monkeypatch.setattr(svc, "load_search_feature_frame", fake_load_search_feature_frame)
     monkeypatch.setattr(svc, "generate_hypotheses_with_audit", fake_generate)

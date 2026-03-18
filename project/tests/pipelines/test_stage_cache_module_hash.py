@@ -4,6 +4,7 @@ E2-T1: Stage cache hash must include directly-imported project.* module hashes.
 If a shared utility module changes, the cache hash must change — even if the
 stage script itself is unchanged.
 """
+
 from __future__ import annotations
 
 from pathlib import Path

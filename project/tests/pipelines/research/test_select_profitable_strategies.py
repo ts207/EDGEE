@@ -8,6 +8,7 @@ import pandas as pd
 
 from project.pipelines.research import select_profitable_strategies as stage
 
+
 def test_select_profitable_strategies_filters_candidates(monkeypatch, tmp_path):
     data_root = tmp_path / "data"
     run_id = "select_profitable_test"
@@ -76,11 +77,7 @@ def test_select_profitable_strategies_filters_candidates(monkeypatch, tmp_path):
     assert rc == 0
 
     out_path = (
-        data_root
-        / "reports"
-        / "strategy_selection"
-        / run_id
-        / "profitable_strategies.parquet"
+        data_root / "reports" / "strategy_selection" / run_id / "profitable_strategies.parquet"
     )
     assert out_path.exists()
     selected = pd.read_parquet(out_path)
@@ -169,12 +166,16 @@ def test_select_profitable_strategies_prefers_strategy_candidates_artifact(monke
     rc = stage.main()
     assert rc == 0
 
-    out_path = data_root / "reports" / "strategy_selection" / run_id / "profitable_strategies.parquet"
+    out_path = (
+        data_root / "reports" / "strategy_selection" / run_id / "profitable_strategies.parquet"
+    )
     selected = pd.read_parquet(out_path)
     assert selected["candidate_id"].tolist() == ["good_strategy"]
 
 
-def test_select_profitable_strategies_enforces_oos_consistency_for_strategy_candidates(monkeypatch, tmp_path):
+def test_select_profitable_strategies_enforces_oos_consistency_for_strategy_candidates(
+    monkeypatch, tmp_path
+):
     data_root = tmp_path / "data"
     run_id = "select_strategy_candidates_oos_gate"
     strategy_dir = data_root / "reports" / "strategy_builder" / run_id
@@ -253,6 +254,8 @@ def test_select_profitable_strategies_enforces_oos_consistency_for_strategy_cand
     rc = stage.main()
     assert rc == 0
 
-    out_path = data_root / "reports" / "strategy_selection" / run_id / "profitable_strategies.parquet"
+    out_path = (
+        data_root / "reports" / "strategy_selection" / run_id / "profitable_strategies.parquet"
+    )
     selected = pd.read_parquet(out_path)
     assert selected["candidate_id"].tolist() == ["good_strategy"]

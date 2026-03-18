@@ -9,6 +9,7 @@ from project.specs.objective import (
     resolve_objective_profile_contract,
 )
 
+
 def test_objective_profile_contract_uses_run_manifest_paths(tmp_path):
     repo_root = tmp_path / "repo"
     project_root = repo_root / "project"
@@ -71,6 +72,7 @@ def test_objective_profile_contract_uses_run_manifest_paths(tmp_path):
     assert contract.capital_budget_usd == 30000.0
     assert contract.effective_per_position_notional_cap_usd == 8000.0
 
+
 def test_objective_profile_contract_explicit_retail_profile_override(tmp_path):
     repo_root = tmp_path / "repo"
     project_root = repo_root / "project"
@@ -111,6 +113,7 @@ def test_objective_profile_contract_explicit_retail_profile_override(tmp_path):
     assert contract.min_tob_coverage == 0.7
     assert contract.max_concurrent_positions == 5
 
+
 def test_low_capital_contract_enforced_when_objective_requires_it(tmp_path):
     repo_root = tmp_path / "repo"
     project_root = repo_root / "project"
@@ -130,9 +133,7 @@ def test_low_capital_contract_enforced_when_objective_requires_it(tmp_path):
         encoding="utf-8",
     )
     (configs_root / "retail_profiles.yaml").write_text(
-        "profiles:\n"
-        "  constrained:\n"
-        "    account_equity_usd: 10000\n",
+        "profiles:\n  constrained:\n    account_equity_usd: 10000\n",
         encoding="utf-8",
     )
     (run_dir / "run_manifest.json").write_text(

@@ -102,12 +102,37 @@ SIGNAL_TO_EVENT_TYPE: Dict[str, str] = {
 REGISTRY_BACKED_SIGNALS = set(SIGNAL_TO_EVENT_TYPE.keys())
 
 REGISTRY_EVENT_COLUMNS = [
-    "run_id", "event_type", "signal_column", "timestamp", "event_ts_raw", "event_ts_snapped",
-    "signal_bar_open_time", "first_tradable_bar_open_time", "active_start_time", "active_end_time",
-    "effective_entry_bar_open_time", "phenom_enter_ts", "eval_bar_ts", "detected_ts", "signal_ts",
-    "enter_ts", "exit_ts", "symbol", "event_id", "direction", "sign", "severity_bucket",
-    "vol_regime", "carry_state", "ms_trend_state", "ms_spread_state", "split_label",
-    "features_at_event", "is_observational", "is_signal_eligible", "is_tradable_now",
+    "run_id",
+    "event_type",
+    "signal_column",
+    "timestamp",
+    "event_ts_raw",
+    "event_ts_snapped",
+    "signal_bar_open_time",
+    "first_tradable_bar_open_time",
+    "active_start_time",
+    "active_end_time",
+    "effective_entry_bar_open_time",
+    "phenom_enter_ts",
+    "eval_bar_ts",
+    "detected_ts",
+    "signal_ts",
+    "enter_ts",
+    "exit_ts",
+    "symbol",
+    "event_id",
+    "direction",
+    "sign",
+    "severity_bucket",
+    "vol_regime",
+    "carry_state",
+    "ms_trend_state",
+    "ms_spread_state",
+    "split_label",
+    "features_at_event",
+    "is_observational",
+    "is_signal_eligible",
+    "is_tradable_now",
     "is_tradable_next_bar",
 ]
 
@@ -116,6 +141,7 @@ AGGREGATE_EVENT_TYPE_UNIONS: Dict[str, Sequence[str]] = {}
 
 def expected_event_types_for_spec(event_type: str) -> Sequence[str]:
     from project.events.event_aliases import resolve_event_alias
+
     normalized = str(event_type).strip().upper()
     if not normalized:
         return ()

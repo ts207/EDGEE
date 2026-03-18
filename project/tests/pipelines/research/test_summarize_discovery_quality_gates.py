@@ -4,6 +4,7 @@ import pandas as pd
 
 import project.pipelines.research.summarize_discovery_quality as summarize_discovery_quality
 
+
 def test_gate_pass_series_prefers_gate_phase2_final_when_present():
     frame = pd.DataFrame(
         {
@@ -16,6 +17,7 @@ def test_gate_pass_series_prefers_gate_phase2_final_when_present():
 
     assert observed.tolist() == [False, True, False]
 
+
 def test_build_summary_uses_phase2_final_for_family_and_global_pass_counts(tmp_path, monkeypatch):
     run_id = "test_run"
     phase2_root = tmp_path / "reports" / "phase2" / run_id
@@ -25,8 +27,18 @@ def test_build_summary_uses_phase2_final_for_family_and_global_pass_counts(tmp_p
     frame = pd.DataFrame(
         [
             {"candidate_id": "c1", "gate_all": 1, "gate_phase2_final": 1, "fail_reasons": ""},
-            {"candidate_id": "c2", "gate_all": 1, "gate_phase2_final": 0, "fail_reasons": "bridge_cost"},
-            {"candidate_id": "c3", "gate_all": 1, "gate_phase2_final": 0, "fail_reasons": "stability"},
+            {
+                "candidate_id": "c2",
+                "gate_all": 1,
+                "gate_phase2_final": 0,
+                "fail_reasons": "bridge_cost",
+            },
+            {
+                "candidate_id": "c3",
+                "gate_all": 1,
+                "gate_phase2_final": 0,
+                "fail_reasons": "stability",
+            },
         ]
     )
     frame.to_csv(event_dir / "phase2_candidates.csv", index=False)
@@ -79,9 +91,24 @@ def test_build_summary_includes_search_engine_event_types(tmp_path, monkeypatch)
 
     frame = pd.DataFrame(
         [
-            {"candidate_id": "s1", "event_type": "STATE_AFTERSHOCK_STATE", "gate_pass": 1, "fail_reasons": ""},
-            {"candidate_id": "s2", "event_type": "STATE_AFTERSHOCK_STATE", "gate_pass": 0, "fail_reasons": "bridge_cost"},
-            {"candidate_id": "s3", "event_type": "STATE_CROWDING_STATE", "gate_pass": 1, "fail_reasons": ""},
+            {
+                "candidate_id": "s1",
+                "event_type": "STATE_AFTERSHOCK_STATE",
+                "gate_pass": 1,
+                "fail_reasons": "",
+            },
+            {
+                "candidate_id": "s2",
+                "event_type": "STATE_AFTERSHOCK_STATE",
+                "gate_pass": 0,
+                "fail_reasons": "bridge_cost",
+            },
+            {
+                "candidate_id": "s3",
+                "event_type": "STATE_CROWDING_STATE",
+                "gate_pass": 1,
+                "fail_reasons": "",
+            },
         ]
     )
     frame.to_parquet(search_dir / "phase2_candidates.parquet", index=False)

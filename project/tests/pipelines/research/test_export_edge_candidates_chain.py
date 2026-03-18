@@ -12,6 +12,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[3] / "project"
 
 import project.pipelines.research.export_edge_candidates as export_edge_candidates
 
+
 def test_export_chain_includes_declared_subtype_families():
     expected_scripts = {
         "FUNDING_EXTREME_ONSET": "analyze_events.py",
@@ -75,8 +76,13 @@ def test_export_chain_includes_declared_subtype_families():
     for event_type, expected_script in expected_scripts.items():
         assert chain_map.get(event_type) == expected_script
 
+
 def test_export_chain_has_no_canonical_analyzer_routes():
-    assert all(script != "analyze_canonical_events.py" for _, script, _ in export_edge_candidates.PHASE2_EVENT_CHAIN)
+    assert all(
+        script != "analyze_canonical_events.py"
+        for _, script, _ in export_edge_candidates.PHASE2_EVENT_CHAIN
+    )
+
 
 def test_export_execute_chain_uses_phase2_candidate_discovery(monkeypatch, tmp_path):
     fake_root = tmp_path / "project"
@@ -109,32 +115,44 @@ def test_export_execute_chain_uses_phase2_candidate_discovery(monkeypatch, tmp_p
         symbols="BTCUSDT",
     )
 
-    phase2_cmds = [cmd for cmd in captured if any("phase2_candidate_discovery.py" in token for token in cmd)]
-    legacy_cmds = [cmd for cmd in captured if any("phase2_conditional_hypotheses.py" in token for token in cmd)]
+    phase2_cmds = [
+        cmd for cmd in captured if any("phase2_candidate_discovery.py" in token for token in cmd)
+    ]
+    legacy_cmds = [
+        cmd for cmd in captured if any("phase2_conditional_hypotheses.py" in token for token in cmd)
+    ]
     assert phase2_cmds
     assert not legacy_cmds
 
 
 def test_export_edge_candidates_stamps_confirmatory_metadata(monkeypatch, tmp_path):
     monkeypatch.setattr(export_edge_candidates, "get_data_root", lambda: tmp_path)
-    monkeypatch.setattr(export_edge_candidates, "_collect_phase2_candidates", lambda run_id, run_symbols: [{
-        "candidate_id": "cand_1",
-        "event": "VOL_SHOCK",
-        "status": "PROMOTED_RESEARCH",
-        "selection_score_executed": 1.0,
-        "profit_density_score": 1.0,
-        "edge_score": 1.0,
-        "stability_proxy": 1.0,
-        "p_value": 0.01,
-        "q_value": 0.02,
-        "train_n_obs": 10,
-        "validation_n_obs": 3,
-        "test_n_obs": 2,
-        "validation_samples": 3,
-        "test_samples": 2,
-        "sample_size": 5,
-    }])
-    monkeypatch.setattr(manifest_spec, "load_run_manifest", lambda run_id: {"run_mode": "production"})
+    monkeypatch.setattr(
+        export_edge_candidates,
+        "_collect_phase2_candidates",
+        lambda run_id, run_symbols: [
+            {
+                "candidate_id": "cand_1",
+                "event": "VOL_SHOCK",
+                "status": "PROMOTED_RESEARCH",
+                "selection_score_executed": 1.0,
+                "profit_density_score": 1.0,
+                "edge_score": 1.0,
+                "stability_proxy": 1.0,
+                "p_value": 0.01,
+                "q_value": 0.02,
+                "train_n_obs": 10,
+                "validation_n_obs": 3,
+                "test_n_obs": 2,
+                "validation_samples": 3,
+                "test_samples": 2,
+                "sample_size": 5,
+            }
+        ],
+    )
+    monkeypatch.setattr(
+        manifest_spec, "load_run_manifest", lambda run_id: {"run_mode": "production"}
+    )
     monkeypatch.setattr(export_edge_candidates, "ontology_spec_hash", lambda root: "hash123")
     monkeypatch.setattr(shrinkage, "_apply_hierarchical_shrinkage", lambda df, **kwargs: df)
 
@@ -157,7 +175,10 @@ def test_export_edge_candidates_stamps_confirmatory_metadata(monkeypatch, tmp_pa
     )
 
     assert export_edge_candidates.main() == 0
-    assert captured["path"] == tmp_path / "reports" / "edge_candidates" / "r1" / "edge_candidates_normalized.parquet"
+    assert (
+        captured["path"]
+        == tmp_path / "reports" / "edge_candidates" / "r1" / "edge_candidates_normalized.parquet"
+    )
     out = captured["df"]
     assert list(out["confirmatory_locked"]) == [True]
     assert list(out["frozen_spec_hash"]) == ["hash123"]
@@ -175,21 +196,23 @@ def test_export_edge_candidates_stamps_adjacent_survivorship_metadata(monkeypatc
     monkeypatch.setattr(
         export_edge_candidates,
         "_collect_phase2_candidates",
-        lambda run_id, run_symbols: [{
-            "candidate_id": "cand_1",
-            "candidate_symbol": "BTCUSDT",
-            "event_type": "STATE_CHOP_STATE",
-            "event": "STATE_CHOP_STATE",
-            "direction": "long",
-            "horizon": "60m",
-            "status": "PROMOTED_RESEARCH",
-            "selection_score_executed": 1.0,
-            "profit_density_score": 1.0,
-            "edge_score": 1.0,
-            "stability_proxy": 1.0,
-            "p_value": 0.01,
-            "q_value": 0.02,
-        }],
+        lambda run_id, run_symbols: [
+            {
+                "candidate_id": "cand_1",
+                "candidate_symbol": "BTCUSDT",
+                "event_type": "STATE_CHOP_STATE",
+                "event": "STATE_CHOP_STATE",
+                "direction": "long",
+                "horizon": "60m",
+                "status": "PROMOTED_RESEARCH",
+                "selection_score_executed": 1.0,
+                "profit_density_score": 1.0,
+                "edge_score": 1.0,
+                "stability_proxy": 1.0,
+                "p_value": 0.01,
+                "q_value": 0.02,
+            }
+        ],
     )
     monkeypatch.setattr(manifest_spec, "load_run_manifest", lambda run_id: {"run_mode": "research"})
     monkeypatch.setattr(export_edge_candidates, "ontology_spec_hash", lambda root: "hash123")
@@ -246,20 +269,22 @@ def test_collect_phase2_candidates_includes_search_engine_rows(monkeypatch, tmp_
     monkeypatch.setattr(export_edge_candidates, "get_data_root", lambda: tmp_path)
     search_dir = tmp_path / "reports" / "phase2" / "r_search" / "search_engine"
     search_dir.mkdir(parents=True, exist_ok=True)
-    pd.DataFrame([
-        {
-            "candidate_id": "search_1",
-            "event_type": "STATE_AFTERSHOCK_STATE",
-            "symbol": "BTCUSDT",
-            "q_value": 0.01,
-            "p_value": 0.005,
-            "sample_size": 42,
-            "validation_n_obs": 12,
-            "test_n_obs": 8,
-            "train_n_obs": 22,
-            "gate_bridge_tradable": True,
-        }
-    ]).to_parquet(search_dir / "phase2_candidates.parquet", index=False)
+    pd.DataFrame(
+        [
+            {
+                "candidate_id": "search_1",
+                "event_type": "STATE_AFTERSHOCK_STATE",
+                "symbol": "BTCUSDT",
+                "q_value": 0.01,
+                "p_value": 0.005,
+                "sample_size": 42,
+                "validation_n_obs": 12,
+                "test_n_obs": 8,
+                "train_n_obs": 22,
+                "gate_bridge_tradable": True,
+            }
+        ]
+    ).to_parquet(search_dir / "phase2_candidates.parquet", index=False)
 
     rows = export_edge_candidates._collect_phase2_candidates("r_search", ["BTCUSDT"])
 

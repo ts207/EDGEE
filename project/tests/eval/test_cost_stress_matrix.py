@@ -5,6 +5,7 @@ evaluate_structural_robustness() must test at all four multipliers and return
 results keyed by multiplier, so promotion artifacts show which stress levels a
 candidate survives.
 """
+
 from __future__ import annotations
 
 import numpy as np
@@ -24,7 +25,6 @@ def _make_costs(n: int = 500, cost_bps: float = 2.0, seed: int = 42) -> pd.Serie
 
 
 class TestCostStressMatrix:
-
     def test_returns_result_for_each_multiplier(self):
         """Output must contain a result for each of the four standard multipliers."""
         pnl = _make_pnl(mean_bps=10.0)
@@ -69,9 +69,7 @@ class TestCostStressMatrix:
         )
 
         for mult in (1, 2, 5, 10):
-            assert result[f"cost_stress_{mult}x_pass"], (
-                f"Robust candidate must pass {mult}× stress"
-            )
+            assert result[f"cost_stress_{mult}x_pass"], f"Robust candidate must pass {mult}× stress"
 
     def test_cost_stress_2x_pass_backward_compatible(self):
         """cost_stress_pass (the old 2× result) must still be present for backward compat."""

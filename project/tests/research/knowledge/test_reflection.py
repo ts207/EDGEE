@@ -58,7 +58,9 @@ def test_build_run_reflection_separates_market_and_system_findings(tmp_path, mon
                 "n_events": 24,
             }
         ]
-    ).to_parquet(reports_root / "promotions" / run_id / "promotion_statistical_audit.parquet", index=False)
+    ).to_parquet(
+        reports_root / "promotions" / run_id / "promotion_statistical_audit.parquet", index=False
+    )
     (run_dir / "validate_feature_integrity_5m.json").write_text(
         json.dumps({"status": "warning", "symbols_with_issues": 1}),
         encoding="utf-8",
@@ -116,7 +118,9 @@ def test_build_run_reflection_detects_stale_manifest_after_replayed_tail(tmp_pat
                 "n_events": 140,
             }
         ]
-    ).to_parquet(reports_root / "promotions" / run_id / "promotion_statistical_audit.parquet", index=False)
+    ).to_parquet(
+        reports_root / "promotions" / run_id / "promotion_statistical_audit.parquet", index=False
+    )
 
     monkeypatch.setenv("BACKTEST_DATA_ROOT", str(data_root))
     reflection = build_run_reflection(run_id=run_id)
@@ -157,7 +161,10 @@ def test_build_run_reflection_marks_sample_limited_runs_as_inconclusive(tmp_path
                 "test_samples": 5,
             }
         ]
-    ).to_parquet(reports_root / "edge_candidates" / run_id / "edge_candidates_normalized.parquet", index=False)
+    ).to_parquet(
+        reports_root / "edge_candidates" / run_id / "edge_candidates_normalized.parquet",
+        index=False,
+    )
 
     monkeypatch.setenv("BACKTEST_DATA_ROOT", str(data_root))
     reflection = build_run_reflection(run_id=run_id)

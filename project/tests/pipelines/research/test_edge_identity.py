@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from project.research.edge_identity import edge_id_from_row, structural_edge_components
 
+
 def test_edge_id_ignores_horizon_and_conditioning_variation():
     base = {
         "canonical_event_type": "VOL_SHOCK",
@@ -12,6 +13,7 @@ def test_edge_id_ignores_horizon_and_conditioning_variation():
     row_a = dict(base, horizon_bars=6, condition_signature="severity_bucket=high")
     row_b = dict(base, horizon_bars=12, condition_signature="severity_bucket=extreme")
     assert edge_id_from_row(row_a) == edge_id_from_row(row_b)
+
 
 def test_structural_edge_components_fall_back_to_runtime_fields():
     row = {

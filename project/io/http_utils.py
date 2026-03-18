@@ -14,6 +14,7 @@ class DownloadResult:
     path: Optional[Path] = None
     error: Optional[str] = None
 
+
 def download_with_retries(
     url: str,
     dest_path: Path,
@@ -48,6 +49,7 @@ def download_with_retries(
             if attempt >= max_retries:
                 break
             import random
+
             jitter = random.uniform(0, 1)
             time.sleep(min(backoff_sec * (2**attempt) + jitter, 60.0))
     return DownloadResult(status="failed", error=last_error)

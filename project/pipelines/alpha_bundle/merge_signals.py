@@ -29,6 +29,7 @@ from project.io.utils import ensure_dir, read_parquet, write_parquet
 from project.specs.manifest import finalize_manifest, start_manifest
 from project.core.validation import ensure_utc_timestamp
 
+
 def _read_signals_dir(path: Path) -> pd.DataFrame:
     if path.is_dir():
         files = sorted(list(path.glob("signals_*.parquet")))
@@ -38,6 +39,7 @@ def _read_signals_dir(path: Path) -> pd.DataFrame:
             raise FileNotFoundError(f"No parquet files in {path}")
         return read_parquet([Path(p) for p in files])
     return read_parquet([path])
+
 
 def main() -> int:
     p = argparse.ArgumentParser(description="Merge signal components into a single table")
@@ -59,7 +61,9 @@ def main() -> int:
         inputs.append({"path": args.xs_momentum_path})
     if args.onchain_flow_path:
         inputs.append({"path": args.onchain_flow_path})
-    manifest = start_manifest(stage, run_id, params={}, inputs=inputs, outputs=[{"path": str(out_dir)}])
+    manifest = start_manifest(
+        stage, run_id, params={}, inputs=inputs, outputs=[{"path": str(out_dir)}]
+    )
 
     sig = _read_signals_dir(Path(args.signals_dir))
     tcol = "ts_event" if "ts_event" in sig.columns else "timestamp"
@@ -89,7 +93,11 @@ def main() -> int:
     if args.xs_momentum_path:
         xs = read_parquet([Path(args.xs_momentum_path)])
         xs["ts_event"] = ensure_utc_timestamp(xs["ts_event"], "ts_event")
-        xs = xs[["ts_event", "symbol", "xs_momentum"]].dropna().sort_values(["ts_event", "symbol"], kind="mergesort")
+        xs = (
+            xs[["ts_event", "symbol", "xs_momentum"]]
+            .dropna()
+            .sort_values(["ts_event", "symbol"], kind="mergesort")
+        )
         df = pd.merge(df, xs, left_on=[tcol, "symbol"], right_on=["ts_event", "symbol"], how="left")
         df = df.drop(columns=["ts_event"], errors="ignore")
     else:
@@ -99,7 +107,11 @@ def main() -> int:
     if args.onchain_flow_path:
         oc = read_parquet([Path(args.onchain_flow_path)])
         oc["ts_event"] = ensure_utc_timestamp(oc["ts_event"], "ts_event")
-        oc = oc[["ts_event", "symbol", "onchain_flow_mc"]].dropna().sort_values(["ts_event", "symbol"], kind="mergesort")
+        oc = (
+            oc[["ts_event", "symbol", "onchain_flow_mc"]]
+            .dropna()
+            .sort_values(["ts_event", "symbol"], kind="mergesort")
+        )
         df = pd.merge(df, oc, left_on=[tcol, "symbol"], right_on=["ts_event", "symbol"], how="left")
         df = df.drop(columns=["ts_event"], errors="ignore")
     else:
@@ -128,8 +140,11 @@ def main() -> int:
     out_path = out_dir / "merged_signals.parquet"
     write_parquet(df, out_path)
 
-    finalize_manifest(manifest, status="success", stats={"rows": int(len(df)), "out": str(out_path)})
+    finalize_manifest(
+        manifest, status="success", stats={"rows": int(len(df)), "out": str(out_path)}
+    )
     return 0
+
 
 if __name__ == "__main__":
     raise SystemExit(main())

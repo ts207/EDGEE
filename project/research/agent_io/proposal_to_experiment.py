@@ -155,7 +155,9 @@ def translate_and_validate_proposal(
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Translate an agent proposal into a validated experiment config.")
+    parser = argparse.ArgumentParser(
+        description="Translate an agent proposal into a validated experiment config."
+    )
     parser.add_argument("--proposal", required=True, help="Path to proposal JSON/YAML")
     parser.add_argument("--registry_root", default="project/configs/registries")
     parser.add_argument("--out_dir", default=None)

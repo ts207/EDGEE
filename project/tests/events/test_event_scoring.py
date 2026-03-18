@@ -6,19 +6,21 @@ from project.events.scoring import score_event_frame, EventScoreColumns
 def _make_event_frame(n: int = 20) -> pd.DataFrame:
     rng = np.random.default_rng(42)
     ts = pd.date_range("2024-01-01", periods=n, freq="1h", tz="UTC")
-    return pd.DataFrame({
-        "event_type": ["LIQUIDITY_VACUUM"] * n,
-        "event_id": [f"lv_BTCUSDT_{i:08d}_000" for i in range(n)],
-        "symbol": ["BTCUSDT"] * n,
-        "timestamp": ts,
-        "enter_ts": ts,
-        "exit_ts": ts + pd.Timedelta(hours=1),
-        "evt_signal_intensity": rng.uniform(0.001, 0.05, n),
-        "severity_bucket": rng.choice(["low", "moderate", "high"], n),
-        "spread_z": rng.uniform(0.5, 4.0, n),
-        "basis_z": rng.uniform(-2.0, 2.0, n),
-        "direction": ["non_directional"] * n,
-    })
+    return pd.DataFrame(
+        {
+            "event_type": ["LIQUIDITY_VACUUM"] * n,
+            "event_id": [f"lv_BTCUSDT_{i:08d}_000" for i in range(n)],
+            "symbol": ["BTCUSDT"] * n,
+            "timestamp": ts,
+            "enter_ts": ts,
+            "exit_ts": ts + pd.Timedelta(hours=1),
+            "evt_signal_intensity": rng.uniform(0.001, 0.05, n),
+            "severity_bucket": rng.choice(["low", "moderate", "high"], n),
+            "spread_z": rng.uniform(0.5, 4.0, n),
+            "basis_z": rng.uniform(-2.0, 2.0, n),
+            "direction": ["non_directional"] * n,
+        }
+    )
 
 
 def test_score_event_frame_returns_expected_columns():
@@ -60,16 +62,20 @@ def test_empty_frame_returns_empty_with_columns():
 def test_tradeability_score_calculation():
     df = _make_event_frame(5)
     result = score_event_frame(df)
-    
+
     base_viability = (
-        result["cleanliness_score"] * 
-        result["crowding_score"] * 
-        result["execution_score"] * 
-        result["microstructure_score"]
+        result["cleanliness_score"]
+        * result["crowding_score"]
+        * result["execution_score"]
+        * result["microstructure_score"]
     ).apply(lambda x: np.power(x, 0.25))
-    
-    expected = (base_viability * result["severity_score"] * result["novelty_score"]).apply(np.sqrt).clip(0.0, 1.0)
-    
+
+    expected = (
+        (base_viability * result["severity_score"] * result["novelty_score"])
+        .apply(np.sqrt)
+        .clip(0.0, 1.0)
+    )
+
     pd.testing.assert_series_equal(
         result["event_tradeability_score"].round(6),
         expected.round(6),

@@ -24,16 +24,18 @@ class TrendBase(ThresholdDetector):
         close = df["close"]
         return {"close": close}
 
-    def compute_intensity(self, df: pd.DataFrame, *, features: dict[str, pd.Series], **params: Any) -> pd.Series:
+    def compute_intensity(
+        self, df: pd.DataFrame, *, features: dict[str, pd.Series], **params: Any
+    ) -> pd.Series:
         del df
         # Standard intensity: (Trend Strength) * (1 + Rebound Strength)
         close = features.get("close", pd.Series(0.0, index=pd.RangeIndex(0)))
         if close.empty:
-             return pd.Series(0.0, index=pd.RangeIndex(0))
-        
+            return pd.Series(0.0, index=pd.RangeIndex(0))
+
         trend_window = int(params.get("trend_window", 96))
         rebound_window = int(params.get("rebound_window", 12))
-        
+
         trend = close.pct_change(trend_window).abs().fillna(0.0)
         retrace = close.pct_change(rebound_window).abs().fillna(0.0)
         return (trend * (1.0 + retrace)).clip(lower=0.0)
@@ -58,24 +60,24 @@ class TrendAccelerationDetector(TrendBase):
 
     def prepare_features(self, df: pd.DataFrame, **params: Any) -> dict[str, pd.Series]:
         close = df["close"]
-        
+
         trend_window = int(params.get("trend_window", 96))
         accel_window = int(params.get("accel_window", 3))
-        
+
         trend_raw = close.pct_change(trend_window)
         trend_abs = trend_raw.abs()
         trend_delta = trend_abs.diff(accel_window)
         ret_1 = close.pct_change(1)
-        
+
         window = int(params.get("threshold_window", 2880))
-        
+
         # Adaptive thresholds
         q_ext = float(params.get("min_trend_extension_quantile", self.min_trend_extension_quantile))
         trend_q_ext = trend_abs.rolling(window, min_periods=288).quantile(q_ext).shift(1)
-        
+
         q_accel = float(params.get("threshold_quantile", self.threshold_quantile))
         accel_q_threshold = trend_delta.rolling(window, min_periods=288).quantile(q_accel).shift(1)
-        
+
         return {
             "close": close,
             "trend_raw": trend_raw,
@@ -88,7 +90,9 @@ class TrendAccelerationDetector(TrendBase):
             "canonical_trend_present": self._canonical_trend_present(df),
         }
 
-    def compute_raw_mask(self, df: pd.DataFrame, *, features: dict[str, pd.Series], **params: Any) -> pd.Series:
+    def compute_raw_mask(
+        self, df: pd.DataFrame, *, features: dict[str, pd.Series], **params: Any
+    ) -> pd.Series:
         del df, params
         trend_abs = features["trend_abs"]
         trend_delta = features["trend_delta"]
@@ -96,9 +100,11 @@ class TrendAccelerationDetector(TrendBase):
         trend_raw = features["trend_raw"]
         trend_q_ext = features["trend_q_ext"]
         accel_q_threshold = features["accel_q_threshold"]
-        
+
         # Consistency: recent returns moving in same direction as long trend
-        direction_consistent = (np.sign(ret_1.rolling(window=6, min_periods=3).mean()) == np.sign(trend_raw)).fillna(False)
+        direction_consistent = (
+            np.sign(ret_1.rolling(window=6, min_periods=3).mean()) == np.sign(trend_raw)
+        ).fillna(False)
         canonical_trend_state = features["canonical_trend_state"]
         canonical_trend_present = features.get(
             "canonical_trend_present",
@@ -109,7 +115,7 @@ class TrendAccelerationDetector(TrendBase):
             if not canonical_trend_present.any()
             else canonical_trend_state.isin([1.0, 2.0]).fillna(False)
         )
-        
+
         return (
             (trend_abs >= trend_q_ext).fillna(False)
             & (trend_delta >= accel_q_threshold).fillna(False)
@@ -117,7 +123,9 @@ class TrendAccelerationDetector(TrendBase):
             & canonical_trend_active
         ).fillna(False)
 
-    def compute_intensity(self, df: pd.DataFrame, *, features: dict[str, pd.Series], **params: Any) -> pd.Series:
+    def compute_intensity(
+        self, df: pd.DataFrame, *, features: dict[str, pd.Series], **params: Any
+    ) -> pd.Series:
         del df, params
         return (features["trend_abs"].fillna(0.0) * 100.0).clip(lower=0.0)
 
@@ -129,7 +137,7 @@ class TrendDecelerationDetector(TrendBase):
         close = df["close"]
         trend_window = int(params.get("trend_window", 96))
         accel_window = int(params.get("accel_window", 3))
-        
+
         trend_abs = close.pct_change(trend_window).abs()
         trend_delta = trend_abs.diff(accel_window)
         return {
@@ -140,7 +148,9 @@ class TrendDecelerationDetector(TrendBase):
             "canonical_trend_present": self._canonical_trend_present(df),
         }
 
-    def compute_raw_mask(self, df: pd.DataFrame, *, features: dict[str, pd.Series], **params: Any) -> pd.Series:
+    def compute_raw_mask(
+        self, df: pd.DataFrame, *, features: dict[str, pd.Series], **params: Any
+    ) -> pd.Series:
         del df
         min_trend = float(params.get("min_trend_pct", 0.01))
         min_decel = float(params.get("min_deceleration_pct", 0.001))
@@ -171,7 +181,9 @@ class RangeBreakoutDetector(TrendBase):
         rolling_min = close.rolling(window).min().shift(1)
         return {"close": close, "rolling_max": rolling_max, "rolling_min": rolling_min}
 
-    def compute_raw_mask(self, df: pd.DataFrame, *, features: dict[str, pd.Series], **params: Any) -> pd.Series:
+    def compute_raw_mask(
+        self, df: pd.DataFrame, *, features: dict[str, pd.Series], **params: Any
+    ) -> pd.Series:
         del df, params
         break_up = (features["close"] > features["rolling_max"]).fillna(False)
         break_dn = (features["close"] < features["rolling_min"]).fillna(False)
@@ -188,7 +200,9 @@ class FalseBreakoutDetector(TrendBase):
         rolling_min = close.rolling(window).min().shift(1)
         return {"close": close, "rolling_max": rolling_max, "rolling_min": rolling_min}
 
-    def compute_raw_mask(self, df: pd.DataFrame, *, features: dict[str, pd.Series], **params: Any) -> pd.Series:
+    def compute_raw_mask(
+        self, df: pd.DataFrame, *, features: dict[str, pd.Series], **params: Any
+    ) -> pd.Series:
         del df
         min_break_dist = float(params.get("min_breakout_distance", 0.0030))
         return_buffer = float(params.get("return_buffer", 0.0020))
@@ -206,8 +220,12 @@ class FalseBreakoutDetector(TrendBase):
         was_break_dn = (breakout_dn_prev >= min_break_dist).fillna(False)
 
         # Require a meaningful return inside the range (not just barely crossing the boundary)
-        is_back_in_up = (features["close"] <= features["rolling_max"] * (1 - return_buffer)).fillna(False)
-        is_back_in_dn = (features["close"] >= features["rolling_min"] * (1 + return_buffer)).fillna(False)
+        is_back_in_up = (features["close"] <= features["rolling_max"] * (1 - return_buffer)).fillna(
+            False
+        )
+        is_back_in_dn = (features["close"] >= features["rolling_min"] * (1 + return_buffer)).fillna(
+            False
+        )
 
         return ((was_break_up & is_back_in_up) | (was_break_dn & is_back_in_dn)).fillna(False)
 
@@ -219,18 +237,24 @@ class PullbackPivotDetector(TrendBase):
         close = df["close"]
         trend_window = int(params.get("trend_window", 96))
         pullback_window = int(params.get("pullback_window", 12))
-        
+
         trend = close.pct_change(trend_window)
         retrace = close.pct_change(pullback_window)
         return {"close": close, "trend": trend, "retrace": retrace}
 
-    def compute_raw_mask(self, df: pd.DataFrame, *, features: dict[str, pd.Series], **params: Any) -> pd.Series:
+    def compute_raw_mask(
+        self, df: pd.DataFrame, *, features: dict[str, pd.Series], **params: Any
+    ) -> pd.Series:
         del df
         trend_th = float(params.get("trend_pct", 0.01))
         pullback_th = float(params.get("pullback_pct", 0.005))
-        
-        pivot_up = ((features["trend"] > trend_th) & (features["retrace"] < -pullback_th)).fillna(False)
-        pivot_dn = ((features["trend"] < -trend_th) & (features["retrace"] > pullback_th)).fillna(False)
+
+        pivot_up = ((features["trend"] > trend_th) & (features["retrace"] < -pullback_th)).fillna(
+            False
+        )
+        pivot_dn = ((features["trend"] < -trend_th) & (features["retrace"] > pullback_th)).fillna(
+            False
+        )
         return (pivot_up | pivot_dn).fillna(False)
 
 
@@ -260,15 +284,21 @@ class SREventDetector(TrendBase):
             "breakout_z_threshold": pd.Series(breakout_z_threshold, index=df.index, dtype=float),
         }
 
-    def compute_raw_mask(self, df: pd.DataFrame, *, features: dict[str, pd.Series], **params: Any) -> pd.Series:
+    def compute_raw_mask(
+        self, df: pd.DataFrame, *, features: dict[str, pd.Series], **params: Any
+    ) -> pd.Series:
         del df, params
-        breaks_level = (
-            (features["close"] > features["rolling_high"]).fillna(False)
-            | (features["close"] < features["rolling_low"]).fillna(False)
-        )
-        return (breaks_level & (features["breakout_z"] >= features["breakout_z_threshold"]).fillna(False)).fillna(False)
+        breaks_level = (features["close"] > features["rolling_high"]).fillna(False) | (
+            features["close"] < features["rolling_low"]
+        ).fillna(False)
+        return (
+            breaks_level
+            & (features["breakout_z"] >= features["breakout_z_threshold"]).fillna(False)
+        ).fillna(False)
 
-    def compute_intensity(self, df: pd.DataFrame, *, features: dict[str, pd.Series], **params: Any) -> pd.Series:
+    def compute_intensity(
+        self, df: pd.DataFrame, *, features: dict[str, pd.Series], **params: Any
+    ) -> pd.Series:
         del df, params
         return features["breakout_z"].fillna(0.0)
 

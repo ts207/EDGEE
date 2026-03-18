@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 
+
 def test_event_specs_exist():
     root = Path("spec/events")
     # Canonical event specs

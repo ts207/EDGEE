@@ -9,6 +9,7 @@ import pytest
 
 from project.pipelines.features import build_market_context
 
+
 def _feature_frame() -> pd.DataFrame:
     return pd.DataFrame(
         {
@@ -29,6 +30,7 @@ def _feature_frame() -> pd.DataFrame:
         }
     )
 
+
 def test_build_market_context_uses_canonical_funding_rate_scaled():
     features = _feature_frame()
     features["funding_rate_scaled"] = [0.0002, -0.0002, 0.0003, -0.0003]
@@ -39,6 +41,7 @@ def test_build_market_context_uses_canonical_funding_rate_scaled():
     assert out["funding_rate_bps"].tolist() == pytest.approx([2.0, -2.0, 3.0, -3.0])
     assert set(out["carry_state_code"].tolist()) == {1.0, -1.0}
 
+
 def test_build_market_context_requires_funding_rate_scaled_column():
     features = _feature_frame()
     features["funding_rate"] = [0.0002, -0.0002, 0.0003, -0.0003]
@@ -46,17 +49,19 @@ def test_build_market_context_requires_funding_rate_scaled_column():
     with pytest.raises(ValueError, match="missing funding_rate_scaled"):
         build_market_context._build_market_context(symbol="BTCUSDT", features=features)
 
+
 def test_build_market_context_handles_funding_gaps(caplog):
     features = _feature_frame()
     features["funding_rate_scaled"] = [0.0002, None, 0.0003, -0.0003]
 
     with caplog.at_level("WARNING"):
         out = build_market_context._build_market_context(symbol="BTCUSDT", features=features)
-    
+
     assert "funding_rate_scaled contains 1/4 missing rows (25.00%) for BTCUSDT" in caplog.text
     # Should be filled with 0.0
     assert out.iloc[1]["funding_rate_scaled"] == 0.0
     assert out.iloc[1]["funding_rate_bps"] == 0.0
+
 
 def test_build_market_context_handles_fully_missing_funding(caplog):
     features = _feature_frame()
@@ -65,8 +70,11 @@ def test_build_market_context_handles_fully_missing_funding(caplog):
     with caplog.at_level("WARNING"):
         out = build_market_context._build_market_context(symbol="BTCUSDT", features=features)
 
-    assert "funding_rate_scaled unavailable for BTCUSDT; defaulting all 4/4 rows to 0.0" in caplog.text
+    assert (
+        "funding_rate_scaled unavailable for BTCUSDT; defaulting all 4/4 rows to 0.0" in caplog.text
+    )
     assert out["funding_rate_scaled"].tolist() == [0.0, 0.0, 0.0, 0.0]
+
 
 def test_build_market_context_materializes_canonical_state_columns():
     features = _feature_frame()

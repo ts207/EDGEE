@@ -17,8 +17,14 @@ def test_classify_benchmark_slice_distinguishes_review_states(tmp_path: Path) ->
     comparison.write_text(
         json.dumps(
             {
-                "hard_label": {"evaluated_rows": 6, "selected": {"hypothesis_id": "h1", "valid": True}},
-                "confidence_aware": {"evaluated_rows": 6, "selected": {"hypothesis_id": "h1", "valid": False}},
+                "hard_label": {
+                    "evaluated_rows": 6,
+                    "selected": {"hypothesis_id": "h1", "valid": True},
+                },
+                "confidence_aware": {
+                    "evaluated_rows": 6,
+                    "selected": {"hypothesis_id": "h1", "valid": False},
+                },
                 "selection_changed": False,
                 "selection_outcome_changed": True,
             }
@@ -42,8 +48,14 @@ def test_build_and_write_benchmark_review(tmp_path: Path) -> None:
     comparison.write_text(
         json.dumps(
             {
-                "hard_label": {"evaluated_rows": 6, "selected": {"hypothesis_id": "h1", "valid": True}},
-                "confidence_aware": {"evaluated_rows": 6, "selected": {"hypothesis_id": "h2", "valid": True}},
+                "hard_label": {
+                    "evaluated_rows": 6,
+                    "selected": {"hypothesis_id": "h1", "valid": True},
+                },
+                "confidence_aware": {
+                    "evaluated_rows": 6,
+                    "selected": {"hypothesis_id": "h2", "valid": True},
+                },
                 "selection_changed": True,
                 "selection_outcome_changed": False,
             }

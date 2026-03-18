@@ -18,4 +18,3 @@ __all__ = [
     "calculate_target_notional",
     "get_asset_correlation_adjustment",
 ]
-

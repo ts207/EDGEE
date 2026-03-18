@@ -8,6 +8,7 @@ from project.runtime.hashing import load_hashing_spec
 from project.runtime.normalized_event import NormalizedEvent
 from project.runtime.oms_replay import audit_oms_replay
 
+
 def _event(
     *,
     event_id: str,
@@ -31,10 +32,13 @@ def _event(
         order_id=order_id,
     )
 
+
 def test_oms_replay_passes_for_valid_lifecycle():
     hashing_spec = load_hashing_spec(PROJECT_ROOT.parent)
     events = [
-        _event(event_id="e1", event_type="oms_submit", order_id="o1", source_seq=1, recv_time_us=10),
+        _event(
+            event_id="e1", event_type="oms_submit", order_id="o1", source_seq=1, recv_time_us=10
+        ),
         _event(event_id="e2", event_type="oms_ack", order_id="o1", source_seq=2, recv_time_us=20),
         _event(event_id="e3", event_type="oms_fill", order_id="o1", source_seq=3, recv_time_us=30),
     ]
@@ -42,6 +46,7 @@ def test_oms_replay_passes_for_valid_lifecycle():
     assert out["status"] == "pass"
     assert int(out["violation_count"]) == 0
     assert str(out["replay_digest"]).startswith("blake2b_256:")
+
 
 def test_oms_replay_detects_invalid_order_transitions():
     hashing_spec = load_hashing_spec(PROJECT_ROOT.parent)

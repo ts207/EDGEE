@@ -1,35 +1,44 @@
 """Tests for train-only shrinkage lambda estimation."""
+
 import numpy as np
 import pandas as pd
 import pytest
 
 from project.research.helpers.shrinkage import _apply_hierarchical_shrinkage
 
-def _build_test_df(n_train=100, n_val=30, n_test=20, effect_train=0.05, effect_val=0.10, effect_test=0.15):
+
+def _build_test_df(
+    n_train=100, n_val=30, n_test=20, effect_train=0.05, effect_val=0.10, effect_test=0.15
+):
     """Build a synthetic candidate DataFrame with split labels."""
     rng = np.random.default_rng(42)
     rows = []
-    for i, (split, n, effect) in enumerate([
-        ("train", n_train, effect_train),
-        ("validation", n_val, effect_val),
-        ("test", n_test, effect_test),
-    ]):
+    for i, (split, n, effect) in enumerate(
+        [
+            ("train", n_train, effect_train),
+            ("validation", n_val, effect_val),
+            ("test", n_test, effect_test),
+        ]
+    ):
         for j in range(n):
-            rows.append({
-                "canonical_family": "FAM_A",
-                "canonical_event_type": "EVT_X" if j % 2 == 0 else "EVT_Y",
-                "template_verb": "buy",
-                "horizon": "4h",
-                "symbol": "BTCUSDT",
-                "state_id": "S1",
-                "expectancy": float(effect + rng.normal(0, 0.02)),
-                "p_value": float(rng.uniform(0.001, 0.1)),
-                "effective_sample_size": 50,
-                "n_events": 50,
-                "std_return": 0.03,
-                "split_label": split,
-            })
+            rows.append(
+                {
+                    "canonical_family": "FAM_A",
+                    "canonical_event_type": "EVT_X" if j % 2 == 0 else "EVT_Y",
+                    "template_verb": "buy",
+                    "horizon": "4h",
+                    "symbol": "BTCUSDT",
+                    "state_id": "S1",
+                    "expectancy": float(effect + rng.normal(0, 0.02)),
+                    "p_value": float(rng.uniform(0.001, 0.1)),
+                    "effective_sample_size": 50,
+                    "n_events": 50,
+                    "std_return": 0.03,
+                    "split_label": split,
+                }
+            )
     return pd.DataFrame(rows)
+
 
 class TestTrainOnlyShrinkage:
     """Tests for train_only_lambda parameter in hierarchical shrinkage."""
@@ -62,8 +71,9 @@ class TestTrainOnlyShrinkage:
         all_shrunk = result_all["effect_shrunk_state"].values
         train_shrunk = result_train["effect_shrunk_state"].values
         # They should not be identical
-        assert not np.allclose(all_shrunk, train_shrunk, atol=1e-6), \
+        assert not np.allclose(all_shrunk, train_shrunk, atol=1e-6), (
             "Train-only and all-data shrinkage should produce different results when splits have different effects"
+        )
 
     def test_train_only_all_rows_get_shrunk(self):
         """Even with train_only_lambda, all rows (incl. val/test) should be shrunk."""
@@ -101,9 +111,7 @@ class TestTrainOnlyShrinkage:
     def test_empty_df_handled(self):
         """Empty DataFrame should return without error."""
         df = pd.DataFrame()
-        result = _apply_hierarchical_shrinkage(
-            df, train_only_lambda=True, split_col="split_label"
-        )
+        result = _apply_hierarchical_shrinkage(df, train_only_lambda=True, split_col="split_label")
         assert result.empty
 
     def test_confirmatory_uses_aggregate_train_counts_without_split_labels(self, caplog):

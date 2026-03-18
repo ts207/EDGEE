@@ -37,7 +37,13 @@ def test_system_map_has_no_compatibility_surfaces() -> None:
 def test_system_map_artifact_contract_fields_render_as_lists_of_strings() -> None:
     payload = build_system_map_payload()
     for contract in payload["artifact_contracts"]:
-        for field_name in ("stage_patterns", "inputs", "optional_inputs", "outputs", "external_inputs"):
+        for field_name in (
+            "stage_patterns",
+            "inputs",
+            "optional_inputs",
+            "outputs",
+            "external_inputs",
+        ):
             value = contract[field_name]
             assert isinstance(value, list)
             assert all(isinstance(item, str) for item in value)
@@ -46,7 +52,9 @@ def test_system_map_artifact_contract_fields_render_as_lists_of_strings() -> Non
 def test_system_map_canonicalize_event_contract_renders_without_character_splitting() -> None:
     payload = build_system_map_payload()
     contract = next(
-        item for item in payload["artifact_contracts"] if item["stage_patterns"] == ["canonicalize_event_episodes*"]
+        item
+        for item in payload["artifact_contracts"]
+        if item["stage_patterns"] == ["canonicalize_event_episodes*"]
     )
     assert contract["external_inputs"] == ["phase2.event_registry.{event_type}"]
 

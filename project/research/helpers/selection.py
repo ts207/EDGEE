@@ -6,6 +6,7 @@ from typing import Any, Callable, Dict, List, Tuple
 import numpy as np
 import pandas as pd
 
+
 def rank_key(
     row: Dict[str, object],
     *,
@@ -40,6 +41,7 @@ def rank_key(
         str(row.get("candidate_id", "")),
     )
 
+
 def passes_fallback_gate(
     row: Dict[str, object],
     gates: Dict[str, Any],
@@ -68,6 +70,7 @@ def passes_fallback_gate(
     if samples < min_samples:
         return False
     return True
+
 
 def choose_event_rows(
     *,
@@ -107,9 +110,7 @@ def choose_event_rows(
     full_gates = load_gates_spec_fn()
     gates = full_gates.get("gate_v1_fallback", {})
 
-    def _enrich(
-        row: Dict[str, object], idx: int, status_default: str
-    ) -> Dict[str, object]:
+    def _enrich(row: Dict[str, object], idx: int, status_default: str) -> Dict[str, object]:
         cid = str(row.get("candidate_id", "")).strip() or candidate_id_fn(row, idx)
         merged = dict(phase2_lookup.get(cid, {}))
         merged.update(dict(row))
@@ -120,27 +121,16 @@ def choose_event_rows(
             merged["run_id"] = run_id
         if "candidate_symbol" not in merged:
             merged["candidate_symbol"] = (
-                str(merged.get("symbol", "ALL")).upper()
-                if "symbol" in merged
-                else "ALL"
+                str(merged.get("symbol", "ALL")).upper() if "symbol" in merged else "ALL"
             )
-        if (
-            "source_path" not in merged
-            or not str(merged.get("source_path", "")).strip()
-        ):
+        if "source_path" not in merged or not str(merged.get("source_path", "")).strip():
             merged["source_path"] = str(
-                data_root
-                / "reports"
-                / "phase2"
-                / run_id
-                / event_type
-                / "phase2_candidates.csv"
+                data_root / "reports" / "phase2" / run_id / event_type / "phase2_candidates.csv"
             )
         return merged
 
     enriched_edge_rows = [
-        _enrich(row, idx, str(row.get("status", "DRAFT")))
-        for idx, row in enumerate(edge_rows)
+        _enrich(row, idx, str(row.get("status", "DRAFT"))) for idx, row in enumerate(edge_rows)
     ]
 
     if not enriched_edge_rows and not phase2_df.empty:
@@ -183,9 +173,7 @@ def choose_event_rows(
 
     selection_data = []
 
-    def _add_selection_record(
-        c: Dict[str, object], reason: str, selected: bool, rank: int
-    ) -> None:
+    def _add_selection_record(c: Dict[str, object], reason: str, selected: bool, rank: int) -> None:
         after_cost = safe_float_fn(
             c.get(
                 "bridge_expectancy_conservative",
@@ -230,9 +218,7 @@ def choose_event_rows(
 
     rejected_quality_floor_count = 0
 
-    promoted = [
-        row for row in eligible_rows if str(row.get("status", "")).upper() == "PROMOTED"
-    ]
+    promoted = [row for row in eligible_rows if str(row.get("status", "")).upper() == "PROMOTED"]
     if promoted:
         promoted_sorted = sorted(promoted, key=rank_key_fn)
         promoted_quality = [
@@ -251,9 +237,7 @@ def choose_event_rows(
                 max_daily_turnover_multiple=max_daily_turnover_multiple,
             )
         ]
-        rejected_quality_floor_count += max(
-            0, len(promoted_sorted) - len(promoted_quality)
-        )
+        rejected_quality_floor_count += max(0, len(promoted_sorted) - len(promoted_quality))
 
         for c in promoted_sorted:
             if c not in promoted_quality:
@@ -308,9 +292,7 @@ def choose_event_rows(
                 max_daily_turnover_multiple=max_daily_turnover_multiple,
             )
         ]
-        rejected_quality_floor_count += max(
-            0, len(non_promoted_sorted) - len(non_promoted_quality)
-        )
+        rejected_quality_floor_count += max(0, len(non_promoted_sorted) - len(non_promoted_quality))
 
         for c in non_promoted_sorted:
             if c not in non_promoted_quality:
@@ -428,11 +410,7 @@ def choose_event_rows(
             elif mode == "both" and not (is_disc or is_fall):
                 is_eligible = False
 
-            if (
-                is_eligible
-                and not allow_naive_entry_fail
-                and naive_validation is not None
-            ):
+            if is_eligible and not allow_naive_entry_fail and naive_validation is not None:
                 cid = str(row.get("candidate_id", "")).strip()
                 if not naive_validation.get((event_type, cid), False):
                     is_eligible = False
@@ -457,9 +435,7 @@ def choose_event_rows(
                 max_daily_turnover_multiple=max_daily_turnover_multiple,
             )
         ]
-        rejected_quality_floor_count += max(
-            0, len(eligible_parsed_rows) - len(phase2_quality)
-        )
+        rejected_quality_floor_count += max(0, len(eligible_parsed_rows) - len(phase2_quality))
 
         for c in eligible_parsed_rows:
             if c not in phase2_quality:

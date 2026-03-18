@@ -7,6 +7,7 @@ from types import SimpleNamespace
 
 import project.pipelines.research.validate_expectancy_traps as traps
 
+
 def test_newey_west_t_stat_detects_positive_mean_signal():
     rng = np.random.default_rng(11)
     series = pd.Series(0.003 + rng.normal(0.0, 0.001, 300))
@@ -15,12 +16,14 @@ def test_newey_west_t_stat_detects_positive_mean_signal():
     assert t_stat > 2.0
     assert p_value < 0.05
 
+
 def test_circular_block_bootstrap_returns_low_p_for_shifted_mean():
     rng = np.random.default_rng(19)
     series = pd.Series(0.004 + rng.normal(0.0, 0.0012, 250))
     p_value = traps._circular_block_bootstrap_pvalue(series, block_size=8, n_boot=400, seed=7)
     assert 0.0 <= p_value <= 1.0
     assert p_value < 0.05
+
 
 def test_apply_robust_survivor_gates_enforces_fdr_and_oos():
     df = pd.DataFrame(
@@ -87,6 +90,7 @@ def test_apply_robust_survivor_gates_enforces_fdr_and_oos():
     legacy = out[out["gate_legacy_survivor"]]
     assert len(legacy) >= 1
     assert len(legacy) >= len(survivors)
+
 
 def test_gate_profile_discovery_relaxes_thresholds():
     args = SimpleNamespace(

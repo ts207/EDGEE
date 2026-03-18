@@ -1,6 +1,10 @@
 from __future__ import annotations
 
-from project.pipelines.research.compile_strategy_blueprints import _build_blueprint, _load_operator_registry
+from project.pipelines.research.compile_strategy_blueprints import (
+    _build_blueprint,
+    _load_operator_registry,
+)
+
 
 def test_build_blueprint_records_bridge_embargo_in_lineage():
     row = {
@@ -28,6 +32,7 @@ def test_build_blueprint_records_bridge_embargo_in_lineage():
     )
 
     assert bp.lineage.bridge_embargo_days_used == 3
+
 
 def test_blueprint_contains_ontology_contract():
     row = {

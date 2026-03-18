@@ -6,7 +6,10 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from project.events.families.canonical_proxy import AbsorptionProxyDetector, DepthStressProxyDetector
+from project.events.families.canonical_proxy import (
+    AbsorptionProxyDetector,
+    DepthStressProxyDetector,
+)
 from project.io.utils import read_parquet
 from project.scripts.detector_audit_module import _enrich_df
 from project.scripts.generate_synthetic_crypto_regimes import (
@@ -64,7 +67,9 @@ def test_deleveraging_regime_includes_relief_phase():
     assert shock["close"].iloc[-1] < shock["close"].iloc[0]
     assert relief["close"].iloc[-1] >= relief["close"].iloc[0]
 
-    liq_seg = liq[(liq["timestamp"] >= seg_start) & (liq["timestamp"] < seg_end)].reset_index(drop=True)
+    liq_seg = liq[(liq["timestamp"] >= seg_start) & (liq["timestamp"] < seg_end)].reset_index(
+        drop=True
+    )
     assert not liq_seg.empty
     liq_split = max(1, int(len(liq_seg) * 0.70))
     relief_liq = liq_seg["notional_usd"].iloc[liq_split:]
@@ -100,7 +105,9 @@ def test_generate_synthetic_crypto_run_writes_run_scoped_lake(tmp_path):
     assert "intended_effect_direction" in first_segment
     assert any(seg["regime_type"] == "post_deleveraging_rebound" for seg in truth["segments"])
 
-    btc_perp = tmp_path / "lake" / "runs" / "synthetic_test" / "cleaned" / "perp" / "BTCUSDT" / "bars_5m"
+    btc_perp = (
+        tmp_path / "lake" / "runs" / "synthetic_test" / "cleaned" / "perp" / "BTCUSDT" / "bars_5m"
+    )
     funding_path = Path(payload["symbols"][0]["paths"]["funding"])
     assert btc_perp.exists()
     assert funding_path.exists()
@@ -118,13 +125,17 @@ def test_breakout_failure_regime_seeds_compression_then_expansion():
         seed=7,
     )
 
-    breakout_segment = next(seg for seg in payload["regimes"] if seg["regime_type"] == "breakout_failure")
+    breakout_segment = next(
+        seg for seg in payload["regimes"] if seg["regime_type"] == "breakout_failure"
+    )
     perp = payload["perp"].copy()
     perp["timestamp"] = pd.to_datetime(perp["timestamp"], utc=True)
 
     seg_start = pd.Timestamp(breakout_segment["start_ts"], tz="UTC")
     seg_end = pd.Timestamp(breakout_segment["end_ts"], tz="UTC")
-    seg = perp[(perp["timestamp"] >= seg_start) & (perp["timestamp"] < seg_end)].reset_index(drop=True)
+    seg = perp[(perp["timestamp"] >= seg_start) & (perp["timestamp"] < seg_end)].reset_index(
+        drop=True
+    )
     assert not seg.empty
 
     compression_len = max(1, int(len(seg) * 0.60))
@@ -148,14 +159,20 @@ def test_liquidity_stress_regime_collapses_quote_volume_and_widens_spread():
         seed=7,
     )
 
-    liquidity_segment = next(seg for seg in payload["regimes"] if seg["regime_type"] == "liquidity_stress")
+    liquidity_segment = next(
+        seg for seg in payload["regimes"] if seg["regime_type"] == "liquidity_stress"
+    )
     perp = payload["perp"].copy()
     perp["timestamp"] = pd.to_datetime(perp["timestamp"], utc=True)
 
     seg_start = pd.Timestamp(liquidity_segment["start_ts"], tz="UTC")
     seg_end = pd.Timestamp(liquidity_segment["end_ts"], tz="UTC")
-    seg = perp[(perp["timestamp"] >= seg_start) & (perp["timestamp"] < seg_end)].reset_index(drop=True)
-    baseline = perp[(perp["timestamp"] >= seg_start - pd.Timedelta(hours=8)) & (perp["timestamp"] < seg_start)].reset_index(drop=True)
+    seg = perp[(perp["timestamp"] >= seg_start) & (perp["timestamp"] < seg_end)].reset_index(
+        drop=True
+    )
+    baseline = perp[
+        (perp["timestamp"] >= seg_start - pd.Timedelta(hours=8)) & (perp["timestamp"] < seg_start)
+    ].reset_index(drop=True)
 
     assert not seg.empty
     assert not baseline.empty
@@ -196,33 +213,42 @@ def test_post_deleveraging_rebound_properties():
         seed=7,
     )
 
-    rebound_segments = [seg for seg in payload["regimes"] if seg["regime_type"] == "post_deleveraging_rebound"]
+    rebound_segments = [
+        seg for seg in payload["regimes"] if seg["regime_type"] == "post_deleveraging_rebound"
+    ]
     assert rebound_segments
-    
+
     perp = payload["perp"].copy()
     perp["timestamp"] = pd.to_datetime(perp["timestamp"], utc=True)
 
     for segment in rebound_segments:
         seg_start = pd.Timestamp(segment["start_ts"], tz="UTC")
         seg_end = pd.Timestamp(segment["end_ts"], tz="UTC")
-        seg = perp[(perp["timestamp"] >= seg_start) & (perp["timestamp"] < seg_end)].reset_index(drop=True)
-        
+        seg = perp[(perp["timestamp"] >= seg_start) & (perp["timestamp"] < seg_end)].reset_index(
+            drop=True
+        )
+
         assert not seg.empty
-        
+
         # Check returns (should match segment sign)
         total_ret = (seg["close"].iloc[-1] / seg["close"].iloc[0]) - 1.0
         if segment["sign"] > 0:
             assert total_ret > 0
         else:
             assert total_ret < 0
-            
+
         # Check volume decay (first half should have higher volume than second half)
         mid_idx = len(seg) // 2
         assert seg["volume"].iloc[:mid_idx].mean() > seg["volume"].iloc[mid_idx:].mean()
-        
+
         # Check wicks (should be elevated compared to baseline quiet periods)
-        baseline = perp[(perp["timestamp"] >= seg_start - pd.Timedelta(hours=8)) & (perp["timestamp"] < seg_start)].reset_index(drop=True)
+        baseline = perp[
+            (perp["timestamp"] >= seg_start - pd.Timedelta(hours=8))
+            & (perp["timestamp"] < seg_start)
+        ].reset_index(drop=True)
         if not baseline.empty:
             wick_seg = (seg["high"] - np.maximum(seg["open"], seg["close"])) / seg["close"]
-            wick_base = (baseline["high"] - np.maximum(baseline["open"], baseline["close"])) / baseline["close"]
+            wick_base = (
+                baseline["high"] - np.maximum(baseline["open"], baseline["close"])
+            ) / baseline["close"]
             assert wick_seg.mean() > wick_base.mean()

@@ -25,4 +25,3 @@ def test_resolve_search_profile_preserves_custom_search_spec():
     assert resolved["search_spec"] == "custom_spec"
     assert resolved["min_n"] == 12
     assert resolved["min_t_stat"] == 0.75
-

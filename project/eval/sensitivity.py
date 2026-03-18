@@ -4,17 +4,18 @@ from typing import Any, Callable, Dict, List
 import numpy as np
 import pandas as pd
 
+
 def perturb_exit_parameters(blueprint: Dict[str, Any], pct: float = 0.1) -> List[Dict[str, Any]]:
     """
     Perturb exit parameters (t_stop/stop_value and t_target/target_value) by +/- pct.
     Returns a list of perturbed blueprints.
     """
     perturbed = []
-    
+
     base_stop = 1.0
     base_target = 1.0
     is_dsl = False
-    
+
     if "exit" in blueprint and "stop_value" in blueprint["exit"]:
         is_dsl = True
         base_stop = float(blueprint["exit"]["stop_value"])
@@ -35,7 +36,7 @@ def perturb_exit_parameters(blueprint: Dict[str, Any], pct: float = 0.1) -> List
         (1.0 + pct, 1.0 - pct),
         (1.0 + pct, 1.0 + pct),
     ]
-                   
+
     for m_stop, m_target in multipliers:
         bp_copy = copy.deepcopy(blueprint)
         if is_dsl:
@@ -48,10 +49,11 @@ def perturb_exit_parameters(blueprint: Dict[str, Any], pct: float = 0.1) -> List
                 bp_copy["params"] = {}
             bp_copy["params"]["t_stop"] = base_stop * m_stop
             bp_copy["params"]["t_target"] = base_target * m_target
-            
+
         perturbed.append(bp_copy)
-        
+
     return perturbed
+
 
 def perturb_delay_bars(blueprint: Dict[str, Any], delays: List[int] = None) -> List[Dict[str, Any]]:
     """
@@ -59,15 +61,15 @@ def perturb_delay_bars(blueprint: Dict[str, Any], delays: List[int] = None) -> L
     """
     if delays is None:
         delays = [0, 1, 2, 3]
-        
+
     perturbed = []
-    
+
     is_dsl = ("entry" in blueprint and "delay_bars" in blueprint["entry"]) or ("entry" in blueprint)
     if not is_dsl and "params" in blueprint and "delay_bars" in blueprint["params"]:
-        pass # Not DSL, but uses params
+        pass  # Not DSL, but uses params
     elif not is_dsl and "entry" not in blueprint and "params" not in blueprint:
-        is_dsl = True # Default
-    
+        is_dsl = True  # Default
+
     for delay in delays:
         bp_copy = copy.deepcopy(blueprint)
         if is_dsl:
@@ -79,40 +81,41 @@ def perturb_delay_bars(blueprint: Dict[str, Any], delays: List[int] = None) -> L
                 bp_copy["params"] = {}
             bp_copy["params"]["delay_bars"] = delay
         perturbed.append(bp_copy)
-        
+
     return perturbed
 
+
 def run_lightweight_eval(
-    blueprints: List[Dict[str, Any]], 
-    evaluator_fn: Callable[[Dict[str, Any]], Dict[str, float]]
+    blueprints: List[Dict[str, Any]], evaluator_fn: Callable[[Dict[str, Any]], Dict[str, float]]
 ) -> Dict[str, float]:
     """
-    Run lightweight evaluation with perturbed parameters and return the variance 
+    Run lightweight evaluation with perturbed parameters and return the variance
     in performance metrics (e.g., win_rate, pnl).
     """
     results = []
     for bp in blueprints:
         metrics = evaluator_fn(bp)
         results.append(metrics)
-        
+
     if not results:
         return {}
-        
+
     df = pd.DataFrame(results)
-    
+
     variances = {}
     for col in df.select_dtypes(include=[np.number]).columns:
         # Use ddof=1 for sample variance. If length is 1, it will be NaN.
         val = df[col].var(ddof=1)
         variances[f"{col}_variance"] = float(val) if not pd.isna(val) else 0.0
-        
+
     return variances
+
 
 def append_sensitivity_to_report(
     blueprint: Dict[str, Any],
     evaluator_fn: Callable[[Dict[str, Any]], Dict[str, float]],
     pct: float = 0.1,
-    delays: List[int] = None
+    delays: List[int] = None,
 ) -> pd.DataFrame:
     """
     Perform both sweeps, run evaluations, and return a DataFrame that can be
@@ -120,15 +123,15 @@ def append_sensitivity_to_report(
     """
     if delays is None:
         delays = [0, 1, 2, 3]
-        
+
     report_rows = []
-    
+
     # Baseline
     base_metrics = evaluator_fn(blueprint)
     base_row = {"perturbation": "baseline", "type": "baseline"}
     base_row.update(base_metrics)
     report_rows.append(base_row)
-    
+
     # Exits
     exit_bps = perturb_exit_parameters(blueprint, pct=pct)
     for i, bp in enumerate(exit_bps):
@@ -136,7 +139,7 @@ def append_sensitivity_to_report(
         row = {"perturbation": f"exit_sweep_{i}", "type": "exit"}
         row.update(metrics)
         report_rows.append(row)
-        
+
     # Delays
     delay_bps = perturb_delay_bars(blueprint, delays=delays)
     for i, bp in enumerate(delay_bps):
@@ -144,5 +147,5 @@ def append_sensitivity_to_report(
         row = {"perturbation": f"delay_{delays[i]}", "type": "delay"}
         row.update(metrics)
         report_rows.append(row)
-        
+
     return pd.DataFrame(report_rows)

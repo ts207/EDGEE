@@ -4,7 +4,11 @@ from pathlib import Path
 
 import pandas as pd
 
-from project.events.detectors.registry import get_detector, list_registered_event_types, load_all_detectors
+from project.events.detectors.registry import (
+    get_detector,
+    list_registered_event_types,
+    load_all_detectors,
+)
 from project.spec_registry import load_yaml_path
 
 
@@ -15,5 +19,3 @@ def test_runtime_detector_registry_matches_detector_ownership_registry() -> None
 
     registered = set(list_registered_event_types())
     owned = {str(event_type).strip().upper() for event_type in ownership}
-
-

@@ -4,6 +4,7 @@ from typing import Any, Dict, Iterable, Mapping
 
 from project.runtime.hashing import hash_records
 
+
 def determinism_replay_check(
     ticks: Iterable[Mapping[str, Any]],
     *,

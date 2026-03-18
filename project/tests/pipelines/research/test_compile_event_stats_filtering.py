@@ -7,6 +7,7 @@ import pandas as pd
 import project.pipelines.research.compile_strategy_blueprints as compiler
 from project.events.registry import EVENT_REGISTRY_SPECS
 
+
 def _write_events_csv(root: Path, run_id: str, spec_event_type: str, rows: list[dict]) -> Path:
     spec = EVENT_REGISTRY_SPECS[spec_event_type]
     path = root / "reports" / spec.reports_dir / run_id / spec.events_file
@@ -17,6 +18,7 @@ def _write_events_csv(root: Path, run_id: str, spec_event_type: str, rows: list[
     else:
         df.to_csv(path, index=False)
     return path
+
 
 def test_event_stats_subtype_filters_shared_funding_file(monkeypatch, tmp_path):
     run_id = "r_stats_subtype"

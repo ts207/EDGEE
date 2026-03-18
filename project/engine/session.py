@@ -15,16 +15,18 @@ from project.engine.schema import STRATEGY_FRAME_SCHEMA_VERSION, PORTFOLIO_FRAME
 
 _LOG = logging.getLogger(__name__)
 
+
 class BacktestSession:
     """
     Encapsulates the state and execution environment of a backtest.
     """
+
     def __init__(self, config: RunConfiguration):
         self.config = config
         self.repo = ProjectDataRepository(config.data_root, run_id=config.run_id)
         self.engine_dir = config.data_root / "runs" / config.run_id / "engine"
         ensure_dir(self.engine_dir)
-        
+
         # Results
         self.strategy_results: Dict[str, pd.DataFrame] = {}
         self.portfolio_results: pd.DataFrame = pd.DataFrame()
@@ -34,7 +36,7 @@ class BacktestSession:
         """Store strategy returns and metrics."""
         self.strategy_results[strategy_name] = df
         self.metrics["strategies"][strategy_name] = metrics
-        
+
         # Auto-flush strategy returns to disk to save memory
         write_engine_dataframe(
             df,
@@ -54,7 +56,7 @@ class BacktestSession:
                 schema_name="portfolio_frame",
                 schema_version=PORTFOLIO_FRAME_SCHEMA_VERSION,
             )
-            
+
         metrics_path = self.engine_dir / "metrics.json"
         metrics_path.write_text(json.dumps(self.metrics, indent=2, sort_keys=True))
         _LOG.info(f"Session finalized. Results at {self.engine_dir}")

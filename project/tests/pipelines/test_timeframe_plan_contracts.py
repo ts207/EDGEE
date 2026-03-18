@@ -99,9 +99,15 @@ def test_multi_timeframe_plan_contracts_are_resolved_per_timeframe() -> None:
     assert feat_issues_1m == []
     assert feat_issues_5m == []
     assert feat_issues_15m == []
-    assert feat_1m is not None and feat_1m.optional_inputs == _expected_feature_optional_inputs("1m")
-    assert feat_5m is not None and feat_5m.optional_inputs == _expected_feature_optional_inputs("5m")
-    assert feat_15m is not None and feat_15m.optional_inputs == _expected_feature_optional_inputs("15m")
+    assert feat_1m is not None and feat_1m.optional_inputs == _expected_feature_optional_inputs(
+        "1m"
+    )
+    assert feat_5m is not None and feat_5m.optional_inputs == _expected_feature_optional_inputs(
+        "5m"
+    )
+    assert feat_15m is not None and feat_15m.optional_inputs == _expected_feature_optional_inputs(
+        "15m"
+    )
 
 
 def test_combined_timeframe_preflight_resolves_stage_contracts_without_5m_leakage() -> None:
@@ -114,7 +120,9 @@ def test_combined_timeframe_preflight_resolves_stage_contracts_without_5m_leakag
 
     assert contracts["build_features_1m"].optional_inputs == _expected_feature_optional_inputs("1m")
     assert contracts["build_features_5m"].optional_inputs == _expected_feature_optional_inputs("5m")
-    assert contracts["build_features_15m"].optional_inputs == _expected_feature_optional_inputs("15m")
+    assert contracts["build_features_15m"].optional_inputs == _expected_feature_optional_inputs(
+        "15m"
+    )
 
     for stage_name, contract in contracts.items():
         if "_5m" in stage_name:

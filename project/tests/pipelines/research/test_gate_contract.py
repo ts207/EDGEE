@@ -4,6 +4,7 @@ from pathlib import Path
 
 from project.specs import gates
 
+
 def test_select_phase2_gate_spec_auto_profiles():
     spec = {
         "gate_v1_phase2": {"max_q_value": 0.05},
@@ -19,6 +20,7 @@ def test_select_phase2_gate_spec_auto_profiles():
     assert discovery["_resolved_profile"] == "discovery"
     assert promotion["max_q_value"] == 0.01
     assert promotion["_resolved_profile"] == "promotion"
+
 
 def test_resolve_phase2_gate_params_applies_event_override():
     phase2_cfg = {
@@ -45,6 +47,7 @@ def test_resolve_phase2_gate_params_applies_event_override():
     assert cfg["conditioned_bucket_min_samples_override"] is None
     assert cfg["allow_conditioned_bucket_floor_override"] is False
 
+
 def test_resolve_phase2_gate_params_reads_conditioned_bucket_override_policy():
     phase2_cfg = {
         "conditioned_bucket_hard_floor": 35,
@@ -61,11 +64,13 @@ def test_resolve_phase2_gate_params_reads_conditioned_bucket_override_policy():
     assert cfg["conditioned_bucket_min_samples_override"] == 20
     assert cfg["allow_conditioned_bucket_floor_override"] is True
 
+
 def test_select_fallback_gate_spec_defaults_when_missing():
     out = gates.select_fallback_gate_spec({})
     assert out["min_t_stat"] == 2.5
     assert out["min_after_cost_expectancy_bps"] == 1.0
     assert out["min_sample_size"] == 100
+
 
 def test_select_bridge_gate_spec_reads_override():
     out = gates.select_bridge_gate_spec(
@@ -81,6 +86,7 @@ def test_select_bridge_gate_spec_reads_override():
     assert out["stressed_cost_multiplier"] == 1.25
     assert out["min_validation_trades"] == 12
 
+
 def test_resolve_promotion_base_min_events_uses_spec_and_contract_floor():
     out = gates.resolve_promotion_base_min_events(
         {"gate_v1_phase2": {"min_sample_size": 50}},
@@ -88,6 +94,7 @@ def test_resolve_promotion_base_min_events_uses_spec_and_contract_floor():
         contract_min_trade_count=120,
     )
     assert out == 120
+
 
 def test_load_gates_spec_reads_repo_spec():
     repo_root = Path(__file__).resolve().parents[3]

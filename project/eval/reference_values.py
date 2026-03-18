@@ -1,10 +1,12 @@
 """
 Ground truth reference values for basic features.
 """
+
 from __future__ import annotations
 
 import pandas as pd
 import numpy as np
+
 
 def get_reference_sma(data: pd.Series, window: int) -> pd.Series:
     """
@@ -12,11 +14,13 @@ def get_reference_sma(data: pd.Series, window: int) -> pd.Series:
     """
     return data.rolling(window=window).mean()
 
+
 def get_reference_volatility(data: pd.Series, window: int) -> pd.Series:
     """
     Reference implementation of rolling volatility (std dev).
     """
     return data.rolling(window=window).std()
+
 
 def get_synthetic_test_data(n: int = 100) -> pd.Series:
     """

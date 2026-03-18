@@ -16,7 +16,7 @@ class ArtifactSpecContract:
     optional_inputs: tuple[str, ...]
     outputs: tuple[str, ...]
     external_inputs: tuple[str, ...]
-    version: str = 'phase5_artifact_contract_v1'
+    version: str = "phase5_artifact_contract_v1"
 
 
 def build_artifact_specs() -> tuple[ArtifactSpecContract, ...]:
@@ -37,15 +37,23 @@ def validate_artifact_registry_definitions() -> List[str]:
     seen: set[tuple[str, ...]] = set()
     for spec in build_artifact_specs():
         if not spec.stage_patterns:
-            issues.append(f'artifact contract has no stage_patterns: {spec}')
+            issues.append(f"artifact contract has no stage_patterns: {spec}")
             continue
         if spec.stage_patterns in seen:
-            issues.append(f'duplicate artifact contract patterns: {spec.stage_patterns}')
+            issues.append(f"duplicate artifact contract patterns: {spec.stage_patterns}")
         seen.add(spec.stage_patterns)
-        for field_name in ("stage_patterns", "inputs", "optional_inputs", "outputs", "external_inputs"):
+        for field_name in (
+            "stage_patterns",
+            "inputs",
+            "optional_inputs",
+            "outputs",
+            "external_inputs",
+        ):
             value = getattr(spec, field_name)
             if not isinstance(value, tuple):
-                issues.append(f"artifact contract field {field_name} must be a tuple for {spec.stage_patterns}")
+                issues.append(
+                    f"artifact contract field {field_name} must be a tuple for {spec.stage_patterns}"
+                )
                 continue
             invalid = [item for item in value if not isinstance(item, str) or not item.strip()]
             if invalid:
@@ -54,11 +62,13 @@ def validate_artifact_registry_definitions() -> List[str]:
                 )
         for pattern in spec.stage_patterns:
             if not str(pattern).strip():
-                issues.append(f'artifact contract has blank stage_pattern in {spec.stage_patterns}')
+                issues.append(f"artifact contract has blank stage_pattern in {spec.stage_patterns}")
     return issues
 
 
-def resolve_artifact_specs_for_stage(stage_name: str, base_args: list[str]) -> ArtifactSpecContract | None:
+def resolve_artifact_specs_for_stage(
+    stage_name: str, base_args: list[str]
+) -> ArtifactSpecContract | None:
     resolved, issues = resolve_stage_artifact_contract(stage_name, base_args)
     if issues or resolved is None:
         return None

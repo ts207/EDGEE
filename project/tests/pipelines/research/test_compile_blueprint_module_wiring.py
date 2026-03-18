@@ -16,6 +16,7 @@ from project.strategy.dsl.schema import (
     SymbolScopeSpec,
 )
 
+
 def _make_blueprint(*, bp_id: str, candidate_id: str) -> Blueprint:
     return Blueprint(
         id=bp_id,
@@ -65,6 +66,7 @@ def _make_blueprint(*, bp_id: str, candidate_id: str) -> Blueprint:
         ),
     )
 
+
 def test_choose_event_rows_delegates_to_selection_module(monkeypatch):
     captured: dict[str, object] = {}
     sentinel_rows = [{"candidate_id": "c1"}]
@@ -99,6 +101,7 @@ def test_choose_event_rows_delegates_to_selection_module(monkeypatch):
     assert captured["passes_fallback_gate_fn"] is compiler._passes_fallback_gate
     assert captured["as_bool_fn"] is compiler._as_bool
     assert captured["safe_float_fn"] is compiler._safe_float
+
 
 def test_annotate_blueprints_external_validation_supports_pydantic_models(monkeypatch):
     bp = _make_blueprint(bp_id="bp_1", candidate_id="c_1")

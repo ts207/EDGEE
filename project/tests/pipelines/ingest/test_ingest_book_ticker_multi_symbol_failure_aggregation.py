@@ -4,6 +4,7 @@ import sys
 
 import project.pipelines.ingest.ingest_binance_um_book_ticker as ingest_book_ticker
 
+
 class _FakeFuture:
     def __init__(self, *, result_payload=None, error: Exception | None = None):
         self._result_payload = result_payload
@@ -13,6 +14,7 @@ class _FakeFuture:
         if self._error is not None:
             raise self._error
         return self._result_payload
+
 
 def _patch_common_runtime(monkeypatch, capture: list[dict], future_factory):
     class _FakeExecutor:
@@ -42,6 +44,7 @@ def _patch_common_runtime(monkeypatch, capture: list[dict], future_factory):
         return manifest
 
     monkeypatch.setattr(ingest_book_ticker, "finalize_manifest", fake_finalize)
+
 
 def test_book_ticker_collects_all_symbol_outcomes_before_manifest(monkeypatch):
     capture: list[dict] = []
@@ -88,6 +91,7 @@ def test_book_ticker_collects_all_symbol_outcomes_before_manifest(monkeypatch):
     assert "ETHUSDT" in stats["symbols"]
     assert stats["symbols"]["ETHUSDT"]["status"] == "failed"
     assert "eth failed" in stats["symbols"]["ETHUSDT"]["error"]
+
 
 def test_book_ticker_success_when_all_symbols_succeed(monkeypatch):
     capture: list[dict] = []

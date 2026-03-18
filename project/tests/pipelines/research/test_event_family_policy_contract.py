@@ -4,10 +4,12 @@ from project.events.registry import EVENT_REGISTRY_SPECS
 from project.pipelines import run_all
 from project.strategy.dsl.policies import DEFAULT_POLICY, event_policy
 
+
 def test_phase2_chain_covers_all_registry_event_families():
     chain_events = {str(event).strip() for event, _, _ in run_all.PHASE2_EVENT_CHAIN}
     registry_events = set(EVENT_REGISTRY_SPECS.keys())
     assert chain_events == registry_events
+
 
 def test_every_chain_family_has_explicit_policy_and_signal_trigger():
     for event_type, _, _ in run_all.PHASE2_EVENT_CHAIN:

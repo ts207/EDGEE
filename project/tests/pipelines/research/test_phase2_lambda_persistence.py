@@ -3,6 +3,7 @@
 Verifies that _build_lambda_snapshot → save_lambda_state_json → reload JSON
 produces a consistent representation of the lambda state.
 """
+
 import json
 
 from pathlib import Path
@@ -14,6 +15,7 @@ from project.pipelines.research.phase2_lambda_persistence import (
     _build_lambda_snapshot,
     save_lambda_state_json,
 )
+
 
 def _make_fdr_df() -> pd.DataFrame:
     """Minimal FDR DataFrame with lambda columns for all 3 levels."""
@@ -32,14 +34,23 @@ def _make_fdr_df() -> pd.DataFrame:
         }
     )
 
+
 def test_build_lambda_snapshot_schema():
     """Snapshot DataFrame has the expected columns."""
     df = _make_fdr_df()
     snapshot = _build_lambda_snapshot(df)
-    expected_cols = {"level", "template_verb", "horizon", "canonical_family",
-                     "canonical_event_type", "lambda_value", "lambda_status"}
+    expected_cols = {
+        "level",
+        "template_verb",
+        "horizon",
+        "canonical_family",
+        "canonical_event_type",
+        "lambda_value",
+        "lambda_status",
+    }
     assert set(snapshot.columns) == expected_cols
     assert set(snapshot["level"].unique()) == {"family", "event", "state"}
+
 
 def test_save_lambda_state_json_roundtrip(tmp_path: Path):
     """JSON output contains all levels and can be parsed back to dict."""
@@ -66,7 +77,7 @@ def test_save_lambda_state_json_roundtrip(tmp_path: Path):
         assert "lambda_value" in entry
         assert "lambda_status" in entry
         assert "canonical_family" not in entry  # family level has no family key
-    
+
     # Verify event entries have canonical_family
     for entry in state["event"]:
         assert "canonical_family" in entry
@@ -76,6 +87,7 @@ def test_save_lambda_state_json_roundtrip(tmp_path: Path):
     for entry in state["state"]:
         assert "canonical_family" in entry
         assert "canonical_event_type" in entry
+
 
 def test_save_lambda_state_json_empty(tmp_path: Path):
     """Empty FDR DataFrame produces valid JSON with empty levels."""

@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import pandas as pd
 
-from project.research.search.bridge_adapter import hypotheses_to_bridge_candidates, split_bridge_candidates
+from project.research.search.bridge_adapter import (
+    hypotheses_to_bridge_candidates,
+    split_bridge_candidates,
+)
 
 
 def _make_metrics_df() -> pd.DataFrame:

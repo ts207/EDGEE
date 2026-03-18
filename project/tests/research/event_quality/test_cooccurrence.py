@@ -7,10 +7,12 @@ from project.research.event_quality.cooccurrence import compute_cooccurrence
 
 def _make_synced_events(n_bars: int = 300) -> pd.DataFrame:
     """event_a and event_b fire at exactly the same bars (every 20 bars)."""
-    df = pd.DataFrame({
-        "timestamp": pd.date_range("2023-01-01", periods=n_bars, freq="5min"),
-        "close": 100.0,
-    })
+    df = pd.DataFrame(
+        {
+            "timestamp": pd.date_range("2023-01-01", periods=n_bars, freq="5min"),
+            "close": 100.0,
+        }
+    )
     df["event_a"] = [i % 20 == 0 for i in range(n_bars)]
     df["event_b"] = [i % 20 == 0 for i in range(n_bars)]
     return df
@@ -18,10 +20,12 @@ def _make_synced_events(n_bars: int = 300) -> pd.DataFrame:
 
 def _make_independent_events(n_bars: int = 300) -> pd.DataFrame:
     """event_a fires at even 20-bar multiples, event_c fires at odd 20-bar multiples + 10."""
-    df = pd.DataFrame({
-        "timestamp": pd.date_range("2023-01-01", periods=n_bars, freq="5min"),
-        "close": 100.0,
-    })
+    df = pd.DataFrame(
+        {
+            "timestamp": pd.date_range("2023-01-01", periods=n_bars, freq="5min"),
+            "close": 100.0,
+        }
+    )
     df["event_a"] = [i % 20 == 0 for i in range(n_bars)]
     # offset by 10 so they never overlap within ±5 bars
     df["event_c"] = [i % 20 == 10 for i in range(n_bars)]

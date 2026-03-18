@@ -7,26 +7,27 @@ import sys
 # Configure logging to see rejections
 logging.basicConfig(level=logging.DEBUG, stream=sys.stdout)
 
+
 def debug_rejections():
     print("Generating hypotheses from 'synthetic_truth' with debug logging...")
     # This will trigger log.debug("Rejecting invalid spec %s: %s", ...)
     specs, audit = generate_hypotheses_with_audit("synthetic_truth")
-    
+
     print("\nSummary of Rejections:")
     print(f"Total Attempted: {audit['counts']['generated']}")
     print(f"Total Rejected:  {audit['counts']['rejected']}")
     print(f"Rejection Reasons: {audit['rejection_reason_counts']}")
-    
+
     # Analyze the rejected rows to find specific errors
     errors_by_event = {}
-    for row in audit['rejected_rows']:
+    for row in audit["rejected_rows"]:
         # row comes from FeasibilityCheckedHypothesis.to_record()
         # It should have feasibility.details['errors'] if it was a validation_error
         # But wait, looking at generator.py line 226:
         # _record_rejection("validation_error", {"errors": list(errors)})
-        
+
         # Let's just manually re-validate to be sure
-        spec_dict = row.get('spec') # Not in the record directly usually? 
+        spec_dict = row.get("spec")  # Not in the record directly usually?
         # Actually FeasibilityCheckedHypothesis.to_record() includes spec?
         # Let's just use the audit data if possible.
         pass
@@ -53,11 +54,12 @@ def debug_rejections():
                 direction=direction,
                 horizon=horizon,
                 template_id=template,
-                entry_lag=1
+                entry_lag=1,
             )
             errors = validate_hypothesis_spec(spec)
             if errors:
                 print(f"REJECTED: {event_id} | {template} | {horizon} | {direction} -> {errors}")
+
 
 if __name__ == "__main__":
     debug_rejections()

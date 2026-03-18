@@ -16,19 +16,26 @@ from project.core.constants import (
 from project.research.services.phase2_support import horizon_to_bars
 from project.pipelines.research import validate_event_quality
 
+
 def test_runner_uses_canonical_bars_per_year_map():
     assert runner.BARS_PER_YEAR == BARS_PER_YEAR_BY_TIMEFRAME
+
 
 def test_horizon_lookup_uses_canonical_mapping():
     assert horizon_to_bars("5m") == HORIZON_BARS_BY_TIMEFRAME["5m"]
     assert horizon_to_bars("60m") == HORIZON_BARS_BY_TIMEFRAME["60m"]
     assert horizon_to_bars("unknown_horizon") == 12
 
+
 def test_default_event_horizon_grid_is_stable():
     assert DEFAULT_EVENT_HORIZON_BARS == [1, 3, 12]
 
+
 def test_validate_event_quality_default_horizons_uses_canonical_constant():
-    assert validate_event_quality._default_horizons_bars_csv() == ",".join(str(x) for x in DEFAULT_EVENT_HORIZON_BARS)
+    assert validate_event_quality._default_horizons_bars_csv() == ",".join(
+        str(x) for x in DEFAULT_EVENT_HORIZON_BARS
+    )
+
 
 def test_spec_loader_precedence_explicit_over_env_over_default(tmp_path, monkeypatch):
     repo_root = tmp_path / "repo"
@@ -50,6 +57,7 @@ def test_spec_loader_precedence_explicit_over_env_over_default(tmp_path, monkeyp
     loaded = load_global_defaults(project_root=project_root, explicit_path=explicit_path)
     assert loaded["source"] == "explicit"
 
+
 def test_spec_loader_env_over_default(tmp_path, monkeypatch):
     repo_root = tmp_path / "repo"
     project_root = repo_root / "project"
@@ -65,6 +73,7 @@ def test_spec_loader_env_over_default(tmp_path, monkeypatch):
     loaded = load_global_defaults(project_root=project_root)
     assert loaded["source"] == "env"
 
+
 def test_spec_loader_required_raises_when_missing(tmp_path, monkeypatch):
     repo_root = tmp_path / "repo"
     project_root = repo_root / "project"
@@ -74,6 +83,7 @@ def test_spec_loader_required_raises_when_missing(tmp_path, monkeypatch):
     with pytest.raises(FileNotFoundError):
         load_global_defaults(project_root=project_root, required=True)
 
+
 def test_spec_loader_returns_empty_when_optional_and_missing(tmp_path, monkeypatch):
     repo_root = tmp_path / "repo"
     project_root = repo_root / "project"
@@ -81,6 +91,7 @@ def test_spec_loader_returns_empty_when_optional_and_missing(tmp_path, monkeypat
     monkeypatch.delenv("BACKTEST_GLOBAL_DEFAULTS_PATH", raising=False)
 
     assert load_global_defaults(project_root=project_root) == {}
+
 
 def test_objective_spec_loader_precedence_explicit_over_env_over_default(tmp_path, monkeypatch):
     repo_root = tmp_path / "repo"
@@ -106,6 +117,7 @@ def test_objective_spec_loader_precedence_explicit_over_env_over_default(tmp_pat
     )
     assert loaded["id"] == "explicit"
 
+
 def test_objective_spec_loader_env_over_default(tmp_path, monkeypatch):
     repo_root = tmp_path / "repo"
     project_root = repo_root / "project"
@@ -127,6 +139,7 @@ def test_objective_spec_loader_env_over_default(tmp_path, monkeypatch):
     )
     assert loaded["id"] == "env"
 
+
 def test_objective_spec_loader_required_raises_when_missing(tmp_path, monkeypatch):
     repo_root = tmp_path / "repo"
     project_root = repo_root / "project"
@@ -139,6 +152,7 @@ def test_objective_spec_loader_required_raises_when_missing(tmp_path, monkeypatc
             objective_name="retail_profitability",
             required=True,
         )
+
 
 def test_retail_profile_loader_precedence_explicit_over_env_over_default(tmp_path, monkeypatch):
     repo_root = tmp_path / "repo"
@@ -169,6 +183,7 @@ def test_retail_profile_loader_precedence_explicit_over_env_over_default(tmp_pat
     )
     assert int(loaded["max_leverage"]) == 2
 
+
 def test_retail_profile_loader_env_over_default(tmp_path, monkeypatch):
     repo_root = tmp_path / "repo"
     project_root = repo_root / "project"
@@ -192,6 +207,7 @@ def test_retail_profile_loader_env_over_default(tmp_path, monkeypatch):
     )
     assert int(loaded["max_leverage"]) == 5
 
+
 def test_retail_profile_loader_required_raises_when_missing(tmp_path, monkeypatch):
     repo_root = tmp_path / "repo"
     project_root = repo_root / "project"
@@ -204,6 +220,7 @@ def test_retail_profile_loader_required_raises_when_missing(tmp_path, monkeypatc
             profile_name="capital_constrained",
             required=True,
         )
+
 
 def test_retail_profile_loader_required_raises_when_profile_unknown(tmp_path):
     repo_root = tmp_path / "repo"

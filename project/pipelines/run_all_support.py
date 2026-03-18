@@ -63,7 +63,10 @@ def evaluate_startup_guards(*, args: Any, non_production_overrides: list[str]) -
             + ", ".join(forbidden_production_overrides)
         )
 
-    if bool(int(getattr(args, "ci_fail_on_non_production_overrides", 0) or 0)) and non_production_overrides:
+    if (
+        bool(int(getattr(args, "ci_fail_on_non_production_overrides", 0) or 0))
+        and non_production_overrides
+    ):
         return "CI override guard blocked run"
 
     return None

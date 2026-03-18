@@ -16,8 +16,10 @@ from project import PROJECT_ROOT
 from project.core.constants import DEFAULT_EVENT_HORIZON_BARS
 from project.specs.gates import load_gates_spec as _shared_load_gates_spec
 
+
 def _load_gates_spec() -> Dict[str, Any]:
     return _shared_load_gates_spec(PROJECT_ROOT.parent)
+
 
 from project.io.utils import (
     ensure_dir,
@@ -27,9 +29,11 @@ from project.io.utils import (
     choose_partition_dir,
 )
 
+
 def _default_horizons_bars_csv() -> str:
     DATA_ROOT = get_data_root()
     return ",".join(str(int(x)) for x in DEFAULT_EVENT_HORIZON_BARS)
+
 
 def _load_bars(run_id: str, symbol: str, timeframe: str = "5m") -> pd.DataFrame:
     DATA_ROOT = get_data_root()
@@ -44,6 +48,7 @@ def _load_bars(run_id: str, symbol: str, timeframe: str = "5m") -> pd.DataFrame:
     if not files:
         return pd.DataFrame()
     return read_parquet(files)
+
 
 def _load_features(run_id: str, symbol: str) -> pd.DataFrame:
     """Load PIT features table for join-rate computation."""
@@ -64,6 +69,7 @@ def _load_features(run_id: str, symbol: str) -> pd.DataFrame:
         return pd.DataFrame()
     df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True, errors="coerce")
     return df.dropna(subset=["timestamp"]).sort_values("timestamp").reset_index(drop=True)
+
 
 def _compute_join_rate(
     events_df: pd.DataFrame,
@@ -101,7 +107,9 @@ def _compute_join_rate(
 
     # Build a single-column events frame sorted by timestamp.
     evt_ts = pd.to_datetime(events_df[ts_col], utc=True, errors="coerce")
-    evt_frame = pd.DataFrame({"timestamp": evt_ts}).dropna().sort_values("timestamp").reset_index(drop=True)
+    evt_frame = (
+        pd.DataFrame({"timestamp": evt_ts}).dropna().sort_values("timestamp").reset_index(drop=True)
+    )
     n_events = len(evt_frame)
     if n_events == 0:
         return null_result
@@ -115,7 +123,11 @@ def _compute_join_rate(
     # whose timestamp <= event timestamp.
     merged = pd.merge_asof(
         evt_frame,
-        feat[["timestamp", "_feat_pos", "close"] if "close" in feat.columns else ["timestamp", "_feat_pos"]],
+        feat[
+            ["timestamp", "_feat_pos", "close"]
+            if "close" in feat.columns
+            else ["timestamp", "_feat_pos"]
+        ],
         on="timestamp",
         direction="backward",
         tolerance=max_feature_staleness,
@@ -146,6 +158,7 @@ def _compute_join_rate(
         label_rates[f"label_{h}b"] = float(valid / n_events)
 
     return {"features": feature_join_rate, **label_rates}
+
 
 def _compute_sensitivity(
     events_df: pd.DataFrame,
@@ -214,7 +227,6 @@ def _compute_sensitivity(
     }
 
 
-
 def _event_identity_columns(events_df: pd.DataFrame) -> pd.Series:
     if events_df.empty:
         return pd.Series(dtype=str)
@@ -232,8 +244,14 @@ def _event_identity_columns(events_df: pd.DataFrame) -> pd.Series:
 
 def _event_sign_series(events_df: pd.DataFrame) -> pd.Series:
     mapping = {
-        "long": 1.0, "up": 1.0, "buy": 1.0, "bull": 1.0,
-        "short": -1.0, "down": -1.0, "sell": -1.0, "bear": -1.0,
+        "long": 1.0,
+        "up": 1.0,
+        "buy": 1.0,
+        "bull": 1.0,
+        "short": -1.0,
+        "down": -1.0,
+        "sell": -1.0,
+        "bear": -1.0,
     }
     for col in ["sign", "event_direction", "signal_direction", "direction_score", "direction"]:
         if col not in events_df.columns:
@@ -248,7 +266,9 @@ def _event_sign_series(events_df: pd.DataFrame) -> pd.Series:
     return pd.Series(np.nan, index=events_df.index, dtype=float)
 
 
-def _compute_rerun_proxy_metrics(events_df: pd.DataFrame, severity_cols: List[str], pct_delta: float = 0.10) -> Dict[str, Any]:
+def _compute_rerun_proxy_metrics(
+    events_df: pd.DataFrame, severity_cols: List[str], pct_delta: float = 0.10
+) -> Dict[str, Any]:
     base_count = int(len(events_df))
     if base_count == 0:
         return {
@@ -308,7 +328,7 @@ def _compute_rerun_proxy_metrics(events_df: pd.DataFrame, severity_cols: List[st
     if aligned.empty:
         sign_stability = float("nan")
     else:
-        sign_stability = float((np.sign(aligned["base"]) == np.sign(aligned["tight"])) .mean())
+        sign_stability = float((np.sign(aligned["base"]) == np.sign(aligned["tight"])).mean())
 
     prevalence_elasticity = abs((tight_n - n) / max(1, n) / pct_delta) if pct_delta else 0.0
     return {
@@ -320,9 +340,15 @@ def _compute_rerun_proxy_metrics(events_df: pd.DataFrame, severity_cols: List[st
     }
 
 
-def _compare_event_runs(base_events: pd.DataFrame, rerun_events: pd.DataFrame, severity_cols: Sequence[str]) -> Dict[str, Any]:
-    base_ids = set(_event_identity_columns(base_events).tolist()) if not base_events.empty else set()
-    rerun_ids = set(_event_identity_columns(rerun_events).tolist()) if not rerun_events.empty else set()
+def _compare_event_runs(
+    base_events: pd.DataFrame, rerun_events: pd.DataFrame, severity_cols: Sequence[str]
+) -> Dict[str, Any]:
+    base_ids = (
+        set(_event_identity_columns(base_events).tolist()) if not base_events.empty else set()
+    )
+    rerun_ids = (
+        set(_event_identity_columns(rerun_events).tolist()) if not rerun_events.empty else set()
+    )
     base_n = len(base_ids)
     rerun_n = len(rerun_ids)
     union_n = len(base_ids | rerun_ids)
@@ -332,16 +358,24 @@ def _compare_event_runs(base_events: pd.DataFrame, rerun_events: pd.DataFrame, s
     def _signed_id_frame(df: pd.DataFrame) -> pd.DataFrame:
         ids = _event_identity_columns(df).rename("event_id")
         signs = _event_sign_series(df).rename("sign")
-        out = pd.concat([ids, signs], axis=1).dropna(subset=["event_id"]).drop_duplicates(subset=["event_id"], keep="last")
+        out = (
+            pd.concat([ids, signs], axis=1)
+            .dropna(subset=["event_id"])
+            .drop_duplicates(subset=["event_id"], keep="last")
+        )
         return out
 
     base_signed = _signed_id_frame(base_events)
     rerun_signed = _signed_id_frame(rerun_events)
-    aligned = base_signed.merge(rerun_signed, on="event_id", how="inner", suffixes=("_base", "_rerun")).dropna()
+    aligned = base_signed.merge(
+        rerun_signed, on="event_id", how="inner", suffixes=("_base", "_rerun")
+    ).dropna()
     if aligned.empty:
         sign_stability = float("nan")
     else:
-        sign_stability = float((np.sign(aligned["sign_base"]) == np.sign(aligned["sign_rerun"])).mean())
+        sign_stability = float(
+            (np.sign(aligned["sign_base"]) == np.sign(aligned["sign_rerun"])).mean()
+        )
 
     prevalence_elasticity = abs((rerun_n - base_n) / max(1, base_n))
     metrics: Dict[str, Any] = {
@@ -352,7 +386,14 @@ def _compare_event_runs(base_events: pd.DataFrame, rerun_events: pd.DataFrame, s
         "sign_stability": sign_stability,
     }
 
-    severity_col = next((col for col in severity_cols if col in base_events.columns and col in rerun_events.columns), None)
+    severity_col = next(
+        (
+            col
+            for col in severity_cols
+            if col in base_events.columns and col in rerun_events.columns
+        ),
+        None,
+    )
     if severity_col is not None:
         base_sev = pd.to_numeric(base_events[severity_col], errors="coerce")
         rerun_sev = pd.to_numeric(rerun_events[severity_col], errors="coerce")
@@ -367,7 +408,9 @@ def _load_rerun_events(out_dir: Path, event_type: str, symbol: str) -> pd.DataFr
     preferred = [
         out_dir / str(event_type).strip().upper() / "events.parquet",
         out_dir / str(event_type).strip().upper() / "events.csv",
-        out_dir / str(event_type).strip().upper() / f"{str(event_type).strip().lower()}_events.parquet",
+        out_dir
+        / str(event_type).strip().upper()
+        / f"{str(event_type).strip().lower()}_events.parquet",
         out_dir / str(event_type).strip().upper() / f"{str(event_type).strip().lower()}_events.csv",
     ]
     for path in preferred:
@@ -399,7 +442,11 @@ def _load_rerun_events(out_dir: Path, event_type: str, symbol: str) -> pd.DataFr
     if not frames:
         return pd.DataFrame()
     out = pd.concat(frames, ignore_index=True)
-    dedup_cols = [col for col in ["event_type", "symbol", "enter_ts", "timestamp", "event_ts", "signal_ts"] if col in out.columns]
+    dedup_cols = [
+        col
+        for col in ["event_type", "symbol", "enter_ts", "timestamp", "event_ts", "signal_ts"]
+        if col in out.columns
+    ]
     if dedup_cols:
         out = out.drop_duplicates(subset=dedup_cols)
     return out.reset_index(drop=True)
@@ -419,6 +466,7 @@ _SEVERITY_COLS: Dict[str, List[str]] = {
     "OI_FLUSH": ["oi_z", "oi_pct_change"],
     "LIQUIDATION_CASCADE": ["liquidation_notional", "liquidation_count"],
 }
+
 
 def _compute_rerun_sensitivity(
     run_id: str,
@@ -454,11 +502,15 @@ def _compute_rerun_sensitivity(
             cmd = [
                 sys.executable,
                 str(script_path),
-                "--run_id", str(run_id),
-                "--symbols", str(symbol),
-                "--timeframe", str(timeframe),
+                "--run_id",
+                str(run_id),
+                "--symbols",
+                str(symbol),
+                "--timeframe",
+                str(timeframe),
                 *detector_args,
-                "--out_dir", str(out_dir),
+                "--out_dir",
+                str(out_dir),
             ]
             proc = subprocess.run(
                 cmd,
@@ -487,6 +539,7 @@ def _compute_rerun_sensitivity(
     except Exception as exc:
         return {"status": "rerun_failed", "reason": f"{type(exc).__name__}:{exc}"}
 
+
 def validate_event_quality(
     events_df: pd.DataFrame,
     bars_df: pd.DataFrame,
@@ -509,7 +562,11 @@ def validate_event_quality(
     total_events = len(events_df)
     events_per_10k = (total_events / total_bars) * 10000 if total_bars > 0 else 0
 
-    bars_per_day = 1440 if timeframe == "1m" else (288 if timeframe == "5m" else (96 if timeframe == "15m" else 24))
+    bars_per_day = (
+        1440
+        if timeframe == "1m"
+        else (288 if timeframe == "5m" else (96 if timeframe == "15m" else 24))
+    )
     days = total_bars / bars_per_day if bars_per_day > 0 else 1
     events_per_day = total_events / days if days > 0 else 0
 
@@ -539,7 +596,7 @@ def validate_event_quality(
     # 4. Sensitivity Sweep
     severity_cols = _SEVERITY_COLS.get(event_type, ["severity", "magnitude", "score"])
     proxy_sensitivity = _compute_sensitivity(events_df, severity_cols)
-    
+
     rerun_sensitivity = {}
     if run_rerun_sensitivity:
         rerun_sensitivity = _compute_rerun_sensitivity(
@@ -547,7 +604,7 @@ def validate_event_quality(
             event_type=event_type,
             symbol=symbol,
             base_events=events_df,
-            timeframe=timeframe
+            timeframe=timeframe,
         )
 
     # 5. Hard Fail Rules (Gate E-1)
@@ -559,13 +616,17 @@ def validate_event_quality(
 
     fail_reasons = []
     if not (min_prev <= events_per_10k <= max_prev):
-        fail_reasons.append(f"PREVALENCE_OUT_OF_BOUNDS ({events_per_10k:.2f} not in [{min_prev}, {max_prev}])")
+        fail_reasons.append(
+            f"PREVALENCE_OUT_OF_BOUNDS ({events_per_10k:.2f} not in [{min_prev}, {max_prev}])"
+        )
     if join_rate < min_join:
         fail_reasons.append(f"LOW_JOIN_RATE ({join_rate:.4f} < {min_join})")
     if clustering_5 > max_clust:
         fail_reasons.append(f"EXCESSIVE_CLUSTERING ({clustering_5:.4f} > {max_clust})")
-    
-    elasticity = rerun_sensitivity.get("prevalence_elasticity", proxy_sensitivity.get("prevalence_elasticity", float("nan")))
+
+    elasticity = rerun_sensitivity.get(
+        "prevalence_elasticity", proxy_sensitivity.get("prevalence_elasticity", float("nan"))
+    )
     if not pd.isna(elasticity) and elasticity > max_elasticity:
         fail_reasons.append(f"HIGH_ELASTICITY ({elasticity:.2f} > {max_elasticity})")
 
@@ -595,6 +656,7 @@ def validate_event_quality(
         "fail_reasons": fail_reasons,
     }
     return report
+
 
 def main():
     DATA_ROOT = get_data_root()
@@ -627,16 +689,21 @@ def main():
         logging.error(f"Events file not found: {events_path}")
         sys.exit(1)
 
-
     events_df = pd.read_csv(events_path)
     reports = []
     overall_pass = True
 
     for symbol in symbols:
         bars = _load_bars(args.run_id, symbol, args.timeframe)
-        sym_events = events_df[events_df["symbol"] == symbol] if "symbol" in events_df.columns else events_df
+        sym_events = (
+            events_df[events_df["symbol"] == symbol] if "symbol" in events_df.columns else events_df
+        )
         report = validate_event_quality(
-            sym_events, bars, args.event_type, symbol, args.run_id,
+            sym_events,
+            bars,
+            args.event_type,
+            symbol,
+            args.run_id,
             timeframe=args.timeframe,
             horizons_bars=horizons_bars,
             max_join_staleness_minutes=args.max_join_staleness_minutes,

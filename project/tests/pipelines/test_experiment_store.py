@@ -5,6 +5,7 @@ import sqlite3
 
 from project.io.experiment_store import upsert_run_manifest, upsert_stage_manifest
 
+
 def test_experiment_store_upserts_run_and_stage_manifest(tmp_path):
     data_root = tmp_path / "data"
     run_id = "r1"

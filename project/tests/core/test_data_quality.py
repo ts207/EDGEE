@@ -40,4 +40,3 @@ def test_summarize_frame_quality_reports_gaps_duplicates_and_missing_ratio():
     assert summary.gap_ratio == 0.5
     assert summary.coerced_value_count == 3
     assert summary.missing_ratio > 0.0
-

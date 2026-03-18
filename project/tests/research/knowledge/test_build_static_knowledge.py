@@ -25,9 +25,17 @@ def test_build_static_knowledge_writes_expected_artifacts(tmp_path):
     knobs = pd.read_parquet(result["knobs_path"])
     index_payload = json.loads(result["index_path"].read_text(encoding="utf-8"))
 
-    assert {"event", "state", "template", "detector", "context_family", "context_label", "feature", "event_family", "trigger_type"} <= set(
-        entities["entity_type"].astype(str)
-    )
+    assert {
+        "event",
+        "state",
+        "template",
+        "detector",
+        "context_family",
+        "context_label",
+        "feature",
+        "event_family",
+        "trigger_type",
+    } <= set(entities["entity_type"].astype(str))
     assert "belongs_to_family" in set(relations["relation_type"].astype(str))
     assert "detects" in set(relations["relation_type"].astype(str))
     assert "supports_trigger_type" in set(relations["relation_type"].astype(str))

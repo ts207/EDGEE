@@ -5,6 +5,7 @@ from typing import Any, Dict, Iterable, List
 
 import pandas as pd
 
+
 def summarize_phase2_event(event_path: Path) -> Dict[str, Any]:
     if not event_path.exists():
         return {
@@ -29,11 +30,35 @@ def summarize_phase2_event(event_path: Path) -> Dict[str, Any]:
     action_col = "action" if "action" in df.columns else ""
     direction_col = "direction_rule" if "direction_rule" in df.columns else ""
 
-    templates = sorted({str(x).strip() for x in df.get(template_col, pd.Series(dtype=str)).dropna() if str(x).strip()})
-    actions = sorted({str(x).strip() for x in df.get(action_col, pd.Series(dtype=str)).dropna() if str(x).strip()}) if action_col else []
-    direction_rules = sorted(
-        {str(x).strip() for x in df.get(direction_col, pd.Series(dtype=str)).dropna() if str(x).strip()}
-    ) if direction_col else []
+    templates = sorted(
+        {
+            str(x).strip()
+            for x in df.get(template_col, pd.Series(dtype=str)).dropna()
+            if str(x).strip()
+        }
+    )
+    actions = (
+        sorted(
+            {
+                str(x).strip()
+                for x in df.get(action_col, pd.Series(dtype=str)).dropna()
+                if str(x).strip()
+            }
+        )
+        if action_col
+        else []
+    )
+    direction_rules = (
+        sorted(
+            {
+                str(x).strip()
+                for x in df.get(direction_col, pd.Series(dtype=str)).dropna()
+                if str(x).strip()
+            }
+        )
+        if direction_col
+        else []
+    )
     by_template = (
         df.groupby(template_col).size().sort_index().astype(int).to_dict()
         if template_col in df.columns
@@ -48,6 +73,7 @@ def summarize_phase2_event(event_path: Path) -> Dict[str, Any]:
         "missing": False,
     }
 
+
 def build_run_summary(*, data_root: Path, run_id: str, events: Iterable[str]) -> Dict[str, Any]:
     out: Dict[str, Any] = {"run_id": str(run_id), "events": {}}
     for event in events:
@@ -55,15 +81,11 @@ def build_run_summary(*, data_root: Path, run_id: str, events: Iterable[str]) ->
         if not et:
             continue
         event_path = (
-            Path(data_root)
-            / "reports"
-            / "phase2"
-            / str(run_id)
-            / et
-            / "phase2_candidates.parquet"
+            Path(data_root) / "reports" / "phase2" / str(run_id) / et / "phase2_candidates.parquet"
         )
         out["events"][et] = summarize_phase2_event(event_path)
     return out
+
 
 def compare_summaries(
     *,
@@ -80,7 +102,5 @@ def compare_summaries(
         c = current_events.get(event, {})
         for key in keys:
             if b.get(key) != c.get(key):
-                failures.append(
-                    f"{event}:{key} baseline={b.get(key)!r} current={c.get(key)!r}"
-                )
+                failures.append(f"{event}:{key} baseline={b.get(key)!r} current={c.get(key)!r}")
     return failures

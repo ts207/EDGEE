@@ -4,30 +4,27 @@ import numpy as np
 from project.research.search.evaluator import evaluate_hypothesis_batch
 from project.domain.hypotheses import HypothesisSpec, TriggerSpec
 
+
 def test_evaluate_rich_metrics():
     # Setup dummy data
     np.random.seed(42)
     dates = pd.date_range("2023-01-01", periods=100, freq="15min")
     close = pd.Series(np.linspace(100, 110, 100) + np.random.normal(0, 0.1, 100), index=dates)
     # Add some "events"
-    features = pd.DataFrame({
-        "timestamp": dates,
-        "close": close,
-        "event_vol_spike": [False] * 100
-    })
+    features = pd.DataFrame({"timestamp": dates, "close": close, "event_vol_spike": [False] * 100})
     features.iloc[10, features.columns.get_loc("event_vol_spike")] = True
     features.iloc[50, features.columns.get_loc("event_vol_spike")] = True
-    
+
     spec = HypothesisSpec(
         trigger=TriggerSpec.event("vol_spike"),
         direction="long",
         horizon="5m",
         template_id="continuation",
-        entry_lag=1
+        entry_lag=1,
     )
-    
+
     res = evaluate_hypothesis_batch([spec], features, min_sample_size=2)
-    
+
     assert not res.empty
     assert "mae_mean_bps" in res.columns
     assert "mfe_mean_bps" in res.columns
@@ -36,12 +33,13 @@ def test_evaluate_rich_metrics():
     # Long direction on uptrend should have positive return
     assert res.iloc[0]["mean_return_bps"] > 0
     # Uptrend should have minimal adverse excursion
-    assert res.iloc[0]["mae_mean_bps"] >= -1.0 # 0.0 ideally
+    assert res.iloc[0]["mae_mean_bps"] >= -1.0  # 0.0 ideally
 
 
 def test_excursion_stats_use_log_returns():
     """MAE/MFE must use log returns to match forward return computation."""
     from project.research.search.evaluator import _excursion_stats
+
     # Create a known price series: 100 -> 110 (10% simple, 9.53% log)
     close = pd.Series([100.0, 110.0, 100.0, 90.0, 100.0])
     mask = pd.Series([True, False, False, False, False])
@@ -58,20 +56,22 @@ def test_robustness_zero_mean_halves():
     # Alternating prices to produce zero mean but non-zero variance
     # [100, 101, 100, 101, ...]
     close = pd.Series([100.0, 101.0] * 100, index=dates)
-    features = pd.DataFrame({
-        "timestamp": dates,
-        "close": close,
-        "event_vol_shock": [i % 4 == 0 for i in range(200)],
-        "volume": [1000] * 200
-    })
+    features = pd.DataFrame(
+        {
+            "timestamp": dates,
+            "close": close,
+            "event_vol_shock": [i % 4 == 0 for i in range(200)],
+            "volume": [1000] * 200,
+        }
+    )
     spec = HypothesisSpec(
         trigger=TriggerSpec.event("VOL_SHOCK"),
         direction="long",
-        horizon="1m", # 1 bar
+        horizon="1m",  # 1 bar
         template_id="continuation",
         entry_lag=0,
     )
-    # With entry_lag=0, events at 0, 4, 8... 
+    # With entry_lag=0, events at 0, 4, 8...
     # Forward return for index 0 is log(close[1]/close[0]) = log(101/100)
     # Forward return for index 4 is log(close[5]/close[4]) = log(101/100)
     # WAIT: index 0 return is log(101/100), index 2 is log(101/100)
@@ -84,7 +84,7 @@ def test_robustness_zero_mean_halves():
     # idx 0: log(101/100) > 0
     # idx 2: log(99/100) < 0
     # Both halves will have one positive and one negative return -> mean ~ 0
-    
+
     res = evaluate_hypothesis_batch([spec], features, min_sample_size=2)
     assert res.iloc[0]["valid"]
     assert res.iloc[0]["robustness_score"] < 1.0
@@ -106,12 +106,14 @@ def test_filter_template_produces_different_metrics_than_base():
     # filter feature: only True for first half of the data
     filter_col = [i < n_bars // 2 for i in range(n_bars)]
 
-    features = pd.DataFrame({
-        "timestamp": dates,
-        "close": close,
-        "event_vol_shock": event_col,
-        "feature_test_filter": filter_col,
-    })
+    features = pd.DataFrame(
+        {
+            "timestamp": dates,
+            "close": close,
+            "event_vol_shock": event_col,
+            "feature_test_filter": filter_col,
+        }
+    )
 
     base_spec = HypothesisSpec(
         trigger=TriggerSpec.event("VOL_SHOCK"),
@@ -137,9 +139,7 @@ def test_filter_template_produces_different_metrics_than_base():
     base_n = res[res["template_id"] == "base"]["n"].iloc[0]
     filter_n = res[res["template_id"] == "only_if_test"]["n"].iloc[0]
     # Filter applies feature condition which restricts to first half of events
-    assert filter_n < base_n, (
-        f"Filter hypothesis n={filter_n} should be < base n={base_n}"
-    )
+    assert filter_n < base_n, f"Filter hypothesis n={filter_n} should be < base n={base_n}"
 
 
 def test_evaluate_emits_split_level_sample_counts():

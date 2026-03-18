@@ -165,7 +165,9 @@ def test_live_runner_account_sync_success_resets_failure_count() -> None:
 
 
 class _DummyStrategy:
-    def generate_positions(self, bars: pd.DataFrame, features: pd.DataFrame, params: dict) -> pd.Series:
+    def generate_positions(
+        self, bars: pd.DataFrame, features: pd.DataFrame, params: dict
+    ) -> pd.Series:
         out = pd.Series([0.0, 1.0, 1.0], index=pd.DatetimeIndex(bars["timestamp"]), dtype=float)
         out.attrs["strategy_metadata"] = {"family": "test"}
         return out
@@ -202,7 +204,9 @@ def test_live_runner_submit_strategy_result_routes_order_through_oms(monkeypatch
     monkeypatch.setattr("project.engine.strategy_executor.get_strategy", lambda _: _DummyStrategy())
     monkeypatch.setattr(
         "project.engine.strategy_executor.load_symbol_constraints",
-        lambda symbol, meta_dir: SymbolConstraints(tick_size=None, step_size=None, min_notional=None),
+        lambda symbol, meta_dir: SymbolConstraints(
+            tick_size=None, step_size=None, min_notional=None
+        ),
     )
 
     result = calculate_strategy_returns(
@@ -215,7 +219,11 @@ def test_live_runner_submit_strategy_result_routes_order_through_oms(monkeypatch
             "execution_lag_bars": 0,
             "expected_return_bps": 25.0,
             "expected_adverse_bps": 5.0,
-            "execution_model": {"cost_model": "static", "base_fee_bps": 2.0, "base_slippage_bps": 1.0},
+            "execution_model": {
+                "cost_model": "static",
+                "base_fee_bps": 2.0,
+                "base_slippage_bps": 1.0,
+            },
         },
         0.0,
         tmp_path,
@@ -268,11 +276,15 @@ def test_live_runner_submit_strategy_result_returns_none_for_flat_result() -> No
     assert runner.submit_strategy_result(result, client_order_id="flat") is None
 
 
-def test_live_runner_submit_strategy_result_throttles_negative_bucket(monkeypatch, tmp_path) -> None:
+def test_live_runner_submit_strategy_result_throttles_negative_bucket(
+    monkeypatch, tmp_path
+) -> None:
     monkeypatch.setattr("project.engine.strategy_executor.get_strategy", lambda _: _DummyStrategy())
     monkeypatch.setattr(
         "project.engine.strategy_executor.load_symbol_constraints",
-        lambda symbol, meta_dir: SymbolConstraints(tick_size=None, step_size=None, min_notional=None),
+        lambda symbol, meta_dir: SymbolConstraints(
+            tick_size=None, step_size=None, min_notional=None
+        ),
     )
     result = calculate_strategy_returns(
         "BTCUSDT",
@@ -284,7 +296,11 @@ def test_live_runner_submit_strategy_result_throttles_negative_bucket(monkeypatc
             "execution_lag_bars": 0,
             "expected_return_bps": 25.0,
             "expected_adverse_bps": 5.0,
-            "execution_model": {"cost_model": "static", "base_fee_bps": 2.0, "base_slippage_bps": 1.0},
+            "execution_model": {
+                "cost_model": "static",
+                "base_fee_bps": 2.0,
+                "base_slippage_bps": 1.0,
+            },
         },
         0.0,
         tmp_path,
@@ -355,7 +371,9 @@ def test_live_runner_submit_strategy_result_blocks_degraded_bucket(monkeypatch, 
     monkeypatch.setattr("project.engine.strategy_executor.get_strategy", lambda _: _DummyStrategy())
     monkeypatch.setattr(
         "project.engine.strategy_executor.load_symbol_constraints",
-        lambda symbol, meta_dir: SymbolConstraints(tick_size=None, step_size=None, min_notional=None),
+        lambda symbol, meta_dir: SymbolConstraints(
+            tick_size=None, step_size=None, min_notional=None
+        ),
     )
     result = calculate_strategy_returns(
         "BTCUSDT",
@@ -367,7 +385,11 @@ def test_live_runner_submit_strategy_result_blocks_degraded_bucket(monkeypatch, 
             "execution_lag_bars": 0,
             "expected_return_bps": 25.0,
             "expected_adverse_bps": 5.0,
-            "execution_model": {"cost_model": "static", "base_fee_bps": 2.0, "base_slippage_bps": 1.0},
+            "execution_model": {
+                "cost_model": "static",
+                "base_fee_bps": 2.0,
+                "base_slippage_bps": 1.0,
+            },
         },
         0.0,
         tmp_path,
@@ -437,7 +459,9 @@ def test_live_runner_persists_execution_quality_report_after_fill(monkeypatch, t
     monkeypatch.setattr("project.engine.strategy_executor.get_strategy", lambda _: _DummyStrategy())
     monkeypatch.setattr(
         "project.engine.strategy_executor.load_symbol_constraints",
-        lambda symbol, meta_dir: SymbolConstraints(tick_size=None, step_size=None, min_notional=None),
+        lambda symbol, meta_dir: SymbolConstraints(
+            tick_size=None, step_size=None, min_notional=None
+        ),
     )
 
     result = calculate_strategy_returns(
@@ -450,7 +474,11 @@ def test_live_runner_persists_execution_quality_report_after_fill(monkeypatch, t
             "execution_lag_bars": 0,
             "expected_return_bps": 25.0,
             "expected_adverse_bps": 5.0,
-            "execution_model": {"cost_model": "static", "base_fee_bps": 2.0, "base_slippage_bps": 1.0},
+            "execution_model": {
+                "cost_model": "static",
+                "base_fee_bps": 2.0,
+                "base_slippage_bps": 1.0,
+            },
         },
         0.0,
         tmp_path,
@@ -474,7 +502,10 @@ def test_live_runner_persists_execution_quality_report_after_fill(monkeypatch, t
 
     payload = json.loads(report_path.read_text(encoding="utf-8"))
     assert payload["summary"]["fills"] == 1.0
-    assert payload["summary"]["avg_realized_net_edge_bps"] < payload["summary"]["avg_expected_net_edge_bps"]
+    assert (
+        payload["summary"]["avg_realized_net_edge_bps"]
+        < payload["summary"]["avg_expected_net_edge_bps"]
+    )
     assert payload["records"][0]["client_order_id"] == "runner-order-2"
     assert payload["records"][0]["strategy"] == "dummy_strategy"
     assert payload["records"][0]["volatility_regime"] == "elevated"
@@ -491,6 +522,7 @@ def test_live_runner_persist_execution_quality_report_returns_none_without_path(
 
 
 # --- TICKET-010: kill-switch trigger tests ---
+
 
 def test_stale_data_triggers_kill_switch() -> None:
     """STALE_DATA kill-switch fires when data health monitor reports unhealthy."""
@@ -511,11 +543,13 @@ def test_stale_data_triggers_kill_switch() -> None:
         "max_last_seen_sec_ago": 30.0,
     }
     with patch.object(runner.health_monitor, "check_health", return_value=stale_report):
+
         async def _run():
             # Simulate one iteration of _monitor_data_health
             report = runner.health_monitor.check_health()
             if not report["is_healthy"]:
                 from project.live.kill_switch import KillSwitchReason
+
                 runner.kill_switch.trigger(
                     KillSwitchReason.STALE_DATA,
                     f"Stale data feeds detected: {report['stale_count']} streams",
@@ -558,7 +592,11 @@ def test_ws_client_calls_on_reconnect_exhausted_after_max_retries() -> None:
     async def _run():
         # Patch websockets.connect to always raise, forcing exhaustion
         import unittest.mock as mock
-        with mock.patch("project.live.ingest.ws_client.websockets.connect", side_effect=ConnectionRefusedError("refused")):
+
+        with mock.patch(
+            "project.live.ingest.ws_client.websockets.connect",
+            side_effect=ConnectionRefusedError("refused"),
+        ):
             # Override sleep to avoid actual delay
             with mock.patch("asyncio.sleep", return_value=None):
                 client._running = True

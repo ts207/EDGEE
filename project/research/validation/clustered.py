@@ -8,7 +8,9 @@ import statsmodels.api as sm
 from scipy import stats
 
 
-def _clean_inputs(values: pd.Series, clusters: Optional[pd.Series] = None) -> Tuple[pd.Series, Optional[pd.Series]]:
+def _clean_inputs(
+    values: pd.Series, clusters: Optional[pd.Series] = None
+) -> Tuple[pd.Series, Optional[pd.Series]]:
     vals = pd.to_numeric(values, errors="coerce")
     mask = vals.notna()
     vals = vals.loc[mask]
@@ -22,7 +24,9 @@ def _clean_inputs(values: pd.Series, clusters: Optional[pd.Series] = None) -> Tu
     return vals.loc[valid_index], cl.loc[valid_index]
 
 
-def clustered_standard_error(values: pd.Series, clusters: Optional[pd.Series] = None) -> tuple[float, int, str]:
+def clustered_standard_error(
+    values: pd.Series, clusters: Optional[pd.Series] = None
+) -> tuple[float, int, str]:
     vals, cl = _clean_inputs(values, clusters)
     n = len(vals)
     if n == 0:

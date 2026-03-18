@@ -55,9 +55,7 @@ def test_main_writes_output_to_requested_timeframe_path(monkeypatch, tmp_path):
         return None
 
     monkeypatch.setattr(build_features, "choose_partition_dir", fake_choose_partition_dir)
-    monkeypatch.setattr(
-        build_features, "list_parquet_files", lambda _path: [Path("dummy.parquet")]
-    )
+    monkeypatch.setattr(build_features, "list_parquet_files", lambda _path: [Path("dummy.parquet")])
     monkeypatch.setattr(build_features, "read_parquet", lambda _files: bars.copy())
     monkeypatch.setattr(
         build_features,
@@ -156,9 +154,7 @@ def test_main_writes_feature_quality_report(monkeypatch, tmp_path):
 def test_main_writes_feature_quality_report_with_baseline(monkeypatch, tmp_path):
     bars = pd.DataFrame(
         {
-            "timestamp": pd.to_datetime(
-                ["2026-01-01T00:00:00Z", "2026-01-01T00:05:00Z"], utc=True
-            ),
+            "timestamp": pd.to_datetime(["2026-01-01T00:00:00Z", "2026-01-01T00:05:00Z"], utc=True),
             "open": [100.0, 101.0],
             "high": [101.0, 102.0],
             "low": [99.0, 100.0],
@@ -169,9 +165,7 @@ def test_main_writes_feature_quality_report_with_baseline(monkeypatch, tmp_path)
     )
     baseline = pd.DataFrame(
         {
-            "timestamp": pd.to_datetime(
-                ["2025-12-01T00:00:00Z", "2025-12-01T00:05:00Z"], utc=True
-            ),
+            "timestamp": pd.to_datetime(["2025-12-01T00:00:00Z", "2025-12-01T00:05:00Z"], utc=True),
             "basis_zscore": [1.2, 1.3],
             "close": [95.0, 95.5],
             "volume": [9.0, 9.5],

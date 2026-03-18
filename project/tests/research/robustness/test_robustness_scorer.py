@@ -14,14 +14,16 @@ def _make_regime_results(
 ) -> pd.DataFrame:
     """Build a per-regime results DataFrame for testing the scorer."""
     valid = [abs(t) > 0.5 and n >= 10 for t, n in zip(t_stats, ns)]
-    return pd.DataFrame({
-        "regime": regimes,
-        "n": ns,
-        "mean_return_bps": mean_returns,
-        "t_stat": t_stats,
-        "hit_rate": [0.55 if mr > 0 else 0.45 for mr in mean_returns],
-        "valid": valid,
-    })
+    return pd.DataFrame(
+        {
+            "regime": regimes,
+            "n": ns,
+            "mean_return_bps": mean_returns,
+            "t_stat": t_stats,
+            "hit_rate": [0.55 if mr > 0 else 0.45 for mr in mean_returns],
+            "valid": valid,
+        }
+    )
 
 
 def test_perfect_robustness():
@@ -63,11 +65,16 @@ def test_mixed_regime_score():
 
 def test_no_valid_regimes_returns_zero():
     """No valid regime results → score = 0."""
-    df = pd.DataFrame({
-        "regime": ["r1"], "n": [3],
-        "mean_return_bps": [10.0], "t_stat": [1.0],
-        "hit_rate": [0.6], "valid": [False],
-    })
+    df = pd.DataFrame(
+        {
+            "regime": ["r1"],
+            "n": [3],
+            "mean_return_bps": [10.0],
+            "t_stat": [1.0],
+            "hit_rate": [0.6],
+            "valid": [False],
+        }
+    )
     score = compute_robustness_score(df, overall_direction=1.0)
     assert score == 0.0
 

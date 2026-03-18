@@ -4,13 +4,16 @@ import pandas as pd
 
 from project.research.multiplicity import apply_multiplicity_controls
 
+
 def test_hierarchical_fdr_simes_and_within_family_bh():
     rows = [
         {"candidate_id": "strong_signal", "family_id": "fam_a", "p_value": 0.001},
         {"candidate_id": "weak_signal", "family_id": "fam_a", "p_value": 0.20},
     ]
     for idx in range(1, 10):
-        rows.append({"candidate_id": f"noise_{idx}", "family_id": f"fam_{idx+1}", "p_value": 0.90})
+        rows.append(
+            {"candidate_id": f"noise_{idx}", "family_id": f"fam_{idx + 1}", "p_value": 0.90}
+        )
     raw_df = pd.DataFrame(rows)
 
     out = apply_multiplicity_controls(raw_df=raw_df, max_q=0.05)
@@ -27,7 +30,7 @@ def test_hierarchical_fdr_simes_and_within_family_bh():
     assert bool(strong["is_discovery"]) is True
     # Within fam_a: weak q = 0.20 * 2 / 2 = 0.20 > 0.05
     assert bool(weak["is_discovery"]) is False
-    
+
     # Noise families are completely discarded
     assert bool(noise["is_discovery_family"]) is False
     assert bool(noise["is_discovery"]) is False
@@ -35,10 +38,16 @@ def test_hierarchical_fdr_simes_and_within_family_bh():
     assert bool(strong["gate_multiplicity_strict"]) is True
     assert int(strong["num_tests_event_family"]) == 2
 
+
 def test_apply_multiplicity_controls_research_excludes_low_sample_rows():
     raw_df = pd.DataFrame(
         [
-            {"candidate_id": "low_sample", "family_id": "fam_a", "p_value": 1e-8, "sample_size": 10},
+            {
+                "candidate_id": "low_sample",
+                "family_id": "fam_a",
+                "p_value": 1e-8,
+                "sample_size": 10,
+            },
             {"candidate_id": "eligible", "family_id": "fam_b", "p_value": 1e-3, "sample_size": 120},
             {"candidate_id": "noise", "family_id": "fam_c", "p_value": 0.9, "sample_size": 150},
         ]

@@ -1,4 +1,5 @@
 """Regression: ScheduledNewsDetector must apply spec windows even when news columns exist."""
+
 from __future__ import annotations
 import pandas as pd
 import numpy as np
@@ -19,11 +20,7 @@ def test_spec_windows_applied_when_news_col_all_false():
     """When news column exists but is all-False, spec windows should still trigger."""
     df = _make_df(add_news_col=True)
 
-    fake_spec = {
-        "parameters": {
-            "windows_utc": [{"hour": 12, "minute_start": 0, "minute_end": 10}]
-        }
-    }
+    fake_spec = {"parameters": {"windows_utc": [{"hour": 12, "minute_start": 0, "minute_end": 10}]}}
     det = ScheduledNewsDetector()
     with patch("project.events.families.temporal.load_event_spec", return_value=fake_spec):
         events = det.detect(df, symbol="BTC")
@@ -42,10 +39,15 @@ def test_news_col_true_takes_precedence():
     df.loc[5, "scheduled_news_event"] = True
 
     det = ScheduledNewsDetector()
-    with patch("project.events.families.temporal.load_event_spec", return_value={"parameters": {"windows_utc": []}}):
+    with patch(
+        "project.events.families.temporal.load_event_spec",
+        return_value={"parameters": {"windows_utc": []}},
+    ):
         events = det.detect(df, symbol="BTC")
 
     fire_times = {pd.to_datetime(row["timestamp"]) for row in events.to_dict(orient="records")}
     # Signal is emitted on the NEXT bar after detection (12:25 -> 12:30)
     expected = df["timestamp"].iloc[5] + pd.Timedelta(minutes=5)
-    assert expected in fire_times, "Bar with news_col=True should fire even with empty spec windows."
+    assert expected in fire_times, (
+        "Bar with news_col=True should fire even with empty spec windows."
+    )

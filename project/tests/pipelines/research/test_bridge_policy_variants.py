@@ -8,6 +8,7 @@ from project.pipelines.research.bridge_evaluate_phase2 import (
     _policy_variant_flip_summary,
 )
 
+
 def test_build_policy_variant_specs_includes_delay_and_cooldown_variants():
     variants = _build_policy_variant_specs(
         low_capital_contract={
@@ -23,6 +24,7 @@ def test_build_policy_variant_specs_includes_delay_and_cooldown_variants():
     assert "delay_1__one_trade_per_episode" in ids
     assert "delay_1__cooldown_12" in ids
     assert "delay_1__one_trade_per_episode__cooldown_12" in ids
+
 
 def test_policy_variants_report_pass_to_fail_flip_under_cooldown():
     row = pd.Series(

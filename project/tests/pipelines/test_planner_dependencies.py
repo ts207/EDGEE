@@ -55,7 +55,9 @@ def test_phase2_event_conditioned_stages_are_timeframe_scoped():
         "bridge_evaluate_phase2__VOL_SHOCK_15m",
     ]
 
-    phase2_15m_deps = _resolve_dependencies("phase2_conditional_hypotheses__VOL_SHOCK_15m", stage_names)
+    phase2_15m_deps = _resolve_dependencies(
+        "phase2_conditional_hypotheses__VOL_SHOCK_15m", stage_names
+    )
     bridge_15m_deps = _resolve_dependencies("bridge_evaluate_phase2__VOL_SHOCK_15m", stage_names)
 
     assert phase2_15m_deps == ["canonicalize_event_episodes__VOL_SHOCK_15m"]

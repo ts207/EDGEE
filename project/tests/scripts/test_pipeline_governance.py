@@ -53,5 +53,7 @@ def test_main_sync_writes_feature_catalog(tmp_path, monkeypatch) -> None:
     )
     rc = gov.main(["--sync"])
     assert rc == 0
-    catalog = json.loads((gov.PROJECT_DIR / "schemas" / "feature_catalog.json").read_text(encoding="utf-8"))
+    catalog = json.loads(
+        (gov.PROJECT_DIR / "schemas" / "feature_catalog.json").read_text(encoding="utf-8")
+    )
     assert catalog["features"]["demo"]["family"] == "demo"

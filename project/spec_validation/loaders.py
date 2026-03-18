@@ -10,11 +10,13 @@ ONTOLOGY_DIR = SPEC_DIR / "ontology"
 GRAMMAR_DIR = SPEC_DIR / "grammar"
 SEARCH_DIR = SPEC_DIR / "search"
 
+
 def load_yaml(path: Path) -> Dict[str, Any]:
     if not path.exists():
         return {}
     with open(path, encoding="utf-8") as f:
         return yaml.safe_load(f) or {}
+
 
 def load_ontology_events() -> Dict[str, Dict[str, Any]]:
     events = {}
@@ -22,11 +24,17 @@ def load_ontology_events() -> Dict[str, Dict[str, Any]]:
     for p in event_dir.glob("*.yaml"):
         spec = load_yaml(p)
         kind = str(spec.get("kind", "")).strip().lower() if isinstance(spec, dict) else ""
-        if kind in {"event_unified_registry", "canonical_event_registry", "event_config_defaults", "event_family_defaults"}:
+        if kind in {
+            "event_unified_registry",
+            "canonical_event_registry",
+            "event_config_defaults",
+            "event_family_defaults",
+        }:
             continue
         event_id = p.stem
         events[event_id] = spec
     return events
+
 
 def load_ontology_states() -> Dict[str, Dict[str, Any]]:
     states = {}
@@ -37,11 +45,14 @@ def load_ontology_states() -> Dict[str, Dict[str, Any]]:
         states[state_id] = spec
     return states
 
+
 def load_family_registry() -> Dict[str, Any]:
     return load_yaml(GRAMMAR_DIR / "family_registry.yaml")
 
+
 def load_template_registry() -> Dict[str, Any]:
     return load_yaml(ONTOLOGY_DIR / "templates" / "template_registry.yaml")
+
 
 def load_search_spec(name: str) -> Dict[str, Any]:
     # e.g. name="phase1" -> spec/search/search_phase1.yaml

@@ -150,9 +150,20 @@ def test_main_normalizes_nested_audit_columns(monkeypatch, tmp_path):
         lambda **kwargs: (
             [hypothesis],
             {
-                "generated_rows": [{"hypothesis_id": hypothesis.hypothesis_id(), "context": {}, "rejection_details": {}}],
+                "generated_rows": [
+                    {
+                        "hypothesis_id": hypothesis.hypothesis_id(),
+                        "context": {},
+                        "rejection_details": {},
+                    }
+                ],
                 "rejected_rows": [],
-                "feasible_rows": [{"hypothesis_id": hypothesis.hypothesis_id(), "context": {"state_filter": "HIGH_VOL"}}],
+                "feasible_rows": [
+                    {
+                        "hypothesis_id": hypothesis.hypothesis_id(),
+                        "context": {"state_filter": "HIGH_VOL"},
+                    }
+                ],
                 "counts": {"generated": 1, "feasible": 1, "rejected": 0},
                 "rejection_reason_counts": {},
             },

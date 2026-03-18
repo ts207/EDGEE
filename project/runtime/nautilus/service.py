@@ -6,10 +6,12 @@ from pathlib import Path
 
 _LOG = logging.getLogger(__name__)
 
+
 class NautilusExecutionService:
     """
     A service to run Nautilus backtests and collect performance metrics.
     """
+
     def __init__(self, data_path: Path, output_path: Path):
         self.data_path = data_path
         self.output_path = output_path
@@ -21,7 +23,7 @@ class NautilusExecutionService:
         """
         strategy_id = compilation_artifact["run_manifest"]["strategy_id"]
         _LOG.info("Starting Nautilus backtest for %s", strategy_id)
-        
+
         base_result = {
             "strategy_id": strategy_id,
             "bindings_complete": False,
@@ -33,17 +35,16 @@ class NautilusExecutionService:
         try:
             from nautilus_trader.backtest.engine import BacktestEngine
             from nautilus_trader.config import BacktestEngineConfig
-            
+
             config = BacktestEngineConfig(
-                trader_id=f"backtest_{strategy_id}",
-                data_path=str(self.data_path)
+                trader_id=f"backtest_{strategy_id}", data_path=str(self.data_path)
             )
             engine = BacktestEngine(config=config)
             _LOG.info("Nautilus engine instantiated.")
-            
+
             # Future: configure venue, add data, add strategy
             _LOG.info("Full Nautilus strategy bindings are pending.")
-            
+
             return {
                 **base_result,
                 "status": "binding_incomplete",
@@ -58,7 +59,7 @@ class NautilusExecutionService:
                     "total_return_bps": 120.5,
                     "sharpe_ratio": 2.1,
                     "max_drawdown_bps": 45.0,
-                    "win_rate": 0.58
+                    "win_rate": 0.58,
                 },
                 "tearsheet_path": str(self.output_path / f"{strategy_id}_tearsheet.pdf"),
             }

@@ -17,6 +17,7 @@ to regression-test the schema contract after every discovery run.
 
 When no real phase2 files exist, falls back to a tiny synthetic fixture.
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -31,7 +32,15 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 
 # Archived phase2 artifacts may still contain one retired template id even
 # though current generation no longer emits it.
-_RULE_TEMPLATE_ENUM_BASE = {"mean_reversion", "continuation", "carry", "breakout", "mean_reversion_exhaustion_v1"}
+_RULE_TEMPLATE_ENUM_BASE = {
+    "mean_reversion",
+    "continuation",
+    "carry",
+    "breakout",
+    "mean_reversion_exhaustion_v1",
+}
+
+
 def _templates_from_verb_lexicon() -> set[str]:
     path = REPO_ROOT / "spec" / "hypotheses" / "template_verb_lexicon.yaml"
     if not path.exists():
@@ -51,20 +60,28 @@ def _templates_from_verb_lexicon() -> set[str]:
         out.update({str(v).strip().lower() for v in group if str(v).strip()})
     return out
 
+
 try:
     from project.pipelines.research._hypothesis_defaults import load_hypothesis_defaults
 
     _spec_defaults = load_hypothesis_defaults(project_root=PROJECT_ROOT)
-    _RULE_TEMPLATE_ENUM = {
-        str(x).strip().lower()
-        for x in _spec_defaults.get("rule_templates", [])
-        if str(x).strip()
-    } | _RULE_TEMPLATE_ENUM_BASE | _templates_from_verb_lexicon()
+    _RULE_TEMPLATE_ENUM = (
+        {str(x).strip().lower() for x in _spec_defaults.get("rule_templates", []) if str(x).strip()}
+        | _RULE_TEMPLATE_ENUM_BASE
+        | _templates_from_verb_lexicon()
+    )
 except Exception:
     _RULE_TEMPLATE_ENUM = set(_RULE_TEMPLATE_ENUM_BASE) | _templates_from_verb_lexicon()
-_CONDITION_SOURCE_ENUM = {"runtime", "bucket_non_runtime", "unconditional", "permissive_fallback", "blocked"}
+_CONDITION_SOURCE_ENUM = {
+    "runtime",
+    "bucket_non_runtime",
+    "unconditional",
+    "permissive_fallback",
+    "blocked",
+}
 
 # ── Helpers ────────────────────────────────────────────────────────────────
+
 
 def _collect_phase2_frames() -> list[pd.DataFrame]:
     """Collect all phase2_candidates.csv files for any known run IDs."""
@@ -88,36 +105,41 @@ def _collect_phase2_frames() -> list[pd.DataFrame]:
             pass
     return frames
 
+
 def _synthetic_fixture() -> pd.DataFrame:
     """Minimal synthetic Phase 2 output covering all routing branches."""
-    return pd.DataFrame([
-        {
-            "candidate_id": "LIQUIDATION_CASCADE_mean_reversion_5m_BTCUSDT_all",
-            "rule_template": "mean_reversion",
-            "conditioning": "all",
-            "condition": "all",
-            "condition_source": "unconditional",
-            "compile_eligible": True,
-        },
-        {
-            "candidate_id": "LIQUIDATION_CASCADE_continuation_5m_BTCUSDT_vol_regime_high",
-            "rule_template": "continuation",
-            "conditioning": "vol_regime_high",
-            "condition": "vol_regime_high",
-            "condition_source": "runtime",
-            "compile_eligible": True,
-        },
-        {
-            "candidate_id": "LIQUIDATION_CASCADE_mean_reversion_5m_BTCUSDT_severity_bucket_top_10pct",
-            "rule_template": "mean_reversion",
-            "conditioning": "severity_bucket_top_10pct",
-            "condition": "all",
-            "condition_source": "bucket_non_runtime",
-            "compile_eligible": True,
-        },
-    ])
+    return pd.DataFrame(
+        [
+            {
+                "candidate_id": "LIQUIDATION_CASCADE_mean_reversion_5m_BTCUSDT_all",
+                "rule_template": "mean_reversion",
+                "conditioning": "all",
+                "condition": "all",
+                "condition_source": "unconditional",
+                "compile_eligible": True,
+            },
+            {
+                "candidate_id": "LIQUIDATION_CASCADE_continuation_5m_BTCUSDT_vol_regime_high",
+                "rule_template": "continuation",
+                "conditioning": "vol_regime_high",
+                "condition": "vol_regime_high",
+                "condition_source": "runtime",
+                "compile_eligible": True,
+            },
+            {
+                "candidate_id": "LIQUIDATION_CASCADE_mean_reversion_5m_BTCUSDT_severity_bucket_top_10pct",
+                "rule_template": "mean_reversion",
+                "conditioning": "severity_bucket_top_10pct",
+                "condition": "all",
+                "condition_source": "bucket_non_runtime",
+                "compile_eligible": True,
+            },
+        ]
+    )
+
 
 # ── Fixtures ───────────────────────────────────────────────────────────────
+
 
 @pytest.fixture(scope="module")
 def phase2_frames():
@@ -126,7 +148,9 @@ def phase2_frames():
         return [_synthetic_fixture()]
     return frames
 
+
 # ── Tests ──────────────────────────────────────────────────────────────────
+
 
 class TestPhase2OutputSchema:
     """Phase 2 output schema / data-semantic constraints."""
@@ -215,7 +239,9 @@ class TestPhase2OutputSchema:
         for df in phase2_frames:
             if "conditioning" not in df.columns:
                 continue
-            mask = df["conditioning"].str.contains("severity_bucket_|quantile_", na=False, regex=True)
+            mask = df["conditioning"].str.contains(
+                "severity_bucket_|quantile_", na=False, regex=True
+            )
             if not mask.any():
                 continue
             # Only enforce the routing invariant on post-fix files
@@ -225,12 +251,13 @@ class TestPhase2OutputSchema:
                 assert bad.empty, (
                     f"Post-fix rows with severity_bucket/quantile conditioning must have "
                     f"condition='all' or '__BLOCKED__', found: "
-                    f"{bad[['conditioning','condition']].head(5).to_dict(orient='records')}"
+                    f"{bad[['conditioning', 'condition']].head(5).to_dict(orient='records')}"
                 )
 
     def test_runtime_condition_rows_have_executable_condition(self, phase2_frames):
         """Rows with condition_source='runtime' must have an executable condition string."""
         from project.strategy.dsl.contract_v1 import is_executable_condition
+
         for df in phase2_frames:
             if "condition" not in df.columns or "condition_source" not in df.columns:
                 continue

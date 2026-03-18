@@ -16,7 +16,10 @@ from project.io.utils import ensure_dir, list_parquet_files, read_parquet, write
 from project.specs.manifest import finalize_manifest, start_manifest
 from project.core.validation import ensure_utc_timestamp
 
-def sequential_residualize_apply(Xz: np.ndarray, resid_betas: list[list[float] | None]) -> np.ndarray:
+
+def sequential_residualize_apply(
+    Xz: np.ndarray, resid_betas: list[list[float] | None]
+) -> np.ndarray:
     """Apply sequential residualization using stored betas.
 
     resid_betas[j] is the regression coefficient vector (length j) used to
@@ -34,26 +37,43 @@ def sequential_residualize_apply(Xz: np.ndarray, resid_betas: list[list[float] |
         Xo[:, j] = Xo[:, j] - Xo[:, :j] @ bvec
     return Xo
 
+
 def main() -> int:
-    p = argparse.ArgumentParser(description="Apply AlphaBundle (orth + ridge + post-processing scaffold)")
+    p = argparse.ArgumentParser(
+        description="Apply AlphaBundle (orth + ridge + post-processing scaffold)"
+    )
     p.add_argument("--run_id", required=True)
     p.add_argument("--signals_path", required=True)
     p.add_argument("--ridge_model_path", required=True)
-    p.add_argument("--regime_path", default=None, help="Optional vol_regime.parquet with ts_event, gate_scalar, regime_label")
+    p.add_argument(
+        "--regime_path",
+        default=None,
+        help="Optional vol_regime.parquet with ts_event, gate_scalar, regime_label",
+    )
     p.add_argument("--out_dir", default=None)
     args = p.parse_args()
 
     run_id = args.run_id
     project_root = PROJECT_ROOT
     data_root = get_data_root()
-    out_dir = Path(args.out_dir) if args.out_dir else data_root / "feature_store" / "alpha_bundle" / run_id
+    out_dir = (
+        Path(args.out_dir)
+        if args.out_dir
+        else data_root / "feature_store" / "alpha_bundle" / run_id
+    )
     ensure_dir(out_dir)
 
     stage = "alpha_apply_bundle"
     inputs = [{"path": args.signals_path}, {"path": args.ridge_model_path}]
     if args.regime_path:
         inputs.append({"path": args.regime_path})
-    manifest = start_manifest(stage, run_id, params={"regime_path": args.regime_path}, inputs=inputs, outputs=[{"path": str(out_dir)}])
+    manifest = start_manifest(
+        stage,
+        run_id,
+        params={"regime_path": args.regime_path},
+        inputs=inputs,
+        outputs=[{"path": str(out_dir)}],
+    )
 
     sp = Path(args.signals_path)
     if sp.is_dir():
@@ -99,7 +119,12 @@ def main() -> int:
         rtcol = "ts_event" if "ts_event" in reg.columns else "timestamp"
         reg[rtcol] = ensure_utc_timestamp(reg[rtcol], rtcol)
         reg = reg.sort_values(rtcol, kind="mergesort")
-        base = pd.merge_asof(sig[[tcol]].sort_values(tcol), reg[[rtcol, "gate_scalar", "regime_label"]].rename(columns={rtcol: tcol}), on=tcol, direction="backward")
+        base = pd.merge_asof(
+            sig[[tcol]].sort_values(tcol),
+            reg[[rtcol, "gate_scalar", "regime_label"]].rename(columns={rtcol: tcol}),
+            on=tcol,
+            direction="backward",
+        )
         gate_scalar = base["gate_scalar"].astype(float).fillna(1.0).to_numpy(dtype=np.float64)
         regime_label = base["regime_label"].astype(object)
         score = score * gate_scalar
@@ -119,6 +144,7 @@ def main() -> int:
     finalize_manifest(manifest, status="success", stats=result)
     print(json.dumps(result, indent=2))
     return 0
+
 
 if __name__ == "__main__":
     raise SystemExit(main())

@@ -22,23 +22,54 @@ def test_build_live_data_foundation_payload_ready(tmp_path: Path) -> None:
     timeframe = "5m"
 
     _write_json(
-        data_root / "reports" / "data_quality" / run_id / "cleaned" / market / symbol / f"bars_{timeframe}_quality.json",
+        data_root
+        / "reports"
+        / "data_quality"
+        / run_id
+        / "cleaned"
+        / market
+        / symbol
+        / f"bars_{timeframe}_quality.json",
         {"overall": {"missing_ratio": 0.0, "gap_ratio": 0.0}},
     )
     _write_json(
-        data_root / "reports" / "data_quality" / run_id / "validation" / f"validate_data_coverage_{timeframe}.json",
+        data_root
+        / "reports"
+        / "data_quality"
+        / run_id
+        / "validation"
+        / f"validate_data_coverage_{timeframe}.json",
         {"failure_count": 0, "warning_count": 0},
     )
     _write_json(
-        data_root / "reports" / "feature_quality" / run_id / market / symbol / timeframe / "feature_quality_feature_schema_v2.json",
+        data_root
+        / "reports"
+        / "feature_quality"
+        / run_id
+        / market
+        / symbol
+        / timeframe
+        / "feature_quality_feature_schema_v2.json",
         {"quality": {"feature_count": 4, "features_with_nulls": 0}},
     )
     _write_json(
-        data_root / "reports" / "feature_quality" / run_id / "validation" / f"validate_feature_integrity_{timeframe}.json",
+        data_root
+        / "reports"
+        / "feature_quality"
+        / run_id
+        / "validation"
+        / f"validate_feature_integrity_{timeframe}.json",
         {"status": "success", "symbols": {}},
     )
     _write_json(
-        data_root / "reports" / "context_quality" / run_id / market / symbol / timeframe / "context_quality_report_v1.json",
+        data_root
+        / "reports"
+        / "context_quality"
+        / run_id
+        / market
+        / symbol
+        / timeframe
+        / "context_quality_report_v1.json",
         {"summary": {"dimensions": 6}},
     )
 

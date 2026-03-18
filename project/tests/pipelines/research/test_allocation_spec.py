@@ -115,5 +115,7 @@ def test_write_strategy_contract_artifacts_emits_allocation_spec_artifacts(tmp_p
     assert path.exists()
     payload = json.loads(path.read_text(encoding="utf-8"))
     assert payload["metadata"]["candidate_id"] == "cand_alloc_1"
-    index_payload = json.loads((tmp_path / "allocation_spec_index.json").read_text(encoding="utf-8"))
+    index_payload = json.loads(
+        (tmp_path / "allocation_spec_index.json").read_text(encoding="utf-8")
+    )
     assert index_payload["count"] == 1

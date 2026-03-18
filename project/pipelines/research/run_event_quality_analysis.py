@@ -15,6 +15,7 @@ Usage (library):
     from project.pipelines.research.run_event_quality_analysis import run_event_quality_analysis
     summary = run_event_quality_analysis(features_df, output_dir=Path("..."))
 """
+
 from __future__ import annotations
 
 import argparse
@@ -106,7 +107,9 @@ def run_event_quality_analysis(
     top_redundancy = []
     if not cooc.empty:
         candidates = cooc[cooc["redundancy_candidate"]].head(20)
-        top_redundancy = candidates[["event_a", "event_b", "p_b_given_a", "n_co_fires"]].to_dict("records")
+        top_redundancy = candidates[["event_a", "event_b", "p_b_given_a", "n_co_fires"]].to_dict(
+            "records"
+        )
 
     top_ig = []
     bottom_ig = []

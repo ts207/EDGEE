@@ -10,7 +10,7 @@ def test_generic_um_ohlcv_ingest_owns_timeframe_specific_manifest_naming() -> No
     script_path = PROJECT_ROOT / "pipelines" / "ingest" / "ingest_binance_um_ohlcv.py"
     content = script_path.read_text(encoding="utf-8")
 
-    assert 'def _expected_bars(start: datetime, end_exclusive: datetime, timeframe: str)' in content
+    assert "def _expected_bars(start: datetime, end_exclusive: datetime, timeframe: str)" in content
     assert 'f"ingest_binance_um_ohlcv_{args.timeframe}"' in content
 
 

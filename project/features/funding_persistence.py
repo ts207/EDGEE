@@ -22,13 +22,14 @@ TEMPORAL_CONTRACT = TemporalContract(
     calibration_mode="rolling",
     fit_scope="streaming",
     approved_primitives=("trailing_percentile_rank"),
-    notes="Detects persistent funding regimes using causal percentile ranks."
+    notes="Detects persistent funding regimes using causal percentile ranks.",
 )
 
 FP_DEF_VERSION = "v1"
 _PERSISTENCE_PERCENTILE = 85.0
 _PERSISTENCE_MIN_BARS = 8
 _NORM_DUE_BARS = 96
+
 
 @dataclass(frozen=True)
 class FundingPersistenceConfig:
@@ -37,12 +38,15 @@ class FundingPersistenceConfig:
     persistence_min_bars: int = _PERSISTENCE_MIN_BARS
     norm_due_bars: int = _NORM_DUE_BARS
 
+
 DEFAULT_FP_CONFIG = FundingPersistenceConfig()
 SOURCE_EVENT_TYPE = "FUNDING_PERSISTENCE_TRIGGER"
+
 
 def _rolling_percentile(series: pd.Series, window: int = 96) -> pd.Series:
     """PIT-safe rolling percentile."""
     return trailing_percentile_rank(series, window=window, lag=1) * 100.0
+
 
 def _contiguous_runs(mask: pd.Series) -> List[tuple[int, int]]:
     runs: List[tuple[int, int]] = []
@@ -57,6 +61,7 @@ def _contiguous_runs(mask: pd.Series) -> List[tuple[int, int]]:
         runs.append((start, len(mask) - 1))
     return runs
 
+
 def build_funding_persistence_state(
     frame: pd.DataFrame,
     symbol: str,
@@ -69,7 +74,11 @@ def build_funding_persistence_state(
 
     df = frame[["timestamp", "funding_rate_scaled"]].copy()
     df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True)
-    df = df.sort_values("timestamp").drop_duplicates(subset=["timestamp"], keep="last").reset_index(drop=True)
+    df = (
+        df.sort_values("timestamp")
+        .drop_duplicates(subset=["timestamp"], keep="last")
+        .reset_index(drop=True)
+    )
 
     funding_abs = df["funding_rate_scaled"].astype(float).abs().fillna(0.0)
     funding_abs_pct = _rolling_percentile(funding_abs, window=96).fillna(0.0)
@@ -117,7 +126,9 @@ def build_funding_persistence_state(
             "fp_age_bars": age,
             "fp_event_id": event_id,
             "fp_run_start_index": run_start_idx,
-            "fp_severity": ((funding_abs_pct - config.persistence_percentile) / 100.0).clip(lower=0.0),
+            "fp_severity": ((funding_abs_pct - config.persistence_percentile) / 100.0).clip(
+                lower=0.0
+            ),
             "fp_norm_due": ((active == 1) & (age >= config.norm_due_bars)).astype(np.int8),
         }
     )
@@ -132,7 +143,7 @@ def build_funding_persistence_state(
         out.loc[active_mask, "fp_enter_ts"] = pd.Series(
             df["timestamp"].values[valid_start_indices],
             index=out.index[active_mask],
-            dtype="datetime64[ns, UTC]"
+            dtype="datetime64[ns, UTC]",
         )
 
         # Exit TS is the last timestamp of each contiguous run
@@ -141,8 +152,15 @@ def build_funding_persistence_state(
 
     return out
 
+
 def load_funding_features(data_root: Path, run_id: str, symbol: str) -> pd.DataFrame:
-    from project.io.utils import read_parquet, run_scoped_lake_path, choose_partition_dir, list_parquet_files
+    from project.io.utils import (
+        read_parquet,
+        run_scoped_lake_path,
+        choose_partition_dir,
+        list_parquet_files,
+    )
+
     feature_dataset = feature_dataset_dir_name()
     candidates = [
         run_scoped_lake_path(data_root, run_id, "features", "perp", symbol, "5m", feature_dataset),
@@ -154,6 +172,8 @@ def load_funding_features(data_root: Path, run_id: str, symbol: str) -> pd.DataF
         return pd.DataFrame()
     return read_parquet(files)
 
+
 # --- Registration ---
 from project.core.feature_capabilities import register_feature_loader
+
 register_feature_loader("funding", load_funding_features)

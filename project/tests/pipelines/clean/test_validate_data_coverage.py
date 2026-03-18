@@ -24,8 +24,12 @@ def test_validate_data_coverage_fails_on_missing_ratio(monkeypatch, tmp_path):
     )
 
     monkeypatch.setattr(validate_data_coverage, "get_data_root", lambda: tmp_path)
-    monkeypatch.setattr(validate_data_coverage, "choose_partition_dir", lambda candidates: Path("/tmp/fake"))
-    monkeypatch.setattr(validate_data_coverage, "list_parquet_files", lambda path: [path / "data.parquet"])
+    monkeypatch.setattr(
+        validate_data_coverage, "choose_partition_dir", lambda candidates: Path("/tmp/fake")
+    )
+    monkeypatch.setattr(
+        validate_data_coverage, "list_parquet_files", lambda path: [path / "data.parquet"]
+    )
     monkeypatch.setattr(validate_data_coverage, "read_parquet", lambda files: frame)
     monkeypatch.setattr(validate_data_coverage, "start_manifest", lambda *args, **kwargs: {})
     monkeypatch.setattr(validate_data_coverage, "finalize_manifest", lambda *args, **kwargs: None)
@@ -66,8 +70,12 @@ def test_validate_data_coverage_warns_without_failing(monkeypatch, tmp_path):
     captured: dict[str, object] = {}
 
     monkeypatch.setattr(validate_data_coverage, "get_data_root", lambda: tmp_path)
-    monkeypatch.setattr(validate_data_coverage, "choose_partition_dir", lambda candidates: Path("/tmp/fake"))
-    monkeypatch.setattr(validate_data_coverage, "list_parquet_files", lambda path: [path / "data.parquet"])
+    monkeypatch.setattr(
+        validate_data_coverage, "choose_partition_dir", lambda candidates: Path("/tmp/fake")
+    )
+    monkeypatch.setattr(
+        validate_data_coverage, "list_parquet_files", lambda path: [path / "data.parquet"]
+    )
     monkeypatch.setattr(validate_data_coverage, "read_parquet", lambda files: frame)
     monkeypatch.setattr(validate_data_coverage, "start_manifest", lambda *args, **kwargs: {})
     monkeypatch.setattr(

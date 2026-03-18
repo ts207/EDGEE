@@ -6,7 +6,11 @@ import json
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Tuple
 
-from project.experiments.config_loader import _deep_merge, _set_nested_key, resolve_experiment_config
+from project.experiments.config_loader import (
+    _deep_merge,
+    _set_nested_key,
+    resolve_experiment_config,
+)
 from project.spec_registry import load_yaml_path
 
 EFFECTIVE_CONFIG_SCHEMA_VERSION = "effective_run_config_v1"
@@ -53,7 +57,10 @@ def _filtered_args(parser: argparse.ArgumentParser, payload: Dict[str, Any]) -> 
 
 def _normalize_jsonable(value: Any) -> Any:
     if isinstance(value, dict):
-        return {str(k): _normalize_jsonable(v) for k, v in sorted(value.items(), key=lambda item: str(item[0]))}
+        return {
+            str(k): _normalize_jsonable(v)
+            for k, v in sorted(value.items(), key=lambda item: str(item[0]))
+        }
     if isinstance(value, list):
         return [_normalize_jsonable(v) for v in value]
     if isinstance(value, tuple):
@@ -69,7 +76,9 @@ def resolve_effective_args(
     defaults = _parser_defaults(parser)
     effective: Dict[str, Any] = dict(defaults)
 
-    experiment_config_path = str(getattr(parsed_args, "experiment_config", "") or "").strip() or None
+    experiment_config_path = (
+        str(getattr(parsed_args, "experiment_config", "") or "").strip() or None
+    )
     experiment_config: Dict[str, Any] = {}
     if experiment_config_path:
         experiment_config = resolve_experiment_config(experiment_config_path, overrides=[])

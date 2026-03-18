@@ -9,6 +9,7 @@ Grid-derived lag: no hardcoded timedelta — the bar interval is whatever the
 feature grid says it is. signal_ts in events = detected_ts (nominal); the
 actual tradable bar is found by scanning the grid.
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -18,6 +19,7 @@ import pytest
 
 from project.events import registry
 from project.events.registry import _signal_ts_column, _active_signal_column
+
 
 def _symbol_grid() -> pd.Series:
     return pd.Series(
@@ -31,6 +33,7 @@ def _symbol_grid() -> pd.Series:
             utc=True,
         )
     )
+
 
 def _make_events(
     signal_col: str,
@@ -56,6 +59,7 @@ def _make_events(
             "event_type": ["VOL_SHOCK"],
         }
     )
+
 
 def test_signal_flag_absent_at_and_before_detected_ts(monkeypatch):
     """_signal must be False at detected_ts (the bar where event was detected)."""
@@ -94,6 +98,7 @@ def test_signal_flag_absent_at_and_before_detected_ts(monkeypatch):
     # bar after signal bar: _signal False (impulse, not a window)
     row_0015 = flags[flags["timestamp"] == pd.Timestamp("2026-01-01T00:15:00Z")].iloc[0]
     assert bool(row_0015[signal_col]) is False
+
 
 def test_signal_flag_replay_no_retroactive_set(monkeypatch):
     """
@@ -138,6 +143,7 @@ def test_signal_flag_replay_no_retroactive_set(monkeypatch):
                 f"PIT violation: _signal set at {ts} which is <= detected_ts {detected_ts}"
             )
 
+
 def test_detected_ts_defaults_to_enter_ts_when_absent(monkeypatch):
     """When events have no detected_ts column, registry falls back to enter_ts."""
     monkeypatch.setattr(registry, "_load_symbol_timestamps", lambda **kwargs: _symbol_grid())
@@ -173,6 +179,7 @@ def test_detected_ts_defaults_to_enter_ts_when_absent(monkeypatch):
     assert bool(row_0010[signal_col]) is True
     row_0005 = btc_flags[btc_flags["timestamp"] == pd.Timestamp("2026-01-01T00:05:00Z")].iloc[0]
     assert bool(row_0005[signal_col]) is False
+
 
 def test_signal_bar_clamped_to_grid_when_detected_off_grid(monkeypatch):
     """
@@ -213,6 +220,7 @@ def test_signal_bar_clamped_to_grid_when_detected_off_grid(monkeypatch):
     assert len(signal_true_rows) == 1
     # First bar > 00:07 on the [00:00, 00:05, 00:10, 00:15] grid is 00:10
     assert signal_true_rows.iloc[0]["timestamp"] == pd.Timestamp("2026-01-01T00:10:00Z", tz="UTC")
+
 
 def test_explicit_detected_ts_later_than_enter_ts(monkeypatch):
     """

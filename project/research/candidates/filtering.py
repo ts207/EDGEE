@@ -12,11 +12,13 @@ from project.artifacts import (
     promotion_report_path,
 )
 
+
 def checklist_decision(run_id: str, data_root: Path) -> str:
     payload = load_json_dict(checklist_path(run_id, data_root))
     if not payload:
         return "missing"
     return str(payload.get("decision", "missing")).strip().upper() or "missing"
+
 
 def load_candidate_detail(source_path: Path, candidate_id: str) -> Dict[str, object]:
     if not source_path.exists():
@@ -33,14 +35,20 @@ def load_candidate_detail(source_path: Path, candidate_id: str) -> Dict[str, obj
             candidates = payload.get("candidates", [])
             if isinstance(candidates, list):
                 for item in candidates:
-                    if isinstance(item, dict) and str(item.get("candidate_id", "")).strip() == normalized_candidate_id:
+                    if (
+                        isinstance(item, dict)
+                        and str(item.get("candidate_id", "")).strip() == normalized_candidate_id
+                    ):
                         return dict(item)
             if str(payload.get("candidate_id", "")).strip() == normalized_candidate_id:
                 return dict(payload)
             return {}
         if isinstance(payload, list):
             for item in payload:
-                if isinstance(item, dict) and str(item.get("candidate_id", "")).strip() == normalized_candidate_id:
+                if (
+                    isinstance(item, dict)
+                    and str(item.get("candidate_id", "")).strip() == normalized_candidate_id
+                ):
                     return dict(item)
     if source_path.suffix.lower() == ".csv":
         try:
@@ -68,7 +76,10 @@ def load_candidate_detail(source_path: Path, candidate_id: str) -> Dict[str, obj
         return {}
     return {}
 
-def load_promoted_blueprints(run_id: str, data_root: Path) -> Tuple[List[Dict[str, object]], Dict[str, Path]]:
+
+def load_promoted_blueprints(
+    run_id: str, data_root: Path
+) -> Tuple[List[Dict[str, object]], Dict[str, Path]]:
     promoted_path = promoted_blueprints_path(run_id, data_root)
     report_path = promotion_report_path(run_id, data_root)
     blueprints: List[Dict[str, object]] = []
@@ -94,7 +105,9 @@ def load_promoted_blueprints(run_id: str, data_root: Path) -> Tuple[List[Dict[st
     rows: List[Dict[str, object]] = []
     for blueprint in blueprints:
         blueprint_id = str(blueprint.get("id", "")).strip()
-        promotion = blueprint.get("promotion", {}) if isinstance(blueprint.get("promotion"), dict) else {}
+        promotion = (
+            blueprint.get("promotion", {}) if isinstance(blueprint.get("promotion"), dict) else {}
+        )
         if not promotion and blueprint_id:
             promotion = report_by_id.get(blueprint_id, {})
         rows.append(

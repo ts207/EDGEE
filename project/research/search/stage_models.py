@@ -53,7 +53,9 @@ class FeasibilityCheckedHypothesis:
         row.update(
             {
                 "status": "feasible" if self.feasibility.valid else "rejected",
-                "rejection_reason": None if self.feasibility.valid else self.feasibility.primary_reason,
+                "rejection_reason": None
+                if self.feasibility.valid
+                else self.feasibility.primary_reason,
                 "rejection_reasons": list(self.feasibility.reasons),
                 "rejection_details": dict(self.feasibility.details),
             }

@@ -47,7 +47,9 @@ def run_golden_workflow(*, root: Path, config_path: Path) -> Dict[str, Any]:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Run the canonical golden workflow.")
     parser.add_argument("--root", default=None, help="Output root for generated smoke artifacts.")
-    parser.add_argument("--config", default=str(_default_config_path()), help="Workflow config YAML path.")
+    parser.add_argument(
+        "--config", default=str(_default_config_path()), help="Workflow config YAML path."
+    )
     args = parser.parse_args(argv)
 
     root = Path(args.root) if args.root else (PROJECT_ROOT.parent / "artifacts" / "golden_workflow")

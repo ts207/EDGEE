@@ -3,6 +3,7 @@ E6-T3: Live Kill-switch and Unwind.
 
 Verify that the KillSwitchManager correctly detects risk and triggers.
 """
+
 from __future__ import annotations
 
 import pytest
@@ -13,16 +14,22 @@ from project.live.state import LiveStateStore, PositionState
 def test_drawdown_trigger():
     store = LiveStateStore()
     mgr = KillSwitchManager(store)
-    
+
     # Setup account: $1000 balance, but -$200 unrealized PnL (20% drawdown)
     store.account.wallet_balance = 1000.0
-    store.account.update_position(PositionState(
-        symbol="BTCUSDT", side="LONG", quantity=1.0, 
-        entry_price=60000.0, mark_price=59800.0, unrealized_pnl=-200.0
-    ))
-    
+    store.account.update_position(
+        PositionState(
+            symbol="BTCUSDT",
+            side="LONG",
+            quantity=1.0,
+            entry_price=60000.0,
+            mark_price=59800.0,
+            unrealized_pnl=-200.0,
+        )
+    )
+
     mgr.check_drawdown(max_drawdown_pct=0.15)
-    
+
     assert mgr.status.is_active
     assert mgr.status.reason == KillSwitchReason.EXCESSIVE_DRAWDOWN
     assert "20.00%" in mgr.status.message
@@ -31,18 +38,19 @@ def test_drawdown_trigger():
 def test_callback_triggered():
     store = LiveStateStore()
     mgr = KillSwitchManager(store)
-    
+
     triggered_count = 0
+
     def my_cb(reason, msg):
         nonlocal triggered_count
         triggered_count += 1
-        
+
     mgr.register_callback(my_cb)
     mgr.trigger(KillSwitchReason.MANUAL, "test message")
-    
+
     assert triggered_count == 1
     assert mgr.status.is_active
-    
+
     # Should not trigger again if already active
     mgr.trigger(KillSwitchReason.FEATURE_DRIFT, "should not see this")
     assert triggered_count == 1
@@ -51,10 +59,10 @@ def test_callback_triggered():
 def test_reset():
     store = LiveStateStore()
     mgr = KillSwitchManager(store)
-    
+
     mgr.trigger(KillSwitchReason.MANUAL)
     assert mgr.status.is_active
-    
+
     mgr.reset()
     assert not mgr.status.is_active
     assert mgr.status.reason is None

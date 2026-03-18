@@ -44,7 +44,9 @@ class _ReasonRecorder:
     def _normalize_token(value: str) -> str:
         return " ".join(str(value).strip().split())
 
-    def add_reject(self, reason: str, *, category: str = "uncategorized", deploy_only: bool = False) -> None:
+    def add_reject(
+        self, reason: str, *, category: str = "uncategorized", deploy_only: bool = False
+    ) -> None:
         token = self._normalize_token(reason)
         if not token:
             return
@@ -87,7 +89,9 @@ class _ReasonRecorder:
         return json.dumps(payload, sort_keys=True)
 
     def categorized_promo_fail_json(self) -> str:
-        payload = {k: sorted(set(v)) for k, v in sorted(self.categorized_promo_fail_reasons.items())}
+        payload = {
+            k: sorted(set(v)) for k, v in sorted(self.categorized_promo_fail_reasons.items())
+        }
         return json.dumps(payload, sort_keys=True)
 
 
@@ -120,7 +124,10 @@ def sign_consistency(row: Dict[str, Any]) -> float:
     if not t_stats:
         return 0.0
 
-    matches = [1.0 if (t >= 0.0 and base_sign > 0.0) or (t < 0.0 and base_sign < 0.0) else 0.0 for t in t_stats]
+    matches = [
+        1.0 if (t >= 0.0 and base_sign > 0.0) or (t < 0.0 and base_sign < 0.0) else 0.0
+        for t in t_stats
+    ]
     return float(sum(matches) / len(matches))
 
 
@@ -156,7 +163,10 @@ def control_rate_details_for_event(
                 if key in item:
                     val = _quiet_float(item.get(key), np.nan)
                     if np.isfinite(val):
-                        return {"rate": float(val), "source": f"summary.by_event.{event_type}.{key}"}
+                        return {
+                            "rate": float(val),
+                            "source": f"summary.by_event.{event_type}.{key}",
+                        }
         elif item is not None:
             val = _quiet_float(item, np.nan)
             if np.isfinite(val):

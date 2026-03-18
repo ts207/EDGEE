@@ -6,6 +6,7 @@ from project.events.config import compose_event_config
 import project.events.config as tcc
 from project.events.config import compose_template_config
 
+
 def test_compose_event_config_merges_defaults_and_event_parameters():
     cfg = compose_event_config("LIQUIDATION_CASCADE")
 
@@ -19,6 +20,7 @@ def test_compose_event_config_merges_defaults_and_event_parameters():
     assert cfg.parameters["min_occurrences"] == 0
     assert cfg.parameters["liq_vol_th"] == 100000.0
     assert cfg.parameters["oi_drop_th"] == -500000.0
+
 
 def test_compose_event_config_runtime_overrides_win():
     cfg = compose_event_config(
@@ -52,6 +54,7 @@ def test_compose_event_config_trend_acceleration_uses_calibrated_runtime_paramet
     assert cfg.parameters["min_spacing"] == 192
     assert cfg.parameters["cooldown_bars"] == 12
 
+
 def test_compose_template_config_resolves_registry_row():
     cfg = compose_template_config("LIQUIDITY_SHOCK")
 
@@ -61,7 +64,8 @@ def test_compose_template_config_resolves_registry_row():
     assert "stop_run_repair" in cfg.templates
     assert cfg.horizons == ("15m",)
     assert cfg.config_hash.startswith("sha256:")
-    assert "\"event_type\":\"LIQUIDITY_SHOCK\"" in cfg.normalized_json
+    assert '"event_type":"LIQUIDITY_SHOCK"' in cfg.normalized_json
+
 
 def test_compose_template_config_runtime_overrides_win():
     cfg = compose_template_config(
@@ -80,9 +84,11 @@ def test_compose_template_config_runtime_overrides_win():
     assert cfg.max_candidates_per_run == 42
     assert cfg.conditioning_cols == ("vol_regime",)
 
+
 def test_compose_template_config_missing_event_fails_closed():
     with pytest.raises(KeyError):
         compose_template_config("NOT_A_REAL_EVENT")
+
 
 def test_compose_template_config_hash_is_stable_for_same_inputs():
     a = compose_template_config("VOL_SHOCK")
@@ -90,12 +96,14 @@ def test_compose_template_config_hash_is_stable_for_same_inputs():
     assert a.config_hash == b.config_hash
     assert a.normalized_json == b.normalized_json
 
+
 def test_compose_template_config_rejects_incompatible_template_runtime_override():
     with pytest.raises(ValueError, match="incompatible"):
         compose_template_config(
             "LIQUIDITY_SHOCK",
             runtime_overrides={"templates": ["desync_repair"]},
         )
+
 
 def test_compose_template_config_merge_precedence_and_state_overrides(monkeypatch):
     monkeypatch.setattr(

@@ -149,7 +149,9 @@ def ensure_memory_store(program_id: str, *, data_root: Path | None = None) -> Me
     return paths
 
 
-def read_memory_table(program_id: str, table_name: str, *, data_root: Path | None = None) -> pd.DataFrame:
+def read_memory_table(
+    program_id: str, table_name: str, *, data_root: Path | None = None
+) -> pd.DataFrame:
     paths = ensure_memory_store(program_id, data_root=data_root)
     path = getattr(paths, table_name)
     return _read_best_available(path)
@@ -212,10 +214,29 @@ def build_tested_regions_snapshot(
 ) -> pd.DataFrame:
     resolved_data_root = Path(data_root) if data_root is not None else get_data_root()
     # Prioritize high-fidelity discovery metrics for research runs
-    phase2_path = resolved_data_root / "reports" / "phase2" / run_id / "search_engine" / "phase2_candidates.parquet"
-    promotion_path = resolved_data_root / "reports" / "promotions" / run_id / "promotion_statistical_audit.parquet"
-    edge_path = resolved_data_root / "reports" / "edge_candidates" / run_id / "edge_candidates_normalized.parquet"
-    
+    phase2_path = (
+        resolved_data_root
+        / "reports"
+        / "phase2"
+        / run_id
+        / "search_engine"
+        / "phase2_candidates.parquet"
+    )
+    promotion_path = (
+        resolved_data_root
+        / "reports"
+        / "promotions"
+        / run_id
+        / "promotion_statistical_audit.parquet"
+    )
+    edge_path = (
+        resolved_data_root
+        / "reports"
+        / "edge_candidates"
+        / run_id
+        / "edge_candidates_normalized.parquet"
+    )
+
     df = _read_best_available(phase2_path)
     if df.empty:
         df = _read_best_available(promotion_path)
@@ -223,7 +244,11 @@ def build_tested_regions_snapshot(
         df = _read_best_available(edge_path)
     if df.empty:
         # Fallback for old directory structure or specific event discovery
-        discovery_paths = list((resolved_data_root / "reports" / "phase2" / run_id).glob("**/phase2_candidates.parquet"))
+        discovery_paths = list(
+            (resolved_data_root / "reports" / "phase2" / run_id).glob(
+                "**/phase2_candidates.parquet"
+            )
+        )
         for p in discovery_paths:
             df = _read_best_available(p)
             if not df.empty:
@@ -266,21 +291,38 @@ def build_tested_regions_snapshot(
                 "entry_lag": payload["entry_lag"],
                 "context_hash": payload["context_hash"],
                 "context_json": payload["context_json"],
-                "eval_status": str(row.get("promotion_decision", row.get("eval_status", "evaluated"))).strip() or "evaluated",
+                "eval_status": str(
+                    row.get("promotion_decision", row.get("eval_status", "evaluated"))
+                ).strip()
+                or "evaluated",
                 "train_n_obs": int(row.get("train_n_obs", row.get("sample_size", 0)) or 0),
-                "validation_n_obs": int(row.get("validation_n_obs", row.get("validation_samples", 0)) or 0),
+                "validation_n_obs": int(
+                    row.get("validation_n_obs", row.get("validation_samples", 0)) or 0
+                ),
                 "test_n_obs": int(row.get("test_n_obs", row.get("test_samples", 0)) or 0),
                 "q_value": pd.to_numeric(row.get("q_value"), errors="coerce"),
                 "mean_return_bps": pd.to_numeric(
-                    row.get("mean_return_bps", row.get("bridge_validation_after_cost_bps", row.get("net_expectancy_bps"))),
+                    row.get(
+                        "mean_return_bps",
+                        row.get("bridge_validation_after_cost_bps", row.get("net_expectancy_bps")),
+                    ),
                     errors="coerce",
                 ),
                 "after_cost_expectancy": pd.to_numeric(
-                    row.get("after_cost_expectancy", row.get("after_cost_expectancy_per_trade", row.get("net_expectancy_bps"))),
+                    row.get(
+                        "after_cost_expectancy",
+                        row.get("after_cost_expectancy_per_trade", row.get("net_expectancy_bps")),
+                    ),
                     errors="coerce",
                 ),
                 "stressed_after_cost_expectancy": pd.to_numeric(
-                    row.get("stressed_after_cost_expectancy", row.get("stressed_after_cost_expectancy_per_trade", row.get("bridge_validation_stressed_after_cost_bps"))),
+                    row.get(
+                        "stressed_after_cost_expectancy",
+                        row.get(
+                            "stressed_after_cost_expectancy_per_trade",
+                            row.get("bridge_validation_stressed_after_cost_bps"),
+                        ),
+                    ),
                     errors="coerce",
                 ),
                 "robustness_score": pd.to_numeric(
@@ -289,9 +331,14 @@ def build_tested_regions_snapshot(
                 ),
                 "gate_bridge_tradable": bool(row.get("gate_bridge_tradable") == "pass"),
                 "gate_promo_statistical": bool(row.get("gate_promo_statistical") == "pass"),
-                "gate_promo_retail_net_expectancy": bool(row.get("gate_promo_retail_net_expectancy") == "pass" or row.get("gate_promo_retail_net_expectancy") is True),
+                "gate_promo_retail_net_expectancy": bool(
+                    row.get("gate_promo_retail_net_expectancy") == "pass"
+                    or row.get("gate_promo_retail_net_expectancy") is True
+                ),
                 "mechanical_status": "ok",
-                "primary_fail_gate": str(row.get("promotion_fail_gate_primary", row.get("primary_fail_gate", ""))).strip(),
+                "primary_fail_gate": str(
+                    row.get("promotion_fail_gate_primary", row.get("primary_fail_gate", ""))
+                ).strip(),
                 "warning_count": int(row.get("warning_count", 0) or 0),
                 "updated_at": str(row.get("updated_at", "")),
             }
@@ -347,7 +394,9 @@ def build_failures_snapshot(
                     "program_id": program_id,
                     "stage": str(payload.get("stage", path.stem)),
                     "failure_class": "stage_failed",
-                    "failure_detail": str(payload.get("error_message", payload.get("traceback", ""))).strip(),
+                    "failure_detail": str(
+                        payload.get("error_message", payload.get("traceback", ""))
+                    ).strip(),
                     "artifact_path": str(path),
                     "is_mechanical": True,
                     "is_repeated": False,
@@ -384,7 +433,9 @@ def compute_region_statistics(tested_regions: pd.DataFrame) -> pd.DataFrame:
     return out.reindex(columns=_TABLES["region_statistics"])
 
 
-def _aggregate_dimension(tested_regions: pd.DataFrame, column: str, output_columns: List[str]) -> pd.DataFrame:
+def _aggregate_dimension(
+    tested_regions: pd.DataFrame, column: str, output_columns: List[str]
+) -> pd.DataFrame:
     if tested_regions.empty:
         return pd.DataFrame(columns=output_columns)
     grouped = tested_regions.groupby(column, dropna=False)

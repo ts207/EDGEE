@@ -8,6 +8,7 @@ from project.pipelines.research.holdout_integrity import (
     assert_no_lookahead_join,
 )
 
+
 def test_assert_holdout_split_integrity_passes_ordered_splits():
     events = pd.DataFrame(
         {
@@ -30,6 +31,7 @@ def test_assert_holdout_split_integrity_passes_ordered_splits():
     assert summary["counts"]["validation"] == 1
     assert summary["counts"]["test"] == 1
 
+
 def test_assert_holdout_split_integrity_rejects_invalid_label():
     events = pd.DataFrame(
         {
@@ -39,6 +41,7 @@ def test_assert_holdout_split_integrity_rejects_invalid_label():
     )
     with pytest.raises(ValueError, match="invalid split labels"):
         assert_holdout_split_integrity(events)
+
 
 def test_assert_holdout_split_integrity_rejects_overlap():
     events = pd.DataFrame(
@@ -55,6 +58,7 @@ def test_assert_holdout_split_integrity_rejects_overlap():
     )
     with pytest.raises(ValueError, match="train/validation overlap"):
         assert_holdout_split_integrity(events)
+
 
 def test_assert_no_lookahead_join_rejects_future_feature_timestamp():
     merged = pd.DataFrame(

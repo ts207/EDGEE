@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 from project.core.config import get_data_root
 
@@ -28,12 +27,15 @@ EARLIEST_UM_FUTURES = datetime(2019, 9, 1, tzinfo=timezone.utc)
 FUNDING_HOURS = (0, 8, 16)
 FUNDING_STEP = timedelta(hours=8)
 
+
 def _parse_date(value: str) -> datetime:
     return datetime.strptime(value, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+
 
 def _month_start(ts: datetime) -> datetime:
     ts = ts.astimezone(timezone.utc)
     return ts.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
 
 def _next_month(ts: datetime) -> datetime:
     ts = ts.astimezone(timezone.utc)
@@ -45,6 +47,7 @@ def _next_month(ts: datetime) -> datetime:
         m += 1
     return ts.replace(year=y, month=m, day=1, hour=0, minute=0, second=0, microsecond=0)
 
+
 def _iter_months(start: datetime, end: datetime) -> List[datetime]:
     months: List[datetime] = []
     cursor = _month_start(start)
@@ -53,6 +56,7 @@ def _iter_months(start: datetime, end: datetime) -> List[datetime]:
         cursor = _next_month(cursor)
     return months
 
+
 def _iter_days(start: datetime, end: datetime) -> List[datetime]:
     days: List[datetime] = []
     cursor = start.astimezone(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
@@ -60,6 +64,7 @@ def _iter_days(start: datetime, end: datetime) -> List[datetime]:
         days.append(cursor)
         cursor += timedelta(days=1)
     return days
+
 
 def _ceil_to_next_funding(ts: datetime) -> datetime:
     ts = ts.astimezone(timezone.utc)
@@ -72,6 +77,7 @@ def _ceil_to_next_funding(ts: datetime) -> datetime:
         candidates.append(cand)
     return min(candidates)
 
+
 def _expected_funding_timestamps(start: datetime, end_exclusive: datetime) -> List[pd.Timestamp]:
     start = start.astimezone(timezone.utc)
     end_exclusive = end_exclusive.astimezone(timezone.utc)
@@ -82,6 +88,7 @@ def _expected_funding_timestamps(start: datetime, end_exclusive: datetime) -> Li
         cur += FUNDING_STEP
     return out
 
+
 def _infer_epoch_unit(ts_series: pd.Series) -> str:
     vals = pd.to_numeric(ts_series, errors="coerce").dropna().astype("int64")
     if vals.empty:
@@ -89,11 +96,13 @@ def _infer_epoch_unit(ts_series: pd.Series) -> str:
     med = int(vals.median())
     return "s" if med < 1_000_000_000_000 else "ms"
 
+
 def _snap_to_8h_grid(ts: pd.Series) -> pd.Series:
     ts = pd.to_datetime(ts, utc=True).dt.round("1s")
     secs = (ts.astype("int64", copy=False) // 1_000_000_000).astype("int64")
     snap = ((secs + 4 * 3600) // (8 * 3600)) * (8 * 3600)
     return pd.to_datetime(snap, unit="s", utc=True)
+
 
 def _read_funding_from_zip(path: Path, symbol: str, source: str) -> pd.DataFrame:
     with ZipFile(path) as zf:
@@ -106,7 +115,14 @@ def _read_funding_from_zip(path: Path, symbol: str, source: str) -> pd.DataFrame
             ts_col = None
             rate_col = None
 
-            for candidate in ["fundingtime", "funding_time", "calctime", "calc_time", "timestamp", "time"]:
+            for candidate in [
+                "fundingtime",
+                "funding_time",
+                "calctime",
+                "calc_time",
+                "timestamp",
+                "time",
+            ]:
                 if candidate in columns:
                     ts_col = columns[candidate]
                     break
@@ -123,7 +139,9 @@ def _read_funding_from_zip(path: Path, symbol: str, source: str) -> pd.DataFrame
                 df = pd.read_csv(f, header=None)
 
                 if df.shape[1] < 2:
-                    raise ValueError(f"Unexpected fundingRate CSV format (cols={df.shape[1]}) in {csv_name}")
+                    raise ValueError(
+                        f"Unexpected fundingRate CSV format (cols={df.shape[1]}) in {csv_name}"
+                    )
 
                 ts_col = df.columns[0]
 
@@ -148,6 +166,7 @@ def _read_funding_from_zip(path: Path, symbol: str, source: str) -> pd.DataFrame
     df["source"] = source
     ensure_utc_timestamp(df["timestamp"], "timestamp")
     return df
+
 
 def _fetch_funding_api(
     session: requests.Session,
@@ -182,7 +201,9 @@ def _fetch_funding_api(
 
         rows.extend(payload)
         last_time_ms = int(payload[-1]["fundingTime"])
-        cursor = datetime.fromtimestamp(last_time_ms / 1000, tz=timezone.utc) + timedelta(milliseconds=1)
+        cursor = datetime.fromtimestamp(last_time_ms / 1000, tz=timezone.utc) + timedelta(
+            milliseconds=1
+        )
 
         if sleep_sec:
             time.sleep(sleep_sec)
@@ -198,8 +219,13 @@ def _fetch_funding_api(
     df["source"] = "api"
     df = df[["timestamp", "funding_rate", "symbol", "source"]]
     ensure_utc_timestamp(df["timestamp"], "timestamp")
-    df = df.dropna(subset=["timestamp", "funding_rate"]).sort_values("timestamp").drop_duplicates(subset=["timestamp"])
+    df = (
+        df.dropna(subset=["timestamp", "funding_rate"])
+        .sort_values("timestamp")
+        .drop_duplicates(subset=["timestamp"])
+    )
     return df, api_calls
+
 
 def _partition_complete(path: Path, expected_ts: List[pd.Timestamp]) -> bool:
     if not path.exists():
@@ -223,11 +249,15 @@ def _partition_complete(path: Path, expected_ts: List[pd.Timestamp]) -> bool:
     except Exception:
         return False
 
-def _missing_expected_timestamps(df: pd.DataFrame, expected_ts: List[pd.Timestamp]) -> List[pd.Timestamp]:
+
+def _missing_expected_timestamps(
+    df: pd.DataFrame, expected_ts: List[pd.Timestamp]
+) -> List[pd.Timestamp]:
     if df is None or df.empty:
         return expected_ts
     got = set(pd.to_datetime(df["timestamp"], utc=True))
     return [t for t in expected_ts if t not in got]
+
 
 def _missing_timestamp_ranges(missing_ts: List[pd.Timestamp]) -> List[Tuple[datetime, datetime]]:
     if not missing_ts:
@@ -244,6 +274,7 @@ def _missing_timestamp_ranges(missing_ts: List[pd.Timestamp]) -> List[Tuple[date
         prev = ts
     ranges.append((range_start.to_pydatetime(), (prev + step).to_pydatetime()))
     return ranges
+
 
 def main() -> int:
     data_root = get_data_root()
@@ -276,7 +307,9 @@ def main() -> int:
     if args.log_path:
         ensure_dir(Path(args.log_path).parent)
         log_handlers.append(logging.FileHandler(args.log_path))
-    logging.basicConfig(level=logging.INFO, handlers=log_handlers, format="%(asctime)s %(levelname)s %(message)s")
+    logging.basicConfig(
+        level=logging.INFO, handlers=log_handlers, format="%(asctime)s %(levelname)s %(message)s"
+    )
 
     inputs: List[Dict[str, object]] = []
     outputs: List[Dict[str, object]] = []
@@ -328,7 +361,9 @@ def main() -> int:
                     / f"year={month_start.year}"
                     / f"month={month_start.month:02d}"
                 )
-                out_path = out_dir / f"funding_{symbol}_{month_start.year}-{month_start.month:02d}.parquet"
+                out_path = (
+                    out_dir / f"funding_{symbol}_{month_start.year}-{month_start.month:02d}.parquet"
+                )
                 month_specs.append(
                     {
                         "out_path": out_path,
@@ -343,10 +378,17 @@ def main() -> int:
                     existing_path = out_path if out_path.exists() else out_path.with_suffix(".csv")
                     df_month = read_parquet([existing_path])
                     if "timestamp" not in df_month.columns:
-                        raise ValueError(f"Missing timestamp column in existing partition: {existing_path}")
-                    df_month["timestamp"] = pd.to_datetime(df_month["timestamp"], utc=True, errors="coerce")
+                        raise ValueError(
+                            f"Missing timestamp column in existing partition: {existing_path}"
+                        )
+                    df_month["timestamp"] = pd.to_datetime(
+                        df_month["timestamp"], utc=True, errors="coerce"
+                    )
                     df_month = df_month.dropna(subset=["timestamp"]).sort_values("timestamp")
-                    df_month = df_month[(df_month["timestamp"] >= range_start) & (df_month["timestamp"] < range_end_exclusive)]
+                    df_month = df_month[
+                        (df_month["timestamp"] >= range_start)
+                        & (df_month["timestamp"] < range_end_exclusive)
+                    ]
                     month_frames.append(df_month)
                     continue
 
@@ -381,7 +423,9 @@ def main() -> int:
                             raise RuntimeError(f"Failed to download {monthly_url}: {result.error}")
 
                         # fall back to daily archives
-                        for day in _iter_days(range_start, range_end_exclusive - timedelta(seconds=1)):
+                        for day in _iter_days(
+                            range_start, range_end_exclusive - timedelta(seconds=1)
+                        ):
                             daily_url = join_url(
                                 ARCHIVE_BASE,
                                 "daily",
@@ -400,16 +444,23 @@ def main() -> int:
                             )
                             if daily_result.status == "ok":
                                 archive_files_downloaded.append(daily_url)
-                                frames.append(_read_funding_from_zip(daily_zip, symbol, "archive_daily"))
+                                frames.append(
+                                    _read_funding_from_zip(daily_zip, symbol, "archive_daily")
+                                )
                             elif daily_result.status == "not_found":
                                 missing_archives.append(daily_url)
                             else:
-                                raise RuntimeError(f"Failed to download {daily_url}: {daily_result.error}")
+                                raise RuntimeError(
+                                    f"Failed to download {daily_url}: {daily_result.error}"
+                                )
 
                 if frames:
                     data = pd.concat(frames, ignore_index=True)
                     data = data.sort_values("timestamp").drop_duplicates(subset=["timestamp"])
-                    data = data[(data["timestamp"] >= range_start) & (data["timestamp"] < range_end_exclusive)]
+                    data = data[
+                        (data["timestamp"] >= range_start)
+                        & (data["timestamp"] < range_end_exclusive)
+                    ]
                 else:
                     data = pd.DataFrame(columns=["timestamp", "funding_rate", "symbol", "source"])
 
@@ -419,12 +470,18 @@ def main() -> int:
                     if not data["timestamp"].is_monotonic_increasing:
                         data = data.sort_values("timestamp")
                         if not data["timestamp"].is_monotonic_increasing:
-                            raise ValueError(f"Timestamps not sorted for {symbol} {month_start:%Y-%m}")
+                            raise ValueError(
+                                f"Timestamps not sorted for {symbol} {month_start:%Y-%m}"
+                            )
 
                 month_frames.append(data)
 
-            archive_data = pd.concat(month_frames, ignore_index=True) if month_frames else pd.DataFrame()
-            archive_data = archive_data.sort_values("timestamp") if not archive_data.empty else archive_data
+            archive_data = (
+                pd.concat(month_frames, ignore_index=True) if month_frames else pd.DataFrame()
+            )
+            archive_data = (
+                archive_data.sort_values("timestamp") if not archive_data.empty else archive_data
+            )
             if not archive_data.empty:
                 archive_data = archive_data.drop_duplicates(subset=["timestamp"], keep="first")
 
@@ -452,7 +509,9 @@ def main() -> int:
                         api_frames.append(frame)
                 if api_frames:
                     api_data = pd.concat(api_frames, ignore_index=True)
-                    api_data = api_data.sort_values("timestamp").drop_duplicates(subset=["timestamp"], keep="first")
+                    api_data = api_data.sort_values("timestamp").drop_duplicates(
+                        subset=["timestamp"], keep="first"
+                    )
                 if not api_data.empty:
                     api_coverage_start = api_data["timestamp"].min().isoformat()
                     api_coverage_end = api_data["timestamp"].max().isoformat()
@@ -460,7 +519,9 @@ def main() -> int:
             frames_to_merge = [f for f in (archive_data, api_data) if not f.empty]
             if frames_to_merge:
                 combined = pd.concat(frames_to_merge, ignore_index=True)
-                combined = combined.sort_values("timestamp").drop_duplicates(subset=["timestamp"], keep="first")
+                combined = combined.sort_values("timestamp").drop_duplicates(
+                    subset=["timestamp"], keep="first"
+                )
             else:
                 combined = pd.DataFrame(columns=["timestamp", "funding_rate", "symbol", "source"])
 
@@ -471,12 +532,17 @@ def main() -> int:
                 range_end_exclusive = spec["range_end_exclusive"]
                 expected_ts_month = spec["expected_ts_month"]
                 if combined.empty:
-                    month_data = pd.DataFrame(columns=["timestamp", "funding_rate", "symbol", "source"])
+                    month_data = pd.DataFrame(
+                        columns=["timestamp", "funding_rate", "symbol", "source"]
+                    )
                 else:
                     month_data = combined[
-                        (combined["timestamp"] >= range_start) & (combined["timestamp"] < range_end_exclusive)
+                        (combined["timestamp"] >= range_start)
+                        & (combined["timestamp"] < range_end_exclusive)
                     ].copy()
-                    month_data = month_data.sort_values("timestamp").drop_duplicates(subset=["timestamp"], keep="first")
+                    month_data = month_data.sort_values("timestamp").drop_duplicates(
+                        subset=["timestamp"], keep="first"
+                    )
                 if month_data.empty:
                     continue
                 if not args.force and _partition_complete(out_path, expected_ts_month):
@@ -528,6 +594,7 @@ def main() -> int:
         logging.exception("Funding ingestion failed")
         finalize_manifest(manifest, "failed", error=str(exc), stats=stats)
         return 1
+
 
 if __name__ == "__main__":
     sys.exit(main())

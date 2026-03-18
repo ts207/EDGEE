@@ -121,5 +121,7 @@ def test_write_strategy_contract_artifacts_emits_executable_strategy_spec_artifa
     assert path.exists()
     payload = json.loads(path.read_text(encoding="utf-8"))
     assert payload["metadata"]["blueprint_id"] == "bp_exec_1"
-    index_payload = json.loads((tmp_path / "executable_strategy_spec_index.json").read_text(encoding="utf-8"))
+    index_payload = json.loads(
+        (tmp_path / "executable_strategy_spec_index.json").read_text(encoding="utf-8")
+    )
     assert index_payload["count"] == 1

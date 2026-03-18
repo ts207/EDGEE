@@ -26,7 +26,14 @@ def test_golden_synthetic_discovery_workflow_writes_summary(tmp_path: Path, monk
             out_dir / "phase2_candidates.parquet",
         )
         (out_dir / "phase2_diagnostics.json").write_text(
-            json.dumps({"discovery_profile": "synthetic", "hypotheses_generated": 12, "bridge_candidates_rows": 1}, indent=2),
+            json.dumps(
+                {
+                    "discovery_profile": "synthetic",
+                    "hypotheses_generated": 12,
+                    "bridge_candidates_rows": 1,
+                },
+                indent=2,
+            ),
             encoding="utf-8",
         )
         return _Completed(0)
@@ -52,7 +59,9 @@ def test_golden_synthetic_discovery_workflow_writes_summary(tmp_path: Path, monk
     assert summary["search_engine_diagnostics"]["discovery_profile"] == "synthetic"
 
 
-def test_golden_synthetic_discovery_applies_narrowing_overrides(tmp_path: Path, monkeypatch) -> None:
+def test_golden_synthetic_discovery_applies_narrowing_overrides(
+    tmp_path: Path, monkeypatch
+) -> None:
     captured: dict[str, object] = {}
 
     def _fake_runner(*, data_root: Path, argv: list[str]):

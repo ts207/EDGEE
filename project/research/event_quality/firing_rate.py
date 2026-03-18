@@ -5,6 +5,7 @@ Firing rate audit for event columns in the wide features DataFrame.
 Scans all columns matching the `event_*` pattern, computes per-event
 fire counts and rates, and flags events below a minimum n threshold.
 """
+
 from __future__ import annotations
 
 import re
@@ -16,7 +17,7 @@ _EVENT_COL_RE = re.compile(r"^event_(.+)$")
 def compute_firing_rates(
     features: pd.DataFrame,
     *,
-    bars_per_day: int = 288,   # 5m bars: 288/day
+    bars_per_day: int = 288,  # 5m bars: 288/day
     min_n: int = 100,
 ) -> pd.DataFrame:
     """
@@ -52,21 +53,19 @@ def compute_firing_rates(
         days = n_bars / bars_per_day
         events_per_day = round(n_fires / days, 4) if days > 0 else 0.0
         pct = round(n_fires / n_bars * 100, 4)
-        rows.append({
-            "event_id": event_id,
-            "column_name": col,
-            "n_fires": n_fires,
-            "fire_rate_per_1000_bars": fire_rate_per_1000,
-            "events_per_day": events_per_day,
-            "pct_of_bars": pct,
-            "below_min_n": n_fires < min_n,
-        })
+        rows.append(
+            {
+                "event_id": event_id,
+                "column_name": col,
+                "n_fires": n_fires,
+                "fire_rate_per_1000_bars": fire_rate_per_1000,
+                "events_per_day": events_per_day,
+                "pct_of_bars": pct,
+                "below_min_n": n_fires < min_n,
+            }
+        )
 
     if not rows:
         return pd.DataFrame()
 
-    return (
-        pd.DataFrame(rows)
-        .sort_values("n_fires", ascending=False)
-        .reset_index(drop=True)
-    )
+    return pd.DataFrame(rows).sort_values("n_fires", ascending=False).reset_index(drop=True)

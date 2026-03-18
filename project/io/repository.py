@@ -17,11 +17,13 @@ from project.io.utils import (
 
 _LOG = logging.getLogger(__name__)
 
+
 class ProjectDataRepository:
     """
     Centralized data access layer for Project Edge.
     Handles run-scoped path resolution, partitioned reading, and LRU caching.
     """
+
     def __init__(self, data_root: Path, run_id: Optional[str] = None):
         self.data_root = data_root
         self.run_id = run_id
@@ -32,10 +34,14 @@ class ProjectDataRepository:
         candidates = []
         if self.run_id:
             candidates.append(
-                run_scoped_lake_path(self.data_root, self.run_id, "cleaned", market, symbol, f"bars_{timeframe}")
+                run_scoped_lake_path(
+                    self.data_root, self.run_id, "cleaned", market, symbol, f"bars_{timeframe}"
+                )
             )
-        candidates.append(self.data_root / "lake" / "cleaned" / market / symbol / f"bars_{timeframe}")
-        
+        candidates.append(
+            self.data_root / "lake" / "cleaned" / market / symbol / f"bars_{timeframe}"
+        )
+
         return self._read_partitioned_candidates(candidates, f"bars for {symbol} {timeframe}")
 
     @lru_cache(maxsize=32)
@@ -55,40 +61,58 @@ class ProjectDataRepository:
                     self.data_root, self.run_id, "features", market, symbol, timeframe, dataset_name
                 )
             )
-        candidates.append(self.data_root / "lake" / "features" / market / symbol / timeframe / dataset_name)
-        
-        return self._read_partitioned_candidates(candidates, f"features {dataset_name} for {symbol} {timeframe}")
+        candidates.append(
+            self.data_root / "lake" / "features" / market / symbol / timeframe / dataset_name
+        )
+
+        return self._read_partitioned_candidates(
+            candidates, f"features {dataset_name} for {symbol} {timeframe}"
+        )
 
     @lru_cache(maxsize=32)
-    def load_market_context(self, symbol: str, timeframe: str = "5m", market: str = "perp") -> pd.DataFrame:
+    def load_market_context(
+        self, symbol: str, timeframe: str = "5m", market: str = "perp"
+    ) -> pd.DataFrame:
         """Load market context features."""
         candidates = []
         if self.run_id:
             candidates.append(
-                run_scoped_lake_path(self.data_root, self.run_id, "features", market, symbol, timeframe, "market_context")
+                run_scoped_lake_path(
+                    self.data_root,
+                    self.run_id,
+                    "features",
+                    market,
+                    symbol,
+                    timeframe,
+                    "market_context",
+                )
             )
-        candidates.append(self.data_root / "lake" / "features" / market / symbol / timeframe / "market_context")
-        
-        return self._read_partitioned_candidates(candidates, f"market context for {symbol} {timeframe}")
+        candidates.append(
+            self.data_root / "lake" / "features" / market / symbol / timeframe / "market_context"
+        )
+
+        return self._read_partitioned_candidates(
+            candidates, f"market context for {symbol} {timeframe}"
+        )
 
     def _read_partitioned_candidates(self, candidates: List[Path], label: str) -> pd.DataFrame:
         path_dir = choose_partition_dir(candidates)
         if not path_dir:
             _LOG.warning(f"No data found for {label}")
             return pd.DataFrame()
-        
+
         files = list_parquet_files(path_dir)
         if not files:
             return pd.DataFrame()
-            
+
         df = read_parquet(files)
         if df.empty:
             return pd.DataFrame()
-            
+
         if "timestamp" in df.columns:
             df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True, errors="coerce")
             df = df.sort_values("timestamp").reset_index(drop=True)
-            
+
         return df
 
     def clear_cache(self):

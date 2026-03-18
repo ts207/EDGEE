@@ -5,10 +5,11 @@ import argparse
 import sys
 
 # Add project root to path
-# Now we can import the project's own write_parquet if we want, 
+# Now we can import the project's own write_parquet if we want,
 # or just use pandas since we know we have pyarrow in the venv for this run.
 # To be safe and consistent with the project's IO, we'll use the lib's write_parquet.
 from project.io.utils import write_parquet, read_parquet
+
 
 def fix_file(path: Path):
     if not path.exists():
@@ -32,6 +33,7 @@ def fix_file(path: Path):
         except Exception as e:
             print(f"Failed to process {path}: {e}")
 
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--run_id", required=True)
@@ -39,16 +41,17 @@ def main():
 
     data_root = get_data_root()
     reports_dir = data_root / "reports"
-    
+
     # List of known files that might be corrupted based on analyze_... usage of merge_event_csv
     # The pattern is data/reports/<reports_dir_from_spec>/<run_id>/<events_file_from_spec>
-    
+
     # Use glob with ** for recursive search, or just rglob without leading **
     potential_files = list(reports_dir.glob(f"**/{args.run_id}/*.parquet"))
-    
+
     print(f"Found {len(potential_files)} potential parquet files to check for run_id {args.run_id}")
     for p in potential_files:
         fix_file(p)
+
 
 if __name__ == "__main__":
     main()

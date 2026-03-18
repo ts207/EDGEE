@@ -8,7 +8,9 @@ from project.io.utils import ensure_dir, write_parquet
 from project.scripts.validate_synthetic_detector_truth import validate_detector_truth
 
 
-def _write_event_report(tmp_path, run_id: str, reports_dir: str, events_file: str, rows: list[dict]) -> None:
+def _write_event_report(
+    tmp_path, run_id: str, reports_dir: str, events_file: str, rows: list[dict]
+) -> None:
     out_dir = tmp_path / "reports" / reports_dir / run_id
     ensure_dir(out_dir)
     write_parquet(pd.DataFrame(rows), out_dir / events_file)
@@ -41,8 +43,16 @@ def test_validate_synthetic_detector_truth_scores_expected_windows(tmp_path):
         "cross_venue_desync",
         "cross_venue_desync_events.parquet",
         [
-            {"symbol": "BTCUSDT", "event_type": "CROSS_VENUE_DESYNC", "enter_ts": "2026-01-02T00:30:00Z"},
-            {"symbol": "BTCUSDT", "event_type": "CROSS_VENUE_DESYNC", "enter_ts": "2026-01-05T00:30:00Z"},
+            {
+                "symbol": "BTCUSDT",
+                "event_type": "CROSS_VENUE_DESYNC",
+                "enter_ts": "2026-01-02T00:30:00Z",
+            },
+            {
+                "symbol": "BTCUSDT",
+                "event_type": "CROSS_VENUE_DESYNC",
+                "enter_ts": "2026-01-05T00:30:00Z",
+            },
         ],
     )
 
@@ -64,6 +74,7 @@ def test_tolerance_minutes_accepts_dict():
     """validate_detector_truth must accept tolerance_minutes as a dict."""
     import inspect
     from project.scripts.validate_synthetic_detector_truth import validate_detector_truth
+
     sig = inspect.signature(validate_detector_truth)
     assert "tolerance_minutes" in sig.parameters
 
@@ -71,18 +82,21 @@ def test_tolerance_minutes_accepts_dict():
 def test_tolerance_dict_uses_per_event_type_value(tmp_path):
     """When tolerance_minutes is a dict, event-type-specific values are used."""
     from project.scripts.validate_synthetic_detector_truth import validate_detector_truth
+
     truth_map = {
-        "segments": [{
-            "regime_type": "test",
-            "symbol": "BTCUSDT",
-            "start_ts": "2024-01-01T01:00:00+00:00",
-            "end_ts": "2024-01-01T02:00:00+00:00",
-            "sign": 1,
-            "amplitude": 1.0,
-            "intended_effect_direction": "test",
-            "expected_event_types": ["VOL_SPIKE"],
-            "expected_detector_families": [],
-        }]
+        "segments": [
+            {
+                "regime_type": "test",
+                "symbol": "BTCUSDT",
+                "start_ts": "2024-01-01T01:00:00+00:00",
+                "end_ts": "2024-01-01T02:00:00+00:00",
+                "sign": 1,
+                "amplitude": 1.0,
+                "intended_effect_direction": "test",
+                "expected_event_types": ["VOL_SPIKE"],
+                "expected_detector_families": [],
+            }
+        ]
     }
     truth_map_path = tmp_path / "truth.json"
     truth_map_path.write_text(json.dumps(truth_map))
@@ -123,7 +137,11 @@ def test_validate_synthetic_detector_truth_fails_when_expected_detector_misses(t
         "positioning_extremes",
         "positioning_extremes_events.parquet",
         [
-            {"symbol": "ETHUSDT", "event_type": "DELEVERAGING_WAVE", "enter_ts": "2026-01-07T00:30:00Z"},
+            {
+                "symbol": "ETHUSDT",
+                "event_type": "DELEVERAGING_WAVE",
+                "enter_ts": "2026-01-07T00:30:00Z",
+            },
         ],
     )
 
@@ -210,7 +228,13 @@ def test_validate_synthetic_detector_truth_ignores_supporting_events_by_default(
         run_id,
         "liquidity_dislocation",
         "liquidity_dislocation_events.parquet",
-        [{"symbol": "BTCUSDT", "event_type": "PRICE_VOL_IMBALANCE_PROXY", "enter_ts": "2026-01-02T00:30:00Z"}],
+        [
+            {
+                "symbol": "BTCUSDT",
+                "event_type": "PRICE_VOL_IMBALANCE_PROXY",
+                "enter_ts": "2026-01-02T00:30:00Z",
+            }
+        ],
     )
 
     result = validate_detector_truth(
@@ -219,7 +243,9 @@ def test_validate_synthetic_detector_truth_ignores_supporting_events_by_default(
         truth_map_path=truth_path,
     )
 
-    assert [report["event_type"] for report in result["event_reports"]] == ["LIQUIDITY_STRESS_DIRECT"]
+    assert [report["event_type"] for report in result["event_reports"]] == [
+        "LIQUIDITY_STRESS_DIRECT"
+    ]
     assert result["supporting_event_reports"] == []
 
 
@@ -249,8 +275,16 @@ def test_validate_synthetic_detector_truth_can_report_supporting_events(tmp_path
         "liquidity_dislocation",
         "liquidity_dislocation_events.parquet",
         [
-            {"symbol": "BTCUSDT", "event_type": "ABSORPTION_PROXY", "enter_ts": "2026-01-02T00:30:00Z"},
-            {"symbol": "BTCUSDT", "event_type": "DEPTH_STRESS_PROXY", "enter_ts": "2026-01-02T01:00:00Z"},
+            {
+                "symbol": "BTCUSDT",
+                "event_type": "ABSORPTION_PROXY",
+                "enter_ts": "2026-01-02T00:30:00Z",
+            },
+            {
+                "symbol": "BTCUSDT",
+                "event_type": "DEPTH_STRESS_PROXY",
+                "enter_ts": "2026-01-02T01:00:00Z",
+            },
         ],
     )
 
@@ -262,12 +296,16 @@ def test_validate_synthetic_detector_truth_can_report_supporting_events(tmp_path
     )
 
     assert result["passed"] is False
-    assert [report["event_type"] for report in result["event_reports"]] == ["LIQUIDITY_STRESS_DIRECT"]
+    assert [report["event_type"] for report in result["event_reports"]] == [
+        "LIQUIDITY_STRESS_DIRECT"
+    ]
     assert [report["event_type"] for report in result["supporting_event_reports"]] == [
         "ABSORPTION_PROXY",
         "DEPTH_STRESS_PROXY",
     ]
-    assert all(report["truth_role"] == "supporting" for report in result["supporting_event_reports"])
+    assert all(
+        report["truth_role"] == "supporting" for report in result["supporting_event_reports"]
+    )
     assert result["supporting_event_reports"][0]["per_symbol"][0]["windows_hit"] == 1
     assert result["supporting_event_reports"][1]["per_symbol"][0]["windows_hit"] == 1
 
@@ -305,8 +343,16 @@ def test_validate_synthetic_detector_truth_prefers_event_specific_truth_windows(
         "liquidity_dislocation",
         "liquidity_dislocation_events.parquet",
         [
-            {"symbol": "BTCUSDT", "event_type": "ABSORPTION_PROXY", "enter_ts": "2026-01-02T01:00:00Z"},
-            {"symbol": "BTCUSDT", "event_type": "ABSORPTION_PROXY", "enter_ts": "2026-01-02T06:00:00Z"},
+            {
+                "symbol": "BTCUSDT",
+                "event_type": "ABSORPTION_PROXY",
+                "enter_ts": "2026-01-02T01:00:00Z",
+            },
+            {
+                "symbol": "BTCUSDT",
+                "event_type": "ABSORPTION_PROXY",
+                "enter_ts": "2026-01-02T06:00:00Z",
+            },
         ],
     )
 
@@ -327,6 +373,7 @@ def test_validate_synthetic_detector_truth_prefers_event_specific_truth_windows(
 
 def _write_truth_map(tmp_path, content):
     import json
+
     p = tmp_path / "truth_map.json"
     p.write_text(json.dumps(content), encoding="utf-8")
     return p
@@ -335,10 +382,12 @@ def _write_truth_map(tmp_path, content):
 def _write_vol_shock_events(data_root, run_id, rows):
     """Write VOL_SHOCK events into the directory structure expected by load_event_frame."""
     from project.events.registry import EVENT_REGISTRY_SPECS
+
     spec = EVENT_REGISTRY_SPECS["VOL_SHOCK"]
     out_dir = data_root / "reports" / spec.reports_dir / run_id
     out_dir.mkdir(parents=True, exist_ok=True)
     import pandas as pd
+
     df = pd.DataFrame(rows)
     df.to_parquet(out_dir / spec.events_file)
 
@@ -348,20 +397,34 @@ def test_rejects_high_off_regime_rate(tmp_path):
     import pandas as pd
     from project.scripts.validate_synthetic_detector_truth import validate_detector_truth
 
-    truth_map = {"segments": [{"symbol": "BTCUSDT",
-        "start_ts": "2024-01-01T00:00:00Z", "end_ts": "2024-01-01T01:00:00Z",
-        "regime_label": "stress", "expected_event_types": ["VOL_SHOCK"]}]}
+    truth_map = {
+        "segments": [
+            {
+                "symbol": "BTCUSDT",
+                "start_ts": "2024-01-01T00:00:00Z",
+                "end_ts": "2024-01-01T01:00:00Z",
+                "regime_label": "stress",
+                "expected_event_types": ["VOL_SHOCK"],
+            }
+        ]
+    }
     truth_map_path = _write_truth_map(tmp_path, truth_map)
     run_id = "test_high_off"
-    _write_vol_shock_events(tmp_path, run_id, [
-        {"enter_ts": "2024-01-01T00:15:00Z", "symbol": "BTCUSDT", "event_type": "VOL_SHOCK"},
-        {"enter_ts": "2024-01-02T00:00:00Z", "symbol": "BTCUSDT", "event_type": "VOL_SHOCK"},
-        {"enter_ts": "2024-01-03T00:00:00Z", "symbol": "BTCUSDT", "event_type": "VOL_SHOCK"},
-        {"enter_ts": "2024-01-04T00:00:00Z", "symbol": "BTCUSDT", "event_type": "VOL_SHOCK"},
-    ])
+    _write_vol_shock_events(
+        tmp_path,
+        run_id,
+        [
+            {"enter_ts": "2024-01-01T00:15:00Z", "symbol": "BTCUSDT", "event_type": "VOL_SHOCK"},
+            {"enter_ts": "2024-01-02T00:00:00Z", "symbol": "BTCUSDT", "event_type": "VOL_SHOCK"},
+            {"enter_ts": "2024-01-03T00:00:00Z", "symbol": "BTCUSDT", "event_type": "VOL_SHOCK"},
+            {"enter_ts": "2024-01-04T00:00:00Z", "symbol": "BTCUSDT", "event_type": "VOL_SHOCK"},
+        ],
+    )
     report = validate_detector_truth(
-        data_root=tmp_path, run_id=run_id,
-        truth_map_path=truth_map_path, event_types=["VOL_SHOCK"],
+        data_root=tmp_path,
+        run_id=run_id,
+        truth_map_path=truth_map_path,
+        event_types=["VOL_SHOCK"],
     )
     per_symbol = report["event_reports"][0]["per_symbol"][0]
     assert not per_symbol["passed_off_regime_bound"], (
@@ -374,22 +437,36 @@ def test_rejects_low_precision(tmp_path):
     import pandas as pd
     from project.scripts.validate_synthetic_detector_truth import validate_detector_truth
 
-    truth_map = {"segments": [{"symbol": "BTCUSDT",
-        "start_ts": "2024-01-01T00:00:00Z", "end_ts": "2024-01-01T02:00:00Z",
-        "regime_label": "stress", "expected_event_types": ["VOL_SHOCK"]}]}
+    truth_map = {
+        "segments": [
+            {
+                "symbol": "BTCUSDT",
+                "start_ts": "2024-01-01T00:00:00Z",
+                "end_ts": "2024-01-01T02:00:00Z",
+                "regime_label": "stress",
+                "expected_event_types": ["VOL_SHOCK"],
+            }
+        ]
+    }
     truth_map_path = _write_truth_map(tmp_path, truth_map)
     run_id = "test_low_prec"
-    _write_vol_shock_events(tmp_path, run_id, [
-        {"enter_ts": "2024-01-01T00:30:00Z", "symbol": "BTCUSDT", "event_type": "VOL_SHOCK"},
-        {"enter_ts": "2024-01-05T00:00:00Z", "symbol": "BTCUSDT", "event_type": "VOL_SHOCK"},
-        {"enter_ts": "2024-01-06T00:00:00Z", "symbol": "BTCUSDT", "event_type": "VOL_SHOCK"},
-        {"enter_ts": "2024-01-07T00:00:00Z", "symbol": "BTCUSDT", "event_type": "VOL_SHOCK"},
-        {"enter_ts": "2024-01-08T00:00:00Z", "symbol": "BTCUSDT", "event_type": "VOL_SHOCK"},
-        {"enter_ts": "2024-01-09T00:00:00Z", "symbol": "BTCUSDT", "event_type": "VOL_SHOCK"},
-    ])
+    _write_vol_shock_events(
+        tmp_path,
+        run_id,
+        [
+            {"enter_ts": "2024-01-01T00:30:00Z", "symbol": "BTCUSDT", "event_type": "VOL_SHOCK"},
+            {"enter_ts": "2024-01-05T00:00:00Z", "symbol": "BTCUSDT", "event_type": "VOL_SHOCK"},
+            {"enter_ts": "2024-01-06T00:00:00Z", "symbol": "BTCUSDT", "event_type": "VOL_SHOCK"},
+            {"enter_ts": "2024-01-07T00:00:00Z", "symbol": "BTCUSDT", "event_type": "VOL_SHOCK"},
+            {"enter_ts": "2024-01-08T00:00:00Z", "symbol": "BTCUSDT", "event_type": "VOL_SHOCK"},
+            {"enter_ts": "2024-01-09T00:00:00Z", "symbol": "BTCUSDT", "event_type": "VOL_SHOCK"},
+        ],
+    )
     report = validate_detector_truth(
-        data_root=tmp_path, run_id=run_id,
-        truth_map_path=truth_map_path, event_types=["VOL_SHOCK"],
+        data_root=tmp_path,
+        run_id=run_id,
+        truth_map_path=truth_map_path,
+        event_types=["VOL_SHOCK"],
         min_precision_fraction=0.5,
     )
     per_symbol = report["event_reports"][0]["per_symbol"][0]
@@ -403,19 +480,33 @@ def test_accepts_clean_detector(tmp_path):
     import pandas as pd
     from project.scripts.validate_synthetic_detector_truth import validate_detector_truth
 
-    truth_map = {"segments": [{"symbol": "BTCUSDT",
-        "start_ts": "2024-01-01T00:00:00Z", "end_ts": "2024-01-01T02:00:00Z",
-        "regime_label": "stress", "expected_event_types": ["VOL_SHOCK"]}]}
+    truth_map = {
+        "segments": [
+            {
+                "symbol": "BTCUSDT",
+                "start_ts": "2024-01-01T00:00:00Z",
+                "end_ts": "2024-01-01T02:00:00Z",
+                "regime_label": "stress",
+                "expected_event_types": ["VOL_SHOCK"],
+            }
+        ]
+    }
     truth_map_path = _write_truth_map(tmp_path, truth_map)
     run_id = "test_clean"
-    _write_vol_shock_events(tmp_path, run_id, [
-        {"enter_ts": "2024-01-01T00:20:00Z", "symbol": "BTCUSDT", "event_type": "VOL_SHOCK"},
-        {"enter_ts": "2024-01-01T00:50:00Z", "symbol": "BTCUSDT", "event_type": "VOL_SHOCK"},
-        {"enter_ts": "2024-01-01T01:20:00Z", "symbol": "BTCUSDT", "event_type": "VOL_SHOCK"},
-    ])
+    _write_vol_shock_events(
+        tmp_path,
+        run_id,
+        [
+            {"enter_ts": "2024-01-01T00:20:00Z", "symbol": "BTCUSDT", "event_type": "VOL_SHOCK"},
+            {"enter_ts": "2024-01-01T00:50:00Z", "symbol": "BTCUSDT", "event_type": "VOL_SHOCK"},
+            {"enter_ts": "2024-01-01T01:20:00Z", "symbol": "BTCUSDT", "event_type": "VOL_SHOCK"},
+        ],
+    )
     report = validate_detector_truth(
-        data_root=tmp_path, run_id=run_id,
-        truth_map_path=truth_map_path, event_types=["VOL_SHOCK"],
+        data_root=tmp_path,
+        run_id=run_id,
+        truth_map_path=truth_map_path,
+        event_types=["VOL_SHOCK"],
         min_precision_fraction=0.5,
     )
     per_symbol = report["event_reports"][0]["per_symbol"][0]

@@ -26,10 +26,11 @@ TEMPORAL_CONTRACT = TemporalContract(
     calibration_mode="rolling",
     fit_scope="streaming",
     approved_primitives=("trailing_quantile", "trailing_median"),
-    notes="Uses causal shock threshold on RV shock ratio."
+    notes="Uses causal shock threshold on RV shock ratio.",
 )
 
 VSR_DEF_VERSION = "v1"
+
 
 @dataclass(frozen=True)
 class VolShockRelaxationConfig:
@@ -44,7 +45,9 @@ class VolShockRelaxationConfig:
     auc_horizon_bars: int = 96
     range_expansion_threshold: float = 0.02
 
+
 DEFAULT_VSR_CONFIG = VolShockRelaxationConfig()
+
 
 def _compute_core_series(df: pd.DataFrame, cfg: VolShockRelaxationConfig) -> pd.DataFrame:
     out = df.copy()
@@ -57,16 +60,24 @@ def _compute_core_series(df: pd.DataFrame, cfg: VolShockRelaxationConfig) -> pd.
     # Actually, we want RV at t to be based on periods up to t.
     # But if we use it for a signal at t, it must be known.
     # RV window 12.
-    out["rv"] = np.sqrt(out["logret"].pow(2).rolling(cfg.rv_window, min_periods=cfg.rv_window).mean())
-    
+    out["rv"] = np.sqrt(
+        out["logret"].pow(2).rolling(cfg.rv_window, min_periods=cfg.rv_window).mean()
+    )
+
     # rv_base and mad should be PIT-safe (lag=1)
     out["rv_base"] = trailing_median(out["rv"], window=cfg.baseline_window, lag=1)
-    
+
     # MAD calculation: (rv[t] - rv_base[t]) is NOT PIT safe if rv_base[t] uses rv[t-window:t-1]
     # because rv[t] is from logret[t].
     # But if the trigger is at t, we need to compare rv[t] to a threshold known at t-1.
-    
-    mad = (out["rv"] - out["rv_base"]).abs().rolling(cfg.baseline_window, min_periods=cfg.baseline_window).median().shift(1)
+
+    mad = (
+        (out["rv"] - out["rv_base"])
+        .abs()
+        .rolling(cfg.baseline_window, min_periods=cfg.baseline_window)
+        .median()
+        .shift(1)
+    )
     denom = (1.4826 * mad).replace(0.0, np.nan)
     out["shock_ratio"] = (out["rv"] / out["rv_base"]).replace([np.inf, -np.inf], np.nan)
     out["shock_z"] = (out["rv"] - out["rv_base"]) / denom
@@ -85,10 +96,7 @@ def detect_vol_shock_relaxation_events(
 
     df = _compute_core_series(frame, config)
     df["t_shock_dynamic"] = trailing_quantile(
-        df["shock_ratio"],
-        window=config.baseline_window,
-        q=config.shock_quantile,
-        lag=1
+        df["shock_ratio"], window=config.baseline_window, q=config.shock_quantile, lag=1
     )
     threshold_series = df["t_shock_dynamic"]
     threshold_valid = threshold_series[np.isfinite(threshold_series)]
@@ -108,7 +116,11 @@ def detect_vol_shock_relaxation_events(
             continue
 
         sr_now = float(df["shock_ratio"].iat[i]) if pd.notna(df["shock_ratio"].iat[i]) else np.nan
-        sr_prev = float(df["shock_ratio"].iat[i - 1]) if pd.notna(df["shock_ratio"].iat[i - 1]) else np.nan
+        sr_prev = (
+            float(df["shock_ratio"].iat[i - 1])
+            if pd.notna(df["shock_ratio"].iat[i - 1])
+            else np.nan
+        )
         thr_now = float(threshold_series.iat[i]) if pd.notna(threshold_series.iat[i]) else np.nan
         thr_prev = (
             float(threshold_series.iat[i - 1]) if pd.notna(threshold_series.iat[i - 1]) else np.nan
@@ -145,26 +157,40 @@ def detect_vol_shock_relaxation_events(
 
         event_num += 1
         event_id = format_event_id("VOL_SHOCK", symbol, int(enter), event_num)
-        
+
         window = df.iloc[enter : exit_idx + 1].copy()
         rv_peak = float(window["rv"].max()) if not window.empty else np.nan
-        peak_idx = int(window["rv"].idxmax()) if not window.empty and window["rv"].notna().any() else enter
+        peak_idx = (
+            int(window["rv"].idxmax()) if not window.empty and window["rv"].notna().any() else enter
+        )
         sr_peak = float(window["shock_ratio"].max()) if not window.empty else np.nan
         t_rv_peak = int(max(0, peak_idx - enter))
-        rv_base_enter = float(df["rv_base"].iat[enter]) if pd.notna(df["rv_base"].iat[enter]) else np.nan
-        half_target = rv_base_enter + 0.5 * (rv_peak - rv_base_enter) if np.isfinite(rv_base_enter) and np.isfinite(rv_peak) else np.nan
+        rv_base_enter = (
+            float(df["rv_base"].iat[enter]) if pd.notna(df["rv_base"].iat[enter]) else np.nan
+        )
+        half_target = (
+            rv_base_enter + 0.5 * (rv_peak - rv_base_enter)
+            if np.isfinite(rv_base_enter) and np.isfinite(rv_peak)
+            else np.nan
+        )
 
         half_life = np.nan
         if np.isfinite(half_target):
             for h in range(0, min(config.post_horizon_bars, n - enter)):
-                rv_h = float(df["rv"].iat[enter + h]) if pd.notna(df["rv"].iat[enter + h]) else np.nan
+                rv_h = (
+                    float(df["rv"].iat[enter + h]) if pd.notna(df["rv"].iat[enter + h]) else np.nan
+                )
                 if np.isfinite(rv_h) and rv_h <= half_target:
                     half_life = float(h)
                     break
 
         h_end = min(n - 1, enter + config.auc_horizon_bars)
         h_window = df.iloc[enter : h_end + 1]
-        excess = (h_window["rv"] - rv_base_enter).clip(lower=0.0) if np.isfinite(rv_base_enter) else pd.Series(dtype=float)
+        excess = (
+            (h_window["rv"] - rv_base_enter).clip(lower=0.0)
+            if np.isfinite(rv_base_enter)
+            else pd.Series(dtype=float)
+        )
         auc_excess = float(excess.fillna(0.0).sum()) if not excess.empty else np.nan
 
         post_end = min(n - 1, enter + config.post_horizon_bars)
@@ -173,11 +199,13 @@ def detect_vol_shock_relaxation_events(
         sec_end = min(exit_idx, post_end)
         if peak_idx + 1 <= sec_end:
             for k in range(peak_idx + 1, sec_end + 1):
-                sr_k = float(df["shock_ratio"].iat[k]) if pd.notna(df["shock_ratio"].iat[k]) else np.nan
-                thr_k = (
-                    float(threshold_series.iat[k])
-                    if pd.notna(threshold_series.iat[k])
+                sr_k = (
+                    float(df["shock_ratio"].iat[k])
+                    if pd.notna(df["shock_ratio"].iat[k])
                     else np.nan
+                )
+                thr_k = (
+                    float(threshold_series.iat[k]) if pd.notna(threshold_series.iat[k]) else np.nan
                 )
                 if np.isfinite(sr_k) and np.isfinite(thr_k) and sr_k >= thr_k:
                     sec_time = float(k - enter)
@@ -231,8 +259,10 @@ def detect_vol_shock_relaxation_events(
     events = pd.DataFrame(event_rows)
     if events.empty:
         from project.events.shared import EVENT_COLUMNS
+
         events = pd.DataFrame(columns=EVENT_COLUMNS)
     return events, df, {"t_shock": t_shock_ref, "t_relax": config.relax_threshold}
+
 
 def build_event_state_frame(core: pd.DataFrame, events: pd.DataFrame) -> pd.DataFrame:
     out = core[["timestamp"]].copy()
@@ -250,9 +280,9 @@ def build_event_state_frame(core: pd.DataFrame, events: pd.DataFrame) -> pd.Data
         eid = ev["event_id"]
         enter_ts = ev["enter_ts"]
         exit_ts = ev["exit_ts"]
-        out.loc[s : e, "vsr_active"] = 1
-        out.loc[s : e, "vsr_event_id"] = eid
-        out.loc[s : e, "vsr_enter_ts"] = enter_ts
+        out.loc[s:e, "vsr_active"] = 1
+        out.loc[s:e, "vsr_event_id"] = eid
+        out.loc[s:e, "vsr_enter_ts"] = enter_ts
         out.loc[s:e, "vsr_age_bars"] = np.arange(1, e - s + 2)
         out.loc[e, "vsr_exit_ts"] = exit_ts
     return out

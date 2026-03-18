@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
+
 try:
     from scipy import stats
 except ModuleNotFoundError:  # pragma: no cover - environment-specific fallback
     from project.core.stats import stats
+
 
 def fit_gaussian_copula(u1: np.ndarray, u2: np.ndarray) -> float:
     """
@@ -15,9 +17,10 @@ def fit_gaussian_copula(u1: np.ndarray, u2: np.ndarray) -> float:
     # Inverse probability transform
     z1 = stats.norm.ppf(np.clip(u1, 1e-6, 1 - 1e-6))
     z2 = stats.norm.ppf(np.clip(u2, 1e-6, 1 - 1e-6))
-    
+
     rho = np.corrcoef(z1, z2)[0, 1]
     return float(rho)
+
 
 def calculate_gaussian_conditional_prob(u1: float, u2: float, rho: float) -> float:
     """
@@ -25,12 +28,13 @@ def calculate_gaussian_conditional_prob(u1: float, u2: float, rho: float) -> flo
     """
     z1 = stats.norm.ppf(np.clip(u1, 1e-6, 1 - 1e-6))
     z2 = stats.norm.ppf(np.clip(u2, 1e-6, 1 - 1e-6))
-    
+
     num = z1 - rho * z2
     denom = np.sqrt(1 - rho**2)
-    
+
     prob = stats.norm.cdf(num / denom)
     return float(prob)
+
 
 def get_empirical_uniforms(x: pd.Series) -> pd.Series:
     """

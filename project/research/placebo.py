@@ -10,11 +10,16 @@ _LOG = logging.getLogger(__name__)
 _DEFAULT_RANDOM_SEED = 0
 
 
-def _aligned_returns_positions(returns: pd.Series, positions: pd.Series) -> Tuple[pd.Series, pd.Series]:
-    df = pd.concat([
-        pd.to_numeric(returns, errors="coerce").rename("returns"),
-        pd.to_numeric(positions, errors="coerce").rename("positions"),
-    ], axis=1).dropna()
+def _aligned_returns_positions(
+    returns: pd.Series, positions: pd.Series
+) -> Tuple[pd.Series, pd.Series]:
+    df = pd.concat(
+        [
+            pd.to_numeric(returns, errors="coerce").rename("returns"),
+            pd.to_numeric(positions, errors="coerce").rename("positions"),
+        ],
+        axis=1,
+    ).dropna()
     return df["returns"], df["positions"]
 
 
@@ -75,11 +80,14 @@ def evaluate_random_entry_placebo(
     Compare actual performance against random entries within the same market state.
     Random placements preserve observed trade-count and approximate holding durations.
     """
-    df = pd.concat([
-        pd.to_numeric(returns, errors="coerce").rename("returns"),
-        pd.Series(states).rename("state"),
-        pd.to_numeric(actual_positions, errors="coerce").rename("positions"),
-    ], axis=1).dropna(subset=["returns", "positions"])
+    df = pd.concat(
+        [
+            pd.to_numeric(returns, errors="coerce").rename("returns"),
+            pd.Series(states).rename("state"),
+            pd.to_numeric(actual_positions, errors="coerce").rename("positions"),
+        ],
+        axis=1,
+    ).dropna(subset=["returns", "positions"])
     if df.empty:
         return {"pass": True, "percentile": 1.0}
 
@@ -90,12 +98,15 @@ def evaluate_random_entry_placebo(
     if n_trades == 0:
         return {"pass": True, "percentile": 1.0}
 
-    state_values = df["state"].astype("object") if "state" in df else pd.Series(["all"] * len(df), index=df.index)
+    state_values = (
+        df["state"].astype("object")
+        if "state" in df
+        else pd.Series(["all"] * len(df), index=df.index)
+    )
     active_mask = df["positions"].fillna(0.0).ne(0.0)
     state_counts = state_values.loc[active_mask].value_counts(dropna=False)
     eligible_by_state = {
-        state: np.flatnonzero((state_values == state).to_numpy())
-        for state in state_counts.index
+        state: np.flatnonzero((state_values == state).to_numpy()) for state in state_counts.index
     }
     rng = np.random.default_rng(random_seed)
     random_totals: List[float] = []
@@ -107,7 +118,10 @@ def evaluate_random_entry_placebo(
             duration = int(lengths[min(trade_idx, len(lengths) - 1)])
             if duration <= 0:
                 continue
-            sampled_state = rng.choice(state_counts.index.to_list(), p=(state_counts / state_counts.sum()).to_numpy(dtype=float))
+            sampled_state = rng.choice(
+                state_counts.index.to_list(),
+                p=(state_counts / state_counts.sum()).to_numpy(dtype=float),
+            )
             eligible = eligible_by_state.get(sampled_state, np.array([], dtype=int))
             if eligible.size == 0:
                 continue

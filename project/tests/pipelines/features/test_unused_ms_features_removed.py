@@ -1,11 +1,14 @@
 """Guard: unused microstructure features must not be computed in build_features."""
+
 from __future__ import annotations
 import ast
 from pathlib import Path
 
 REMOVED_COLUMNS = {"ms_roll_24", "ms_amihud_24", "ms_kyle_24", "ms_vpin_24"}
 # Anchor the path to this file's location so the test works from any working directory.
-BUILD_FEATURES_PATH = Path(__file__).resolve().parents[3] / "project" / "pipelines" / "features" / "build_features.py"
+BUILD_FEATURES_PATH = (
+    Path(__file__).resolve().parents[3] / "project" / "pipelines" / "features" / "build_features.py"
+)
 
 
 def test_removed_ms_features_not_assigned():

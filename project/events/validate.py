@@ -12,7 +12,9 @@ REQUIRED_EVENT_FIELDS = tuple(field.name for field in fields(EventRecord))
 REQUIRED_TIMESTAMP_FIELDS = ("eval_bar_ts", "detected_ts", "signal_ts")
 
 
-def validate_event_payload(event: Mapping[str, Any], *, require_registry_entry: bool = True) -> None:
+def validate_event_payload(
+    event: Mapping[str, Any], *, require_registry_entry: bool = True
+) -> None:
     missing = [name for name in REQUIRED_EVENT_FIELDS if name not in event]
     if missing:
         raise ValueError(f"Event payload missing required fields: {missing}")
@@ -47,6 +49,8 @@ def validate_event_frame_columns(columns: Iterable[str]) -> None:
         raise ValueError(f"Event frame missing required columns: {missing}")
 
 
-def validate_event_rows(rows: Sequence[Mapping[str, Any]], *, require_registry_entry: bool = True) -> None:
+def validate_event_rows(
+    rows: Sequence[Mapping[str, Any]], *, require_registry_entry: bool = True
+) -> None:
     for row in rows:
         validate_event_payload(row, require_registry_entry=require_registry_entry)

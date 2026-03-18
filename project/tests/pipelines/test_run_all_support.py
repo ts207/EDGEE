@@ -14,7 +14,6 @@ def test_evaluate_startup_guards_rejects_blueprint_fallback_with_actionable_mess
     )
 
     assert (
-        message
-        == "INV_NO_FALLBACK_IN_MEASUREMENT: "
+        message == "INV_NO_FALLBACK_IN_MEASUREMENT: "
         "strategy blueprint fallback cannot be enabled for measured runs"
     )

@@ -42,16 +42,20 @@ def _filter_candidates_for_symbol(candidates: pd.DataFrame, symbol: str) -> pd.D
     scoped = candidates.loc[symbol_series.isin({symbol_name, "ALL", ""})].copy()
     return scoped
 
+
 def _bool_series(df: pd.DataFrame, column: str, default: bool = False) -> pd.Series:
     if column not in df.columns:
         return pd.Series(bool(default), index=df.index, dtype=bool)
     raw = df[column]
     truthy = {"1", "true", "t", "yes", "y", "on"}
     return raw.map(
-        lambda x: bool(x)
-        if isinstance(x, bool)
-        else (str(x).strip().lower() in truthy if x is not None else bool(default))
+        lambda x: (
+            bool(x)
+            if isinstance(x, bool)
+            else (str(x).strip().lower() in truthy if x is not None else bool(default))
+        )
     ).astype(bool)
+
 
 def _load_candidates(path: Path | str) -> pd.DataFrame:
     src = Path(path)
@@ -80,18 +84,22 @@ def _load_candidates(path: Path | str) -> pd.DataFrame:
     gate_bridge_columns = [col for col in out.columns if col.startswith("gate_bridge_")]
     for col in gate_bridge_columns:
         out[col] = False
-    for col in ("bridge_eval_status", "bridge_fail_reasons", "bridge_fail_gate_primary", "bridge_fail_reason_primary"):
+    for col in (
+        "bridge_eval_status",
+        "bridge_fail_reasons",
+        "bridge_fail_gate_primary",
+        "bridge_fail_reason_primary",
+    ):
         if col in out.columns:
             out[col] = ""
 
     stale_bridge_columns = [
-        col
-        for col in out.columns
-        if ("bridge" in col.lower()) and (col not in gate_bridge_columns)
+        col for col in out.columns if ("bridge" in col.lower()) and (col not in gate_bridge_columns)
     ]
     if stale_bridge_columns:
         out = out.drop(columns=stale_bridge_columns, errors="ignore")
     return out
+
 
 def _select_bridge_candidates(
     full_candidates: pd.DataFrame,
@@ -119,6 +127,7 @@ def _select_bridge_candidates(
     else:
         selected = gate_research
     return out.loc[selected].copy()
+
 
 def _build_policy_variant_specs(
     *,
@@ -159,6 +168,7 @@ def _build_policy_variant_specs(
                 )
     return specs
 
+
 def _build_bridge_symbol_calibrations(
     *,
     metrics_df: pd.DataFrame,
@@ -189,6 +199,7 @@ def _build_bridge_symbol_calibrations(
             "min_tob_coverage": float(min_tob_coverage),
         }
     return out
+
 
 def _bridge_summary_count_fields(
     *,
@@ -245,7 +256,10 @@ def _build_bridge_summary_payload(df_out: pd.DataFrame) -> Dict[str, Any]:
     )
     primary_fail_counts = {
         gate: int(count)
-        for gate, count in primary_fail_counts[primary_fail_counts != ""].value_counts().to_dict().items()
+        for gate, count in primary_fail_counts[primary_fail_counts != ""]
+        .value_counts()
+        .to_dict()
+        .items()
     }
 
     tradable_wo_micro = int(
@@ -272,8 +286,12 @@ def _build_bridge_summary_payload(df_out: pd.DataFrame) -> Dict[str, Any]:
     summary.update(
         {
             "after_cost_non_positive_count": int((after_cost.fillna(-np.inf) <= 0.0).sum()),
-            "median_bridge_validation_after_cost_bps": float(after_cost.dropna().median()) if after_cost.notna().any() else 0.0,
-            "median_bridge_effective_cost_bps_per_trade": float(effective_cost.dropna().median()) if effective_cost.notna().any() else 0.0,
+            "median_bridge_validation_after_cost_bps": float(after_cost.dropna().median())
+            if after_cost.notna().any()
+            else 0.0,
+            "median_bridge_effective_cost_bps_per_trade": float(effective_cost.dropna().median())
+            if effective_cost.notna().any()
+            else 0.0,
             "uniform_negative_expectancy_count": int(
                 (
                     after_cost.notna()
@@ -287,6 +305,7 @@ def _build_bridge_summary_payload(df_out: pd.DataFrame) -> Dict[str, Any]:
         }
     )
     return summary
+
 
 def _evaluate_policy_variants_for_candidate(row: pd.Series, **kwargs) -> List[Dict[str, Any]]:
     bridge_result = dict(kwargs.get("bridge_result") or {})
@@ -320,7 +339,9 @@ def _evaluate_policy_variants_for_candidate(row: pd.Series, **kwargs) -> List[Di
         cooldown = max(0, safe_int(variant.get("variant_cooldown_bars"), 0))
 
         delay_penalty = max(0, delay - baseline_delay) * base_eff_cost
-        after_cost_bps = base_after_cost - delay_penalty if np.isfinite(base_after_cost) else float(np.nan)
+        after_cost_bps = (
+            base_after_cost - delay_penalty if np.isfinite(base_after_cost) else float(np.nan)
+        )
         stressed_after_cost_bps = (
             after_cost_bps - ((stressed_cost_multiplier - 1.0) * base_eff_cost)
             if np.isfinite(after_cost_bps)
@@ -360,7 +381,9 @@ def _evaluate_policy_variants_for_candidate(row: pd.Series, **kwargs) -> List[Di
         )
         gate_low_cap = bool(low_cap_eval.get("gate_low_capital_viability", True))
 
-        gross_edge = after_cost_bps + base_eff_cost if np.isfinite(after_cost_bps) else float(np.nan)
+        gross_edge = (
+            after_cost_bps + base_eff_cost if np.isfinite(after_cost_bps) else float(np.nan)
+        )
         gate_has_trades = validation_trades >= min_validation_trades
         gate_positive = bool(np.isfinite(after_cost_bps) and after_cost_bps > 0.0)
         gate_stressed = bool(np.isfinite(stressed_after_cost_bps) and stressed_after_cost_bps > 0.0)
@@ -406,6 +429,7 @@ def _evaluate_policy_variants_for_candidate(row: pd.Series, **kwargs) -> List[Di
         )
     return results
 
+
 def _evaluate_bridge_row(
     row: pd.Series,
     event_type: str,
@@ -446,13 +470,18 @@ def _evaluate_bridge_row(
         low_capital_contract=dict(low_capital_contract or {}),
         enforce_low_capital_viability=enforce_low_capital_viability,
     )
-    result = metrics_rows[0] if metrics_rows else {
-        "candidate_id": str(row.get("candidate_id", "")).strip(),
-        "bridge_eval_status": "rejected:bridge_evaluation_failed",
-        "gate_bridge_tradable": False,
-    }
+    result = (
+        metrics_rows[0]
+        if metrics_rows
+        else {
+            "candidate_id": str(row.get("candidate_id", "")).strip(),
+            "bridge_eval_status": "rejected:bridge_evaluation_failed",
+            "gate_bridge_tradable": False,
+        }
+    )
     overlay = overlay_rows[0] if overlay_rows else None
     return result, overlay
+
 
 def _policy_variant_flip_summary(df: pd.DataFrame) -> Dict[str, Any]:
     if df.empty:
@@ -471,7 +500,9 @@ def _policy_variant_flip_summary(df: pd.DataFrame) -> Dict[str, Any]:
         .groupby("candidate_id")["_baseline_pass"]
         .max()
     )
-    working["_baseline_pass"] = working["candidate_id"].map(baseline_by_candidate).fillna(False).astype(bool)
+    working["_baseline_pass"] = (
+        working["candidate_id"].map(baseline_by_candidate).fillna(False).astype(bool)
+    )
     pass_to_fail = int(
         working.loc[~baseline_mask & working["_baseline_pass"] & ~tradable_mask, "candidate_id"]
         .dropna()
@@ -496,6 +527,7 @@ def _policy_variant_flip_summary(df: pd.DataFrame) -> Dict[str, Any]:
         "policy_variant_count": int(len(working)),
     }
 
+
 def _load_symbol_calibrated_cost_bps(symbol: str, calibration_dir: Path) -> float | None:
     path = Path(calibration_dir) / f"{str(symbol).strip().upper()}.json"
     if not path.exists():
@@ -515,6 +547,7 @@ def _load_symbol_calibrated_cost_bps(symbol: str, calibration_dir: Path) -> floa
         return float(max(0.0, fee) + max(0.0, slip))
     return None
 
+
 def _write_bridge_symbol_calibrations(
     *,
     calibrations: Dict[str, Any],
@@ -530,6 +563,7 @@ def _write_bridge_symbol_calibrations(
         path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
         written.append(path)
     return written
+
 
 def _make_parser() -> argparse.ArgumentParser:
     DATA_ROOT = get_data_root()
@@ -560,6 +594,7 @@ def _make_parser() -> argparse.ArgumentParser:
     parser.add_argument("--retail_profiles_spec", default=None)
     return parser
 
+
 def main() -> int:
     DATA_ROOT = get_data_root()
     parser = _make_parser()
@@ -578,13 +613,15 @@ def main() -> int:
     )
     ensure_dir(out_dir)
 
-    stage_name = os.getenv("BACKTEST_STAGE_INSTANCE_ID", f"bridge_evaluate_phase2__{args.event_type}_{timeframe}")
+    stage_name = os.getenv(
+        "BACKTEST_STAGE_INSTANCE_ID", f"bridge_evaluate_phase2__{args.event_type}_{timeframe}"
+    )
     manifest = start_manifest(stage_name, args.run_id, vars(args), [], [])
-    
+
     try:
         symbols = [s.strip().upper() for s in args.symbols.split(",") if s.strip()]
         event_type = str(args.event_type).strip().upper()
-        
+
         any_candidates = False
         for symbol in symbols:
             sym_out = out_dir / symbol
@@ -598,16 +635,18 @@ def main() -> int:
                 )
                 / "phase2_candidates.parquet"
             )
-                
+
             if not cand_path.exists():
                 logging.warning(f"No candidates found for {event_type} at {cand_path}")
                 continue
-            
+
             candidates = pd.read_parquet(cand_path)
             if candidates.empty:
                 write_parquet(pd.DataFrame(), sym_out / "bridge_evaluation.parquet")
                 (sym_out / "bridge_summary.json").write_text(
-                    json.dumps(_build_bridge_summary_payload(pd.DataFrame()), indent=2, sort_keys=True),
+                    json.dumps(
+                        _build_bridge_summary_payload(pd.DataFrame()), indent=2, sort_keys=True
+                    ),
                     encoding="utf-8",
                 )
                 continue
@@ -615,17 +654,19 @@ def main() -> int:
             if candidates.empty:
                 write_parquet(pd.DataFrame(), sym_out / "bridge_evaluation.parquet")
                 (sym_out / "bridge_summary.json").write_text(
-                    json.dumps(_build_bridge_summary_payload(pd.DataFrame()), indent=2, sort_keys=True),
+                    json.dumps(
+                        _build_bridge_summary_payload(pd.DataFrame()), indent=2, sort_keys=True
+                    ),
                     encoding="utf-8",
                 )
                 continue
-            
+
             any_candidates = True
 
             # Load bridge results (dummy logic for this example - in reality, it would load from lake)
             # For now, we assume candidates contains bridge performance metrics
             # as it was produced by a previous pipeline step (e.g. phase2_cost_integration)
-            
+
             # Delegate to service
             metrics_rows, overlay_rows = evaluate_bridge_performance(
                 candidates,
@@ -644,31 +685,38 @@ def main() -> int:
                     "max_sweep_pressure": args.micro_max_sweep_pressure,
                     "max_abs_imbalance": args.micro_max_abs_imbalance,
                     "min_feature_coverage": args.micro_min_feature_coverage,
-                }
+                },
             )
-            
+
             if metrics_rows:
                 df_out = pd.DataFrame(metrics_rows)
                 # B1: Ensure mandatory bridge metrics exist
                 mandatory_metrics = [
-                    "fill_feasibility", "min_order_feasibility", "tob_coverage",
-                    "expected_spread_cost", "realized_slippage_estimate", "turnover",
-                    "delay_sensitivity", "one_trade_per_episode_sensitivity",
-                    "cooldown_sensitivity", "stress_cost_survival"
+                    "fill_feasibility",
+                    "min_order_feasibility",
+                    "tob_coverage",
+                    "expected_spread_cost",
+                    "realized_slippage_estimate",
+                    "turnover",
+                    "delay_sensitivity",
+                    "one_trade_per_episode_sensitivity",
+                    "cooldown_sensitivity",
+                    "stress_cost_survival",
                 ]
                 for m in mandatory_metrics:
                     if m not in df_out.columns:
                         df_out[m] = np.nan
-                
+
                 # B2: Sign the artifacts
                 df_out["bridge_run_id"] = args.run_id
                 df_out["bridge_schema_version"] = "v2"
                 if "bridge_certified" not in df_out.columns:
                     df_out["bridge_certified"] = True
-                
+
                 # Compute artifact hash
                 payload = df_out.to_json(orient="records").encode("utf-8")
                 import hashlib
+
                 df_out["bridge_artifact_hash"] = hashlib.sha256(payload).hexdigest()
 
                 write_parquet(df_out, sym_out / "bridge_evaluation.parquet")
@@ -676,7 +724,7 @@ def main() -> int:
                     json.dumps(_build_bridge_summary_payload(df_out), indent=2, sort_keys=True),
                     encoding="utf-8",
                 )
-        
+
         if not any_candidates:
             message = f"No candidates found for evaluation across all symbols for {event_type}. Skipping evaluation."
             logging.info(message)
@@ -690,6 +738,7 @@ def main() -> int:
         logging.exception("Bridge evaluation failed")
         finalize_manifest(manifest, "failed", error=str(e))
         return 1
+
 
 if __name__ == "__main__":
     sys.exit(main())

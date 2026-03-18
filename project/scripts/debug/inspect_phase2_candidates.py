@@ -17,6 +17,7 @@ DEFAULT_SAMPLE_COLUMNS = [
     "cost_bps_resolved",
 ]
 
+
 def _make_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
@@ -51,6 +52,7 @@ def _make_parser() -> argparse.ArgumentParser:
     )
     return parser
 
+
 def _resolve_targets(csv_path: str | None, base_dir: str) -> list[Path]:
     if csv_path:
         path = Path(csv_path)
@@ -60,6 +62,7 @@ def _resolve_targets(csv_path: str | None, base_dir: str) -> list[Path]:
         return []
     return sorted(root.rglob("phase2_candidates.csv"))
 
+
 def _series_mean(df: pd.DataFrame, col: str) -> float | None:
     if col not in df.columns:
         return None
@@ -67,6 +70,7 @@ def _series_mean(df: pd.DataFrame, col: str) -> float | None:
     if series.dropna().empty:
         return None
     return float(series.mean())
+
 
 def _print_file_summary(path: Path, df: pd.DataFrame, sample_rows: int) -> None:
     total_rows = len(df)
@@ -94,6 +98,7 @@ def _print_file_summary(path: Path, df: pd.DataFrame, sample_rows: int) -> None:
         if sample_cols:
             print("sample:")
             print(df[sample_cols].head(sample_rows).to_string(index=False))
+
 
 def main() -> int:
     args = _make_parser().parse_args()
@@ -147,6 +152,7 @@ def main() -> int:
             print(value)
 
     return 0
+
 
 if __name__ == "__main__":
     raise SystemExit(main())

@@ -12,6 +12,7 @@ Usage:
         --live_start 2024-07-01 --live_end 2024-09-30 \\
         [--timeframe 5m] [--n_bins 10]
 """
+
 from __future__ import annotations
 from project.core.config import get_data_root
 
@@ -22,6 +23,7 @@ from typing import List
 import numpy as np
 import pandas as pd
 from project.core.feature_schema import feature_dataset_dir_name
+
 DATA_ROOT = get_data_root()
 
 MONITOR_FEATURES = [
@@ -34,6 +36,7 @@ MONITOR_FEATURES = [
 
 PSI_WARN_THRESHOLD = 0.25
 PSI_ERROR_THRESHOLD = 0.50
+
 
 def _compute_psi(ref: pd.Series, live: pd.Series, n_bins: int = 10) -> float:
     """Compute Population Stability Index between ref and live distributions."""
@@ -52,10 +55,19 @@ def _compute_psi(ref: pd.Series, live: pd.Series, n_bins: int = 10) -> float:
     psi = float(np.sum((live_pct - ref_pct) * np.log(live_pct / ref_pct)))
     return psi
 
+
 def _load_features(run_id: str, symbol: str, timeframe: str) -> pd.DataFrame:
     feature_dataset = feature_dataset_dir_name()
     candidates = [
-        DATA_ROOT / "lake" / "runs" / run_id / "features" / "perp" / symbol / timeframe / feature_dataset,
+        DATA_ROOT
+        / "lake"
+        / "runs"
+        / run_id
+        / "features"
+        / "perp"
+        / symbol
+        / timeframe
+        / feature_dataset,
         DATA_ROOT / "lake" / "features" / "perp" / symbol / timeframe / feature_dataset,
     ]
     for d in candidates:
@@ -64,6 +76,7 @@ def _load_features(run_id: str, symbol: str, timeframe: str) -> pd.DataFrame:
             if files:
                 return pd.read_parquet(files)
     return pd.DataFrame()
+
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Monitor feature distribution drift via PSI.")
@@ -79,12 +92,21 @@ def main() -> int:
 
     features = _load_features(args.run_id, args.symbol.upper(), args.timeframe)
     if features.empty:
-        print(f"[drift] ERROR: no features found for run_id={args.run_id} symbol={args.symbol}", file=sys.stderr)
+        print(
+            f"[drift] ERROR: no features found for run_id={args.run_id} symbol={args.symbol}",
+            file=sys.stderr,
+        )
         return 1
 
     features["timestamp"] = pd.to_datetime(features["timestamp"], utc=True)
-    ref = features[(features["timestamp"] >= pd.Timestamp(args.ref_start, tz="UTC")) & (features["timestamp"] <= pd.Timestamp(args.ref_end, tz="UTC"))]
-    live = features[(features["timestamp"] >= pd.Timestamp(args.live_start, tz="UTC")) & (features["timestamp"] <= pd.Timestamp(args.live_end, tz="UTC"))]
+    ref = features[
+        (features["timestamp"] >= pd.Timestamp(args.ref_start, tz="UTC"))
+        & (features["timestamp"] <= pd.Timestamp(args.ref_end, tz="UTC"))
+    ]
+    live = features[
+        (features["timestamp"] >= pd.Timestamp(args.live_start, tz="UTC"))
+        & (features["timestamp"] <= pd.Timestamp(args.live_end, tz="UTC"))
+    ]
 
     any_error = False
     for feat in MONITOR_FEATURES:
@@ -99,9 +121,13 @@ def main() -> int:
             level = "WARN"
         else:
             level = "OK"
-        print(f"[drift][{level}] {args.symbol} | {feat}: PSI={psi:.4f}", file=sys.stderr if level == "ERROR" else sys.stdout)
+        print(
+            f"[drift][{level}] {args.symbol} | {feat}: PSI={psi:.4f}",
+            file=sys.stderr if level == "ERROR" else sys.stdout,
+        )
 
     return 1 if any_error else 0
+
 
 if __name__ == "__main__":
     sys.exit(main())

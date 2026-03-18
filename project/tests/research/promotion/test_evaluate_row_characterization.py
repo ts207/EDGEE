@@ -93,7 +93,9 @@ def test_evaluate_row_characterization_dsr_failure():
     kwargs["min_dsr"] = 0.95
     result = evaluate_row(row=row, **kwargs)
     assert result["gate_promo_dsr"] is False, f"Result: {result}"
-    assert "dsr" in result["promotion_fail_gate_primary"] or result["promotion_decision"] == "rejected"
+    assert (
+        "dsr" in result["promotion_fail_gate_primary"] or result["promotion_decision"] == "rejected"
+    )
 
 
 def test_evaluate_row_characterization_low_capital_failure():
@@ -140,4 +142,7 @@ def test_evaluate_row_characterization_flags_continuation_quality_fragility():
     assert result["gate_bridge_tradable"] == "pass"
     assert result["gate_promo_continuation_quality"] == "fail"
     assert "continuation_quality_microstructure" in result["reject_reason"]
-    assert "gate_promo_continuation_quality" in str(result["promotion_fail_gate_primary"]) or "continuation_quality" in result["reject_reason"]
+    assert (
+        "gate_promo_continuation_quality" in str(result["promotion_fail_gate_primary"])
+        or "continuation_quality" in result["reject_reason"]
+    )

@@ -15,6 +15,7 @@ from project.strategy.dsl.schema import (
     SymbolScopeSpec,
 )
 
+
 def _make_blueprint(*, bp_id: str, candidate_id: str, delay_bars: int = 1) -> Blueprint:
     return Blueprint(
         id=bp_id,
@@ -75,6 +76,7 @@ def _make_blueprint(*, bp_id: str, candidate_id: str, delay_bars: int = 1) -> Bl
         ),
     )
 
+
 def _low_cap_contract() -> dict[str, object]:
     return {
         "account_equity_usd": 25_000.0,
@@ -97,6 +99,7 @@ def _low_cap_contract() -> dict[str, object]:
         "signal_snap_side": "left",
         "active_range_semantics": "[start,end)",
     }
+
 
 def test_strategy_contract_build_and_validate_against_low_cap_contract():
     blueprint = _make_blueprint(bp_id="bp_1", candidate_id="cand_1", delay_bars=1)
@@ -128,6 +131,7 @@ def test_strategy_contract_build_and_validate_against_low_cap_contract():
         == payload["entry"]["delay_bars"]
     )
 
+
 def test_strategy_contract_validator_fails_closed_on_mismatched_entry_delay():
     blueprint = _make_blueprint(bp_id="bp_2", candidate_id="cand_2")
     strategy_spec = compiler._build_strategy_contract(
@@ -144,7 +148,12 @@ def test_strategy_contract_validator_fails_closed_on_mismatched_entry_delay():
     strategy_spec = strategy_spec.model_copy(
         update={
             "execution": strategy_spec.execution.model_copy(
-                update={"policy_executor_config": {**strategy_spec.execution.policy_executor_config, "entry_delay_bars": 99}}
+                update={
+                    "policy_executor_config": {
+                        **strategy_spec.execution.policy_executor_config,
+                        "entry_delay_bars": 99,
+                    }
+                }
             )
         }
     )
@@ -155,6 +164,7 @@ def test_strategy_contract_validator_fails_closed_on_mismatched_entry_delay():
             low_capital_contract={},
             require_low_capital_contract=False,
         )
+
 
 def test_write_strategy_contract_artifacts_emits_per_candidate_json_and_executor_config(
     tmp_path,
@@ -181,7 +191,9 @@ def test_write_strategy_contract_artifacts_emits_per_candidate_json_and_executor
     assert artifacts["executable_strategy_spec_count"] == 2
     assert artifacts["allocation_spec_count"] == 2
     for bp in blueprints:
-        executable_path = tmp_path / "executable_strategy_specs" / f"{bp.id}.executable_strategy_spec.json"
+        executable_path = (
+            tmp_path / "executable_strategy_specs" / f"{bp.id}.executable_strategy_spec.json"
+        )
         assert executable_path.exists()
         payload = json.loads(executable_path.read_text(encoding="utf-8"))
         assert payload["metadata"]["candidate_id"] == bp.candidate_id

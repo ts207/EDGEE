@@ -10,8 +10,17 @@ def test_compare_phase2_run_diagnostics_reports_candidate_and_survivor_shifts():
     baseline = {
         "combined_candidate_rows": 10,
         "false_discovery_diagnostics": {
-            "global": {"candidates_total": 10, "survivors_total": 3, "symbols_total": 2, "families_total": 4},
-            "sample_quality": {"zero_eval_rows": 1, "median_validation_n_obs": 12.0, "median_test_n_obs": 11.0},
+            "global": {
+                "candidates_total": 10,
+                "survivors_total": 3,
+                "symbols_total": 2,
+                "families_total": 4,
+            },
+            "sample_quality": {
+                "zero_eval_rows": 1,
+                "median_validation_n_obs": 12.0,
+                "median_test_n_obs": 11.0,
+            },
             "sample_quality_gate": {"rejected_by_sample_quality_gate": 1},
             "survivor_quality": {"median_q_value": 0.03, "median_estimate_bps": 8.0},
         },
@@ -19,8 +28,17 @@ def test_compare_phase2_run_diagnostics_reports_candidate_and_survivor_shifts():
     candidate = {
         "combined_candidate_rows": 14,
         "false_discovery_diagnostics": {
-            "global": {"candidates_total": 14, "survivors_total": 5, "symbols_total": 2, "families_total": 6},
-            "sample_quality": {"zero_eval_rows": 3, "median_validation_n_obs": 9.0, "median_test_n_obs": 8.0},
+            "global": {
+                "candidates_total": 14,
+                "survivors_total": 5,
+                "symbols_total": 2,
+                "families_total": 6,
+            },
+            "sample_quality": {
+                "zero_eval_rows": 3,
+                "median_validation_n_obs": 9.0,
+                "median_test_n_obs": 8.0,
+            },
             "sample_quality_gate": {"rejected_by_sample_quality_gate": 4},
             "survivor_quality": {"median_q_value": 0.05, "median_estimate_bps": 6.5},
         },
@@ -69,7 +87,10 @@ def test_compare_promotion_run_diagnostics_reports_fail_gate_and_reason_shifts()
             "promoted_count": 1,
             "rejected_count": 7,
             "mean_failed_gate_count_rejected": 2.0,
-            "primary_fail_gate_counts": {"gate_promo_stability": 2, "gate_promo_negative_control": 3},
+            "primary_fail_gate_counts": {
+                "gate_promo_stability": 2,
+                "gate_promo_negative_control": 3,
+            },
             "primary_reject_reason_counts": {"stability_score": 1, "negative_control_fail": 3},
         }
     }
@@ -89,14 +110,34 @@ def test_compare_edge_candidate_reports_captures_cost_and_expectancy_shifts(tmp_
 
     pd.DataFrame(
         [
-            {"gate_bridge_tradable": "fail", "resolved_cost_bps": 0.5, "expectancy_bps": -0.5, "avg_dynamic_cost_bps": 0.5},
-            {"gate_bridge_tradable": "pass", "resolved_cost_bps": 0.5, "expectancy_bps": 1.0, "avg_dynamic_cost_bps": 0.5},
+            {
+                "gate_bridge_tradable": "fail",
+                "resolved_cost_bps": 0.5,
+                "expectancy_bps": -0.5,
+                "avg_dynamic_cost_bps": 0.5,
+            },
+            {
+                "gate_bridge_tradable": "pass",
+                "resolved_cost_bps": 0.5,
+                "expectancy_bps": 1.0,
+                "avg_dynamic_cost_bps": 0.5,
+            },
         ]
     ).to_parquet(baseline)
     pd.DataFrame(
         [
-            {"gate_bridge_tradable": "pass", "resolved_cost_bps": 0.1, "expectancy_bps": -0.1, "avg_dynamic_cost_bps": 0.1},
-            {"gate_bridge_tradable": "pass", "resolved_cost_bps": 0.1, "expectancy_bps": 1.4, "avg_dynamic_cost_bps": 0.1},
+            {
+                "gate_bridge_tradable": "pass",
+                "resolved_cost_bps": 0.1,
+                "expectancy_bps": -0.1,
+                "avg_dynamic_cost_bps": 0.1,
+            },
+            {
+                "gate_bridge_tradable": "pass",
+                "resolved_cost_bps": 0.1,
+                "expectancy_bps": 1.4,
+                "avg_dynamic_cost_bps": 0.1,
+            },
         ]
     ).to_parquet(candidate)
 
@@ -118,13 +159,46 @@ def test_compare_run_reports_reads_json_files(tmp_path):
     baseline_edge = tmp_path / "baseline_edge.parquet"
     candidate_edge = tmp_path / "candidate_edge.parquet"
 
-    baseline_phase2.write_text(json.dumps({"false_discovery_diagnostics": {"global": {"candidates_total": 2, "survivors_total": 1}}}), encoding="utf-8")
-    candidate_phase2.write_text(json.dumps({"false_discovery_diagnostics": {"global": {"candidates_total": 5, "survivors_total": 2}}}), encoding="utf-8")
-    baseline_promo.write_text(json.dumps({"decision_summary": {"candidates_total": 1, "promoted_count": 1, "rejected_count": 0}}), encoding="utf-8")
-    candidate_promo.write_text(json.dumps({"decision_summary": {"candidates_total": 1, "promoted_count": 0, "rejected_count": 1}}), encoding="utf-8")
+    baseline_phase2.write_text(
+        json.dumps(
+            {
+                "false_discovery_diagnostics": {
+                    "global": {"candidates_total": 2, "survivors_total": 1}
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    candidate_phase2.write_text(
+        json.dumps(
+            {
+                "false_discovery_diagnostics": {
+                    "global": {"candidates_total": 5, "survivors_total": 2}
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    baseline_promo.write_text(
+        json.dumps(
+            {"decision_summary": {"candidates_total": 1, "promoted_count": 1, "rejected_count": 0}}
+        ),
+        encoding="utf-8",
+    )
+    candidate_promo.write_text(
+        json.dumps(
+            {"decision_summary": {"candidates_total": 1, "promoted_count": 0, "rejected_count": 1}}
+        ),
+        encoding="utf-8",
+    )
     import pandas as pd
-    pd.DataFrame([{"gate_bridge_tradable": "fail", "resolved_cost_bps": 0.5, "expectancy_bps": -0.5}]).to_parquet(baseline_edge)
-    pd.DataFrame([{"gate_bridge_tradable": "pass", "resolved_cost_bps": 0.1, "expectancy_bps": -0.1}]).to_parquet(candidate_edge)
+
+    pd.DataFrame(
+        [{"gate_bridge_tradable": "fail", "resolved_cost_bps": 0.5, "expectancy_bps": -0.5}]
+    ).to_parquet(baseline_edge)
+    pd.DataFrame(
+        [{"gate_bridge_tradable": "pass", "resolved_cost_bps": 0.1, "expectancy_bps": -0.1}]
+    ).to_parquet(candidate_edge)
 
     out = svc.compare_run_reports(
         baseline_phase2_path=baseline_phase2,
@@ -139,7 +213,10 @@ def test_compare_run_reports_reads_json_files(tmp_path):
     assert out["promotion"]["delta"]["promoted_count"] == -1
     assert out["edge_candidates"]["delta"]["tradable_count"] == 1
     assert out["artifacts"]["promotion"] == {"baseline_exists": True, "candidate_exists": True}
-    assert out["artifacts"]["edge_candidates"] == {"baseline_exists": True, "candidate_exists": True}
+    assert out["artifacts"]["edge_candidates"] == {
+        "baseline_exists": True,
+        "candidate_exists": True,
+    }
 
 
 def test_assess_run_comparison_reports_warn_or_fail_status():
@@ -217,7 +294,9 @@ def test_assess_run_comparison_skips_candidate_count_enforcement_on_profile_mism
     assert assessed["status"] == "pass"
     assert assessed["profile_mismatch"] is True
     assert assessed["violation_count"] == 0
-    assert any("candidate-count drift threshold was not enforced" in note for note in assessed["notes"])
+    assert any(
+        "candidate-count drift threshold was not enforced" in note for note in assessed["notes"]
+    )
 
 
 def test_assess_run_comparison_warns_on_mass_promotion_shift_from_dsr_relaxation():

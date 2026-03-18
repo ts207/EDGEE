@@ -1,10 +1,11 @@
 """
 Rich Bridge adapter: translate hypothesis metrics into full production schema.
 
-Takes the rich metrics DataFrame produced by the hypothesis evaluator and 
+Takes the rich metrics DataFrame produced by the hypothesis evaluator and
 maps them into the 40+ column schema expected by bridge evaluation and
 blueprint compilation.
 """
+
 from __future__ import annotations
 
 import re
@@ -16,6 +17,7 @@ from project.research.gating import two_sided_p_from_t
 from project.spec_validation import get_event_family, resolve_execution_templates
 
 log = logging.getLogger(__name__)
+
 
 def _sanitize_event_type(row: pd.Series) -> str:
     trigger_type = str(row.get("trigger_type", "event")).lower()
@@ -49,9 +51,7 @@ def hypotheses_to_bridge_candidates(
     # Core Mappings
     out = pd.DataFrame()
     out["candidate_id"] = filtered["hypothesis_id"].astype(str)
-    out["event_type"] = [
-        _sanitize_event_type(row) for _, row in filtered.iterrows()
-    ]
+    out["event_type"] = [_sanitize_event_type(row) for _, row in filtered.iterrows()]
     out["direction"] = filtered["direction"].astype(str)
     out["rule_template"] = filtered["template_id"].astype(str)
     out["template_verb"] = out["rule_template"]
@@ -68,49 +68,57 @@ def hypotheses_to_bridge_candidates(
         "test_samples",
     ):
         if source_col in filtered.columns:
-            out[source_col] = pd.to_numeric(filtered[source_col], errors="coerce").fillna(0).astype(int)
+            out[source_col] = (
+                pd.to_numeric(filtered[source_col], errors="coerce").fillna(0).astype(int)
+            )
         else:
             out[source_col] = 0
-    
+
     # Financial Mappings (bps -> decimal)
     out["expectancy"] = filtered["mean_return_bps"] / 10000.0
     out["mean_return_bps"] = filtered["mean_return_bps"]
     out["after_cost_expectancy_per_trade"] = filtered["cost_adjusted_return_bps"] / 10000.0
-    
+
     # Stress testing: subtract an additional 2bps
-    out["stressed_after_cost_expectancy_per_trade"] = (filtered["cost_adjusted_return_bps"] - 2.0) / 10000.0
-    
+    out["stressed_after_cost_expectancy_per_trade"] = (
+        filtered["cost_adjusted_return_bps"] - 2.0
+    ) / 10000.0
+
     # Rich Metrics
     out["robustness_score"] = filtered["robustness_score"]
-    out["stress_test_survival"] = filtered["stress_score"] if "stress_score" in filtered.columns else 0.0
-    out["kill_switch_count"] = (filtered["kill_switch_count"] if "kill_switch_count" in filtered.columns else 0)
+    out["stress_test_survival"] = (
+        filtered["stress_score"] if "stress_score" in filtered.columns else 0.0
+    )
+    out["kill_switch_count"] = (
+        filtered["kill_switch_count"] if "kill_switch_count" in filtered.columns else 0
+    )
     out["kill_switch_count"] = out["kill_switch_count"].astype(int)
-    
+
     out["delta_adverse_mean"] = filtered["mae_mean_bps"] / 10000.0
     out["delta_opportunity_mean"] = filtered["mfe_mean_bps"] / 10000.0
     out["capacity_proxy"] = filtered["capacity_proxy"]
-    out["turnover_proxy_mean"] = 0.5 # Default turnover proxy
-    
+    out["turnover_proxy_mean"] = 0.5  # Default turnover proxy
+
     # Gating Flags
     out["gate_oos_validation"] = filtered["robustness_score"] >= 0.7
-    out["gate_multiplicity"] = False # Will be set by apply_multiplicity_controls()
+    out["gate_multiplicity"] = False  # Will be set by apply_multiplicity_controls()
     out["gate_c_regime_stable"] = filtered["robustness_score"] >= 0.6
     out["gate_after_cost_positive"] = filtered["cost_adjusted_return_bps"] > 0
     out["gate_after_cost_stressed_positive"] = (filtered["cost_adjusted_return_bps"] - 2.0) > 0
-    
+
     # Overall Tradability
-    # A candidate is "tradable" if it passes t-stat, n, OOS score, 
+    # A candidate is "tradable" if it passes t-stat, n, OOS score,
     # and survives at least 50% of stress scenarios.
     out["gate_bridge_tradable"] = (
-        (out["t_stat"].abs() >= 2.0) & 
-        (out["gate_after_cost_stressed_positive"]) &
-        (out["gate_oos_validation"]) &
-        (out["stress_test_survival"] >= 0.5)
+        (out["t_stat"].abs() >= 2.0)
+        & (out["gate_after_cost_stressed_positive"])
+        & (out["gate_oos_validation"])
+        & (out["stress_test_survival"] >= 0.5)
     )
-    
+
     out["bridge_eval_status"] = np.where(out["gate_bridge_tradable"], "tradable", "rejected")
     out["promotion_track"] = np.where(out["gate_bridge_tradable"], "standard", "fallback_only")
-    
+
     # Structural stats (needed for blueprint compilation)
     out["pnl_series"] = "[]"
 
@@ -123,15 +131,19 @@ def hypotheses_to_bridge_candidates(
 
     # Derive family_id from trigger metadata
     out["family_id"] = (
-        filtered["trigger_type"].astype(str) + "_"
-        + filtered["template_id"].astype(str) + "_"
+        filtered["trigger_type"].astype(str)
+        + "_"
+        + filtered["template_id"].astype(str)
+        + "_"
         + filtered["horizon"].astype(str)
     ).values
 
     # Derive canonical_family from trigger_key (the part after "type:", e.g. "event:VOL_SPIKE" -> "VOL_SPIKE")
-    out["canonical_family"] = filtered["trigger_key"].apply(
-        lambda k: str(k).split(":", 1)[1].upper() if ":" in str(k) else str(k).upper()
-    ).values
+    out["canonical_family"] = (
+        filtered["trigger_key"]
+        .apply(lambda k: str(k).split(":", 1)[1].upper() if ":" in str(k) else str(k).upper())
+        .values
+    )
 
     # Symbol placeholder
     if "symbol" not in out.columns:
@@ -150,7 +162,11 @@ def hypotheses_to_bridge_candidates(
             exec_templates = resolve_execution_templates(family) if family else []
             if not exec_templates:
                 if family:
-                    log.warning("No execution templates resolved for family %r (event_id=%r); keeping as 'base'", family, event_id)
+                    log.warning(
+                        "No execution templates resolved for family %r (event_id=%r); keeping as 'base'",
+                        family,
+                        event_id,
+                    )
                 # No execution templates found — keep as "base" rather than drop
                 expanded_parts.append(pd.DataFrame([row]))
                 continue
@@ -175,7 +191,9 @@ def split_bridge_candidates(
 
     valid_mask = metrics_df["valid"].fillna(False)
     min_n_mask = pd.to_numeric(metrics_df["n"], errors="coerce").fillna(0) >= int(min_n)
-    min_t_mask = pd.to_numeric(metrics_df["t_stat"], errors="coerce").abs().fillna(0.0) >= float(min_t_stat)
+    min_t_mask = pd.to_numeric(metrics_df["t_stat"], errors="coerce").abs().fillna(0.0) >= float(
+        min_t_stat
+    )
     pass_mask = valid_mask & min_n_mask & min_t_mask
 
     filtered = metrics_df[pass_mask].copy()
@@ -190,7 +208,9 @@ def split_bridge_candidates(
             else:
                 if int(pd.to_numeric(row.get("n", 0), errors="coerce") or 0) < int(min_n):
                     row_reasons.append("min_sample_size")
-                if abs(float(pd.to_numeric(row.get("t_stat", 0.0), errors="coerce") or 0.0)) < float(min_t_stat):
+                if abs(
+                    float(pd.to_numeric(row.get("t_stat", 0.0), errors="coerce") or 0.0)
+                ) < float(min_t_stat):
                     row_reasons.append("min_t_stat")
             if not row_reasons:
                 row_reasons = ["filtered_out"]

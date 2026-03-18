@@ -99,16 +99,26 @@ def test_update_campaign_memory_materializes_memory_and_compat_outputs(monkeypat
 
     rc = update_campaign_memory.main(
         [
-            "--run_id", run_id,
-            "--program_id", program_id,
-            "--data_root", str(data_root),
-            "--promising_top_k", "1",
-            "--avoid_top_k", "1",
-            "--repair_top_k", "1",
-            "--exploit_top_k", "1",
-            "--frontier_untested_top_k", "1",
-            "--frontier_repair_top_k", "1",
-            "--exhausted_failure_threshold", "1",
+            "--run_id",
+            run_id,
+            "--program_id",
+            program_id,
+            "--data_root",
+            str(data_root),
+            "--promising_top_k",
+            "1",
+            "--avoid_top_k",
+            "1",
+            "--repair_top_k",
+            "1",
+            "--exploit_top_k",
+            "1",
+            "--frontier_untested_top_k",
+            "1",
+            "--frontier_repair_top_k",
+            "1",
+            "--exhausted_failure_threshold",
+            "1",
         ]
     )
     assert rc == 0
@@ -166,8 +176,10 @@ def test_update_campaign_memory_uses_explicit_data_root_for_manifest(monkeypatch
 
     rc = update_campaign_memory.main(
         [
-            "--run_id", run_id,
-            "--data_root", str(data_root),
+            "--run_id",
+            run_id,
+            "--data_root",
+            str(data_root),
         ]
     )
 

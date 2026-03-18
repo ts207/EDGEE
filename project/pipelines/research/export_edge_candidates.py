@@ -64,6 +64,7 @@ def _normalize_direction_value(value: object) -> str:
         return "flat"
     return text
 
+
 def _parse_symbols_csv(symbols_csv: str) -> List[str]:
     symbols = [s.strip().upper() for s in str(symbols_csv).split(",") if s.strip()]
     ordered: List[str] = []
@@ -73,6 +74,7 @@ def _parse_symbols_csv(symbols_csv: str) -> List[str]:
             ordered.append(symbol)
             seen.add(symbol)
     return ordered
+
 
 def _infer_symbol_tag(row: Dict[str, object], run_symbols: Sequence[str]) -> str:
     symbol_value = str(row.get("symbol", "")).strip().upper()
@@ -88,8 +90,6 @@ def _infer_symbol_tag(row: Dict[str, object], run_symbols: Sequence[str]) -> str
     return "ALL"
 
 
-
-
 def _candidate_type_from_action(action_name: str) -> str:
     action = str(action_name or "").strip().lower()
     if action == "entry_gate_skip" or action.startswith("risk_throttle_"):
@@ -100,10 +100,18 @@ def _candidate_type_from_action(action_name: str) -> str:
 
 
 def _is_confirmatory_run_mode(run_mode: str) -> bool:
-    return str(run_mode or "").strip().lower() in {"confirmatory", "production", "certification", "promotion", "deploy"}
+    return str(run_mode or "").strip().lower() in {
+        "confirmatory",
+        "production",
+        "certification",
+        "promotion",
+        "deploy",
+    }
 
 
-def _load_latest_adjacent_survivorship_index(run_id: str) -> tuple[Dict[tuple[str, str, str, str], Dict[str, object]], str | None]:
+def _load_latest_adjacent_survivorship_index(
+    run_id: str,
+) -> tuple[Dict[tuple[str, str, str, str], Dict[str, object]], str | None]:
     data_root = get_data_root()
     base = data_root / "reports" / "adjacent_survivorship"
     if not base.exists():
@@ -139,7 +147,9 @@ def _load_latest_adjacent_survivorship_index(run_id: str) -> tuple[Dict[tuple[st
     return {}, None
 
 
-def _apply_adjacent_survivorship_annotations(df: pd.DataFrame, *, run_id: str) -> tuple[pd.DataFrame, str | None]:
+def _apply_adjacent_survivorship_annotations(
+    df: pd.DataFrame, *, run_id: str
+) -> tuple[pd.DataFrame, str | None]:
     if df.empty:
         return df.copy(), None
     required = ["candidate_symbol", "event_type", "direction", "horizon"]
@@ -183,7 +193,9 @@ def _apply_adjacent_survivorship_annotations(df: pd.DataFrame, *, run_id: str) -
         target_runs.append(str(match.get("target_run_id") or report_target_run_id or ""))
         failure_tokens = match.get("failure_reasons", [])
         if isinstance(failure_tokens, list):
-            fail_reasons.append("|".join(str(token) for token in failure_tokens if str(token).strip()))
+            fail_reasons.append(
+                "|".join(str(token) for token in failure_tokens if str(token).strip())
+            )
         else:
             fail_reasons.append(str(failure_tokens))
         target_expectancy.append(match.get("target_after_cost_expectancy_per_trade"))
@@ -294,9 +306,11 @@ def _normalize_edge_candidates_df(
 
     if "gate_bridge_tradable" in out.columns:
         out["gate_bridge_tradable"] = out["gate_bridge_tradable"].apply(
-            lambda x: "pass"
-            if str(x).lower().strip() in ("1", "true", "t", "yes", "y", "on", "pass")
-            else "fail"
+            lambda x: (
+                "pass"
+                if str(x).lower().strip() in ("1", "true", "t", "yes", "y", "on", "pass")
+                else "fail"
+            )
         )
     if "direction" in out.columns:
         out["direction"] = out["direction"].apply(_normalize_direction_value)
@@ -312,6 +326,7 @@ def _normalize_edge_candidates_df(
         ).reset_index(drop=True)
     return out
 
+
 def _phase2_row_to_candidate(
     run_id: str,
     event: str,
@@ -323,7 +338,7 @@ def _phase2_row_to_candidate(
 ) -> Dict[str, object]:
     # Lossless handoff: start with every field from the input row
     candidate = dict(row)
-    
+
     # Ensure canonical identifiers and standard types
     candidate["run_id"] = str(run_id)
     candidate["event"] = str(event)
@@ -331,24 +346,26 @@ def _phase2_row_to_candidate(
     candidate["status"] = str(row.get("status", default_status))
     candidate["source_path"] = str(source_path)
     candidate["direction"] = _normalize_direction_value(row.get("direction"))
-    
+
     # Symbols
     candidate["run_symbols"] = list(run_symbols)
     candidate["candidate_symbol"] = _infer_symbol_tag(row=row, run_symbols=run_symbols)
-    
+
     # Handle common statistical aliases if missing
     if "n_events" not in candidate:
         candidate["n_events"] = _quiet_int(row.get("sample_size", row.get("count", 0)), 0)
     if "sample_size" not in candidate:
         candidate["sample_size"] = candidate["n_events"]
-        
+
     # Consistency for score fields often used in sorting or gating
     risk_reduction = max(0.0, -_quiet_float(row.get("delta_adverse_mean"), 0.0))
     opp_delta = _quiet_float(row.get("delta_opportunity_mean"), 0.0)
-    
+
     if "edge_score" not in candidate:
-        candidate["edge_score"] = _quiet_float(row.get("edge_score"), risk_reduction + max(0.0, opp_delta))
-        
+        candidate["edge_score"] = _quiet_float(
+            row.get("edge_score"), risk_reduction + max(0.0, opp_delta)
+        )
+
     expectancy_source = row.get("after_cost_expectancy_per_trade")
     if _is_missing_value(expectancy_source):
         expectancy_source = row.get("expectancy_after_multiplicity")
@@ -356,27 +373,35 @@ def _phase2_row_to_candidate(
         expectancy_source = row.get("expectancy_per_trade")
     if _is_missing_value(expectancy_source):
         expectancy_source = row.get("expectancy")
-        
+
     if "expectancy_per_trade" not in candidate:
-        candidate["expectancy_per_trade"] = _quiet_float(expectancy_source, _quiet_float(row.get("expected_return_proxy"), opp_delta))
-        
+        candidate["expectancy_per_trade"] = _quiet_float(
+            expectancy_source, _quiet_float(row.get("expected_return_proxy"), opp_delta)
+        )
+
     if "after_cost_expectancy_per_trade" not in candidate:
-         candidate["after_cost_expectancy_per_trade"] = _quiet_float(
-             row.get("after_cost_expectancy_per_trade", row.get("expectancy")),
-             candidate["expectancy_per_trade"],
-         )
+        candidate["after_cost_expectancy_per_trade"] = _quiet_float(
+            row.get("after_cost_expectancy_per_trade", row.get("expectancy")),
+            candidate["expectancy_per_trade"],
+        )
 
     # Robustness / Stability
     gate_cols = [
-        "gate_a_ci_separated", "gate_b_time_stable", "gate_c_regime_stable",
-        "gate_d_friction_floor", "gate_f_exposure_guard", "gate_e_simplicity",
+        "gate_a_ci_separated",
+        "gate_b_time_stable",
+        "gate_c_regime_stable",
+        "gate_d_friction_floor",
+        "gate_f_exposure_guard",
+        "gate_e_simplicity",
     ]
     gates_present = [g for g in gate_cols if g in row]
     if gates_present:
-        stability_proxy = float(sum(1 for g in gates_present if as_bool(row.get(g))) / len(gates_present))
+        stability_proxy = float(
+            sum(1 for g in gates_present if as_bool(row.get(g))) / len(gates_present)
+        )
     else:
         stability_proxy = _quiet_float(row.get("stability_proxy"), 0.0)
-        
+
     candidate["stability_proxy"] = stability_proxy
     if "robustness_score" not in candidate:
         candidate["robustness_score"] = _quiet_float(row.get("robustness_score"), stability_proxy)
@@ -426,7 +451,9 @@ def _build_symbol_eval_lookup(event_dir: Path) -> Dict[str, Dict[str, object]]:
             continue
         best = max(items, key=lambda item: float(item.get("row_score", -1e18)))
         symbol_scores = {
-            str(item.get("symbol", "ALL")).strip().upper() or "ALL": _quiet_float(item.get("row_score"), 0.0)
+            str(item.get("symbol", "ALL")).strip().upper() or "ALL": _quiet_float(
+                item.get("row_score"), 0.0
+            )
             for item in items
         }
         positive_scores = [score for score in symbol_scores.values() if score > 0.0]
@@ -453,7 +480,9 @@ def _build_symbol_eval_lookup(event_dir: Path) -> Dict[str, Dict[str, object]]:
     return lookup
 
 
-def _build_bridge_eval_lookup(*, run_id: str, event_type: str, timeframe: str) -> Dict[str, Dict[str, object]]:
+def _build_bridge_eval_lookup(
+    *, run_id: str, event_type: str, timeframe: str
+) -> Dict[str, Dict[str, object]]:
     bridge_root = bridge_event_out_dir(
         data_root=get_data_root(),
         run_id=run_id,
@@ -480,6 +509,7 @@ def _build_bridge_eval_lookup(*, run_id: str, event_type: str, timeframe: str) -
                 lookup[candidate_id] = row.to_dict()
     return lookup
 
+
 def _run_research_chain(
     run_id: str,
     symbols: str,
@@ -493,7 +523,15 @@ def _run_research_chain(
             logging.warning("Missing phase1 script (skipping): %s", script_path)
             continue
 
-        cmd = [sys.executable, str(script_path), "--run_id", run_id, "--symbols", symbols, *extra_args]
+        cmd = [
+            sys.executable,
+            str(script_path),
+            "--run_id",
+            run_id,
+            "--symbols",
+            symbols,
+            *extra_args,
+        ]
         result = subprocess.run(cmd)
         if result.returncode != 0:
             logging.warning("Phase1 stage failed (non-blocking): %s", script)
@@ -554,6 +592,7 @@ def _run_research_chain(
             if bridge_result.returncode != 0:
                 logging.warning("Bridge stage failed (non-blocking): %s", event_type)
 
+
 def _collect_phase2_candidates(run_id: str, run_symbols: Sequence[str]) -> List[Dict[str, object]]:
     DATA_ROOT = get_data_root()
     rows: List[Dict[str, object]] = []
@@ -563,7 +602,10 @@ def _collect_phase2_candidates(run_id: str, run_symbols: Sequence[str]) -> List[
 
     for event_dir in sorted([p for p in phase2_root.iterdir() if p.is_dir()]):
         candidate_root = event_dir
-        if not (candidate_root / "phase2_candidates.csv").exists() and not (candidate_root / "phase2_candidates.parquet").exists():
+        if (
+            not (candidate_root / "phase2_candidates.csv").exists()
+            and not (candidate_root / "phase2_candidates.parquet").exists()
+        ):
             timeframe_roots = [
                 child
                 for child in sorted(event_dir.iterdir())
@@ -580,7 +622,9 @@ def _collect_phase2_candidates(run_id: str, run_symbols: Sequence[str]) -> List[
             candidate_csv = candidate_root / "phase2_candidates.csv"
             candidate_parquet = candidate_root / "phase2_candidates.parquet"
             symbol_eval_lookup = _build_symbol_eval_lookup(candidate_root)
-            timeframe = normalize_timeframe(candidate_root.name if candidate_root != event_dir else "5m")
+            timeframe = normalize_timeframe(
+                candidate_root.name if candidate_root != event_dir else "5m"
+            )
             bridge_eval_lookup = _build_bridge_eval_lookup(
                 run_id=run_id,
                 event_type=event_dir.name,
@@ -590,7 +634,11 @@ def _collect_phase2_candidates(run_id: str, run_symbols: Sequence[str]) -> List[
             phase2_lookup: Dict[str, Dict[str, object]] = {}
             if candidate_csv.exists() or candidate_parquet.exists():
                 try:
-                    phase2_df = pd.read_csv(candidate_csv) if candidate_csv.exists() else pd.read_parquet(candidate_parquet)
+                    phase2_df = (
+                        pd.read_csv(candidate_csv)
+                        if candidate_csv.exists()
+                        else pd.read_parquet(candidate_parquet)
+                    )
                 except Exception:
                     phase2_df = pd.DataFrame()
                 if not phase2_df.empty:
@@ -623,13 +671,22 @@ def _collect_phase2_candidates(run_id: str, run_symbols: Sequence[str]) -> List[
                         merged = dict(phase2_lookup[cid])
                         merged.update(candidate_row)
                         candidate_row = merged
-                    if ("gate_bridge_tradable" in candidate_row) and (not as_bool(candidate_row.get("gate_bridge_tradable", False))):
+                    if ("gate_bridge_tradable" in candidate_row) and (
+                        not as_bool(candidate_row.get("gate_bridge_tradable", False))
+                    ):
                         continue
                     if cid and cid in symbol_eval_lookup:
                         candidate_row.update(symbol_eval_lookup[cid])
                     if cid and cid in bridge_eval_lookup:
                         candidate_row.update(bridge_eval_lookup[cid])
-                    event_name = str(candidate_row.get("event_type", candidate_row.get("event", event_dir.name))).strip() or event_dir.name
+                    event_name = (
+                        str(
+                            candidate_row.get(
+                                "event_type", candidate_row.get("event", event_dir.name)
+                            )
+                        ).strip()
+                        or event_dir.name
+                    )
                     event_rows.append(
                         _phase2_row_to_candidate(
                             run_id=run_id,
@@ -643,7 +700,11 @@ def _collect_phase2_candidates(run_id: str, run_symbols: Sequence[str]) -> List[
                     )
 
             if not event_rows and (candidate_csv.exists() or candidate_parquet.exists()):
-                df = pd.read_csv(candidate_csv) if candidate_csv.exists() else pd.read_parquet(candidate_parquet)
+                df = (
+                    pd.read_csv(candidate_csv)
+                    if candidate_csv.exists()
+                    else pd.read_parquet(candidate_parquet)
+                )
                 if not df.empty:
                     if "gate_all_research" in df.columns:
                         df = df[df["gate_all_research"].map(as_bool)].copy()
@@ -654,7 +715,10 @@ def _collect_phase2_candidates(run_id: str, run_symbols: Sequence[str]) -> List[
                     if not df.empty:
                         for idx, row in df.iterrows():
                             row_payload = row.to_dict()
-                            row_payload["status"] = str(row_payload.get("status", "PROMOTED_RESEARCH")).strip() or "PROMOTED_RESEARCH"
+                            row_payload["status"] = (
+                                str(row_payload.get("status", "PROMOTED_RESEARCH")).strip()
+                                or "PROMOTED_RESEARCH"
+                            )
                             cid = str(row_payload.get("candidate_id", "")).strip()
                             if not cid:
                                 cond = str(row_payload.get("condition", "")).strip()
@@ -666,14 +730,23 @@ def _collect_phase2_candidates(run_id: str, run_symbols: Sequence[str]) -> List[
                                 row_payload.update(symbol_eval_lookup[cid])
                             if cid and cid in bridge_eval_lookup:
                                 row_payload.update(bridge_eval_lookup[cid])
-                            event_name = str(row_payload.get("event_type", row_payload.get("event", event_dir.name))).strip() or event_dir.name
+                            event_name = (
+                                str(
+                                    row_payload.get(
+                                        "event_type", row_payload.get("event", event_dir.name)
+                                    )
+                                ).strip()
+                                or event_dir.name
+                            )
                             event_rows.append(
                                 _phase2_row_to_candidate(
                                     run_id=run_id,
                                     event=event_name,
                                     row=row_payload,
                                     idx=idx,
-                                    source_path=candidate_csv if candidate_csv.exists() else candidate_parquet,
+                                    source_path=candidate_csv
+                                    if candidate_csv.exists()
+                                    else candidate_parquet,
                                     default_status="PROMOTED_RESEARCH",
                                     run_symbols=run_symbols,
                                 )
@@ -682,11 +755,14 @@ def _collect_phase2_candidates(run_id: str, run_symbols: Sequence[str]) -> List[
             rows.extend(event_rows)
     return rows
 
+
 def main() -> int:
     DATA_ROOT = get_data_root()
     parser = argparse.ArgumentParser(description="Expand and normalize edge candidate universe")
     parser.add_argument("--run_id", required=True)
-    parser.add_argument("--symbols", required=True, help="Comma-separated discovery symbols for this run")
+    parser.add_argument(
+        "--symbols", required=True, help="Comma-separated discovery symbols for this run"
+    )
     parser.add_argument("--execute", type=int, default=0)
     parser.add_argument("--hypothesis_datasets", default="auto", help=argparse.SUPPRESS)
     parser.add_argument("--hypothesis_max_fused", type=int, default=24, help=argparse.SUPPRESS)
@@ -697,7 +773,9 @@ def main() -> int:
     if args.log_path:
         ensure_dir(Path(args.log_path).parent)
         log_handlers.append(logging.FileHandler(args.log_path))
-    logging.basicConfig(level=logging.INFO, handlers=log_handlers, format="%(asctime)s %(levelname)s %(message)s")
+    logging.basicConfig(
+        level=logging.INFO, handlers=log_handlers, format="%(asctime)s %(levelname)s %(message)s"
+    )
 
     run_symbols = _parse_symbols_csv(args.symbols)
     if not run_symbols:
@@ -723,16 +801,16 @@ def main() -> int:
             )
 
         rows = _collect_phase2_candidates(args.run_id, run_symbols=run_symbols)
-        
+
         # S1/S2: Apply Hierarchical Shrinkage across the collected candidate universe
         from project.research.helpers.shrinkage import _apply_hierarchical_shrinkage
         from project.specs.manifest import load_run_manifest
-        
+
         run_manifest = load_run_manifest(args.run_id)
         run_mode = str(run_manifest.get("run_mode", "exploratory")).strip().lower()
         is_confirmatory = _is_confirmatory_run_mode(run_mode)
         current_spec_hash = ontology_spec_hash(PROJECT_ROOT.parent)
-        
+
         candidates_df = pd.DataFrame(rows)
         if not candidates_df.empty:
             # We need standard columns for shrinkage:
@@ -740,9 +818,9 @@ def main() -> int:
             # These are already in the candidate rows.
             shrunk_df = _apply_hierarchical_shrinkage(
                 candidates_df,
-                train_only_lambda=True, # Enforce S1 requirement
+                train_only_lambda=True,  # Enforce S1 requirement
                 split_col="split_label",
-                run_mode=run_mode
+                run_mode=run_mode,
             )
             # Merge back the shrunk columns
             # (Note: _apply_hierarchical_shrinkage returns a full DF, so we just use it)
@@ -769,8 +847,12 @@ def main() -> int:
         write_parquet(df, out_csv)
         out_json.write_text(df.to_json(orient="records", indent=2), encoding="utf-8")
 
-        outputs.append({"path": str(out_csv), "rows": int(len(df)), "start_ts": None, "end_ts": None})
-        outputs.append({"path": str(out_json), "rows": int(len(df)), "start_ts": None, "end_ts": None})
+        outputs.append(
+            {"path": str(out_csv), "rows": int(len(df)), "start_ts": None, "end_ts": None}
+        )
+        outputs.append(
+            {"path": str(out_json), "rows": int(len(df)), "start_ts": None, "end_ts": None}
+        )
         finalize_manifest(
             manifest,
             "success",
@@ -784,6 +866,7 @@ def main() -> int:
         logging.exception("Edge candidate export failed")
         finalize_manifest(manifest, "failed", error=str(exc), stats={})
         return 1
+
 
 if __name__ == "__main__":
     sys.exit(main())

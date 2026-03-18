@@ -9,7 +9,13 @@ from pathlib import Path
 
 import pandas as pd
 from project.core.data_quality import summarize_frame_quality
-from project.io.utils import choose_partition_dir, ensure_dir, list_parquet_files, read_parquet, run_scoped_lake_path
+from project.io.utils import (
+    choose_partition_dir,
+    ensure_dir,
+    list_parquet_files,
+    read_parquet,
+    run_scoped_lake_path,
+)
 from project.specs.manifest import finalize_manifest, start_manifest
 
 
@@ -38,9 +44,15 @@ def _evaluate_threshold(
     fmt: str,
 ) -> tuple[str | None, str | None]:
     if fail_threshold is not None and value > fail_threshold:
-        return ("failure", f"{label}={format(value, fmt)} exceeds fail threshold {format(fail_threshold, fmt)}")
+        return (
+            "failure",
+            f"{label}={format(value, fmt)} exceeds fail threshold {format(fail_threshold, fmt)}",
+        )
     if warn_threshold is not None and value > warn_threshold:
-        return ("warning", f"{label}={format(value, fmt)} exceeds warn threshold {format(warn_threshold, fmt)}")
+        return (
+            "warning",
+            f"{label}={format(value, fmt)} exceeds warn threshold {format(warn_threshold, fmt)}",
+        )
     return (None, None)
 
 
@@ -58,19 +70,23 @@ def main() -> int:
     parser.add_argument("--warn_duplicate_timestamps", type=int, default=None)
     parser.add_argument("--timeframe", default="5m")
     args = parser.parse_args()
-    
+
     symbols = [s.strip() for s in args.symbols.split(",") if s.strip()]
     data_root = get_data_root()
-    
-    manifest = start_manifest(f"validate_data_coverage_{args.timeframe}", args.run_id, vars(args), [], [])
-    
+
+    manifest = start_manifest(
+        f"validate_data_coverage_{args.timeframe}", args.run_id, vars(args), [], []
+    )
+
     symbol_stats = {}
     total_failures = 0
     total_warnings = 0
-    
+
     for symbol in symbols:
         candidates = [
-            run_scoped_lake_path(data_root, args.run_id, "cleaned", "perp", symbol, f"bars_{args.timeframe}"),
+            run_scoped_lake_path(
+                data_root, args.run_id, "cleaned", "perp", symbol, f"bars_{args.timeframe}"
+            ),
             data_root / "lake" / "cleaned" / "perp" / symbol / f"bars_{args.timeframe}",
         ]
         path = choose_partition_dir(candidates)
@@ -78,13 +94,13 @@ def main() -> int:
             logging.error(f"Missing cleaned bars for {symbol}")
             total_failures += 1
             continue
-            
+
         df = read_parquet(list_parquet_files(path))
         if df.empty:
             logging.error(f"Empty cleaned bars for {symbol}")
             total_failures += 1
             continue
-            
+
         if "is_gap" not in df.columns:
             logging.error(f"Missing 'is_gap' column for {symbol}")
             total_failures += 1
@@ -93,7 +109,15 @@ def main() -> int:
         quality = summarize_frame_quality(
             df,
             expected_minutes=5 if args.timeframe == "5m" else None,
-            numeric_cols=["open", "high", "low", "close", "volume", "quote_volume", "taker_base_volume"],
+            numeric_cols=[
+                "open",
+                "high",
+                "low",
+                "close",
+                "volume",
+                "quote_volume",
+                "taker_base_volume",
+            ],
         )
         gap_pct = float(df["is_gap"].mean())
         warnings: list[str] = []
@@ -179,6 +203,7 @@ def main() -> int:
         },
     )
     return 1 if total_failures > 0 else 0
+
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")

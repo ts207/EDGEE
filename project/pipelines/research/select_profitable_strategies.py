@@ -41,7 +41,9 @@ def _load_candidates_table(run_id: str, candidates_path: str = "") -> tuple[pd.D
     preferred_paths: List[Path] = []
     if str(candidates_path).strip():
         requested = Path(candidates_path)
-        preferred_paths.extend([requested, requested.with_suffix(".csv"), requested.with_suffix(".json")])
+        preferred_paths.extend(
+            [requested, requested.with_suffix(".csv"), requested.with_suffix(".json")]
+        )
     preferred_paths.extend(
         [
             candidates_root / "strategy_candidates.parquet",
@@ -62,7 +64,10 @@ def _load_candidates_table(run_id: str, candidates_path: str = "") -> tuple[pd.D
             return _read_candidate_table(path), path
         except Exception as exc:
             logging.debug("Failed to read candidate table from %s: %s", path, exc)
-    return pd.DataFrame(), preferred_paths[0] if preferred_paths else candidates_root / "strategy_candidates.parquet"
+    return pd.DataFrame(), preferred_paths[
+        0
+    ] if preferred_paths else candidates_root / "strategy_candidates.parquet"
+
 
 def _bool_series(df: pd.DataFrame, column: str) -> pd.Series:
     if column not in df.columns:
@@ -76,7 +81,9 @@ def _bool_series_default(df: pd.DataFrame, column: str, default: bool) -> pd.Ser
     return df[column].map(fail_closed_bool).astype(bool)
 
 
-def _first_numeric(df: pd.DataFrame, names: List[str], default: float = np.nan) -> tuple[pd.Series, str]:
+def _first_numeric(
+    df: pd.DataFrame, names: List[str], default: float = np.nan
+) -> tuple[pd.Series, str]:
     for name in names:
         if name in df.columns:
             series = pd.to_numeric(df[name], errors="coerce")
@@ -124,8 +131,11 @@ def _allocation_viable_series(df: pd.DataFrame) -> pd.Series:
         except Exception:
             out.append(True)
             continue
-        out.append(bool(payload.get("allocation_viable", True)) if isinstance(payload, dict) else True)
+        out.append(
+            bool(payload.get("allocation_viable", True)) if isinstance(payload, dict) else True
+        )
     return pd.Series(out, index=df.index, dtype=bool)
+
 
 def _normalize_candidate_frame(df: pd.DataFrame) -> pd.DataFrame:
     out = df.copy()
@@ -137,13 +147,13 @@ def _normalize_candidate_frame(df: pd.DataFrame) -> pd.DataFrame:
 
     if "candidate_id" not in out.columns:
         out["candidate_id"] = [
-            f"{event}_{idx}"
-            for idx, event in enumerate(out["event_type"].astype(str).tolist())
+            f"{event}_{idx}" for idx, event in enumerate(out["event_type"].astype(str).tolist())
         ]
     out["candidate_id"] = out["candidate_id"].astype(str).str.strip()
     if "status" not in out.columns:
         out["status"] = pd.NA
     return out
+
 
 def main() -> int:
     DATA_ROOT = get_data_root()
@@ -168,7 +178,9 @@ def main() -> int:
     if args.log_path:
         ensure_dir(Path(args.log_path).parent)
         handlers.append(logging.FileHandler(args.log_path))
-    logging.basicConfig(level=logging.INFO, handlers=handlers, format="%(asctime)s %(levelname)s %(message)s")
+    logging.basicConfig(
+        level=logging.INFO, handlers=handlers, format="%(asctime)s %(levelname)s %(message)s"
+    )
 
     symbols = [s.strip().upper() for s in str(args.symbols).split(",") if s.strip()]
     run_id = str(args.run_id).strip()
@@ -176,7 +188,11 @@ def main() -> int:
         raise ValueError("--run_id must be non-empty")
 
     out_root = DATA_ROOT / "reports" / "strategy_selection" / run_id
-    out_path = Path(args.out_path).resolve() if str(args.out_path).strip() else out_root / "profitable_strategies.parquet"
+    out_path = (
+        Path(args.out_path).resolve()
+        if str(args.out_path).strip()
+        else out_root / "profitable_strategies.parquet"
+    )
     out_csv_path = out_path.with_suffix(".csv")
     summary_path = out_root / "profitability_summary.json"
 
@@ -212,21 +228,21 @@ def main() -> int:
             else float(contract.min_net_expectancy_bps)
         )
         min_events = (
-            int(args.min_events)
-            if args.min_events is not None
-            else int(contract.min_trade_count)
+            int(args.min_events) if args.min_events is not None else int(contract.min_trade_count)
         )
         min_oos_consistency = float(contract.min_oos_sign_consistency)
 
-        raw_df, source_path = _load_candidates_table(run_id, candidates_path=str(args.candidates_path))
+        raw_df, source_path = _load_candidates_table(
+            run_id, candidates_path=str(args.candidates_path)
+        )
         inputs.append({"path": str(source_path), "rows": int(len(raw_df))})
-        
+
         if raw_df.empty:
             raise ValueError(
                 f"Required promoted candidates table is missing or empty for run_id={run_id}. "
                 f"Checked: {source_path}"
             )
-        
+
         df = _normalize_candidate_frame(raw_df)
 
         expectancy, expectancy_col = _first_expectancy_bps(df)
@@ -236,7 +252,9 @@ def main() -> int:
             default=0.0,
         )
         selection_score, selection_col = _first_numeric(df, ["selection_score"], default=0.0)
-        oos_consistency, oos_col = _first_numeric(df, ["oos_sign_consistency", "sign_consistency"], default=np.nan)
+        oos_consistency, oos_col = _first_numeric(
+            df, ["oos_sign_consistency", "sign_consistency"], default=np.nan
+        )
         expectancy_ok = expectancy.fillna(-np.inf) >= float(min_expectancy_bps)
         sample_ok = sample_size.fillna(0.0) >= float(min_events)
         strategy_candidate_mode = "strategy_candidate_id" in df.columns
@@ -294,7 +312,7 @@ def main() -> int:
         selected["expectancy_bps"] = expectancy.loc[selected.index].astype(float)
         selected["sample_size"] = sample_size.loc[selected.index].astype(float)
         selected["selection_score"] = selection_score.loc[selected.index].astype(float)
-        
+
         # Profitability score preserves NaN if either component is NaN to avoid false optimism
         selected["profitability_score"] = (
             selected["expectancy_bps"] + selected["selection_score"]
@@ -353,6 +371,7 @@ def main() -> int:
         logging.exception("Profitability selection failed")
         finalize_manifest(manifest, "failed", error=str(exc), stats={})
         return 1
+
 
 if __name__ == "__main__":
     sys.exit(main())

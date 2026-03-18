@@ -1,4 +1,5 @@
 """Smoke tests for phase2_search_engine pipeline stage."""
+
 import json
 import sys
 from pathlib import Path
@@ -12,11 +13,13 @@ sys.path.insert(0, str(Path(__file__).parents[2]))
 
 def test_stage_is_importable():
     import project.pipelines.research.phase2_search_engine as stage
+
     assert stage is not None
 
 
 def test_stage_has_main():
     import project.pipelines.research.phase2_search_engine as stage
+
     assert callable(stage.main)
 
 
@@ -25,7 +28,9 @@ def test_stage_exits_zero_with_empty_features(tmp_path):
     import project.pipelines.research.phase2_search_engine as stage
 
     empty_features = pd.DataFrame()
-    with patch("project.pipelines.research.phase2_search_engine.load_features", return_value=empty_features):
+    with patch(
+        "project.pipelines.research.phase2_search_engine.load_features", return_value=empty_features
+    ):
         result = stage.run(
             run_id="test_run",
             symbols="BTCUSDT",
@@ -41,19 +46,34 @@ def test_stage_writes_output_parquet(tmp_path):
     import numpy as np
 
     n = 100
-    features = pd.DataFrame({
-        "timestamp": pd.date_range("2024-01-01", periods=n, freq="15min"),
-        "close": np.random.uniform(40000, 50000, n),
-        "event_vol_spike": np.zeros(n, dtype=bool),
-    })
+    features = pd.DataFrame(
+        {
+            "timestamp": pd.date_range("2024-01-01", periods=n, freq="15min"),
+            "close": np.random.uniform(40000, 50000, n),
+            "event_vol_spike": np.zeros(n, dtype=bool),
+        }
+    )
 
-    with patch("project.pipelines.research.phase2_search_engine.load_features", return_value=features), \
-         patch("project.events.event_flags.load_registry_flags", return_value=pd.DataFrame()), \
-         patch(
-             "project.pipelines.research.phase2_search_engine.generate_hypotheses_with_audit",
-             return_value=([], {"counts": {"generated": 0, "feasible": 0, "rejected": 0}, "rejection_reason_counts": {}}),
-         ), \
-         patch("project.pipelines.research.phase2_search_engine.run_distributed_search", return_value=pd.DataFrame()):
+    with (
+        patch(
+            "project.pipelines.research.phase2_search_engine.load_features", return_value=features
+        ),
+        patch("project.events.event_flags.load_registry_flags", return_value=pd.DataFrame()),
+        patch(
+            "project.pipelines.research.phase2_search_engine.generate_hypotheses_with_audit",
+            return_value=(
+                [],
+                {
+                    "counts": {"generated": 0, "feasible": 0, "rejected": 0},
+                    "rejection_reason_counts": {},
+                },
+            ),
+        ),
+        patch(
+            "project.pipelines.research.phase2_search_engine.run_distributed_search",
+            return_value=pd.DataFrame(),
+        ),
+    ):
         stage.run(
             run_id="test_run",
             symbols="BTCUSDT",
@@ -63,13 +83,19 @@ def test_stage_writes_output_parquet(tmp_path):
 
     output_file = tmp_path / "output" / "phase2_candidates.parquet"
     assert output_file.exists()
-    diagnostics = json.loads((tmp_path / "output" / "phase2_diagnostics.json").read_text(encoding="utf-8"))
+    diagnostics = json.loads(
+        (tmp_path / "output" / "phase2_diagnostics.json").read_text(encoding="utf-8")
+    )
     assert diagnostics["hypotheses_generated"] == 0
     assert diagnostics["feasible_hypotheses"] == 0
     assert diagnostics["rejected_hypotheses"] == 0
     assert diagnostics["feature_rows"] == len(features)
-    assert (tmp_path / "output" / "hypotheses" / "BTCUSDT" / "generated_hypotheses.parquet").exists()
-    assert (tmp_path / "output" / "hypotheses" / "BTCUSDT" / "evaluated_hypotheses.parquet").exists()
+    assert (
+        tmp_path / "output" / "hypotheses" / "BTCUSDT" / "generated_hypotheses.parquet"
+    ).exists()
+    assert (
+        tmp_path / "output" / "hypotheses" / "BTCUSDT" / "evaluated_hypotheses.parquet"
+    ).exists()
     assert (tmp_path / "output" / "hypotheses" / "BTCUSDT" / "gate_failures.parquet").exists()
 
 
@@ -77,27 +103,46 @@ def test_stage_normalizes_nested_audit_columns_before_parquet(tmp_path):
     import project.pipelines.research.phase2_search_engine as stage
     import numpy as np
 
-    features = pd.DataFrame({
-        "timestamp": pd.date_range("2024-01-01", periods=16, freq="15min"),
-        "close": np.random.uniform(40000, 50000, 16),
-    })
+    features = pd.DataFrame(
+        {
+            "timestamp": pd.date_range("2024-01-01", periods=16, freq="15min"),
+            "close": np.random.uniform(40000, 50000, 16),
+        }
+    )
 
-    with patch("project.pipelines.research.phase2_search_engine.load_features", return_value=features), \
-         patch("project.events.event_flags.load_registry_flags", return_value=pd.DataFrame()), \
-         patch(
-             "project.pipelines.research.phase2_search_engine.generate_hypotheses_with_audit",
-             return_value=(
-                 [],
-                 {
-                     "generated_rows": [{"hypothesis_id": "h1", "context": {}, "rejection_details": {}}],
-                     "feasible_rows": [{"hypothesis_id": "h1", "context": {"state_filter": "HIGH_VOL"}}],
-                     "rejected_rows": [{"hypothesis_id": "h2", "rejection_reasons": ["validation_error"], "rejection_details": {}}],
-                     "counts": {"generated": 1, "feasible": 1, "rejected": 1},
-                     "rejection_reason_counts": {"validation_error": 1},
-                 },
-             ),
-         ), \
-         patch("project.pipelines.research.phase2_search_engine.run_distributed_search", return_value=pd.DataFrame()):
+    with (
+        patch(
+            "project.pipelines.research.phase2_search_engine.load_features", return_value=features
+        ),
+        patch("project.events.event_flags.load_registry_flags", return_value=pd.DataFrame()),
+        patch(
+            "project.pipelines.research.phase2_search_engine.generate_hypotheses_with_audit",
+            return_value=(
+                [],
+                {
+                    "generated_rows": [
+                        {"hypothesis_id": "h1", "context": {}, "rejection_details": {}}
+                    ],
+                    "feasible_rows": [
+                        {"hypothesis_id": "h1", "context": {"state_filter": "HIGH_VOL"}}
+                    ],
+                    "rejected_rows": [
+                        {
+                            "hypothesis_id": "h2",
+                            "rejection_reasons": ["validation_error"],
+                            "rejection_details": {},
+                        }
+                    ],
+                    "counts": {"generated": 1, "feasible": 1, "rejected": 1},
+                    "rejection_reason_counts": {"validation_error": 1},
+                },
+            ),
+        ),
+        patch(
+            "project.pipelines.research.phase2_search_engine.run_distributed_search",
+            return_value=pd.DataFrame(),
+        ),
+    ):
         rc = stage.run(
             run_id="test_run",
             symbols="BTCUSDT",
@@ -106,7 +151,9 @@ def test_stage_normalizes_nested_audit_columns_before_parquet(tmp_path):
         )
 
     assert rc == 0
-    generated = pd.read_parquet(tmp_path / "output" / "hypotheses" / "BTCUSDT" / "generated_hypotheses.parquet")
+    generated = pd.read_parquet(
+        tmp_path / "output" / "hypotheses" / "BTCUSDT" / "generated_hypotheses.parquet"
+    )
     assert generated.loc[0, "context"] == "{}"
 
 
@@ -143,20 +190,25 @@ def test_search_engine_applies_multiplicity(tmp_path, monkeypatch):
     import numpy as np
 
     dates = pd.date_range("2023-01-01", periods=200, freq="15min")
-    features = pd.DataFrame({
-        "timestamp": dates,
-        "close": np.linspace(100, 110, 200) + np.random.default_rng(42).normal(0, 0.1, 200),
-        "event_vol_spike": [i % 10 == 0 for i in range(200)],
-    })
+    features = pd.DataFrame(
+        {
+            "timestamp": dates,
+            "close": np.linspace(100, 110, 200) + np.random.default_rng(42).normal(0, 0.1, 200),
+            "event_vol_spike": [i % 10 == 0 for i in range(200)],
+        }
+    )
 
     # Monkeypatch generate_hypotheses to return small set
     from project.domain.hypotheses import HypothesisSpec, TriggerSpec
+
     def mock_generate(*a, **kw):
         hypotheses = [
             HypothesisSpec(
                 trigger=TriggerSpec.event("vol_spike"),
-                direction="long", horizon="5m",
-                template_id="continuation", entry_lag=1,
+                direction="long",
+                horizon="5m",
+                template_id="continuation",
+                entry_lag=1,
             ),
         ]
         return hypotheses, {
@@ -166,11 +218,20 @@ def test_search_engine_applies_multiplicity(tmp_path, monkeypatch):
             "counts": {"generated": 1, "feasible": 1, "rejected": 0},
             "rejection_reason_counts": {},
         }
-    monkeypatch.setattr("project.pipelines.research.phase2_search_engine.generate_hypotheses_with_audit", mock_generate)
-    monkeypatch.setattr("project.pipelines.research.phase2_search_engine.load_features", lambda *a, **kw: features)
-    monkeypatch.setattr("project.events.event_flags.load_registry_flags", lambda *a, **kw: pd.DataFrame())
+
+    monkeypatch.setattr(
+        "project.pipelines.research.phase2_search_engine.generate_hypotheses_with_audit",
+        mock_generate,
+    )
+    monkeypatch.setattr(
+        "project.pipelines.research.phase2_search_engine.load_features", lambda *a, **kw: features
+    )
+    monkeypatch.setattr(
+        "project.events.event_flags.load_registry_flags", lambda *a, **kw: pd.DataFrame()
+    )
 
     from project.pipelines.research.phase2_search_engine import run
+
     out_dir = tmp_path / "output"
     rc = run("test_run", "BTCUSDT", tmp_path, out_dir)
     assert rc == 0
@@ -191,18 +252,25 @@ def test_search_engine_synthetic_profile_resolves_search_spec_and_min_n(tmp_path
     import numpy as np
     import project.pipelines.research.phase2_search_engine as stage
 
-    features = pd.DataFrame({
-        "timestamp": pd.date_range("2026-01-01", periods=40, freq="5min", tz="UTC"),
-        "close": np.linspace(100, 101, 40),
-    })
+    features = pd.DataFrame(
+        {
+            "timestamp": pd.date_range("2026-01-01", periods=40, freq="5min", tz="UTC"),
+            "close": np.linspace(100, 101, 40),
+        }
+    )
     captured = {}
 
     def _mock_generate(spec_name, **kwargs):
         captured["search_spec"] = spec_name
-        return [], {"counts": {"generated": 0, "feasible": 0, "rejected": 0}, "rejection_reason_counts": {}}
+        return [], {
+            "counts": {"generated": 0, "feasible": 0, "rejected": 0},
+            "rejection_reason_counts": {},
+        }
 
     monkeypatch.setattr(stage, "load_features", lambda *a, **kw: features)
-    monkeypatch.setattr("project.events.event_flags.load_registry_flags", lambda *a, **kw: pd.DataFrame())
+    monkeypatch.setattr(
+        "project.events.event_flags.load_registry_flags", lambda *a, **kw: pd.DataFrame()
+    )
     monkeypatch.setattr(stage, "generate_hypotheses_with_audit", _mock_generate)
 
     rc = stage.run(
@@ -217,7 +285,9 @@ def test_search_engine_synthetic_profile_resolves_search_spec_and_min_n(tmp_path
     )
     assert rc == 0
     assert captured["search_spec"] == "synthetic_truth"
-    diagnostics = json.loads((tmp_path / "output" / "phase2_diagnostics.json").read_text(encoding="utf-8"))
+    diagnostics = json.loads(
+        (tmp_path / "output" / "phase2_diagnostics.json").read_text(encoding="utf-8")
+    )
     assert diagnostics["discovery_profile"] == "synthetic"
     assert diagnostics["min_n"] == 8
     assert diagnostics["min_t_stat"] == 0.25
@@ -228,19 +298,26 @@ def test_search_engine_passes_search_budget_to_generator(tmp_path, monkeypatch):
     import numpy as np
     import project.pipelines.research.phase2_search_engine as stage
 
-    features = pd.DataFrame({
-        "timestamp": pd.date_range("2026-01-01", periods=24, freq="5min", tz="UTC"),
-        "close": np.linspace(100, 101, 24),
-    })
+    features = pd.DataFrame(
+        {
+            "timestamp": pd.date_range("2026-01-01", periods=24, freq="5min", tz="UTC"),
+            "close": np.linspace(100, 101, 24),
+        }
+    )
     captured: dict[str, object] = {}
 
     def _mock_generate(spec_name, **kwargs):
         captured["search_spec"] = spec_name
         captured["max_hypotheses"] = kwargs.get("max_hypotheses")
-        return [], {"counts": {"generated": 0, "feasible": 0, "rejected": 0}, "rejection_reason_counts": {}}
+        return [], {
+            "counts": {"generated": 0, "feasible": 0, "rejected": 0},
+            "rejection_reason_counts": {},
+        }
 
     monkeypatch.setattr(stage, "load_features", lambda *a, **kw: features)
-    monkeypatch.setattr("project.events.event_flags.load_registry_flags", lambda *a, **kw: pd.DataFrame())
+    monkeypatch.setattr(
+        "project.events.event_flags.load_registry_flags", lambda *a, **kw: pd.DataFrame()
+    )
     monkeypatch.setattr(stage, "generate_hypotheses_with_audit", _mock_generate)
 
     rc = stage.run(
@@ -254,7 +331,9 @@ def test_search_engine_passes_search_budget_to_generator(tmp_path, monkeypatch):
     assert rc == 0
     assert captured["search_spec"] == "full"
     assert captured["max_hypotheses"] == 12
-    diagnostics = json.loads((tmp_path / "output" / "phase2_diagnostics.json").read_text(encoding="utf-8"))
+    diagnostics = json.loads(
+        (tmp_path / "output" / "phase2_diagnostics.json").read_text(encoding="utf-8")
+    )
     assert diagnostics["search_budget"] == 12
 
 
@@ -275,14 +354,25 @@ def test_search_engine_run_uses_explicit_registry_root(tmp_path, monkeypatch):
         return type("Plan", (), {"hypotheses": [], "program_id": "prog"})()
 
     monkeypatch.setattr(stage, "load_features", lambda *a, **kw: features)
-    monkeypatch.setattr("project.events.event_flags.load_registry_flags", lambda *a, **kw: pd.DataFrame())
+    monkeypatch.setattr(
+        "project.events.event_flags.load_registry_flags", lambda *a, **kw: pd.DataFrame()
+    )
     monkeypatch.setattr(
         stage,
         "generate_hypotheses_with_audit",
-        lambda *a, **kw: ([], {"counts": {"generated": 0, "feasible": 0, "rejected": 0}, "rejection_reason_counts": {}}),
+        lambda *a, **kw: (
+            [],
+            {
+                "counts": {"generated": 0, "feasible": 0, "rejected": 0},
+                "rejection_reason_counts": {},
+            },
+        ),
     )
     monkeypatch.setattr(stage, "run_distributed_search", lambda *a, **kw: pd.DataFrame())
-    monkeypatch.setattr("project.pipelines.research.experiment_engine.build_experiment_plan", _mock_build_experiment_plan)
+    monkeypatch.setattr(
+        "project.pipelines.research.experiment_engine.build_experiment_plan",
+        _mock_build_experiment_plan,
+    )
 
     rc = stage.run(
         run_id="registry_root_run",
@@ -317,11 +407,19 @@ def test_search_engine_passes_timeframe_and_data_root_to_feature_loader(tmp_path
         return features
 
     monkeypatch.setattr(stage, "load_features", _mock_load_features)
-    monkeypatch.setattr("project.events.event_flags.load_registry_flags", lambda *a, **kw: pd.DataFrame())
+    monkeypatch.setattr(
+        "project.events.event_flags.load_registry_flags", lambda *a, **kw: pd.DataFrame()
+    )
     monkeypatch.setattr(
         stage,
         "generate_hypotheses_with_audit",
-        lambda *a, **kw: ([], {"counts": {"generated": 0, "feasible": 0, "rejected": 0}, "rejection_reason_counts": {}}),
+        lambda *a, **kw: (
+            [],
+            {
+                "counts": {"generated": 0, "feasible": 0, "rejected": 0},
+                "rejection_reason_counts": {},
+            },
+        ),
     )
 
     rc = stage.run(
@@ -337,7 +435,9 @@ def test_search_engine_passes_timeframe_and_data_root_to_feature_loader(tmp_path
     assert captured["symbol"] == "BTCUSDT"
     assert captured["timeframe"] == "15m"
     assert captured["data_root"] == tmp_path
-    diagnostics = json.loads((tmp_path / "output" / "phase2_diagnostics.json").read_text(encoding="utf-8"))
+    diagnostics = json.loads(
+        (tmp_path / "output" / "phase2_diagnostics.json").read_text(encoding="utf-8")
+    )
     assert diagnostics["timeframe"] == "15m"
 
 
@@ -356,10 +456,15 @@ def test_search_engine_passes_merged_features_to_generation_feasibility(tmp_path
     def _mock_generate(spec_name, **kwargs):
         captured["search_spec"] = spec_name
         captured["features_columns"] = list(kwargs["features"].columns)
-        return [], {"counts": {"generated": 0, "feasible": 0, "rejected": 0}, "rejection_reason_counts": {}}
+        return [], {
+            "counts": {"generated": 0, "feasible": 0, "rejected": 0},
+            "rejection_reason_counts": {},
+        }
 
     monkeypatch.setattr(stage, "load_features", lambda *a, **kw: features)
-    monkeypatch.setattr("project.events.event_flags.load_registry_flags", lambda *a, **kw: pd.DataFrame())
+    monkeypatch.setattr(
+        "project.events.event_flags.load_registry_flags", lambda *a, **kw: pd.DataFrame()
+    )
     monkeypatch.setattr(stage, "generate_hypotheses_with_audit", _mock_generate)
 
     rc = stage.run(
@@ -376,6 +481,7 @@ def test_search_engine_passes_merged_features_to_generation_feasibility(tmp_path
 
 def test_search_engine_aggregates_multi_symbol_candidates_and_diagnostics(tmp_path, monkeypatch):
     import project.pipelines.research.phase2_search_engine as stage
+
     features = pd.DataFrame(
         {
             "timestamp": pd.date_range("2026-01-01", periods=12, freq="5min", tz="UTC"),
@@ -384,13 +490,18 @@ def test_search_engine_aggregates_multi_symbol_candidates_and_diagnostics(tmp_pa
     )
 
     monkeypatch.setattr(stage, "load_features", lambda run_id, symbol, **kwargs: features)
-    monkeypatch.setattr("project.events.event_flags.load_registry_flags", lambda *a, **kw: pd.DataFrame())
+    monkeypatch.setattr(
+        "project.events.event_flags.load_registry_flags", lambda *a, **kw: pd.DataFrame()
+    )
     monkeypatch.setattr(
         stage,
         "generate_hypotheses_with_audit",
         lambda *a, **kw: (
             ["h1"],
-            {"counts": {"generated": 1, "feasible": 1, "rejected": 0}, "rejection_reason_counts": {}},
+            {
+                "counts": {"generated": 1, "feasible": 1, "rejected": 0},
+                "rejection_reason_counts": {},
+            },
         ),
     )
     monkeypatch.setattr(
@@ -428,7 +539,9 @@ def test_search_engine_aggregates_multi_symbol_candidates_and_diagnostics(tmp_pa
 
     assert rc == 0
     result = pd.read_parquet(tmp_path / "output" / "phase2_candidates.parquet")
-    diagnostics = json.loads((tmp_path / "output" / "phase2_diagnostics.json").read_text(encoding="utf-8"))
+    diagnostics = json.loads(
+        (tmp_path / "output" / "phase2_diagnostics.json").read_text(encoding="utf-8")
+    )
     assert set(result["symbol"].astype(str)) == {"BTCUSDT", "ETHUSDT"}
     assert diagnostics["symbols_requested"] == ["BTCUSDT", "ETHUSDT"]
     assert diagnostics["primary_symbol"] == ""
@@ -481,13 +594,18 @@ def test_search_engine_assigns_split_labels_before_evaluation(tmp_path, monkeypa
         )
 
     monkeypatch.setattr(stage, "load_features", lambda *a, **kw: features)
-    monkeypatch.setattr("project.events.event_flags.load_registry_flags", lambda *a, **kw: pd.DataFrame())
+    monkeypatch.setattr(
+        "project.events.event_flags.load_registry_flags", lambda *a, **kw: pd.DataFrame()
+    )
     monkeypatch.setattr(
         stage,
         "generate_hypotheses_with_audit",
         lambda *a, **kw: (
             ["h1"],
-            {"counts": {"generated": 1, "feasible": 1, "rejected": 0}, "rejection_reason_counts": {}},
+            {
+                "counts": {"generated": 1, "feasible": 1, "rejected": 0},
+                "rejection_reason_counts": {},
+            },
         ),
     )
     monkeypatch.setattr(stage, "run_distributed_search", _mock_run_distributed_search)

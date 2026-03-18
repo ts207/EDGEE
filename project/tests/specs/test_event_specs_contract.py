@@ -18,15 +18,16 @@ from project.strategy.dsl.policies import EVENT_POLICIES
 REPO_ROOT = Path(__file__).resolve().parents[3]
 SPEC_DIR = Path(__file__).resolve().parents[2] / "spec" / "events"
 
+
 def get_active_event_specs():
     specs = []
     if not SPEC_DIR.exists():
         return specs
-        
+
     for yaml_file in sorted(SPEC_DIR.glob("*.yaml")):
         if yaml_file.name == "canonical_event_registry.yaml":
             continue
-        
+
         with open(yaml_file, "r") as f:
             try:
                 data = yaml.safe_load(f)
@@ -42,7 +43,9 @@ def get_active_event_specs():
                 continue
     return specs
 
+
 ACTIVE_SPECS = get_active_event_specs()
+
 
 @pytest.mark.parametrize("yaml_filename, data", ACTIVE_SPECS)
 def test_event_spec_io_contract(yaml_filename, data):
@@ -60,19 +63,22 @@ def test_event_spec_io_contract(yaml_filename, data):
     events_file = data["events_file"]
     allowed_suffixes = [".parquet", ".csv"]
     suffix = Path(events_file).suffix.lower()
-    assert suffix in allowed_suffixes, f"Disallowed suffix '{suffix}' in {yaml_filename}. Allowed: {allowed_suffixes}"
-    
+    assert suffix in allowed_suffixes, (
+        f"Disallowed suffix '{suffix}' in {yaml_filename}. Allowed: {allowed_suffixes}"
+    )
+
     # 3. Check phase2 coverage
     event_type = data["event_type"]
     phase2_types = {item[0] for item in PHASE2_EVENT_CHAIN}
-    
+
     # Explicitly exempted types (e.g. specialized trading events or test types)
     exempt_from_phase2 = {
-        "TYPE_A", "TYPE_B", 
-        "BASIS_DISLOC", # Handled via custom logic or pending
-        "COPULA_PAIRS_TRADING", # specialized
+        "TYPE_A",
+        "TYPE_B",
+        "BASIS_DISLOC",  # Handled via custom logic or pending
+        "COPULA_PAIRS_TRADING",  # specialized
     }
-    
+
     if event_type not in exempt_from_phase2:
         assert event_type in phase2_types, (
             f"Event type '{event_type}' from {yaml_filename} not found in "
@@ -85,12 +91,13 @@ def test_event_spec_io_contract(yaml_filename, data):
     # We ensure it's either explicitly defined or registered.
     explicit_policies = {k.upper() for k in EVENT_POLICIES.keys()}
     registry_types = set(EVENT_REGISTRY_SPECS.keys())
-    
+
     has_policy = (event_type.upper() in explicit_policies) or (event_type.upper() in registry_types)
     assert has_policy, (
         f"Event type '{event_type}' has no explicit policy and is missing from "
         f"EVENT_REGISTRY_SPECS (registry.py). Strategy compilation will fail."
     )
+
 
 def test_registry_completeness():
     """
@@ -99,7 +106,10 @@ def test_registry_completeness():
     registry_types = set(EVENT_REGISTRY_SPECS.keys())
     for yaml_filename, data in ACTIVE_SPECS:
         event_type = data["event_type"]
-        assert event_type in registry_types, f"Active event '{event_type}' from {yaml_filename} missing from registry.py EVENT_REGISTRY_SPECS"
+        assert event_type in registry_types, (
+            f"Active event '{event_type}' from {yaml_filename} missing from registry.py EVENT_REGISTRY_SPECS"
+        )
+
 
 if __name__ == "__main__":
     # Quick manual run

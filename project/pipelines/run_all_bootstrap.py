@@ -5,7 +5,10 @@ from pathlib import Path
 from typing import Any, Callable
 
 from project import PROJECT_ROOT
-from project.pipelines.effective_config import build_effective_config_payload, write_effective_config
+from project.pipelines.effective_config import (
+    build_effective_config_payload,
+    write_effective_config,
+)
 from project.pipelines.pipeline_defaults import utc_now_iso
 from project.pipelines.pipeline_planning import collect_startup_non_production_overrides
 from project.pipelines.pipeline_provenance import (

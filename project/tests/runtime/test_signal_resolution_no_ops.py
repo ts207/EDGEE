@@ -3,6 +3,7 @@ Tests that confirm the explicit no-op semantics of oos_validation_pass
 and that the legacy name raises an error so production blueprints cannot
 silently rely on a phantom safety surface.
 """
+
 import pandas as pd
 import pytest
 from unittest.mock import MagicMock
@@ -24,6 +25,7 @@ def test_oos_validation_pass_raises_unknown_signal():
     Production blueprints referencing it should fail at evaluation time.
     """
     from project.strategy.runtime.dsl_runtime.signal_resolution import signal_mask
+
     frame = _make_frame()
     bp = _make_blueprint()
     with pytest.raises(ValueError, match="unknown trigger signals"):
@@ -35,6 +37,7 @@ def test_event_detected_raises_unknown_signal():
     must not silently bypass event detection via this phantom signal.
     """
     from project.strategy.runtime.dsl_runtime.signal_resolution import signal_mask
+
     frame = _make_frame()
     bp = _make_blueprint()
     with pytest.raises(ValueError, match="unknown trigger signals"):

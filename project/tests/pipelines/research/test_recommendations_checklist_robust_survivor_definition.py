@@ -6,6 +6,7 @@ import pandas as pd
 
 import project.pipelines.research.generate_recommendations_checklist as checklist
 
+
 class _Args:
     min_edge_candidates = 1
     min_promoted_candidates = 1
@@ -19,11 +20,17 @@ class _Args:
     require_stability_pass = 1
     require_capacity_pass = 1
 
+
 def test_checklist_uses_survivor_definition_note():
     payload = checklist._build_payload(
         run_id="r1",
         args=_Args(),
-        edge_metrics={"rows": 1, "promoted": 1, "bridge_tradable": 1, "bridge_tradable_promoted": 1},
+        edge_metrics={
+            "rows": 1,
+            "promoted": 1,
+            "bridge_tradable": 1,
+            "bridge_tradable_promoted": 1,
+        },
         expectancy_payload={"expectancy_exists": True, "expectancy_evidence": [{"x": 1}]},
         robustness_payload={
             "survivor_definition": "promotion_grade_v1",
@@ -38,6 +45,7 @@ def test_checklist_uses_survivor_definition_note():
     assert gate["passed"] is True
     assert gate["note"] == "definition=promotion_grade_v1"
     assert payload["metrics"]["robust_survivor_count"] == 1
+
 
 def test_checklist_discovery_profile_relaxes_ops_gates():
     args = SimpleNamespace(
@@ -58,11 +66,17 @@ def test_checklist_discovery_profile_relaxes_ops_gates():
     assert out.require_stability_pass == 0
     assert out.require_capacity_pass == 0
 
+
 def test_checklist_capacity_profile_gates_capital_footprint_counts():
     payload = checklist._build_payload(
         run_id="r2",
         args=_Args(),
-        edge_metrics={"rows": 2, "promoted": 2, "bridge_tradable": 2, "bridge_tradable_promoted": 2},
+        edge_metrics={
+            "rows": 2,
+            "promoted": 2,
+            "bridge_tradable": 2,
+            "bridge_tradable_promoted": 2,
+        },
         expectancy_payload={"expectancy_exists": True, "expectancy_evidence": [{"x": 1}]},
         robustness_payload={
             "survivor_definition": "promotion_grade_v1",
@@ -76,9 +90,12 @@ def test_checklist_capacity_profile_gates_capital_footprint_counts():
         },
         paths={},
     )
-    gate = next(g for g in payload["gates"] if g["name"] == "capital_slot_pressure_over_limit_count")
+    gate = next(
+        g for g in payload["gates"] if g["name"] == "capital_slot_pressure_over_limit_count"
+    )
     assert gate["passed"] is False
     assert payload["decision"] == "KEEP_RESEARCH"
+
 
 def test_release_signoff_blocks_on_kpi_and_override_failures():
     signoff = checklist._build_release_signoff(
@@ -115,6 +132,7 @@ def test_release_signoff_blocks_on_kpi_and_override_failures():
     assert "kpi_trade_count" in failed
     assert "override_audit_clean" in failed
 
+
 def test_release_signoff_approves_when_gates_pass_and_no_overrides():
     signoff = checklist._build_release_signoff(
         run_id="r4",
@@ -146,6 +164,7 @@ def test_release_signoff_approves_when_gates_pass_and_no_overrides():
     assert signoff["decision"] == "APPROVE_RELEASE"
     assert signoff["failure_reasons"] == []
 
+
 def test_edge_metrics_uses_edge_candidates_parquet_first(tmp_path):
     edge_dir = tmp_path / "reports" / "edge_candidates" / "r5"
     edge_dir.mkdir(parents=True, exist_ok=True)
@@ -161,9 +180,17 @@ def test_edge_metrics_uses_edge_candidates_parquet_first(tmp_path):
         edge_parquet_path=edge_dir / "edge_candidates_normalized.parquet",
         edge_csv_path=edge_dir / "edge_candidates_normalized.csv",
         edge_json_path=edge_dir / "edge_candidates_normalized.json",
-        promotion_audit_parquet_path=tmp_path / "reports" / "promotions" / "r5" / "promotion_audit.parquet",
+        promotion_audit_parquet_path=tmp_path
+        / "reports"
+        / "promotions"
+        / "r5"
+        / "promotion_audit.parquet",
         promotion_audit_csv_path=tmp_path / "reports" / "promotions" / "r5" / "promotion_audit.csv",
-        promotion_summary_path=tmp_path / "reports" / "promotions" / "r5" / "promotion_summary.json",
+        promotion_summary_path=tmp_path
+        / "reports"
+        / "promotions"
+        / "r5"
+        / "promotion_summary.json",
     )
 
     assert metrics["source"] == "edge_candidates_parquet"
@@ -171,6 +198,7 @@ def test_edge_metrics_uses_edge_candidates_parquet_first(tmp_path):
     assert metrics["promoted"] == 2
     assert metrics["bridge_tradable"] == 2
     assert metrics["bridge_tradable_promoted"] == 1
+
 
 def test_edge_metrics_falls_back_to_promotion_audit_when_edge_export_missing(tmp_path):
     promo_dir = tmp_path / "reports" / "promotions" / "r6"
@@ -184,9 +212,21 @@ def test_edge_metrics_falls_back_to_promotion_audit_when_edge_export_missing(tmp
     ).to_parquet(promo_dir / "promotion_audit.parquet", index=False)
 
     metrics = checklist._edge_candidate_metrics(
-        edge_parquet_path=tmp_path / "reports" / "edge_candidates" / "r6" / "edge_candidates_normalized.parquet",
-        edge_csv_path=tmp_path / "reports" / "edge_candidates" / "r6" / "edge_candidates_normalized.csv",
-        edge_json_path=tmp_path / "reports" / "edge_candidates" / "r6" / "edge_candidates_normalized.json",
+        edge_parquet_path=tmp_path
+        / "reports"
+        / "edge_candidates"
+        / "r6"
+        / "edge_candidates_normalized.parquet",
+        edge_csv_path=tmp_path
+        / "reports"
+        / "edge_candidates"
+        / "r6"
+        / "edge_candidates_normalized.csv",
+        edge_json_path=tmp_path
+        / "reports"
+        / "edge_candidates"
+        / "r6"
+        / "edge_candidates_normalized.json",
         promotion_audit_parquet_path=promo_dir / "promotion_audit.parquet",
         promotion_audit_csv_path=promo_dir / "promotion_audit.csv",
         promotion_summary_path=promo_dir / "promotion_summary.json",
@@ -197,6 +237,7 @@ def test_edge_metrics_falls_back_to_promotion_audit_when_edge_export_missing(tmp
     assert metrics["promoted"] == 2
     assert metrics["bridge_tradable"] == 2
     assert metrics["bridge_tradable_promoted"] == 1
+
 
 def test_kpi_payload_hydrates_from_promotion_audit_when_missing(tmp_path):
     promo_dir = tmp_path / "reports" / "promotions" / "r7"

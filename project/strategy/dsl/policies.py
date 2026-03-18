@@ -104,6 +104,7 @@ EVENT_POLICIES: Dict[str, Dict[str, object]] = {
     },
 }
 
+
 def event_policy(event_type: str) -> Dict[str, object]:
     raw = str(event_type).strip()
     if not raw:
@@ -124,6 +125,7 @@ def event_policy(event_type: str) -> Dict[str, object]:
         "triggers": [str(spec.signal_column)],
     }
 
+
 def overlay_defaults(names: List[str], robustness_score: float) -> List[dict]:
     overlays = []
     for name in names:
@@ -137,7 +139,7 @@ def overlay_defaults(names: List[str], robustness_score: float) -> List[dict]:
             overlays.append({"name": name, "params": {"max_abs_funding_bps": 12.0}})
         elif name == "cross_venue_guard":
             overlays.append({"name": name, "params": {"max_desync_bps": 12.0}})
-    
+
     # Hierarchical risk throttling
     if robustness_score < 0.5:
         overlays.append({"name": "risk_throttle", "params": {"size_scale": 0.0}})
@@ -147,5 +149,5 @@ def overlay_defaults(names: List[str], robustness_score: float) -> List[dict]:
         overlays.append({"name": "risk_throttle", "params": {"size_scale": 0.5}})
     elif robustness_score < 0.85:
         overlays.append({"name": "risk_throttle", "params": {"size_scale": 0.75}})
-        
+
     return overlays

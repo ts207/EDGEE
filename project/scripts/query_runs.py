@@ -7,6 +7,7 @@ _SCRIPTS_DIR = Path(__file__).resolve().parent
 
 from project.scripts.build_run_registry import query_top_promoted, DATA_ROOT
 
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Query the run registry SQLite database")
     parser.add_argument(
@@ -50,6 +51,7 @@ def main() -> int:
         conn.close()
 
     return 0
+
 
 if __name__ == "__main__":
     sys.exit(main())

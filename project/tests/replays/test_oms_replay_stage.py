@@ -6,6 +6,7 @@ import sys
 
 import pandas as pd
 
+
 def test_run_oms_replay_stage_emits_report(monkeypatch, tmp_path):
     run_id = "oms_replay_stage_run"
     data_root = tmp_path / "data"
@@ -60,6 +61,7 @@ def test_run_oms_replay_stage_emits_report(monkeypatch, tmp_path):
     assert payload["status"] == "pass"
     assert int(payload["violation_count"]) == 0
     assert str(payload["replay_digest"]).startswith("blake2b_256:")
+
 
 def test_run_oms_replay_stage_fail_on_violations(monkeypatch, tmp_path):
     run_id = "oms_replay_stage_fail"

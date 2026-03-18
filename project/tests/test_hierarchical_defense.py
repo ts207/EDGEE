@@ -5,6 +5,7 @@ from typing import Any, Dict
 
 from project.research.promotion.core import evaluate_row
 
+
 class MockContract:
     def __init__(self):
         self.min_net_expectancy_bps = 5.0
@@ -13,12 +14,13 @@ class MockContract:
         self.require_retail_viability = True
         self.require_low_capital_contract = False
 
+
 def test_hierarchical_defense_success():
     row = {
         "event_type": "VOL_SPIKE",
         "n_events": 100,
         "q_value": 0.01,
-        "expectancy": 0.0020, # 20 bps
+        "expectancy": 0.0020,  # 20 bps
         "std_return": 0.01,
         "gate_stability": True,
         "gate_delay_robustness": True,
@@ -26,7 +28,7 @@ def test_hierarchical_defense_success():
         "gate_after_cost_stressed_positive": True,
         "gate_bridge_microstructure": True,
         "bridge_validation_after_cost_bps": 20.0,
-        "baseline_expectancy_bps": 5.0, # Candidate is 20 bps, beats 5*1.1
+        "baseline_expectancy_bps": 5.0,  # Candidate is 20 bps, beats 5*1.1
         "pass_shift_placebo": True,
         "pass_random_entry_placebo": True,
         "pass_direction_reversal_placebo": True,
@@ -42,7 +44,7 @@ def test_hierarchical_defense_success():
         "expectancy_bps_15m": 20.0,
         "net_expectancy_bps": 20.0,
     }
-    
+
     result = evaluate_row(
         row=row,
         hypothesis_index={},
@@ -63,14 +65,15 @@ def test_hierarchical_defense_success():
     assert result["gate_promo_baseline_beats_complexity"] is True
     assert result["gate_promo_placebo_controls"] is True
 
+
 def test_hierarchical_defense_baseline_fail():
     row = {
         "event_type": "VOL_SPIKE",
         "n_events": 100,
         "q_value": 0.01,
-        "expectancy": 0.0006, # 6 bps
+        "expectancy": 0.0006,  # 6 bps
         "bridge_validation_after_cost_bps": 6.0,
-        "baseline_expectancy_bps": 10.0, # Candidate is 6 bps, fails to beat 10*1.1
+        "baseline_expectancy_bps": 10.0,  # Candidate is 6 bps, fails to beat 10*1.1
         "pass_shift_placebo": True,
         "pass_random_entry_placebo": True,
         "pass_direction_reversal_placebo": True,
@@ -80,7 +83,7 @@ def test_hierarchical_defense_baseline_fail():
         "gate_delayed_entry_stress": True,
         "tob_coverage": 0.95,
     }
-    
+
     result = evaluate_row(
         row=row,
         hypothesis_index={},
@@ -95,10 +98,11 @@ def test_hierarchical_defense_baseline_fail():
         require_hypothesis_audit=False,
         allow_missing_negative_controls=True,
     )
-    
+
     print(f"DEBUG FAIL: result = {result}")
     assert result["promotion_decision"] == "rejected"
     assert "failed_baseline_comparison" in result["reject_reason"]
+
 
 if __name__ == "__main__":
     test_hierarchical_defense_success()

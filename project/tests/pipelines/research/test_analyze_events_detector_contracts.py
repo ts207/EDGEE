@@ -7,7 +7,9 @@ import pandas as pd
 from project.pipelines.research import analyze_events
 
 
-def test_analyze_events_uses_registry_event_stream_for_sequence_detectors(monkeypatch, tmp_path) -> None:
+def test_analyze_events_uses_registry_event_stream_for_sequence_detectors(
+    monkeypatch, tmp_path
+) -> None:
     load_calls: dict[str, int] = {"registry": 0, "features": 0}
 
     def _registry_events(*args, **kwargs):
@@ -93,7 +95,9 @@ def test_analyze_events_runs_analyzers_per_symbol_market(monkeypatch, tmp_path) 
     monkeypatch.setattr(analyze_events, "load_all_detectors", lambda: None)
     monkeypatch.setattr(analyze_events, "get_detector", lambda event_type: FakeDetector())
     monkeypatch.setattr(analyze_events, "load_features", _load_features)
-    monkeypatch.setattr(analyze_events, "merge_event_csv", lambda out_path, event_type, new_df: new_df.copy())
+    monkeypatch.setattr(
+        analyze_events, "merge_event_csv", lambda out_path, event_type, new_df: new_df.copy()
+    )
     monkeypatch.setattr(analyze_events, "run_analyzer_suite", _run_analyzers)
     monkeypatch.setattr(analyze_events, "get_data_root", lambda: tmp_path)
     monkeypatch.setattr(analyze_events, "start_manifest", lambda *args, **kwargs: {})

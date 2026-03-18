@@ -88,7 +88,9 @@ def _evaluate_continuation_quality(
         )
         if not continuation_quality_pass:
             if not stability_pass:
-                reasons.add_reject("continuation_quality_stability", category="continuation_quality")
+                reasons.add_reject(
+                    "continuation_quality_stability", category="continuation_quality"
+                )
             if not oos_pass:
                 reasons.add_reject(
                     "continuation_quality_oos_validation", category="continuation_quality"
@@ -333,7 +335,9 @@ def _evaluate_control_audit_and_dsr(
     q_value_by = _quiet_float(row.get("q_value_by"), np.nan)
     q_value_cluster = _quiet_float(row.get("q_value_cluster"), np.nan)
     multiplicity_diag_available = bool(np.isfinite(q_value_by) and np.isfinite(q_value_cluster))
-    multiplicity_diag_pass = bool((not require_multiplicity_diagnostics) or multiplicity_diag_available)
+    multiplicity_diag_pass = bool(
+        (not require_multiplicity_diagnostics) or multiplicity_diag_available
+    )
     if not multiplicity_diag_pass:
         reasons.add_pair(
             reject_reason="multiplicity_diagnostics_missing",
@@ -533,7 +537,9 @@ def _evaluate_deploy_oos_and_low_capital(
             reasons.add_promo_fail("gate_promo_oos_validation", category="oos_validation")
 
     low_capital_viability_pass = bool_gate(row.get("gate_bridge_low_capital_viability"))
-    low_capital_viability_score = _quiet_float(row.get("low_capital_viability_score", np.nan), np.nan)
+    low_capital_viability_score = _quiet_float(
+        row.get("low_capital_viability_score", np.nan), np.nan
+    )
     low_capital_reject_codes = [
         token.strip()
         for token in str(row.get("low_capital_reject_reason_codes", "")).split(",")
@@ -543,9 +549,7 @@ def _evaluate_deploy_oos_and_low_capital(
         reasons.add_reject("low_capital_viability", category="low_capital_viability")
         for code in low_capital_reject_codes:
             reasons.add_reject(code.lower(), category="low_capital_viability")
-        reasons.add_promo_fail(
-            "gate_promo_low_capital_viability", category="low_capital_viability"
-        )
+        reasons.add_promo_fail("gate_promo_low_capital_viability", category="low_capital_viability")
 
     return {
         "run_mode_normalized": str(row.get("run_mode", "")).strip().lower(),

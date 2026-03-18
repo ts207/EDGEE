@@ -3,10 +3,12 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 from project.core.constants import BARS_PER_YEAR_BY_TIMEFRAME
+
 try:
     from scipy import stats
 except ModuleNotFoundError:  # pragma: no cover - environment-specific fallback
     from project.core.stats import stats
+
 
 def probabilistic_sharpe_ratio(
     pnl: pd.Series,
@@ -30,12 +32,13 @@ def probabilistic_sharpe_ratio(
     skew = float(stats.skew(pnl_arr))
     kurt = float(stats.kurtosis(pnl_arr, fisher=True))  # excess kurtosis
     # Standard error of SR (Lo 2002 adjusted for non-normality)
-    radicand = (1.0 + 0.5 * sr ** 2 - skew * sr + ((kurt + 3.0) / 4.0) * sr ** 2) / (n - 1)
+    radicand = (1.0 + 0.5 * sr**2 - skew * sr + ((kurt + 3.0) / 4.0) * sr**2) / (n - 1)
     se = np.sqrt(max(0.0, radicand))
     if se <= 0.0:
         return 1.0 if sr > benchmark_sr else 0.0
     z = (sr - benchmark_sr) / se
     return float(stats.norm.cdf(z))
+
 
 def deflated_sharpe_ratio(
     pnl: pd.Series,
@@ -58,11 +61,17 @@ def deflated_sharpe_ratio(
     # Expected maximum of n_trials standard normal draws (Euler–Mascheroni approximation)
     euler_mascheroni = 0.5772156649
     expected_max = (
-        (1.0 - euler_mascheroni) * stats.norm.ppf(1.0 - 1.0 / n_trials)
-        + euler_mascheroni * stats.norm.ppf(1.0 - 1.0 / (n_trials * np.e))
-    ) if n_trials > 1 else 0.0
+        (
+            (1.0 - euler_mascheroni) * stats.norm.ppf(1.0 - 1.0 / n_trials)
+            + euler_mascheroni * stats.norm.ppf(1.0 - 1.0 / (n_trials * np.e))
+        )
+        if n_trials > 1
+        else 0.0
+    )
     # Std of the raw SR estimator across trials: 1/sqrt(n)
     sr_std = 1.0 / np.sqrt(n)
     # Deflated benchmark SR in raw units
     deflated_benchmark = max(benchmark_sr, expected_max * sr_std)
-    return probabilistic_sharpe_ratio(pnl, benchmark_sr=deflated_benchmark, periods_per_year=periods_per_year)
+    return probabilistic_sharpe_ratio(
+        pnl, benchmark_sr=deflated_benchmark, periods_per_year=periods_per_year
+    )

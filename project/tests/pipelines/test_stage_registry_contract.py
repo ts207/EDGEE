@@ -6,13 +6,16 @@ import pytest
 from project import PROJECT_ROOT
 from project.pipelines import stage_registry
 
+
 def test_stage_registry_definitions_valid():
     issues = stage_registry.validate_stage_registry_definitions(PROJECT_ROOT)
     assert issues == []
 
+
 def test_stage_artifact_registry_definitions_valid():
     issues = stage_registry.validate_stage_artifact_registry_definitions()
     assert issues == []
+
 
 def test_stage_plan_contract_validation():
     # Valid plan
@@ -66,6 +69,7 @@ def test_stage_plan_contract_validation():
     issues = stage_registry.validate_stage_plan_contract(stages, PROJECT_ROOT)
     assert issues == []
 
+
 def test_stage_registry_reports_unknown_stage():
     issues = stage_registry.validate_stage_plan_contract(
         [
@@ -79,6 +83,7 @@ def test_stage_registry_reports_unknown_stage():
     )
     assert any("unknown stage family" in issue for issue in issues)
 
+
 def test_stage_registry_reports_script_mismatch():
     issues = stage_registry.validate_stage_plan_contract(
         [
@@ -91,6 +96,7 @@ def test_stage_registry_reports_script_mismatch():
         PROJECT_ROOT,
     )
     assert any("violated allowed patterns" in issue for issue in issues)
+
 
 def test_stage_dataflow_dag_valid():
     stages = [
@@ -112,6 +118,8 @@ def test_stage_dataflow_dag_valid():
     ]
     issues = stage_registry.validate_stage_dataflow_dag(stages)
     assert issues == []
+
+
 def test_stage_dataflow_dag_missing_input():
     stages = [
         (
@@ -123,12 +131,14 @@ def test_stage_dataflow_dag_missing_input():
     issues = stage_registry.validate_stage_dataflow_dag(stages)
     assert any("requires input artifact 'runtime.normalized_stream'" in issue for issue in issues)
 
+
 def test_stage_dataflow_dag_cycle():
     # This is hard to trigger with real stages without modifying the registry,
     # but we can mock the resolution if needed.
     # For now, let's just test that it handles an empty dag correctly.
     issues = stage_registry.validate_stage_dataflow_dag([])
     assert isinstance(issues, list)
+
 
 def test_stage_dataflow_dag_duplicate_producer():
     stages = [

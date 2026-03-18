@@ -9,6 +9,7 @@ from project.pipelines.research.bridge_evaluate_phase2 import (
 )
 from project.research.bridge_evaluation import bridge_metrics_for_row
 
+
 def test_bridge_summary_count_fields_include_canonical_and_extended_detectors():
     out = _bridge_summary_count_fields(
         n_candidates_in=12,
@@ -21,13 +22,12 @@ def test_bridge_summary_count_fields_include_canonical_and_extended_detectors():
     assert out["n_candidates_tradable"] == 3
     assert out["n_candidates_tradable_without_microstructure"] == 5
     assert out["microstructure_delta_tradable"] == 2
-    assert out["top_5_bridge_fail_reasons"] == {
-        "gate_bridge_after_cost_positive_validation": 9
-    }
+    assert out["top_5_bridge_fail_reasons"] == {"gate_bridge_after_cost_positive_validation": 9}
 
     # Backward-compatible aliases are kept in sync.
     assert out["candidate_count"] == out["n_candidates_in"]
     assert out["tradable_count"] == out["n_candidates_tradable"]
+
 
 def test_bridge_summary_count_fields_empty_case_is_zero_safe():
     out = _bridge_summary_count_fields(
@@ -90,9 +90,7 @@ def test_build_bridge_summary_payload_includes_primary_fail_and_cost_diagnostics
     assert out["median_bridge_validation_after_cost_bps"] == -0.5
     assert out["median_bridge_effective_cost_bps_per_trade"] == 0.5
     assert out["uniform_negative_expectancy_count"] == 2
-    assert out["primary_fail_gate_counts"] == {
-        "gate_bridge_after_cost_positive_validation": 2
-    }
+    assert out["primary_fail_gate_counts"] == {"gate_bridge_after_cost_positive_validation": 2}
 
 
 def test_bridge_metrics_for_row_skips_missing_optional_value_warning_spam(caplog):

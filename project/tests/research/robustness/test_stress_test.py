@@ -64,12 +64,14 @@ def test_high_vol_scenario_detected():
 
 
 def test_missing_feature_column_marks_invalid():
-    df = pd.DataFrame({
-        "timestamp": pd.date_range("2023-01-01", periods=50, freq="5min"),
-        "close": 100.0,
-        "event_vol_shock": [i % 5 == 0 for i in range(50)],
-        # Intentionally omit all stress feature columns
-    })
+    df = pd.DataFrame(
+        {
+            "timestamp": pd.date_range("2023-01-01", periods=50, freq="5min"),
+            "close": 100.0,
+            "event_vol_shock": [i % 5 == 0 for i in range(50)],
+            # Intentionally omit all stress feature columns
+        }
+    )
     spec = HypothesisSpec(
         trigger=TriggerSpec.event("VOL_SHOCK"),
         direction="long",

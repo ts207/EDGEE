@@ -12,10 +12,12 @@ def _make_predictive_event(n_bars: int = 1000, horizon_bars: int = 12) -> pd.Dat
     """
     np.random.seed(42)
     close = 100.0 + np.cumsum(np.random.normal(0, 0.1, n_bars + horizon_bars))
-    df = pd.DataFrame({
-        "timestamp": pd.date_range("2023-01-01", periods=n_bars, freq="5min"),
-        "close": close[:n_bars],
-    })
+    df = pd.DataFrame(
+        {
+            "timestamp": pd.date_range("2023-01-01", periods=n_bars, freq="5min"),
+            "close": close[:n_bars],
+        }
+    )
     # forward return
     fwd = np.log(close[horizon_bars : n_bars + horizon_bars]) - np.log(close[:n_bars])
     # event_good: fires on top quartile of forward returns (circular: use fwd > median)

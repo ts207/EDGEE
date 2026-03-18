@@ -14,7 +14,9 @@ from project.scripts.generate_synthetic_crypto_regimes import (
 
 
 def test_profiles_are_exposed_and_manifested():
-    assert {"default", "2021_bull", "range_chop", "stress_crash", "alt_rotation"}.issubset(PROFILE_SETTINGS)
+    assert {"default", "2021_bull", "range_chop", "stress_crash", "alt_rotation"}.issubset(
+        PROFILE_SETTINGS
+    )
 
     payload = generate_symbol_frames(
         symbol="BTCUSDT",
@@ -29,7 +31,9 @@ def test_profiles_are_exposed_and_manifested():
 
 
 def test_profile_changes_schedule_density():
-    index = pd.date_range(start="2026-01-01", end="2026-04-01", freq="5min", tz="UTC", inclusive="left")
+    index = pd.date_range(
+        start="2026-01-01", end="2026-04-01", freq="5min", tz="UTC", inclusive="left"
+    )
     stress = build_regime_schedule("BTCUSDT", index, volatility_profile="stress_crash")
     default = build_regime_schedule("BTCUSDT", index, volatility_profile="default")
 

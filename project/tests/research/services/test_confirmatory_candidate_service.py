@@ -103,8 +103,20 @@ def test_plan_confirmatory_window_reports_missing_forward_month(tmp_path):
     data_root = tmp_path / "data"
     (data_root / "runs" / "origin_run").mkdir(parents=True, exist_ok=True)
     (data_root / "runs" / "older_run").mkdir(parents=True, exist_ok=True)
-    (data_root / "reports" / "phase2" / "older_run" / "search_engine").mkdir(parents=True, exist_ok=True)
-    (data_root / "lake" / "raw" / "binance" / "perp" / "BTCUSDT" / "funding" / "year=2025" / "month=01").mkdir(parents=True, exist_ok=True)
+    (data_root / "reports" / "phase2" / "older_run" / "search_engine").mkdir(
+        parents=True, exist_ok=True
+    )
+    (
+        data_root
+        / "lake"
+        / "raw"
+        / "binance"
+        / "perp"
+        / "BTCUSDT"
+        / "funding"
+        / "year=2025"
+        / "month=01"
+    ).mkdir(parents=True, exist_ok=True)
 
     (data_root / "runs" / "origin_run" / "run_manifest.json").write_text(
         json.dumps(
@@ -129,7 +141,12 @@ def test_plan_confirmatory_window_reports_missing_forward_month(tmp_path):
         encoding="utf-8",
     )
     pd.DataFrame([{"candidate_id": "x"}]).to_parquet(
-        data_root / "reports" / "phase2" / "older_run" / "search_engine" / "phase2_candidates.parquet",
+        data_root
+        / "reports"
+        / "phase2"
+        / "older_run"
+        / "search_engine"
+        / "phase2_candidates.parquet",
         index=False,
     )
 
@@ -234,7 +251,17 @@ def test_adjacent_survivorship_classifies_fail_reasons(tmp_path):
 def test_build_confirmatory_workflow_payload_blocks_when_forward_data_missing(tmp_path):
     data_root = tmp_path / "data"
     (data_root / "runs" / "origin_run").mkdir(parents=True, exist_ok=True)
-    (data_root / "lake" / "raw" / "binance" / "perp" / "BTCUSDT" / "funding" / "year=2025" / "month=01").mkdir(parents=True, exist_ok=True)
+    (
+        data_root
+        / "lake"
+        / "raw"
+        / "binance"
+        / "perp"
+        / "BTCUSDT"
+        / "funding"
+        / "year=2025"
+        / "month=01"
+    ).mkdir(parents=True, exist_ok=True)
     (data_root / "runs" / "origin_run" / "run_manifest.json").write_text(
         json.dumps(
             {
@@ -275,8 +302,28 @@ def test_build_confirmatory_workflow_payload_recommends_promotion_review_for_str
         ),
         encoding="utf-8",
     )
-    (data_root / "lake" / "raw" / "binance" / "perp" / "BTCUSDT" / "funding" / "year=2025" / "month=01").mkdir(parents=True, exist_ok=True)
-    (data_root / "lake" / "raw" / "binance" / "perp" / "BTCUSDT" / "funding" / "year=2025" / "month=02").mkdir(parents=True, exist_ok=True)
+    (
+        data_root
+        / "lake"
+        / "raw"
+        / "binance"
+        / "perp"
+        / "BTCUSDT"
+        / "funding"
+        / "year=2025"
+        / "month=01"
+    ).mkdir(parents=True, exist_ok=True)
+    (
+        data_root
+        / "lake"
+        / "raw"
+        / "binance"
+        / "perp"
+        / "BTCUSDT"
+        / "funding"
+        / "year=2025"
+        / "month=02"
+    ).mkdir(parents=True, exist_ok=True)
 
     pd.DataFrame(
         [

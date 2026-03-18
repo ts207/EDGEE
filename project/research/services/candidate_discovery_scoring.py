@@ -38,7 +38,11 @@ def split_and_score_candidates(
 
     working = events_df.copy()
     resolved_split_scheme_id, train_frac, validation_frac = resolve_split_scheme(split_scheme_id)
-    time_col = "enter_ts" if "enter_ts" in working.columns else ("timestamp" if "timestamp" in working.columns else None)
+    time_col = (
+        "enter_ts"
+        if "enter_ts" in working.columns
+        else ("timestamp" if "timestamp" in working.columns else None)
+    )
     if time_col is None:
         out = candidates.copy()
         out["p_value"] = np.nan
@@ -54,8 +58,8 @@ def split_and_score_candidates(
         return out
 
     split_plan_id = (
-        f"TVT_{int(round(train_frac*100))}_{int(round(validation_frac*100))}_"
-        f"{100-int(round((train_frac+validation_frac)*100))}"
+        f"TVT_{int(round(train_frac * 100))}_{int(round(validation_frac * 100))}_"
+        f"{100 - int(round((train_frac + validation_frac) * 100))}"
     )
     current_split_plan_id = (
         str(working.get("split_plan_id", pd.Series(dtype=object)).astype(str).iloc[0])
@@ -81,7 +85,9 @@ def split_and_score_candidates(
     out = candidates.copy()
     out["split_scheme_id"] = str(resolved_split_scheme_id)
     out["split_plan_id"] = (
-        str(working["split_plan_id"].iloc[0]) if "split_plan_id" in working.columns and not working.empty else ""
+        str(working["split_plan_id"].iloc[0])
+        if "split_plan_id" in working.columns and not working.empty
+        else ""
     )
     out["purge_bars_used"] = int(purge_bars)
     out["embargo_bars_used"] = int(embargo_bars)
@@ -108,7 +114,9 @@ def split_and_score_candidates(
         out["cost_regime_multiplier"] = 1.0
 
     for idx, row in out.iterrows():
-        row_horizon_bars = int(pd.to_numeric(row.get("horizon_bars", horizon_bars), errors="coerce") or horizon_bars)
+        row_horizon_bars = int(
+            pd.to_numeric(row.get("horizon_bars", horizon_bars), errors="coerce") or horizon_bars
+        )
         row_horizon = str(row.get("horizon", discovery.bars_to_timeframe(row_horizon_bars)))
         return_frame = build_event_return_frame_fn(
             working,
@@ -121,8 +129,12 @@ def split_and_score_candidates(
             horizon_bars_override=row_horizon_bars,
             stop_loss_bps=pd.to_numeric(row.get("stop_loss_bps"), errors="coerce"),
             take_profit_bps=pd.to_numeric(row.get("take_profit_bps"), errors="coerce"),
-            stop_loss_atr_multipliers=pd.to_numeric(row.get("stop_loss_atr_multipliers"), errors="coerce"),
-            take_profit_atr_multipliers=pd.to_numeric(row.get("take_profit_atr_multipliers"), errors="coerce"),
+            stop_loss_atr_multipliers=pd.to_numeric(
+                row.get("stop_loss_atr_multipliers"), errors="coerce"
+            ),
+            take_profit_atr_multipliers=pd.to_numeric(
+                row.get("take_profit_atr_multipliers"), errors="coerce"
+            ),
             cost_bps=float(cost_estimate.cost_bps) if cost_estimate is not None else 0.0,
             direction_override=pd.to_numeric(row.get("direction"), errors="coerce"),
         )
@@ -137,12 +149,12 @@ def split_and_score_candidates(
                 evaluation_mask = split_labels != "train"
             if not bool(evaluation_mask.any()):
                 evaluation_mask = pd.Series(True, index=return_frame.index)
-            eval_frame = return_frame.loc[evaluation_mask, ["forward_return", "cluster_day"]].dropna(
-                subset=["forward_return"]
-            )
-            train_frame = return_frame.loc[split_labels == "train", ["forward_return", "cluster_day"]].dropna(
-                subset=["forward_return"]
-            )
+            eval_frame = return_frame.loc[
+                evaluation_mask, ["forward_return", "cluster_day"]
+            ].dropna(subset=["forward_return"])
+            train_frame = return_frame.loc[
+                split_labels == "train", ["forward_return", "cluster_day"]
+            ].dropna(subset=["forward_return"])
         estimate = estimate_effect_from_frame_fn(
             eval_frame,
             value_col="forward_return",
@@ -168,7 +180,9 @@ def split_and_score_candidates(
         out.at[idx, "estimation_method"] = str(estimate.method)
         out.at[idx, "cluster_col"] = str(estimate.cluster_col or "cluster_day")
         out.at[idx, "effect_split_basis"] = (
-            "validation_test" if not eval_frame.empty and bool(split_labels.isin(["validation", "test"]).any()) else "all"
+            "validation_test"
+            if not eval_frame.empty and bool(split_labels.isin(["validation", "test"]).any())
+            else "all"
         )
         out.at[idx, "validation_n_obs"] = int((split_labels == "validation").sum())
         out.at[idx, "test_n_obs"] = int((split_labels == "test").sum())
@@ -177,10 +191,14 @@ def split_and_score_candidates(
             float(train_frame["forward_return"].mean()) if not train_frame.empty else 0.0
         )
         out.at[idx, "expectancy_bps"] = float(out.at[idx, "expectancy"] * 1e4)
-        out.at[idx, "t_stat"] = float(
-            eval_frame["forward_return"].mean()
-            / (eval_frame["forward_return"].std(ddof=1) / np.sqrt(len(eval_frame)))
-        ) if len(eval_frame) > 1 and float(eval_frame["forward_return"].std(ddof=1) or 0.0) > 0.0 else 0.0
+        out.at[idx, "t_stat"] = (
+            float(
+                eval_frame["forward_return"].mean()
+                / (eval_frame["forward_return"].std(ddof=1) / np.sqrt(len(eval_frame)))
+            )
+            if len(eval_frame) > 1 and float(eval_frame["forward_return"].std(ddof=1) or 0.0) > 0.0
+            else 0.0
+        )
     return out
 
 
@@ -195,10 +213,18 @@ def apply_validation_multiple_testing(candidates_df: pd.DataFrame) -> pd.DataFra
         out_col="correction_family_id",
     )
     out = apply_multiple_testing(
-        out, p_col="p_value_raw", family_col="correction_family_id", method="bh", out_col="p_value_adj"
+        out,
+        p_col="p_value_raw",
+        family_col="correction_family_id",
+        method="bh",
+        out_col="p_value_adj",
     )
     out = apply_multiple_testing(
-        out, p_col="p_value_raw", family_col="correction_family_id", method="by", out_col="p_value_adj_by"
+        out,
+        p_col="p_value_raw",
+        family_col="correction_family_id",
+        method="by",
+        out_col="p_value_adj_by",
     )
     out = apply_multiple_testing(
         out,

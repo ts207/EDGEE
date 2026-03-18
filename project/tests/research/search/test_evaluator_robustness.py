@@ -12,7 +12,7 @@ def _make_diverse_features(n_bars: int = 1000) -> pd.DataFrame:
     close = 100.0 + np.cumsum(np.random.normal(0.0001, 0.01, n_bars))
     df = pd.DataFrame({"timestamp": dates, "close": close})
     df["event_test"] = [i % 10 == 0 for i in range(n_bars)]
-    
+
     # Regime columns
     df["state_high_vol_regime"] = [1] * 333 + [0] * 333 + [0] * 334
     df["state_low_vol_regime"] = [0] * 333 + [1] * 333 + [1] * 334
@@ -22,7 +22,7 @@ def _make_diverse_features(n_bars: int = 1000) -> pd.DataFrame:
     df["state_chop_active"] = 0
     df["state_spread_tight"] = 1
     df["state_spread_wide"] = 0
-    
+
     # Stress features
     df["rv_pct_17280"] = np.random.uniform(0.1, 0.95, n_bars)
     df["spread_zscore"] = np.random.normal(0, 1, n_bars)

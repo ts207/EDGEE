@@ -6,27 +6,34 @@ import pandas as pd
 
 import project.pipelines.research.evaluate_naive_entry as evaluate_naive_entry
 
+
 def test_load_phase1_events_uses_registry_spec_paths_and_subtype_filter(monkeypatch, tmp_path):
     monkeypatch.setattr(evaluate_naive_entry, "DATA_ROOT", tmp_path)
 
     run_id = "r_eval"
     events_path = (
-        tmp_path
-        / "reports"
-        / "funding_events"
-        / run_id
-        / "funding_episode_events.parquet"
+        tmp_path / "reports" / "funding_events" / run_id / "funding_episode_events.parquet"
     )
     events_path.parent.mkdir(parents=True, exist_ok=True)
 
     pd.DataFrame(
         [
-            {"event_type": "FUNDING_EXTREME_ONSET", "symbol": "BTCUSDT", "enter_ts": "2026-01-01T00:00:00Z"},
-            {"event_type": "FUNDING_PERSISTENCE_TRIGGER", "symbol": "BTCUSDT", "enter_ts": "2026-01-01T00:05:00Z"},
+            {
+                "event_type": "FUNDING_EXTREME_ONSET",
+                "symbol": "BTCUSDT",
+                "enter_ts": "2026-01-01T00:00:00Z",
+            },
+            {
+                "event_type": "FUNDING_PERSISTENCE_TRIGGER",
+                "symbol": "BTCUSDT",
+                "enter_ts": "2026-01-01T00:05:00Z",
+            },
         ]
     ).to_parquet(events_path, index=False)
 
-    out = evaluate_naive_entry._load_phase1_events(run_id=run_id, event_type="FUNDING_PERSISTENCE_TRIGGER")
+    out = evaluate_naive_entry._load_phase1_events(
+        run_id=run_id, event_type="FUNDING_PERSISTENCE_TRIGGER"
+    )
     assert not out.empty
     assert set(out["event_type"].astype(str).unique()) == {"FUNDING_PERSISTENCE_TRIGGER"}
 
@@ -84,7 +91,11 @@ def test_main_evaluates_bridge_pass_phase2_candidates(monkeypatch, tmp_path):
         captured["status"] = status
         captured["stats"] = stats or {}
 
-    monkeypatch.setattr(evaluate_naive_entry, "start_manifest", lambda *args, **kwargs: {"stage": "evaluate_naive_entry"})
+    monkeypatch.setattr(
+        evaluate_naive_entry,
+        "start_manifest",
+        lambda *args, **kwargs: {"stage": "evaluate_naive_entry"},
+    )
     monkeypatch.setattr(evaluate_naive_entry, "finalize_manifest", fake_finalize)
     monkeypatch.setattr(
         evaluate_naive_entry,
@@ -134,14 +145,37 @@ def test_main_evaluates_bridge_pass_phase2_candidates(monkeypatch, tmp_path):
 def test_build_regime_events_supports_state_and_transition_candidates(monkeypatch):
     features = pd.DataFrame(
         [
-            {"timestamp": "2025-01-01T00:00:00Z", "symbol": "BTCUSDT", "close": 100.0, "chop_regime": 0.0, "bull_trend_regime": 1.0, "bear_trend_regime": 0.0},
-            {"timestamp": "2025-01-01T00:05:00Z", "symbol": "BTCUSDT", "close": 101.0, "chop_regime": 1.0, "bull_trend_regime": 0.0, "bear_trend_regime": 0.0},
-            {"timestamp": "2025-01-01T00:10:00Z", "symbol": "BTCUSDT", "close": 102.0, "chop_regime": 1.0, "bull_trend_regime": 0.0, "bear_trend_regime": 0.0},
+            {
+                "timestamp": "2025-01-01T00:00:00Z",
+                "symbol": "BTCUSDT",
+                "close": 100.0,
+                "chop_regime": 0.0,
+                "bull_trend_regime": 1.0,
+                "bear_trend_regime": 0.0,
+            },
+            {
+                "timestamp": "2025-01-01T00:05:00Z",
+                "symbol": "BTCUSDT",
+                "close": 101.0,
+                "chop_regime": 1.0,
+                "bull_trend_regime": 0.0,
+                "bear_trend_regime": 0.0,
+            },
+            {
+                "timestamp": "2025-01-01T00:10:00Z",
+                "symbol": "BTCUSDT",
+                "close": 102.0,
+                "chop_regime": 1.0,
+                "bull_trend_regime": 0.0,
+                "bear_trend_regime": 0.0,
+            },
         ]
     )
     features["timestamp"] = pd.to_datetime(features["timestamp"], utc=True)
 
-    monkeypatch.setattr(evaluate_naive_entry, "load_features", lambda *args, **kwargs: features.copy())
+    monkeypatch.setattr(
+        evaluate_naive_entry, "load_features", lambda *args, **kwargs: features.copy()
+    )
 
     state_events = evaluate_naive_entry._build_regime_events(
         run_id="r1",
@@ -158,7 +192,9 @@ def test_build_regime_events_supports_state_and_transition_candidates(monkeypatc
 
     assert len(state_events) == 1
     assert state_events["event_type"].iloc[0] == "STATE_CHOP_STATE"
-    assert round(float(state_events["forward_return_h"].iloc[0]), 6) == round((102.0 / 101.0) - 1.0, 6)
+    assert round(float(state_events["forward_return_h"].iloc[0]), 6) == round(
+        (102.0 / 101.0) - 1.0, 6
+    )
 
     assert len(transition_events) == 1
     assert transition_events["event_type"].iloc[0] == "TRANSITION_TRENDING_STATE_CHOP_STATE"

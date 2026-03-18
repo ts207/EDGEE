@@ -13,7 +13,11 @@ def _base_blueprint() -> dict:
         "run_id": "r1",
         "event_type": "VOL_SHOCK",
         "candidate_id": "cand_1",
-        "symbol_scope": {"mode": "single_symbol", "symbols": ["BTCUSDT"], "candidate_symbol": "BTCUSDT"},
+        "symbol_scope": {
+            "mode": "single_symbol",
+            "symbols": ["BTCUSDT"],
+            "candidate_symbol": "BTCUSDT",
+        },
         "direction": "long",
         "entry": {
             "triggers": ["spread_guard_pass"],
@@ -66,10 +70,14 @@ def _base_blueprint() -> dict:
 
 def _base_features(bars: pd.DataFrame) -> pd.DataFrame:
     # Preserve timestamp for the merge join in DslInterpreterV1
-    return bars[["timestamp", "close", "quote_volume"]].assign(
-        funding_rate_scaled=0.0001,
-        spread_bps=1.0,  # 1bp << 12bps threshold for spread_guard_pass
-    ).copy()
+    return (
+        bars[["timestamp", "close", "quote_volume"]]
+        .assign(
+            funding_rate_scaled=0.0001,
+            spread_bps=1.0,  # 1bp << 12bps threshold for spread_guard_pass
+        )
+        .copy()
+    )
 
 
 def test_blueprint_feature_reference_contract_rejects_disallowed_condition_feature():
@@ -85,6 +93,7 @@ def test_blueprint_feature_reference_contract_rejects_disallowed_condition_featu
     ]
     with pytest.raises(ValueError, match="Disallowed feature reference"):
         _build_blueprint(bp)
+
 
 def test_dsl_enforces_minimum_one_bar_decision_lag():
     bars = pd.DataFrame(
@@ -120,6 +129,7 @@ def test_dsl_enforces_minimum_one_bar_decision_lag():
     assert int(positions.iloc[0]) == 0
     assert int(positions.iloc[1]) in {0, 1}
     assert int(positions.iloc[1]) == 1
+
 
 def test_dsl_accepts_registry_backed_signal_without_hardcoded_allowlist_entry():
     bars = pd.DataFrame(
@@ -161,6 +171,7 @@ def test_dsl_accepts_registry_backed_signal_without_hardcoded_allowlist_entry():
     assert int(positions.iloc[0]) == 0
     assert int(positions.iloc[1]) == 1
 
+
 def test_dsl_rejects_unknown_non_registry_signal():
     bars = pd.DataFrame(
         {
@@ -193,6 +204,7 @@ def test_dsl_rejects_unknown_non_registry_signal():
                 "dsl_blueprint": blueprint,
             },
         )
+
 
 def test_dsl_enforces_fail_on_zero_trigger_coverage():
     bars = pd.DataFrame(
@@ -231,6 +243,7 @@ def test_dsl_enforces_fail_on_zero_trigger_coverage():
                 "fail_on_zero_trigger_coverage": 1,
             },
         )
+
 
 def test_dsl_emits_trigger_coverage_in_metadata():
     bars = pd.DataFrame(
@@ -346,10 +359,29 @@ def test_dsl_accepts_executable_strategy_spec_contract():
                 "max_gross_leverage": 1.0,
             },
             "execution": {
-                "symbol_scope": {"mode": "single_symbol", "symbols": ["BTCUSDT"], "candidate_symbol": "BTCUSDT"},
-                "execution": {"mode": "market", "urgency": "aggressive", "max_slippage_bps": 100.0, "fill_profile": "base", "retry_logic": {}},
-                "policy_executor_config": {"entry_delay_bars": 0, "max_concurrent_positions": 1, "per_position_notional_cap_usd": 1000.0, "fee_tier": "standard"},
-                "throttles": {"one_trade_per_episode": False, "cooldown_bars": 0, "max_concurrent_positions": 1},
+                "symbol_scope": {
+                    "mode": "single_symbol",
+                    "symbols": ["BTCUSDT"],
+                    "candidate_symbol": "BTCUSDT",
+                },
+                "execution": {
+                    "mode": "market",
+                    "urgency": "aggressive",
+                    "max_slippage_bps": 100.0,
+                    "fill_profile": "base",
+                    "retry_logic": {},
+                },
+                "policy_executor_config": {
+                    "entry_delay_bars": 0,
+                    "max_concurrent_positions": 1,
+                    "per_position_notional_cap_usd": 1000.0,
+                    "fee_tier": "standard",
+                },
+                "throttles": {
+                    "one_trade_per_episode": False,
+                    "cooldown_bars": 0,
+                    "max_concurrent_positions": 1,
+                },
             },
             "portfolio_constraints": {
                 "effective_per_position_notional_cap_usd": 1000.0,

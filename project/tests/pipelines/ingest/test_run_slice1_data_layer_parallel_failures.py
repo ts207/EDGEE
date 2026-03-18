@@ -4,6 +4,7 @@ import pytest
 
 import project.pipelines.ingest.run_slice1_data_layer as run_slice1
 
+
 class _FakeProcess:
     def __init__(self, script_path: str, rc: int):
         self.script_path = script_path
@@ -11,6 +12,7 @@ class _FakeProcess:
 
     def wait(self) -> int:
         return self._rc
+
 
 def test_run_parallel_exits_with_failure_count_and_logs_scripts(monkeypatch, caplog):
     rc_by_script = {
@@ -37,6 +39,7 @@ def test_run_parallel_exits_with_failure_count_and_logs_scripts(monkeypatch, cap
     assert int(exc.value.code) == 2
     assert "script_fail_a.py" in caplog.text
     assert "script_fail_b.py" in caplog.text
+
 
 def test_run_parallel_no_failures_does_not_exit(monkeypatch):
     def fake_popen(cmd):

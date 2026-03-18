@@ -141,8 +141,16 @@ def test_research_golden_sample_quality_degradation_surfaces_in_comparison():
         ]
     )
 
-    baseline_diag = {"false_discovery_diagnostics": discovery_svc._build_false_discovery_diagnostics(baseline_candidates)}
-    degraded_diag = {"false_discovery_diagnostics": discovery_svc._build_false_discovery_diagnostics(degraded_candidates)}
+    baseline_diag = {
+        "false_discovery_diagnostics": discovery_svc._build_false_discovery_diagnostics(
+            baseline_candidates
+        )
+    }
+    degraded_diag = {
+        "false_discovery_diagnostics": discovery_svc._build_false_discovery_diagnostics(
+            degraded_candidates
+        )
+    }
     comparison = compare_phase2_run_diagnostics(baseline_diag, degraded_diag)
 
     assert comparison["baseline"]["survivor_count"] == 1

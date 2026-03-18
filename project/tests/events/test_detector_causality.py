@@ -5,6 +5,7 @@ Verifies that event detectors satisfy prefix invariance: events detected on
 df[:cutoff] must match events detected on the full df for bar indices well
 before the cutoff (i.e., at least `margin` bars before the cutoff).
 """
+
 from __future__ import annotations
 
 import numpy as np

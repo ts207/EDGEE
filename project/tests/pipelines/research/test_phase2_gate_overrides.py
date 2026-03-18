@@ -5,6 +5,7 @@ from pathlib import Path
 from project.pipelines.research import phase2_spec_registry as p2_spec
 from project.specs.gates import load_gates_spec, resolve_phase2_gate_params, select_phase2_gate_spec
 
+
 def test_resolve_phase2_gate_params_applies_event_override():
     gate_v1_phase2 = {
         "max_q_value": 0.05,
@@ -30,6 +31,7 @@ def test_resolve_phase2_gate_params_applies_event_override():
     assert cfg["conditioned_bucket_min_samples_override"] is None
     assert cfg["allow_conditioned_bucket_floor_override"] is False
 
+
 def test_select_phase2_gate_spec_auto_research_uses_discovery_profile():
     gates_spec = {
         "gate_v1_phase2": {"max_q_value": 0.05},
@@ -41,6 +43,7 @@ def test_select_phase2_gate_spec_auto_research_uses_discovery_profile():
     selected = p2_spec._select_phase2_gate_spec(gates_spec, mode="research", gate_profile="auto")
     assert selected["max_q_value"] == 0.10
     assert selected["_resolved_profile"] == "discovery"
+
 
 def test_select_phase2_gate_spec_auto_production_uses_promotion_profile():
     gates_spec = {
@@ -62,10 +65,13 @@ def test_select_phase2_gate_spec_supports_synthetic_profile():
             "synthetic": {"max_q_value": 0.35, "min_sample_size": 8},
         },
     }
-    selected = p2_spec._select_phase2_gate_spec(gates_spec, mode="research", gate_profile="synthetic")
+    selected = p2_spec._select_phase2_gate_spec(
+        gates_spec, mode="research", gate_profile="synthetic"
+    )
     assert selected["max_q_value"] == 0.35
     assert selected["min_sample_size"] == 8
     assert selected["_resolved_profile"] == "synthetic"
+
 
 def test_load_family_spec_reads_repo_spec():
     REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -83,6 +89,7 @@ def test_load_family_spec_reads_repo_spec():
         "tail_risk_avoid",
     ]
 
+
 def test_resolve_phase2_gate_params_liquidity_vacuum_tuned_override():
     REPO_ROOT = Path(__file__).resolve().parents[3]
     gates_spec = load_gates_spec(REPO_ROOT)
@@ -93,6 +100,7 @@ def test_resolve_phase2_gate_params_liquidity_vacuum_tuned_override():
     assert cfg["conservative_cost_multiplier"] == 1.0
     assert cfg["require_sign_stability"] is False
 
+
 def test_promotion_profile_does_not_include_discovery_event_relaxation():
     REPO_ROOT = Path(__file__).resolve().parents[3]
     gates_spec = load_gates_spec(REPO_ROOT)
@@ -102,6 +110,7 @@ def test_promotion_profile_does_not_include_discovery_event_relaxation():
     assert cfg["min_after_cost_expectancy_bps"] == 0.1
     assert cfg["conservative_cost_multiplier"] == 1.5
     assert cfg["require_sign_stability"] is True
+
 
 def test_load_family_spec_supports_conditioning_cols_override():
     REPO_ROOT = Path(__file__).resolve().parents[3]

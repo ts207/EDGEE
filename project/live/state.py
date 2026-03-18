@@ -4,6 +4,7 @@ Live state tracking for account and positions.
 Provides a unified 'LiveState' container to track balance, active positions,
 and exchange status in real-time.
 """
+
 from __future__ import annotations
 
 import json
@@ -16,7 +17,7 @@ from typing import Any, Dict, List, Optional
 @dataclass
 class PositionState:
     symbol: str
-    side: str               # "LONG" | "SHORT"
+    side: str  # "LONG" | "SHORT"
     quantity: float
     entry_price: float
     mark_price: float
@@ -39,7 +40,7 @@ class AccountState:
     total_unrealized_pnl: float = 0.0
     positions: Dict[str, PositionState] = field(default_factory=dict)
     update_time: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    exchange_status: str = "NORMAL" # NORMAL | DEGRADED | DOWN
+    exchange_status: str = "NORMAL"  # NORMAL | DEGRADED | DOWN
 
     def update_position(self, pos: PositionState):
         self.positions[pos.symbol] = pos
@@ -66,6 +67,7 @@ class KillSwitchSnapshot:
 
 class LiveStateStore:
     """Thread-safe or async-safe store for LiveState (to be expanded)."""
+
     def __init__(self, *, snapshot_path: str | Path | None = None):
         self.account = AccountState()
         self._last_snapshot_time: Optional[datetime] = None
@@ -83,9 +85,13 @@ class LiveStateStore:
         """
         self.account.wallet_balance = float(data.get("wallet_balance", self.account.wallet_balance))
         self.account.margin_balance = float(data.get("margin_balance", self.account.margin_balance))
-        self.account.available_balance = float(data.get("available_balance", self.account.available_balance))
-        self.account.exchange_status = str(data.get("exchange_status", self.account.exchange_status))
-        
+        self.account.available_balance = float(
+            data.get("available_balance", self.account.available_balance)
+        )
+        self.account.exchange_status = str(
+            data.get("exchange_status", self.account.exchange_status)
+        )
+
         positions_raw = data.get("positions", [])
         for p in positions_raw:
             qty = float(p.get("quantity", 0.0))
@@ -100,12 +106,14 @@ class LiveStateStore:
                     entry_price=float(p.get("entry_price", 0.0)),
                     mark_price=float(p.get("mark_price", p.get("entry_price", 0.0))),
                     unrealized_pnl=float(p.get("unrealized_pnl", 0.0)),
-                    liquidation_price=float(p.get("liquidation_price", 0.0)) if p.get("liquidation_price") else None,
+                    liquidation_price=float(p.get("liquidation_price", 0.0))
+                    if p.get("liquidation_price")
+                    else None,
                     leverage=float(p.get("leverage", 1.0) or 1.0),
                     margin_type=str(p.get("margin_type", "ISOLATED")),
                 )
                 self.account.update_position(pos)
-        
+
         self._last_snapshot_time = self.account.update_time
         self._maybe_persist()
 
@@ -115,7 +123,7 @@ class LiveStateStore:
         Discrepancies are returned as human-readable error messages.
         """
         errors = []
-        
+
         # 1. Compare Wallet Balance
         exchange_wallet = float(exchange_data.get("wallet_balance", 0.0))
         if abs(self.account.wallet_balance - exchange_wallet) > tolerance:
@@ -123,29 +131,28 @@ class LiveStateStore:
                 f"Wallet balance mismatch: local={self.account.wallet_balance}, "
                 f"exchange={exchange_wallet}"
             )
-            
+
         # 2. Compare Positions
         exchange_positions = {
-            str(p["symbol"]).upper(): p 
-            for p in exchange_data.get("positions", [])
+            str(p["symbol"]).upper(): p for p in exchange_data.get("positions", [])
         }
         local_positions = self.account.positions
-        
+
         all_symbols = set(exchange_positions.keys()) | set(local_positions.keys())
         for sym in all_symbols:
             e_pos = exchange_positions.get(sym)
             l_pos = local_positions.get(sym)
-            
+
             e_qty = float(e_pos["quantity"]) if e_pos else 0.0
             l_qty = float(l_pos.quantity) if l_pos else 0.0
             if l_pos and l_pos.side == "SHORT":
                 l_qty = -l_qty
-                
+
             if abs(e_qty - l_qty) > tolerance:
                 errors.append(
                     f"Position mismatch for {sym}: local_qty={l_qty}, exchange_qty={e_qty}"
                 )
-        
+
         return errors
 
     def set_kill_switch_snapshot(self, snapshot: Dict[str, Any]) -> None:
@@ -194,7 +201,9 @@ class LiveStateStore:
             },
             "kill_switch": self.get_kill_switch_snapshot(),
             "last_snapshot_time": (
-                self._last_snapshot_time.isoformat() if self._last_snapshot_time is not None else None
+                self._last_snapshot_time.isoformat()
+                if self._last_snapshot_time is not None
+                else None
             ),
         }
 
@@ -220,7 +229,9 @@ class LiveStateStore:
                 mark_price=float(raw.get("mark_price", 0.0)),
                 unrealized_pnl=float(raw.get("unrealized_pnl", 0.0)),
                 liquidation_price=(
-                    float(raw["liquidation_price"]) if raw.get("liquidation_price") is not None else None
+                    float(raw["liquidation_price"])
+                    if raw.get("liquidation_price") is not None
+                    else None
                 ),
                 leverage=float(raw.get("leverage", 1.0)),
                 margin_type=str(raw.get("margin_type", "ISOLATED")),
@@ -238,7 +249,9 @@ class LiveStateStore:
     def save_snapshot(self, path: str | Path) -> Path:
         target = Path(path)
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(json.dumps(self.to_snapshot(), indent=2, sort_keys=True), encoding="utf-8")
+        target.write_text(
+            json.dumps(self.to_snapshot(), indent=2, sort_keys=True), encoding="utf-8"
+        )
         return target
 
     @classmethod

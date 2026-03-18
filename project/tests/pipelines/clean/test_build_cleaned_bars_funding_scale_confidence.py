@@ -8,6 +8,7 @@ import pandas as pd
 import project.pipelines.clean.build_cleaned_bars as build_cleaned_bars
 from project.core import validation as sanity
 
+
 def test_infer_funding_scale_reports_low_confidence_for_ambiguous_data():
     frame = pd.DataFrame(
         {
@@ -19,6 +20,7 @@ def test_infer_funding_scale_reports_low_confidence_for_ambiguous_data():
     _, scale_used, confidence = sanity.infer_and_apply_funding_scale(frame, "funding_rate")
     assert scale_used == 1.0
     assert confidence < 0.99
+
 
 def test_infer_funding_scale_explicit_override_is_high_confidence():
     frame = pd.DataFrame(
@@ -36,6 +38,7 @@ def test_infer_funding_scale_explicit_override_is_high_confidence():
     assert scale_used == sanity.FUNDING_SCALE_NAME_TO_MULTIPLIER["bps"]
     assert confidence == 1.0
 
+
 def _raw_frame() -> pd.DataFrame:
     return pd.DataFrame(
         {
@@ -48,6 +51,7 @@ def _raw_frame() -> pd.DataFrame:
             "volume": [10.0, 12.0],
         }
     )
+
 
 def _ambiguous_funding_frame() -> pd.DataFrame:
     return pd.DataFrame(
@@ -68,6 +72,7 @@ def _legacy_scaled_only_funding_frame() -> pd.DataFrame:
         }
     )
 
+
 def _monkeypatch_io(monkeypatch, *, raw: pd.DataFrame, funding: pd.DataFrame, tmp_path: Path):
     calls = {"i": 0}
 
@@ -81,7 +86,13 @@ def _monkeypatch_io(monkeypatch, *, raw: pd.DataFrame, funding: pd.DataFrame, tm
     manifest_calls = []
 
     def fake_start_manifest(stage_name, run_id, params, inputs, outputs):
-        return {"stage": stage_name, "run_id": run_id, "params": params, "inputs": inputs, "outputs": outputs}
+        return {
+            "stage": stage_name,
+            "run_id": run_id,
+            "params": params,
+            "inputs": inputs,
+            "outputs": outputs,
+        }
 
     def fake_finalize_manifest(manifest, status, error=None, stats=None):
         manifest_calls.append({"status": status, "error": error, "stats": stats})
@@ -98,8 +109,11 @@ def _monkeypatch_io(monkeypatch, *, raw: pd.DataFrame, funding: pd.DataFrame, tm
     monkeypatch.setattr(build_cleaned_bars, "write_parquet", fake_write_parquet)
     return manifest_calls
 
+
 def test_build_cleaned_fails_on_low_confidence_auto_scale(monkeypatch, tmp_path):
-    manifest_calls = _monkeypatch_io(monkeypatch, raw=_raw_frame(), funding=_ambiguous_funding_frame(), tmp_path=tmp_path)
+    manifest_calls = _monkeypatch_io(
+        monkeypatch, raw=_raw_frame(), funding=_ambiguous_funding_frame(), tmp_path=tmp_path
+    )
     monkeypatch.setattr(
         sys,
         "argv",
@@ -122,8 +136,11 @@ def test_build_cleaned_fails_on_low_confidence_auto_scale(monkeypatch, tmp_path)
     assert manifest_calls[-1]["status"] == "failed"
     assert "Low confidence funding scale inference" in str(manifest_calls[-1]["error"])
 
+
 def test_build_cleaned_allows_explicit_funding_scale(monkeypatch, tmp_path):
-    manifest_calls = _monkeypatch_io(monkeypatch, raw=_raw_frame(), funding=_ambiguous_funding_frame(), tmp_path=tmp_path)
+    manifest_calls = _monkeypatch_io(
+        monkeypatch, raw=_raw_frame(), funding=_ambiguous_funding_frame(), tmp_path=tmp_path
+    )
     monkeypatch.setattr(
         sys,
         "argv",

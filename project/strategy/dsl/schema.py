@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any, Dict, List, Literal, Optional
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+
 class SymbolScopeSpec(BaseModel):
     model_config = ConfigDict(frozen=True)
     mode: Literal["single_symbol", "multi_symbol", "all"]
@@ -24,21 +25,24 @@ class SymbolScopeSpec(BaseModel):
             raise ValueError("symbol_scope.candidate_symbol must be non-empty")
         return v
 
+
 class ConditionNodeSpec(BaseModel):
     model_config = ConfigDict(frozen=True)
     feature: Optional[str] = None
-    operator: Optional[Literal[
-        ">",
-        ">=",
-        "<",
-        "<=",
-        "==",
-        "crosses_above",
-        "crosses_below",
-        "in_range",
-        "zscore_gt",
-        "zscore_lt",
-    ]] = None
+    operator: Optional[
+        Literal[
+            ">",
+            ">=",
+            "<",
+            "<=",
+            "==",
+            "crosses_above",
+            "crosses_below",
+            "in_range",
+            "zscore_gt",
+            "zscore_lt",
+        ]
+    ] = None
     value: Optional[float] = None
     value_high: float | None = None
     lookback_bars: int = Field(default=0, ge=0)
@@ -68,8 +72,11 @@ class ConditionNodeSpec(BaseModel):
     def check_window_bars(cls, v, info):
         op = info.data.get("operator")
         if op in {"zscore_gt", "zscore_lt"} and int(v) < 2:
-            raise ValueError("entry.condition_nodes[].window_bars must be >= 2 for zscore operators")
+            raise ValueError(
+                "entry.condition_nodes[].window_bars must be >= 2 for zscore operators"
+            )
         return v
+
 
 class EntrySpec(BaseModel):
     model_config = ConfigDict(frozen=True)
@@ -82,6 +89,7 @@ class EntrySpec(BaseModel):
     condition_nodes: List[ConditionNodeSpec] = Field(default_factory=list)
     arm_bars: int = Field(default=0, ge=0)
     reentry_lockout_bars: int = Field(default=0, ge=0)
+
 
 class ExitSpec(BaseModel):
     model_config = ConfigDict(frozen=True)
@@ -102,6 +110,7 @@ class ExitSpec(BaseModel):
             if key not in v:
                 raise ValueError(f"exit.invalidation missing `{key}`")
         return v
+
 
 class SizingSpec(BaseModel):
     model_config = ConfigDict(frozen=True)
@@ -132,6 +141,7 @@ class SizingSpec(BaseModel):
             raise ValueError("sizing.target_vol must be >= 0")
         return v
 
+
 class OverlaySpec(BaseModel):
     model_config = ConfigDict(frozen=True)
     name: str = Field(min_length=1)
@@ -143,6 +153,7 @@ class OverlaySpec(BaseModel):
         if not str(v).strip():
             raise ValueError("overlay.name must be non-empty")
         return v
+
 
 class EvaluationSpec(BaseModel):
     model_config = ConfigDict(frozen=True)
@@ -166,6 +177,7 @@ class EvaluationSpec(BaseModel):
                 raise ValueError(f"evaluation.robustness_flags missing `{key}`")
         return v
 
+
 class LineageSpec(BaseModel):
     model_config = ConfigDict(frozen=True)
     source_path: str = Field(min_length=1)
@@ -173,7 +185,9 @@ class LineageSpec(BaseModel):
     generated_at_utc: str = Field(min_length=1)
     bridge_embargo_days_used: int | None = Field(default=None, ge=0)
     wf_evidence_hash: str = ""
-    wf_status: Literal["pass", "trimmed_zero_trade", "trimmed_worst_negative", "pending"] = "pending"
+    wf_status: Literal["pass", "trimmed_zero_trade", "trimmed_worst_negative", "pending"] = (
+        "pending"
+    )
     events_count_used_for_gate: int = Field(default=0, ge=0)
     min_events_threshold: int = Field(default=0, ge=0)
     cost_config_digest: str = ""
@@ -203,6 +217,7 @@ class LineageSpec(BaseModel):
             raise ValueError("lineage.ontology_spec_hash must start with sha256: when provided")
         return v
 
+
 class ExecutionSpec(BaseModel):
     model_config = ConfigDict(frozen=True)
     mode: Literal["close", "next_open", "limit", "market"] = "market"
@@ -210,6 +225,7 @@ class ExecutionSpec(BaseModel):
     max_slippage_bps: float = Field(default=100.0, ge=0)
     fill_profile: Literal["optimistic", "base", "stressed"] = "base"
     retry_logic: Dict[str, Any] = Field(default_factory=dict)
+
 
 class Blueprint(BaseModel):
     model_config = ConfigDict(frozen=True)

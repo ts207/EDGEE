@@ -20,7 +20,9 @@ def test_validate_stage_manifest_on_disk_returns_false_for_invalid_json(tmp_path
     assert "invalid manifest JSON" in message
 
 
-def test_validate_stage_manifest_on_disk_propagates_unexpected_runtime_errors(monkeypatch, tmp_path) -> None:
+def test_validate_stage_manifest_on_disk_propagates_unexpected_runtime_errors(
+    monkeypatch, tmp_path
+) -> None:
     manifest_path = tmp_path / "stage.json"
     manifest_path.write_text("{}", encoding="utf-8")
 
@@ -33,7 +35,9 @@ def test_validate_stage_manifest_on_disk_propagates_unexpected_runtime_errors(mo
         manifest.validate_stage_manifest_on_disk(manifest_path, allow_failed_minimal=False)
 
 
-def test_validate_stage_manifest_on_disk_raises_data_integrity_error_for_schema_violation(tmp_path) -> None:
+def test_validate_stage_manifest_on_disk_raises_data_integrity_error_for_schema_violation(
+    tmp_path,
+) -> None:
     manifest_path = tmp_path / "stage.json"
     manifest_path.write_text(json.dumps({"status": "success"}), encoding="utf-8")
 

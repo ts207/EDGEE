@@ -6,6 +6,7 @@ from project.strategy.templates.generator import generate_candidates
 from project.strategy.templates.spec import StrategySpec
 from project.strategy.templates.validation import check_closed_left_rolling, validate_pit_invariants
 
+
 def test_deterministic_generator():
     grids = {"a": [1.0, 2.0], "b": [3.0, 4.0]}
     c1 = generate_candidates("TEST", {}, grids, 2, 42)
@@ -14,10 +15,12 @@ def test_deterministic_generator():
     assert c1[0].strategy_id == c2[0].strategy_id
     assert c1[1].strategy_id == c2[1].strategy_id
 
+
 def test_reordering_spec_normalization():
     s1 = StrategySpec("V", "en", "ex", params={"x": 1.0, "y": 2.0})
     s2 = StrategySpec("V", "en", "ex", params={"y": 2.0, "x": 1.0})
     assert s1.strategy_id == s2.strategy_id
+
 
 def test_compiler_respects_cap_and_cooldown():
     idx = pd.date_range("2024-01-01", periods=10, freq="5min")
@@ -36,11 +39,13 @@ def test_compiler_respects_cap_and_cooldown():
 
     assert pos.max() <= 0.5
 
+
 def test_validation_pit():
     idx = pd.date_range("2024-01-01", periods=10, freq="5min")
     series = pd.Series([1.0] * 10, index=idx)
     assert validate_pit_invariants(series)
     assert check_closed_left_rolling(series)
+
 
 def test_compiler_stable_resolution():
     idx = pd.date_range("2024-01-01", periods=10, freq="5min")

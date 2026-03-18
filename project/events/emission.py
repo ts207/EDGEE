@@ -18,7 +18,11 @@ SEVERITY_TO_INT = {
     "extreme": 4,
 }
 
-INT_TO_SEVERITY = {value: key for key, value in SEVERITY_TO_INT.items() if key in {"minor", "moderate", "major", "extreme"}}
+INT_TO_SEVERITY = {
+    value: key
+    for key, value in SEVERITY_TO_INT.items()
+    if key in {"minor", "moderate", "major", "extreme"}
+}
 
 
 def coerce_severity(value: Any) -> int:
@@ -28,7 +32,6 @@ def coerce_severity(value: Any) -> int:
         return int(value)
     normalized = str(value).strip().lower()
     return SEVERITY_TO_INT.get(normalized, 2)
-
 
 
 def emit_canonical_event(
@@ -77,6 +80,7 @@ def emit_canonical_event(
         event_version=event_version,
         meta=dict(meta or {}),
     )
+
 
 def to_event_row(
     record: EventRecord,

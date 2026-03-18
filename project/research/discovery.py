@@ -17,6 +17,7 @@ from project.core.constants import HORIZON_BARS_BY_TIMEFRAME
 
 log = logging.getLogger(__name__)
 
+
 def bool_mask_from_series(series: pd.Series) -> pd.Series:
     """Convert a series containing truthy values into a boolean mask."""
     if series.dtype == bool:
@@ -24,9 +25,11 @@ def bool_mask_from_series(series: pd.Series) -> pd.Series:
     s = series.astype(str).str.strip().lower()
     return s.isin({"true", "1", "1.0", "yes", "y", "pass"}).fillna(False)
 
+
 def horizon_to_bars(timeframe: str) -> int:
     """Convert a timeframe string to horizon bars using the canonical mapping."""
     return HORIZON_BARS_BY_TIMEFRAME.get(timeframe, 12)
+
 
 def bars_to_timeframe(horizon_bars: int) -> str:
     """Reverse mapping from bars to timeframe string."""
@@ -34,6 +37,7 @@ def bars_to_timeframe(horizon_bars: int) -> str:
         if bars == horizon_bars:
             return tf
     return f"{horizon_bars}b"
+
 
 def direction_token_to_float(value: object) -> float:
     """Convert direction tokens (1, -1, 'long', etc.) to float."""
@@ -51,6 +55,7 @@ def direction_token_to_float(value: object) -> float:
     if s in {"short", "sell", "down", "-1", "neg"}:
         return -1.0
     return 0.0
+
 
 def return_sign_hint(events_df: pd.DataFrame) -> float:
     """Attempt to infer default direction sign from return columns if available."""
@@ -78,9 +83,11 @@ def return_sign_hint(events_df: pd.DataFrame) -> float:
             return mean_sign
     return 0.0
 
+
 def action_name_from_direction(direction: float) -> str:
     """Return 'long' or 'short' based on sign."""
     return "long" if float(direction) >= 0 else "short"
+
 
 def event_template_map() -> Dict[str, str]:
     """Hardcoded fallback template map for legacy events."""
@@ -91,6 +98,7 @@ def event_template_map() -> Dict[str, str]:
         "MOMENTUM_BREAKOUT": "momentum_follow_through",
     }
 
+
 def default_direction_sign_for_event_type(event_type: str, default: float = 0.0) -> float:
     """Return default sign for known event types."""
     # Logic extracted from phase2_candidate_discovery.py
@@ -100,7 +108,10 @@ def default_direction_sign_for_event_type(event_type: str, default: float = 0.0)
         return 1.0
     return default
 
-def infer_event_direction_sign(events_df: pd.DataFrame, event_type: str | None = None, default: float = 0.0) -> float:
+
+def infer_event_direction_sign(
+    events_df: pd.DataFrame, event_type: str | None = None, default: float = 0.0
+) -> float:
     """Combined inference for event direction."""
     if event_type:
         ds = default_direction_sign_for_event_type(event_type, 0.0)
@@ -118,7 +129,9 @@ def resolve_registry_direction_policy(
     event_type: str | None = None,
     default: float = 0.0,
 ) -> Dict[str, Any]:
-    default_sign = default_direction_sign_for_event_type(event_type or "", 0.0) if event_type else 0.0
+    default_sign = (
+        default_direction_sign_for_event_type(event_type or "", 0.0) if event_type else 0.0
+    )
     if default_sign != 0.0:
         return {
             "direction_sign": float(default_sign),
@@ -141,12 +154,16 @@ def resolve_registry_direction_policy(
         "resolved": False,
     }
 
-def candidate_return_series(events_df: pd.DataFrame, horizon_bars: int, direction_sign: float) -> pd.Series:
+
+def candidate_return_series(
+    events_df: pd.DataFrame, horizon_bars: int, direction_sign: float
+) -> pd.Series:
     """Extract forward returns for a candidate, adjusted for direction."""
     col = f"return_{horizon_bars}"
     if col not in events_df.columns:
         return pd.Series(dtype=float)
     return events_df[col] * float(direction_sign)
+
 
 def series_stats(values: pd.Series, horizon_bars: Optional[int] = None) -> Dict[str, float]:
     """Compute summary statistics for a return series with optional overlap correction."""
@@ -156,26 +173,29 @@ def series_stats(values: pd.Series, horizon_bars: Optional[int] = None) -> Dict[
     n = len(vals)
     if n == 0:
         return {"n": 0, "mean": 0.0, "std": 0.0, "t_stat": 0.0}
-    
+
     mu = vals.mean()
     sigma = vals.std()
-    
+
     # Use robust Newey-West t-stat if horizon_bars is provided to correct for overlap bias
     if horizon_bars is not None and horizon_bars > 1:
         from project.core.stats import newey_west_t_stat_for_mean
+
         # NW lag choice: h-1 is standard for overlapping returns of length h
         nw_res = newey_west_t_stat_for_mean(vals, max_lag=horizon_bars - 1)
         t_stat = nw_res.t_stat
     else:
         t_stat = (mu / (sigma / np.sqrt(n))) if sigma > 1e-9 and n > 1 else 0.0
-        
+
     return {"n": n, "mean": mu, "std": sigma, "t_stat": t_stat}
+
 
 def condition_routing(cond_name: str, *, strict: bool = True) -> Tuple[str, str]:
     """Route a conditioning label to a DSL-safe condition string."""
     from project.research.condition_routing import condition_routing as _condition_routing
 
     return _condition_routing(cond_name, strict=strict)
+
 
 def make_family_id(
     symbol: str,
@@ -194,6 +214,7 @@ def make_family_id(
     if state_id:
         tokens.append(state_id)
     return ":".join(str(t).upper() for t in tokens if t)
+
 
 def _synthesize_concept_candidates(
     *,
@@ -217,7 +238,9 @@ def _synthesize_concept_candidates(
         return pd.DataFrame()
 
     working = events_df.copy()
-    direction_sign = infer_event_direction_sign(working, event_type=concept.event_definition.event_type, default=0.0)
+    direction_sign = infer_event_direction_sign(
+        working, event_type=concept.event_definition.event_type, default=0.0
+    )
     use_features = features_df is not None and not features_df.empty
     if use_features:
         from project.research.gating import build_event_return_frame
@@ -241,34 +264,47 @@ def _synthesize_concept_candidates(
                 stop_loss_atr_multipliers=spec.stop_loss_atr_multipliers,
                 take_profit_atr_multipliers=spec.take_profit_atr_multipliers,
             )
-            returns = return_frame["forward_return"] if not return_frame.empty else pd.Series(dtype=float)
+            returns = (
+                return_frame["forward_return"] if not return_frame.empty else pd.Series(dtype=float)
+            )
         else:
-            returns = candidate_return_series(working, horizon_bars=horizon_bars, direction_sign=direction_sign)
+            returns = candidate_return_series(
+                working, horizon_bars=horizon_bars, direction_sign=direction_sign
+            )
         stats = series_stats(returns)
 
         cid = f"{symbol}_{concept.concept_id}_{rule_template}_{horizon_label}_{idx}".upper()
-        rows.append({
-            "candidate_id": cid,
-            "symbol": symbol,
-            "event_type": concept.event_definition.event_type,
-            "rule_template": rule_template,
-            "horizon": horizon_label,
-            "horizon_bars": int(horizon_bars),
-            "direction": float(direction_sign),
-            "expectancy": stats["mean"],
-            "expectancy_bps": float(stats["mean"] * 1e4),
-            "sample_size": stats["n"],
-            "t_stat": stats["t_stat"],
-            "family_id": make_family_id(symbol=symbol, event_type=concept.event_definition.event_type, rule=rule_template, horizon=horizon_label, cond_label="all"),
-            "run_id": run_id,
-            "strategy_id": spec.strategy_id,
-            "stop_loss_bps": spec.stop_loss_bps,
-            "take_profit_bps": spec.take_profit_bps,
-            "stop_loss_atr_multipliers": spec.stop_loss_atr_multipliers,
-            "take_profit_atr_multipliers": spec.take_profit_atr_multipliers,
-            "spec_params_json": json.dumps(spec.normalize(), sort_keys=True),
-        })
+        rows.append(
+            {
+                "candidate_id": cid,
+                "symbol": symbol,
+                "event_type": concept.event_definition.event_type,
+                "rule_template": rule_template,
+                "horizon": horizon_label,
+                "horizon_bars": int(horizon_bars),
+                "direction": float(direction_sign),
+                "expectancy": stats["mean"],
+                "expectancy_bps": float(stats["mean"] * 1e4),
+                "sample_size": stats["n"],
+                "t_stat": stats["t_stat"],
+                "family_id": make_family_id(
+                    symbol=symbol,
+                    event_type=concept.event_definition.event_type,
+                    rule=rule_template,
+                    horizon=horizon_label,
+                    cond_label="all",
+                ),
+                "run_id": run_id,
+                "strategy_id": spec.strategy_id,
+                "stop_loss_bps": spec.stop_loss_bps,
+                "take_profit_bps": spec.take_profit_bps,
+                "stop_loss_atr_multipliers": spec.stop_loss_atr_multipliers,
+                "take_profit_atr_multipliers": spec.take_profit_atr_multipliers,
+                "spec_params_json": json.dumps(spec.normalize(), sort_keys=True),
+            }
+        )
     return pd.DataFrame(rows)
+
 
 def _synthesize_experiment_hypotheses(
     *,
@@ -282,10 +318,11 @@ def _synthesize_experiment_hypotheses(
 ) -> pd.DataFrame:
     """Synthesize candidates from an experiment plan for a specific event trigger context."""
     import importlib
+
     experiment_engine = importlib.import_module("project.pipelines.research.experiment_engine")
 
     plan = experiment_engine.build_experiment_plan(Path(experiment_config), Path(registry_root))
-    
+
     # Filter hypotheses that can be evaluated in the context of this event_type
     relevant_hyps = []
     for h in plan.hypotheses:
@@ -308,157 +345,176 @@ def _synthesize_experiment_hypotheses(
     working = events_df.copy()
     if features_df is not None and not features_df.empty:
         from project.research.gating import join_events_to_features
+
         working = join_events_to_features(working, features_df)
 
     rows = []
-    
+
     for h in relevant_hyps:
         # Resolve direction sign
         d_sign = direction_token_to_float(h.direction)
-        
+
         # Adjust sign based on template if needed (legacy behavior for 'mean_reversion')
         actual_sign = d_sign
         if h.template_id == "mean_reversion":
             actual_sign = -d_sign
-            
+
         h_bars = horizon_to_bars(h.horizon)
-        
+
         # 1. Start with full mask
         trigger_mask = pd.Series(True, index=working.index)
-        
+
         # 2. Evaluate Trigger Type Condition
         t = h.trigger
         if t.trigger_type == "event":
-             # If trigger matches current event_type exactly, it's always active here
-             # If it doesn't match, we skip (it should have been filtered out anyway)
-             if t.event_id != event_type:
-                  trigger_mask &= False
-        
+            # If trigger matches current event_type exactly, it's always active here
+            # If it doesn't match, we skip (it should have been filtered out anyway)
+            if t.event_id != event_type:
+                trigger_mask &= False
+
         elif t.trigger_type == "state":
-             state_col = f"state_{t.state_id}"
-             if state_col in working.columns:
-                 trigger_mask &= bool_mask_from_series(working[state_col])
-             elif f"market_state_{t.state_id}" in working.columns:
-                 trigger_mask &= bool_mask_from_series(working[f"market_state_{t.state_id}"])
-             else:
-                 # If state column not found, we cannot evaluate it as active
-                 trigger_mask &= False
-        
+            state_col = f"state_{t.state_id}"
+            if state_col in working.columns:
+                trigger_mask &= bool_mask_from_series(working[state_col])
+            elif f"market_state_{t.state_id}" in working.columns:
+                trigger_mask &= bool_mask_from_series(working[f"market_state_{t.state_id}"])
+            else:
+                # If state column not found, we cannot evaluate it as active
+                trigger_mask &= False
+
         elif t.trigger_type == "transition":
-             from_col = f"state_{t.from_state}"
-             to_col = f"state_{t.to_state}"
-             prev_from_col = f"prev_state_{t.from_state}"
-             prev_to_col = f"prev_state_{t.to_state}"
-             
-             if to_col in working.columns:
-                 # Standard definition: transitioned INTO to_state
-                 # Ideally we were in from_state before.
-                 if from_col in working.columns and prev_from_col in working.columns:
-                     trigger_mask &= (bool_mask_from_series(working[prev_from_col]) & bool_mask_from_series(working[to_col]))
-                 elif prev_to_col in working.columns:
-                     # If we don't know from_state, at least check we WERENT in to_state before
-                     trigger_mask &= (bool_mask_from_series(working[to_col]) & ~bool_mask_from_series(working[prev_to_col]))
-                 else:
-                     # If no prev state info, we check if it is active now (weak)
-                     trigger_mask &= bool_mask_from_series(working[to_col])
-             else:
-                 trigger_mask &= False
+            from_col = f"state_{t.from_state}"
+            to_col = f"state_{t.to_state}"
+            prev_from_col = f"prev_state_{t.from_state}"
+            prev_to_col = f"prev_state_{t.to_state}"
+
+            if to_col in working.columns:
+                # Standard definition: transitioned INTO to_state
+                # Ideally we were in from_state before.
+                if from_col in working.columns and prev_from_col in working.columns:
+                    trigger_mask &= bool_mask_from_series(
+                        working[prev_from_col]
+                    ) & bool_mask_from_series(working[to_col])
+                elif prev_to_col in working.columns:
+                    # If we don't know from_state, at least check we WERENT in to_state before
+                    trigger_mask &= bool_mask_from_series(working[to_col]) & ~bool_mask_from_series(
+                        working[prev_to_col]
+                    )
+                else:
+                    # If no prev state info, we check if it is active now (weak)
+                    trigger_mask &= bool_mask_from_series(working[to_col])
+            else:
+                trigger_mask &= False
 
         elif t.trigger_type == "feature_predicate":
-             if t.feature in working.columns:
-                 val = working[t.feature]
-                 if t.operator == ">": trigger_mask &= (val > t.threshold)
-                 elif t.operator == "<": trigger_mask &= (val < t.threshold)
-                 elif t.operator == ">=": trigger_mask &= (val >= t.threshold)
-                 elif t.operator == "<=": trigger_mask &= (val <= t.threshold)
-                 elif t.operator == "==": trigger_mask &= (val == t.threshold)
-             else:
-                 trigger_mask &= False
-        
+            if t.feature in working.columns:
+                val = working[t.feature]
+                if t.operator == ">":
+                    trigger_mask &= val > t.threshold
+                elif t.operator == "<":
+                    trigger_mask &= val < t.threshold
+                elif t.operator == ">=":
+                    trigger_mask &= val >= t.threshold
+                elif t.operator == "<=":
+                    trigger_mask &= val <= t.threshold
+                elif t.operator == "==":
+                    trigger_mask &= val == t.threshold
+            else:
+                trigger_mask &= False
+
         elif t.trigger_type == "sequence":
-             # Sequence: [E1, E2, ...] 
-             # We evaluate at the timestamp of the LAST event in the sequence
-             if not t.events or t.events[-1] != event_type:
-                  trigger_mask &= False
-             else:
-                  # Simple lookback check for sequences of length 2
-                  if len(t.events) == 2:
-                      e1, e2 = t.events[0], t.events[1]
-                      gap = t.max_gap[0] if t.max_gap else 1
-                      
-                      # Vectorized searchsorted implementation to avoid O(n^2) behavior
-                      e1_times = working[working["event_type"] == e1]["enter_ts"].sort_values()
-                      if e1_times.empty:
-                          trigger_mask &= False
-                      else:
-                          e1_ts_vals = e1_times.values.astype(np.int64)
-                          bar_ts_vals = working["enter_ts"].values.astype(np.int64)
-                          gap_ns = int(pd.Timedelta(minutes=gap * 5).asm8.view(np.int64))
-                          
-                          # Find index of largest e1_time < current_time
-                          idx = np.searchsorted(e1_ts_vals, bar_ts_vals, side="left") - 1
-                          
-                          # Validate index and gap
-                          has_e1 = (idx >= 0) & ((bar_ts_vals - e1_ts_vals[np.maximum(idx, 0)]) <= gap_ns)
-                          trigger_mask &= pd.Series(has_e1 & (working["event_type"] == e2).values, index=working.index)
-                  else:
-                      # TODO: Support longer sequences
-                      trigger_mask &= False
-                      
+            # Sequence: [E1, E2, ...]
+            # We evaluate at the timestamp of the LAST event in the sequence
+            if not t.events or t.events[-1] != event_type:
+                trigger_mask &= False
+            else:
+                # Simple lookback check for sequences of length 2
+                if len(t.events) == 2:
+                    e1, e2 = t.events[0], t.events[1]
+                    gap = t.max_gap[0] if t.max_gap else 1
+
+                    # Vectorized searchsorted implementation to avoid O(n^2) behavior
+                    e1_times = working[working["event_type"] == e1]["enter_ts"].sort_values()
+                    if e1_times.empty:
+                        trigger_mask &= False
+                    else:
+                        e1_ts_vals = e1_times.values.astype(np.int64)
+                        bar_ts_vals = working["enter_ts"].values.astype(np.int64)
+                        gap_ns = int(pd.Timedelta(minutes=gap * 5).asm8.view(np.int64))
+
+                        # Find index of largest e1_time < current_time
+                        idx = np.searchsorted(e1_ts_vals, bar_ts_vals, side="left") - 1
+
+                        # Validate index and gap
+                        has_e1 = (idx >= 0) & (
+                            (bar_ts_vals - e1_ts_vals[np.maximum(idx, 0)]) <= gap_ns
+                        )
+                        trigger_mask &= pd.Series(
+                            has_e1 & (working["event_type"] == e2).values, index=working.index
+                        )
+                else:
+                    # TODO: Support longer sequences
+                    trigger_mask &= False
+
         elif t.trigger_type == "interaction":
-             # Interaction: Left OP Right
-             # Evaluate at current timestamp if both are active (AND)
-             # or if Left is confirmed by Right within lag (CONFIRM)
-             if t.op == "and":
-                  is_left_active = pd.Series(False, index=working.index)
-                  is_right_active = pd.Series(False, index=working.index)
-                  
-                  for side, active_mask in [(t.left, is_left_active), (t.right, is_right_active)]:
-                      if side == event_type:
-                          active_mask.update(pd.Series(True, index=working.index))
-                      elif f"state_{side}" in working.columns:
-                          active_mask.update(bool_mask_from_series(working[f"state_{side}"]))
-                      elif f"market_state_{side}" in working.columns:
-                          active_mask.update(bool_mask_from_series(working[f"market_state_{side}"]))
-                  
-                  trigger_mask &= (is_left_active & is_right_active)
-             else:
-                  # TODO: Support CONFIRM/EXCLUDE
-                  trigger_mask &= False
+            # Interaction: Left OP Right
+            # Evaluate at current timestamp if both are active (AND)
+            # or if Left is confirmed by Right within lag (CONFIRM)
+            if t.op == "and":
+                is_left_active = pd.Series(False, index=working.index)
+                is_right_active = pd.Series(False, index=working.index)
+
+                for side, active_mask in [(t.left, is_left_active), (t.right, is_right_active)]:
+                    if side == event_type:
+                        active_mask.update(pd.Series(True, index=working.index))
+                    elif f"state_{side}" in working.columns:
+                        active_mask.update(bool_mask_from_series(working[f"state_{side}"]))
+                    elif f"market_state_{side}" in working.columns:
+                        active_mask.update(bool_mask_from_series(working[f"market_state_{side}"]))
+
+                trigger_mask &= is_left_active & is_right_active
+            else:
+                # TODO: Support CONFIRM/EXCLUDE
+                trigger_mask &= False
 
         # 3. Evaluate Context
         if h.context:
             for dim, val in h.context.items():
                 if dim in working.columns:
-                    trigger_mask &= (working[dim].astype(str) == str(val))
-        
+                    trigger_mask &= working[dim].astype(str) == str(val)
+
         # 4. Compute stats
         if trigger_mask.any():
             matched_events = working[trigger_mask]
-            returns = candidate_return_series(matched_events, horizon_bars=h_bars, direction_sign=actual_sign)
+            returns = candidate_return_series(
+                matched_events, horizon_bars=h_bars, direction_sign=actual_sign
+            )
             stats = series_stats(returns, horizon_bars=int(h_bars))
-            
-            rows.append({
-                "candidate_id": h.hypothesis_id(),
-                "symbol": symbol,
-                "event_type": event_type,
-                "trigger_type": t.trigger_type,
-                "rule_template": h.template_id,
-                "horizon": h.horizon,
-                "horizon_bars": int(h_bars),
-                "direction": float(actual_sign),
-                "entry_lag_bars": int(h.entry_lag),
-                "expectancy": stats["mean"],
-                "expectancy_bps": float(stats["mean"] * 1e4),
-                "sample_size": stats["n"],
-                "t_stat": stats["t_stat"],
-                "family_id": h.label(),
-                "run_id": run_id,
-                "program_id": plan.program_id,
-                "hypothesis_id": h.hypothesis_id(),
-            })
-            
+
+            rows.append(
+                {
+                    "candidate_id": h.hypothesis_id(),
+                    "symbol": symbol,
+                    "event_type": event_type,
+                    "trigger_type": t.trigger_type,
+                    "rule_template": h.template_id,
+                    "horizon": h.horizon,
+                    "horizon_bars": int(h_bars),
+                    "direction": float(actual_sign),
+                    "entry_lag_bars": int(h.entry_lag),
+                    "expectancy": stats["mean"],
+                    "expectancy_bps": float(stats["mean"] * 1e4),
+                    "sample_size": stats["n"],
+                    "t_stat": stats["t_stat"],
+                    "family_id": h.label(),
+                    "run_id": run_id,
+                    "program_id": plan.program_id,
+                    "hypothesis_id": h.hypothesis_id(),
+                }
+            )
+
     return pd.DataFrame(rows)
+
 
 def _synthesize_registry_candidates(
     *,
@@ -477,9 +533,9 @@ def _synthesize_registry_candidates(
     """Synthesize strategy candidates for an event type with expanded combinations."""
     if events_df.empty:
         return pd.DataFrame()
-        
+
     working = events_df.copy()
-    
+
     # Resolve subsets
     sel_templates = list(templates) if templates else ["continuation", "mean_reversion"]
     sel_horizons = list(horizons) if horizons else [bars_to_timeframe(horizon_bars)]
@@ -487,17 +543,23 @@ def _synthesize_registry_candidates(
     sel_entry_lags = list(entry_lags) if entry_lags else [entry_lag_bars]
 
     rows: List[Dict[str, Any]] = []
-    
+
     # Count total combinations to check against budget
-    total_combinations = len(sel_templates) * len(sel_horizons) * len(sel_directions) * len(sel_entry_lags)
+    total_combinations = (
+        len(sel_templates) * len(sel_horizons) * len(sel_directions) * len(sel_entry_lags)
+    )
     if search_budget is not None and total_combinations > search_budget:
-        log.warning("Total combinations (%d) exceeds search budget (%d). Truncating.", total_combinations, search_budget)
+        log.warning(
+            "Total combinations (%d) exceeds search budget (%d). Truncating.",
+            total_combinations,
+            search_budget,
+        )
         # Simple truncation for now
-    
+
     count = 0
     for h_label in sel_horizons:
         h_bars = horizon_to_bars(h_label)
-        
+
         # Precompute direction policy once per event family/horizon block.
         direction_policy = resolve_registry_direction_policy(
             working,
@@ -505,13 +567,13 @@ def _synthesize_registry_candidates(
             default=0.0,
         )
         direction_sign_auto = float(direction_policy["direction_sign"])
-        
+
         for tpl in sel_templates:
             for d_label in sel_directions:
                 for lag in sel_entry_lags:
                     if search_budget is not None and count >= search_budget:
                         break
-                    
+
                     # Resolve direction sign
                     if d_label == "auto":
                         d_sign = direction_sign_auto
@@ -520,44 +582,50 @@ def _synthesize_registry_candidates(
 
                     if d_sign == 0.0:
                         continue
-                    
+
                     # Adjust sign for mean_reversion if it's the template
                     actual_sign = float(d_sign if tpl == "continuation" else -d_sign)
-                    
+
                     # Compute stats for this combination
-                    returns = candidate_return_series(working, horizon_bars=h_bars, direction_sign=actual_sign)
+                    returns = candidate_return_series(
+                        working, horizon_bars=h_bars, direction_sign=actual_sign
+                    )
                     stats = series_stats(returns)
-                    
+
                     cid = f"{symbol}_{event_type}_{tpl}_{h_label}_{d_label}_{lag}b".upper()
-                    rows.append({
-                        "candidate_id": cid,
-                        "symbol": symbol,
-                        "event_type": event_type,
-                        "rule_template": tpl,
-                        "horizon": h_label,
-                        "horizon_bars": int(h_bars),
-                        "direction": float(actual_sign),
-                        "entry_lag_bars": int(lag),
-                        "expectancy": stats["mean"],
-                        "expectancy_bps": float(stats["mean"] * 1e4),
-                        "sample_size": stats["n"],
-                        "t_stat": stats["t_stat"],
-                        "direction_policy": str(direction_policy["policy"]),
-                        "direction_resolution_source": str(direction_policy["source"]),
-                        "family_id": make_family_id(
-                            symbol=symbol, 
-                            event_type=event_type, 
-                            rule=tpl, 
-                            horizon=h_label, 
-                            cond_label="all",
-                            state_id=f"lag{lag}"
-                        ),
-                        "run_id": run_id,
-                    })
+                    rows.append(
+                        {
+                            "candidate_id": cid,
+                            "symbol": symbol,
+                            "event_type": event_type,
+                            "rule_template": tpl,
+                            "horizon": h_label,
+                            "horizon_bars": int(h_bars),
+                            "direction": float(actual_sign),
+                            "entry_lag_bars": int(lag),
+                            "expectancy": stats["mean"],
+                            "expectancy_bps": float(stats["mean"] * 1e4),
+                            "sample_size": stats["n"],
+                            "t_stat": stats["t_stat"],
+                            "direction_policy": str(direction_policy["policy"]),
+                            "direction_resolution_source": str(direction_policy["source"]),
+                            "family_id": make_family_id(
+                                symbol=symbol,
+                                event_type=event_type,
+                                rule=tpl,
+                                horizon=h_label,
+                                cond_label="all",
+                                state_id=f"lag{lag}",
+                            ),
+                            "run_id": run_id,
+                        }
+                    )
                     count += 1
-                if search_budget is not None and count >= search_budget: break
-            if search_budget is not None and count >= search_budget: break
-        if search_budget is not None and count >= search_budget: break
+                if search_budget is not None and count >= search_budget:
+                    break
+            if search_budget is not None and count >= search_budget:
+                break
+        if search_budget is not None and count >= search_budget:
+            break
 
     return pd.DataFrame(rows)
-

@@ -40,17 +40,21 @@ CANDIDATE_HASH_FIELDS = (
     "state_id",
 )
 
+
 def _norm(value: Any) -> str:
     return str(value or "").strip()
 
+
 def _norm_upper(value: Any) -> str:
     return _norm(value).upper()
+
 
 def _load_yaml(path: Path) -> Dict[str, Any]:
     if not path.exists():
         return {}
     payload = yaml.safe_load(path.read_text(encoding="utf-8"))
     return payload if isinstance(payload, dict) else {}
+
 
 def load_active_hypothesis_specs(repo_root: Path) -> List[Dict[str, Any]]:
     repo_root = Path(repo_root)
@@ -77,9 +81,7 @@ def load_active_hypothesis_specs(repo_root: Path) -> List[Dict[str, Any]]:
         if not isinstance(conditioning_features, list):
             conditioning_features = []
         conditioning_features = [
-            _norm(feature)
-            for feature in conditioning_features
-            if _norm(feature)
+            _norm(feature) for feature in conditioning_features if _norm(feature)
         ]
 
         metric = "lift_bps"
@@ -103,6 +105,7 @@ def load_active_hypothesis_specs(repo_root: Path) -> List[Dict[str, Any]]:
         )
     return out
 
+
 def load_template_side_policy(repo_root: Path) -> Dict[str, str]:
     out: Dict[str, str] = {}
     for template_verb, op in get_domain_registry().operator_rows().items():
@@ -110,9 +113,11 @@ def load_template_side_policy(repo_root: Path) -> Dict[str, str]:
         out[_norm(template_verb)] = side_policy or "both"
     return out
 
+
 def _horizon_bars(horizon: str) -> int:
     key = _norm(horizon).lower()
     return int(HORIZON_BARS_BY_TIMEFRAME.get(key, 12))
+
 
 def _condition_signature(conditioning: Dict[str, Any]) -> str:
     if not conditioning:
@@ -123,6 +128,7 @@ def _condition_signature(conditioning: Dict[str, Any]) -> str:
         parts.append(f"{_norm(key)}={_norm(value)}")
     return "&".join(parts) if parts else "all"
 
+
 def _condition_dsl(conditioning: Dict[str, Any]) -> str:
     if not conditioning:
         return "all"
@@ -132,9 +138,11 @@ def _condition_dsl(conditioning: Dict[str, Any]) -> str:
         clauses.append(f'{_norm(key)} == "{value}"')
     return " AND ".join(clauses) if clauses else "all"
 
+
 def _candidate_hash(payload: Dict[str, Any]) -> str:
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"))
     return "cand_" + hashlib.sha256(encoded.encode("utf-8")).hexdigest()[:24]
+
 
 def _candidate_hash_inputs(
     *,
@@ -167,6 +175,7 @@ def _candidate_hash_inputs(
     }
     return {key: payload[key] for key in CANDIDATE_HASH_FIELDS}
 
+
 def translate_candidate_hypotheses(
     *,
     base_candidate: Dict[str, Any],
@@ -185,9 +194,7 @@ def translate_candidate_hypotheses(
 
     object_type = _norm(base_candidate.get("object_type", "event")).lower() or "event"
     candidate_event_type = _norm_upper(
-        base_candidate.get("canonical_event_type")
-        or base_candidate.get("event_type")
-        or ""
+        base_candidate.get("canonical_event_type") or base_candidate.get("event_type") or ""
     )
     if object_type == "event" and implemented and candidate_event_type not in implemented:
         audit.append(
@@ -271,11 +278,7 @@ def translate_candidate_hypotheses(
             }
         )
         hash_inputs = _candidate_hash_inputs(
-            event_type=_norm(
-                row.get("canonical_event_type")
-                or row.get("event_type")
-                or ""
-            ),
+            event_type=_norm(row.get("canonical_event_type") or row.get("event_type") or ""),
             template_id=_norm(row.get("template_id")),
             horizon_bars=int(row["horizon_bars"]),
             entry_lag_bars=int(row["entry_lag_bars"]),
@@ -288,7 +291,9 @@ def translate_candidate_hypotheses(
             symbol=_norm(row.get("symbol")),
             state_id=_norm(row.get("state_id")),
         )
-        row["candidate_hash_inputs"] = json.dumps(hash_inputs, sort_keys=True, separators=(",", ":"))
+        row["candidate_hash_inputs"] = json.dumps(
+            hash_inputs, sort_keys=True, separators=(",", ":")
+        )
         row["candidate_id"] = _candidate_hash(hash_inputs)
         rows.append(row)
         audit.append(

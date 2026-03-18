@@ -63,12 +63,13 @@ TEMPORAL_CONTRACT = TemporalContract(
     calibration_mode="rolling",  # Default mode
     fit_scope="streaming",
     approved_primitives=("trailing_quantile", "trailing_median"),
-    notes="Shock threshold must be causal or externally prefit."
+    notes="Shock threshold must be causal or externally prefit.",
 )
 
 # Version identifier for liquidity vacuum definition.  Increment this when
 # making backwards‑incompatible changes to the detection logic or metrics.
 LV_DEF_VERSION = "v1"
+
 
 @dataclass(frozen=True)
 class LiquidityVacuumConfig:
@@ -101,7 +102,9 @@ class LiquidityVacuumConfig:
     # Threshold on range expansion used to define secondary shock events
     range_expansion_threshold: float = 0.02
 
+
 DEFAULT_LV_CONFIG = LiquidityVacuumConfig()
+
 
 def _compute_core_series(df: pd.DataFrame, cfg: LiquidityVacuumConfig) -> pd.DataFrame:
     """
@@ -148,14 +151,14 @@ def _compute_core_series(df: pd.DataFrame, cfg: LiquidityVacuumConfig) -> pd.Dat
     # Intrabar range as fraction of close; avoid divide by zero with NaN
     out["range_pct"] = (high - low) / close.replace(0.0, np.nan)
     out["range_med"] = trailing_median(out["range_pct"], window=cfg.range_window, lag=1)
-    
+
     # Causal shock threshold if in rolling mode
     if cfg.shock_threshold_mode == "rolling":
         out["t_shock_dynamic"] = trailing_quantile(
-            out["abs_return"], 
-            window=cfg.volume_window, # Reuse volume window or separate? Plan says 480
+            out["abs_return"],
+            window=cfg.volume_window,  # Reuse volume window or separate? Plan says 480
             q=cfg.shock_quantile,
-            lag=1
+            lag=1,
         )
     return out
 
@@ -215,14 +218,21 @@ def _detect_events_with_threshold(
         # Identify impulse onset: return crosses threshold from below to above
         # Use dynamic threshold if available, otherwise fixed t_shock
         thresh = float(df["t_shock_dynamic"].iat[i]) if "t_shock_dynamic" in df.columns else t_shock
-        
+
         if not np.isfinite(thresh):
             i += 1
             continue
-            
+
         ret_now = float(df["abs_return"].iat[i]) if pd.notna(df["abs_return"].iat[i]) else np.nan
-        ret_prev = float(df["abs_return"].iat[i - 1]) if pd.notna(df["abs_return"].iat[i - 1]) else np.nan
-        onset = np.isfinite(ret_now) and np.isfinite(ret_prev) and (ret_now >= thresh) and (ret_prev < thresh)
+        ret_prev = (
+            float(df["abs_return"].iat[i - 1]) if pd.notna(df["abs_return"].iat[i - 1]) else np.nan
+        )
+        onset = (
+            np.isfinite(ret_now)
+            and np.isfinite(ret_prev)
+            and (ret_now >= thresh)
+            and (ret_prev < thresh)
+        )
         if not onset:
             i += 1
             continue
@@ -233,9 +243,15 @@ def _detect_events_with_threshold(
         end_idx: Optional[int] = None
         j = start_idx
         while j < n and vac_len < config.max_vacuum_bars:
-            vol_ratio = float(df["vol_ratio"].iat[j]) if pd.notna(df["vol_ratio"].iat[j]) else np.nan
-            range_med = float(df["range_med"].iat[j]) if pd.notna(df["range_med"].iat[j]) else np.nan
-            range_pct = float(df["range_pct"].iat[j]) if pd.notna(df["range_pct"].iat[j]) else np.nan
+            vol_ratio = (
+                float(df["vol_ratio"].iat[j]) if pd.notna(df["vol_ratio"].iat[j]) else np.nan
+            )
+            range_med = (
+                float(df["range_med"].iat[j]) if pd.notna(df["range_med"].iat[j]) else np.nan
+            )
+            range_pct = (
+                float(df["range_pct"].iat[j]) if pd.notna(df["range_pct"].iat[j]) else np.nan
+            )
             # Thin liquidity conditions: low volume and high range
             low_vol = np.isfinite(vol_ratio) and (vol_ratio < config.vol_ratio_floor)
             high_range = False
@@ -263,7 +279,11 @@ def _detect_events_with_threshold(
             # Half‑life: time until range decays to half its peak above baseline
             half_life = None
             if np.isfinite(max_range):
-                baseline = float(window["range_med"].iat[0]) if pd.notna(window["range_med"].iat[0]) else 0.0
+                baseline = (
+                    float(window["range_med"].iat[0])
+                    if pd.notna(window["range_med"].iat[0])
+                    else 0.0
+                )
                 target = baseline + 0.5 * (max_range - baseline)
                 for k in range(len(rages)):
                     val = float(rages.iat[k]) if pd.notna(rages.iat[k]) else np.nan
@@ -275,19 +295,29 @@ def _detect_events_with_threshold(
             post_end = min(n - 1, exit_idx + config.post_horizon_bars)
             post = df.iloc[post_start : post_end + 1]
             # Secondary shock: flag if any return exceeds threshold in post horizon
-            thresh_post = float(df["t_shock_dynamic"].iat[exit_idx]) if "t_shock_dynamic" in df.columns else t_shock
+            thresh_post = (
+                float(df["t_shock_dynamic"].iat[exit_idx])
+                if "t_shock_dynamic" in df.columns
+                else t_shock
+            )
             p_secondary = int((post["abs_return"] >= thresh_post).any()) if not post.empty else 0
             # Secondary range expansion: flag if range expands beyond threshold in post horizon
-            p_range_expansion = int((post["range_pct"] >= config.range_expansion_threshold).any()) if not post.empty else 0
+            p_range_expansion = (
+                int((post["range_pct"] >= config.range_expansion_threshold).any())
+                if not post.empty
+                else 0
+            )
             # Cumulative excess range (AUC) relative to baseline over fixed horizon
             auc_horizon_end = min(n - 1, exit_idx + config.auc_horizon_bars)
             auc_window = df.iloc[enter : auc_horizon_end + 1]
-            baseline_range = float(window["range_med"].iat[0]) if pd.notna(window["range_med"].iat[0]) else 0.0
+            baseline_range = (
+                float(window["range_med"].iat[0]) if pd.notna(window["range_med"].iat[0]) else 0.0
+            )
             excess = (auc_window["range_pct"] - baseline_range).clip(lower=0.0)
             auc_excess = float(excess.sum()) if not excess.empty else 0.0
 
             event_id = format_event_id("LIQUIDITY_VACUUM", symbol, int(enter), event_num)
-            
+
             # Collect diagnostic metadata
             metadata = {
                 "enter_idx": int(enter),
@@ -306,7 +336,7 @@ def _detect_events_with_threshold(
                 event_type="LIQUIDITY_VACUUM",
                 symbol=symbol,
                 event_id=event_id,
-                eval_bar_ts=df["timestamp"].iat[exit_idx], # Detection happens at event exit
+                eval_bar_ts=df["timestamp"].iat[exit_idx],  # Detection happens at event exit
                 intensity=max_range,
                 metadata=metadata,
                 shift_bars=0,
@@ -321,8 +351,10 @@ def _detect_events_with_threshold(
         i += 1
     if not event_rows:
         from project.events.shared import EVENT_COLUMNS
+
         return pd.DataFrame(columns=EVENT_COLUMNS)
     return pd.DataFrame(event_rows)
+
 
 def calibrate_shock_threshold(
     df: pd.DataFrame,
@@ -360,23 +392,23 @@ def calibrate_shock_threshold(
     """
     core = _compute_core_series(df, cfg)
     rows: List[Dict[str, object]] = []
-    
-    # In calibration, we sweep quantiles. Since we don't have t_shock_dynamic 
+
+    # In calibration, we sweep quantiles. Since we don't have t_shock_dynamic
     # for EVERY quantile pre-computed in _compute_core_series (only for cfg.shock_quantile),
     # we must compute the causal threshold series for each q here.
     for q in quantiles:
         # Compute causal threshold for this specific quantile
         t_series = trailing_quantile(core["abs_return"], window=cfg.volume_window, q=q, lag=1)
-        
+
         # Inject the swept threshold into core for detection
         core_sweep = core.copy()
         core_sweep["t_shock_dynamic"] = t_series
-        
+
         events = _detect_events_with_threshold(core_sweep, symbol, cfg, t_shock=np.nan)
-        
+
         # For metadata, use the mean or last valid threshold value as a proxy for the 'scalar' threshold
         avg_t = float(t_series.mean())
-        
+
         rows.append(
             {
                 "symbol": symbol,
@@ -396,20 +428,25 @@ def calibrate_shock_threshold(
             break
     if sel is None:
         # fall back to highest quantile
-        sel = rows[-1] if rows else {
-            "symbol": symbol,
-            "shock_quantile": np.nan,
-            "t_shock": np.nan,
-            "event_count": 0,
-            "min_events": min_events,
-            "meets_min_events": False,
-        }
+        sel = (
+            rows[-1]
+            if rows
+            else {
+                "symbol": symbol,
+                "shock_quantile": np.nan,
+                "t_shock": np.nan,
+                "event_count": 0,
+                "min_events": min_events,
+                "meets_min_events": False,
+            }
+        )
     # Append selected threshold info
     sel = sel.copy()
     sel["selected_quantile"] = sel["shock_quantile"]
     sel["selected_t_shock"] = sel["t_shock"]
     sel["selected_event_count"] = sel["event_count"]
     return dfq, sel
+
 
 def detect_liquidity_vacuum_events(
     df: pd.DataFrame,
@@ -438,8 +475,11 @@ def detect_liquidity_vacuum_events(
         Detected events with metrics.  Empty DataFrame if no events.
     """
     from project.events.shared import EVENT_COLUMNS
+
     core = _compute_core_series(df, cfg)
     # If t_shock is provided, it overrides dynamic threshold
     # If not provided and mode is prefit, we would need a prefit value (not implemented yet in this helper)
     # For now, if t_shock is None, it uses the dynamic threshold computed in _compute_core_series
-    return _detect_events_with_threshold(core, symbol, cfg, t_shock if t_shock is not None else np.nan)
+    return _detect_events_with_threshold(
+        core, symbol, cfg, t_shock if t_shock is not None else np.nan
+    )

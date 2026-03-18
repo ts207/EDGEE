@@ -9,16 +9,19 @@ import pandas as pd
 
 _LOG = logging.getLogger(__name__)
 
+
 class OrderUrgency(enum.Enum):
     BASE = "base"
     PASSIVE = "passive"
     AGGRESSIVE = "aggressive"
     DELAYED_AGGRESSIVE = "delayed_aggressive"
 
+
 class ExecutionProfile(enum.Enum):
     BASE = "base"
     OPTIMISTIC = "optimistic"
     STRESSED = "stressed"
+
 
 def calculate_fill_probability(
     order_size: float,
@@ -62,6 +65,7 @@ def calculate_fill_probability(
     fill_prob = base_prob * profile_mult * participation_impact * vol_impact
     return float(np.clip(fill_prob, 0.0, 1.0))
 
+
 def estimate_fill_details(
     order_size: float,
     price: float,
@@ -77,10 +81,10 @@ def estimate_fill_details(
     prob = calculate_fill_probability(
         order_size, liquidity_available, spread_bps, vol_regime, urgency, profile
     )
-    
+
     # Simple Monte Carlo for fill if needed, but here we return expectation
     # In backtest we might want to use the prob to decide if filled or use it for scaling
-    
+
     return {
         "fill_probability": prob,
         "expected_filled_quantity": order_size * prob,

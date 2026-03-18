@@ -29,9 +29,13 @@ def summarize_portfolio_ledger(frame: pd.DataFrame) -> Dict[str, float]:
         }
 
     net_pnl = pd.to_numeric(frame.get("portfolio_net_pnl", 0.0), errors="coerce").fillna(0.0)
-    equity_return = pd.to_numeric(frame.get("portfolio_equity_return", 0.0), errors="coerce").fillna(0.0)
+    equity_return = pd.to_numeric(
+        frame.get("portfolio_equity_return", 0.0), errors="coerce"
+    ).fillna(0.0)
     equity = pd.to_numeric(frame.get("portfolio_equity", 0.0), errors="coerce").fillna(0.0)
-    gross_exposure = pd.to_numeric(frame.get("portfolio_gross_exposure", 0.0), errors="coerce").fillna(0.0)
+    gross_exposure = pd.to_numeric(
+        frame.get("portfolio_gross_exposure", 0.0), errors="coerce"
+    ).fillna(0.0)
     turnover = pd.to_numeric(frame.get("portfolio_turnover", 0.0), errors="coerce").fillna(0.0)
 
     running_peak = equity.cummax().replace(0.0, np.nan)
@@ -54,11 +58,7 @@ def entry_count(frame: pd.DataFrame) -> int:
     if frame.empty:
         return 0
     pos_col = next(
-        (
-            col
-            for col in ("executed_position", "signal_position")
-            if col in frame.columns
-        ),
+        (col for col in ("executed_position", "signal_position") if col in frame.columns),
         None,
     )
     if pos_col is None:
