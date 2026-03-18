@@ -156,10 +156,15 @@ Use the maintained benchmark set deliberately. Do not assume every benchmark in 
 
 Current operator default:
 
+- use the terminal entrypoint for a quick summary of the latest maintained state:
+  - `PYTHONPATH=. python3 project/scripts/show_benchmark_review.py`
 - start with the latest verified benchmark review artifact:
-  - [/tmp/benchmark_research_family_v1_post_zscore_20260318/benchmark_review.json](/tmp/benchmark_research_family_v1_post_zscore_20260318/benchmark_review.json)
+  - [data/reports/benchmarks/latest/benchmark_review.json](../data/reports/benchmarks/latest/benchmark_review.json)
 - use `VOL_SHOCK` as the maintained non-empty live context-comparison slice
 - use `ZSCORE_STRETCH` as the maintained live statistical-dislocation comparison slice
+- use `LIQUIDITY_GAP_PRINT` as the maintained live liquidity-dislocation comparison slice
+- use `OI_SPIKE_POSITIVE` as the maintained live positioning-extremes comparison slice
+- use `SPREAD_BLOWOUT` as the maintained live execution-friction comparison slice
 - use `FALSE_BREAKOUT` quality-boundary mode when you need to see confidence-aware context demote a benchmark decision rather than merely reduce `n`
 - use synthetic `BASIS_DISLOC` as the maintained synthetic statistical-dislocation authority
 - do not treat live `FND_DISLOC` as a current maintained benchmark; it has been superseded by the `ZSCORE_STRETCH` live slice

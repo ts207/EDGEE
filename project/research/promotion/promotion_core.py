@@ -15,6 +15,7 @@ from project.research.promotion.promotion_reporting import (
     portfolio_diversification_violations,
     build_promotion_capital_footprint,
 )
+from project.research.services.benchmark_governance_service import get_benchmark_certification_for_family
 
 
 def _current_data_root():
@@ -68,13 +69,23 @@ def promote_candidates(
     ontology_hash = str(promotion_spec.get("ontology_spec_hash", ""))
     promotion_confirmatory_gates = promotion_spec.get("promotion_confirmatory_gates")
 
+    # Pre-cache benchmark certifications for involved families
+    unique_families = set(df["family"].dropna().unique()) if "family" in df.columns else set()
+    benchmark_certs = {}
+    for fam in unique_families:
+        benchmark_certs[fam] = get_benchmark_certification_for_family(family=fam)
+
     for row in df.to_dict(orient="records"):
         event_type = str(row.get("event_type", row.get("event", ""))).strip()
+        family = str(row.get("family", "")).strip()
+        
         row_min_events = max(
             int(base_min_events),
             int(dynamic_min_events.get(event_type.upper(), base_min_events)),
         )
 
+        bench_cert = benchmark_certs.get(family)
+        
         eval_row = evaluate_row(
             row=row,
             hypothesis_index=hypothesis_index,
@@ -100,6 +111,7 @@ def promote_candidates(
             enforce_baseline_beats_complexity=enforce_baseline_beats_complexity,
             enforce_placebo_controls=enforce_placebo_controls,
             enforce_timeframe_consensus=enforce_timeframe_consensus,
+            benchmark_certification=bench_cert,
         )
         merged = dict(row)
         merged.update(eval_row)

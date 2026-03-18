@@ -31,11 +31,14 @@ from project.research.services.context_mode_comparison_service import (
     write_context_mode_comparison_report,
 )
 from project.research.services.live_data_foundation_service import write_live_data_foundation_report
+
 REPO_ROOT = PROJECT_ROOT.parent
 DATA_ROOT = get_data_root()
 
+
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
 
 def _build_run_command(
     *,
@@ -83,6 +86,7 @@ def _build_run_command(
 
     return cmd
 
+
 def _ensure_dir(path: Path) -> None:
     path.mkdir(parents=True, exist_ok=True)
 
@@ -114,14 +118,19 @@ def _generate_post_run_reports(
 
     live_cfg = reports_cfg.get("live_foundation")
     if isinstance(live_cfg, dict) and bool(live_cfg.get("enabled", True)) and primary_symbol:
-        config_path = _resolve_repo_path(str(live_cfg.get("config", "")).strip()) if str(live_cfg.get("config", "")).strip() else None
+        config_path = (
+            _resolve_repo_path(str(live_cfg.get("config", "")).strip())
+            if str(live_cfg.get("config", "")).strip()
+            else None
+        )
         out_path = write_live_data_foundation_report(
             data_root=data_root,
             run_id=run_id,
             symbol=primary_symbol,
             timeframe=timeframe,
             market=market,
-            feature_schema_version=str(live_cfg.get("feature_schema_version", "v2")).strip() or "v2",
+            feature_schema_version=str(live_cfg.get("feature_schema_version", "v2")).strip()
+            or "v2",
             config_path=config_path,
         )
         generated["live_foundation"] = str(out_path)
@@ -147,8 +156,11 @@ def _generate_post_run_reports(
 
     return generated
 
+
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Run a reproducible benchmark matrix for run_all.py.")
+    parser = argparse.ArgumentParser(
+        description="Run a reproducible benchmark matrix for run_all.py."
+    )
     parser.add_argument(
         "--matrix",
         default=str(REPO_ROOT / "spec" / "benchmarks" / "retail_m0_matrix.yaml"),
@@ -174,7 +186,9 @@ def main() -> int:
         default=None,
         help="Output directory. Defaults to data/reports/perf_benchmarks/<matrix_id>_<timestamp>.",
     )
-    parser.add_argument("--execute", type=int, default=0, help="If 1, execute commands. If 0, dry-run only.")
+    parser.add_argument(
+        "--execute", type=int, default=0, help="If 1, execute commands. If 0, dry-run only."
+    )
     parser.add_argument("--fail_fast", type=int, default=1, help="If 1, stop on first failed run.")
     args = parser.parse_args()
 
@@ -276,16 +290,20 @@ def main() -> int:
                 except Exception:
                     pass
     else:
-        prior_path = Path(matrix.get("prior_baseline", "")).resolve() if matrix.get("prior_baseline") else None
+        prior_path = (
+            Path(matrix.get("prior_baseline", "")).resolve()
+            if matrix.get("prior_baseline")
+            else None
+        )
         if prior_path and prior_path.exists():
             try:
                 prior_review = json.loads(prior_path.read_text(encoding="utf-8"))
             except Exception:
                 pass
-    
+
     thresholds_path = REPO_ROOT / "spec" / "benchmarks" / "benchmark_acceptance_thresholds.yaml"
     thresholds = load_acceptance_thresholds(thresholds_path)
-    
+
     cert = certify_benchmark_review(
         current_review=review,
         prior_review=prior_review,
@@ -307,14 +325,17 @@ def main() -> int:
     print(f"[matrix] wrote summary: {summary_paths['json']}")
     print(f"[matrix] wrote review: {review_paths['json']}")
     print(f"[matrix] wrote certification: {cert_paths['json']}")
-    
+
     if not cert["passed"]:
-        print(f"[matrix] WARNING: Benchmark certification FAILED with {cert['issue_count']} issues.")
+        print(
+            f"[matrix] WARNING: Benchmark certification FAILED with {cert['issue_count']} issues."
+        )
 
     if not execute:
         print("[matrix] dry-run only. Re-run with --execute 1 to run commands.")
 
     return 1 if (failures > 0 or not cert["passed"]) else 0
+
 
 if __name__ == "__main__":
     raise SystemExit(main())

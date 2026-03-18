@@ -46,8 +46,8 @@ class OISpikePositiveDetector(BaseOIShockDetector):
         mean = baseline.rolling(window=window, min_periods=min_periods).mean()
         std = baseline.rolling(window=window, min_periods=min_periods).std()
         oi_z = (oi_log_delta - mean) / std.where(std > 0.0, 1e-12)
-        close_ret = pd.to_numeric(df['close'], errors='coerce').astype(float).pct_change(1)
-        spike_z_th = float(params.get('spike_z_th', params.get('threshold', 2.5)))
+        close_ret = pd.to_numeric(df['close'], errors='coerce').astype(float).pct_change(periods=1)
+        spike_z_th = float(params.get('spike_z_th', params.get('threshold', 2.0)))
         mask = (oi_z >= spike_z_th) & (close_ret > 0)
         canonical_oi_accel = state_at_least(
             df,
@@ -60,7 +60,7 @@ class OISpikePositiveDetector(BaseOIShockDetector):
         return {
             'oi_z': oi_z, 
             'close_ret': close_ret, 
-            'oi_pct_change': oi.pct_change(1),
+            'oi_pct_change': oi.pct_change(periods=1),
             'canonical_oi_accel': canonical_oi_accel,
             'mask': mask.fillna(False)
         }
@@ -85,7 +85,7 @@ class OISpikeNegativeDetector(BaseOIShockDetector):
         mean = baseline.rolling(window=window, min_periods=min_periods).mean()
         std = baseline.rolling(window=window, min_periods=min_periods).std()
         oi_z = (oi_log_delta - mean) / std.where(std > 0.0, 1e-12)
-        close_ret = pd.to_numeric(df['close'], errors='coerce').astype(float).pct_change(1)
+        close_ret = pd.to_numeric(df['close'], errors='coerce').astype(float).pct_change(periods=1)
         spike_z_th = float(params.get('spike_z_th', params.get('threshold', 2.5)))
         mask = (oi_z >= spike_z_th) & (close_ret < 0)
         canonical_oi_accel = state_at_least(
@@ -99,7 +99,7 @@ class OISpikeNegativeDetector(BaseOIShockDetector):
         return {
             'oi_z': oi_z, 
             'close_ret': close_ret, 
-            'oi_pct_change': oi.pct_change(1),
+            'oi_pct_change': oi.pct_change(periods=1),
             'canonical_oi_accel': canonical_oi_accel,
             'mask': mask.fillna(False)
         }
@@ -119,8 +119,8 @@ class OIFlushDetector(BaseOIShockDetector):
         window = int(params.get('oi_window', 96))
         min_periods = int(params.get('min_periods', max(24, window // 4)))
         oi = pd.to_numeric(df['oi_notional'], errors='coerce').replace(0.0, np.nan).astype(float)
-        oi_pct_change = oi.pct_change(1)
-        close_ret = pd.to_numeric(df['close'], errors='coerce').astype(float).pct_change(1)
+        oi_pct_change = oi.pct_change(periods=1)
+        close_ret = pd.to_numeric(df['close'], errors='coerce').astype(float).pct_change(periods=1)
         oi_log_delta = np.log(oi).diff()
         baseline = oi_log_delta.shift(1)
         mean = baseline.rolling(window=window, min_periods=min_periods).mean()

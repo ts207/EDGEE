@@ -8,6 +8,7 @@ from typing import Any, Dict, List
 
 from project.core.config import get_data_root
 
+
 def find_latest_review(data_root: Path) -> Path | None:
     # Check benchmarks/latest first
     latest_link = data_root / "reports" / "benchmarks" / "latest" / "benchmark_review.json"
@@ -20,21 +21,22 @@ def find_latest_review(data_root: Path) -> Path | None:
     if candidates:
         candidates.sort(key=lambda x: x.stat().st_mtime, reverse=True)
         return candidates[0]
-    
+
     return None
+
 
 def find_historical_reviews(matrix_id: str, limit: int = 5) -> List[Path]:
     data_root = get_data_root()
     h_path = data_root / "reports" / "benchmarks" / "history"
     if not h_path.exists():
         return []
-    
+
     runs = sorted(
         [d for d in h_path.iterdir() if d.is_dir() and d.name.startswith(f"{matrix_id}_")],
         key=lambda x: x.name,
-        reverse=True
+        reverse=True,
     )
-    
+
     reviews = []
     for r in runs:
         review_file = r / "benchmark_review.json"
@@ -44,15 +46,23 @@ def find_historical_reviews(matrix_id: str, limit: int = 5) -> List[Path]:
                 break
     return reviews
 
+
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Show the latest benchmark review in the terminal.")
+    parser = argparse.ArgumentParser(
+        description="Show the latest benchmark review in the terminal."
+    )
     parser.add_argument("--path", help="Path to benchmark_review.json. If omitted, find latest.")
-    parser.add_argument("--compare-history", type=int, default=0, help="Number of historical runs to compare side-by-side.")
+    parser.add_argument(
+        "--compare-history",
+        type=int,
+        default=0,
+        help="Number of historical runs to compare side-by-side.",
+    )
     args = parser.parse_args()
 
     data_root = get_data_root()
     review_path: Path | None = None
-    
+
     if args.path:
         review_path = Path(args.path)
     else:
@@ -78,13 +88,13 @@ def main() -> int:
             pass
 
     # Simple terminal output
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print(f"BENCHMARK REVIEW: {review.get('matrix_id', 'unknown')}")
     if cert:
         status_str = "PASS" if cert.get("passed") else "FAIL"
         print(f"CERTIFICATION: {status_str} ({cert.get('issue_count', 0)} issues)")
-    print("="*80)
-    
+    print("=" * 80)
+
     status_counts = review.get("status_counts", {})
     print("\nSTATUS COUNTS:")
     for status, count in sorted(status_counts.items()):
@@ -93,14 +103,18 @@ def main() -> int:
     slices = review.get("slices", [])
     if slices:
         print("\nSLICES:")
-        
+
         # Historical comparison?
         matrix_id = review.get("matrix_id", "matrix")
-        historical_paths = find_historical_reviews(matrix_id, limit=args.compare_history + 1) if args.compare_history > 0 else []
+        historical_paths = (
+            find_historical_reviews(matrix_id, limit=args.compare_history + 1)
+            if args.compare_history > 0
+            else []
+        )
         # Exclude current review if it's in history
         historical_paths = [p for p in historical_paths if p.resolve() != review_path.resolve()]
-        historical_paths = historical_paths[:args.compare_history]
-        
+        historical_paths = historical_paths[: args.compare_history]
+
         historical_reviews = []
         for hp in historical_paths:
             try:
@@ -120,26 +134,30 @@ def main() -> int:
                 found = s.get("live_foundation_readiness", "")[:10]
                 hard = s.get("hard_evaluated_rows", 0)
                 conf = s.get("confidence_evaluated_rows", 0)
-                print(f"{family:<25} | {event:<15} | {status:<15} | {found:<10} | {hard:<5} | {conf:<5}")
+                print(
+                    f"{family:<25} | {event:<15} | {status:<15} | {found:<10} | {hard:<5} | {conf:<5}"
+                )
         else:
             # Comparison Header
             header = f"{'Family':<25} | {'Event':<15} | {'Current (Hard)':<15}"
             for i, hr in enumerate(historical_reviews):
                 # Use timestamp from path if possible
-                ts = hr.get("created_at_utc", f"Past {i+1}")[:10]
+                ts = hr.get("created_at_utc", f"Past {i + 1}")[:10]
                 header += f" | {ts:<15}"
             print(header)
             print("-" * len(header))
-            
+
             for s in slices:
                 bid = s.get("benchmark_id")
                 family = s.get("family", "")[:25]
                 event = s.get("event_type", "")[:15]
                 hard = s.get("hard_evaluated_rows", 0)
-                
+
                 row_str = f"{family:<25} | {event:<15} | {hard:<15}"
                 for hr in historical_reviews:
-                    hs = next((hs for hs in hr.get("slices", []) if hs.get("benchmark_id") == bid), {})
+                    hs = next(
+                        (hs for hs in hr.get("slices", []) if hs.get("benchmark_id") == bid), {}
+                    )
                     h_hard = hs.get("hard_evaluated_rows", "-")
                     row_str += f" | {h_hard:<15}"
                 print(row_str)
@@ -147,11 +165,15 @@ def main() -> int:
     if cert and cert.get("issues"):
         print("\nCERTIFICATION ISSUES:")
         for issue in cert["issues"]:
-            print(f"  - [{issue.get('severity').upper()}] {issue.get('benchmark_id')}: {issue.get('message')}")
+            print(
+                f"  - [{issue.get('severity').upper()}] {issue.get('benchmark_id')}: {issue.get('message')}"
+            )
 
-    print("\n" + "="*80 + "\n")
+    print("\n" + "=" * 80 + "\n")
     return 0
+
 
 if __name__ == "__main__":
     import sys
+
     sys.exit(main())

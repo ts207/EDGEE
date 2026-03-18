@@ -54,6 +54,7 @@ def evaluate_row(
     enforce_regime_stability: bool = True,
     policy_version: str = "phase4_pr5_v1",
     bundle_version: str = "phase4_bundle_v1",
+    benchmark_certification: Dict[str, Any] | None = None,
 ) -> Dict[str, Any]:
     try:
         from project.research.promotion.promotion_eligibility import _ReasonRecorder
@@ -61,6 +62,18 @@ def evaluate_row(
 
         reasons = _ReasonRecorder.create()
         event_type = str(row.get("event_type", row.get("event", ""))).strip() or "UNKNOWN_EVENT"
+        
+        # Benchmark Certification Gate
+        bench_pass = True
+        if benchmark_certification:
+            bench_pass = bool(benchmark_certification.get("passed", False))
+            if not bench_pass:
+                reasons.add_pair(
+                    reject_reason=f"benchmark_{benchmark_certification.get('status', 'failed')}",
+                    promo_fail_reason="gate_promo_benchmark_certification",
+                    category="benchmark_integrity",
+                )
+        
         plan_row_id = str(row.get("plan_row_id", "")).strip()
         n_events = _quiet_int(row.get("n_events", row.get("sample_size", 0)), 0)
         q_value = coerce_numeric_nan(row.get("q_value"))
@@ -199,6 +212,7 @@ def evaluate_row(
             is_trade_trigger=is_trade_trigger,
             max_q_value=max_q_value,
             promotion_profile=promotion_profile,
+            benchmark_pass=bench_pass,
         )
         result["is_continuation_template_family"] = continuation_eval["is_continuation_template_family"]
         result["gate_bridge_tradable"] = "pass" if continuation_eval["bridge_tradable"] else "fail"

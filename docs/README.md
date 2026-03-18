@@ -70,7 +70,24 @@ Use these docs when you need to answer a specific operator question.
 
 Current verified artifact baseline:
 
-- [/tmp/benchmark_research_family_v1_post_zscore_20260318/benchmark_review.json](/tmp/benchmark_research_family_v1_post_zscore_20260318/benchmark_review.json)
+- [data/reports/benchmarks/latest/benchmark_review.json](../data/reports/benchmarks/latest/benchmark_review.json)
+
+## Benchmark Governance
+
+Maintain the benchmark suite and certify reruns:
+
+```bash
+# Full maintenance cycle (re-run, certify, report)
+PYTHONPATH=. python3 project/scripts/run_benchmark_maintenance_cycle.py
+
+# Quick terminal review
+PYTHONPATH=. python3 project/scripts/show_benchmark_review.py
+```
+
+Core docs:
+- [Benchmark Status](./BENCHMARK_STATUS.md)
+- [Benchmark Governance Runbook](./BENCHMARK_GOVERNANCE_RUNBOOK.md)
+- [Benchmark Triage Guide](./BENCHMARK_TRIAGE.md)
 
 ## Core Policy Docs
 

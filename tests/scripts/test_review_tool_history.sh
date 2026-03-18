@@ -3,5 +3,5 @@ set -e
 
 echo "Running smoke test for show_benchmark_review.py --compare-history..."
 
-# This should FAIL because --compare-history doesn't exist yet
+# This verifies side-by-side historical row count comparison
 PYTHONPATH=. python3 project/scripts/show_benchmark_review.py --compare-history 3

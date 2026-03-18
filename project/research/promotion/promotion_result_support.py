@@ -73,6 +73,7 @@ def _assemble_promotion_result(
     is_trade_trigger: bool,
     max_q_value: float,
     promotion_profile: str,
+    benchmark_pass: bool = True,
 ) -> Dict[str, Any]:
     promoted = bool(
         statistical_pass
@@ -92,6 +93,7 @@ def _assemble_promotion_result(
         and multiplicity_pass
         and robustness_pass
         and regime_pass
+        and benchmark_pass
         and (retail_viability_pass or not bool(require_retail_viability))
         and (low_capital_viability_pass or not bool(require_low_capital_viability))
     )
@@ -185,4 +187,5 @@ def _assemble_promotion_result(
         "gate_promo_delayed_entry_stress": "pass" if delayed_entry_pass else "fail",
         "gate_promo_timeframe_consensus": "pass" if timeframe_consensus_pass else "fail",
         "gate_promo_continuation_quality": "pass" if continuation_quality_pass else "fail",
+        "gate_promo_benchmark_certification": "pass" if benchmark_pass else "fail",
     }

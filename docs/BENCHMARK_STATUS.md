@@ -6,17 +6,40 @@ Use it with [Research Operator Playbook](./RESEARCH_OPERATOR_PLAYBOOK.md), not i
 
 ## Current Verified Baseline
 
-The latest verified maintained benchmark rerun is:
+The latest verified maintained benchmark rerun is available at:
 
-- review artifact: [/tmp/benchmark_research_family_v1_post_zscore_20260318/benchmark_review.json](/tmp/benchmark_research_family_v1_post_zscore_20260318/benchmark_review.json)
-- summary artifact: [/tmp/benchmark_research_family_v1_post_zscore_20260318/benchmark_summary.json](/tmp/benchmark_research_family_v1_post_zscore_20260318/benchmark_summary.json)
+- review artifact: [data/reports/benchmarks/latest/benchmark_review.json](../data/reports/benchmarks/latest/benchmark_review.json)
+- summary artifact: [data/reports/benchmarks/latest/benchmark_summary.json](../data/reports/benchmarks/latest/benchmark_summary.json)
+- certification artifact: [data/reports/benchmarks/latest/benchmark_certification.json](../data/reports/benchmarks/latest/benchmark_certification.json)
+
+### Quick Terminal Review
+
+Use the operator script for a quick terminal summary of the latest maintained review and certification:
+
+```bash
+PYTHONPATH=. python3 project/scripts/show_benchmark_review.py
+```
+
+### Unified Maintenance Cycle
+
+To rebuild the benchmark matrix and certify the results in one command:
+
+```bash
+PYTHONPATH=. python3 project/scripts/run_benchmark_maintenance_cycle.py
+```
+
+Results are archived in `data/reports/benchmarks/history/` and linked to `data/reports/benchmarks/latest/`.
+
+### Governance and Triage
+
+Maintainers should follow the [Benchmark Governance Runbook](./BENCHMARK_GOVERNANCE_RUNBOOK.md) for standard workflows.
+Follow the [Benchmark Triage Guide](./BENCHMARK_TRIAGE.md) when certification fails.
+Per-slice acceptance floors are codified in [benchmark_acceptance_thresholds.yaml](../spec/benchmarks/benchmark_acceptance_thresholds.yaml).
 
 That rerun produced this current maintained status mix:
 
-- `informative = 2`
+- `informative = 5`
 - `quality_boundary = 1`
-
-Use that review artifact as the concrete starting point for operator interpretation, then drill into the per-slice reports below.
 
 ## How To Read This
 
@@ -35,7 +58,6 @@ Use that review artifact as the concrete starting point for operator interpretat
   - spec: [search_benchmark_vol_shock.yaml](../spec/search/search_benchmark_vol_shock.yaml)
   - status: `informative`
   - why: live BTC 2024Q1 slice produces a real non-empty hard-label vs confidence-aware comparison artifact and a maintained live-foundation report
-  - current verified result: same selected hypothesis remains valid in both modes, with confidence-aware context reducing usable support
   - report locations:
     - `data/reports/context_mode_comparison/bench_vol_shock_btc_2024q1/context_mode_comparison.json`
     - `data/reports/live_foundation/bench_vol_shock_btc_2024q1/perp/BTCUSDT/5m/live_data_foundation_report.json`
@@ -46,17 +68,43 @@ Use that review artifact as the concrete starting point for operator interpretat
   - run: `bench_zscore_stretch_btc_2025jan`
   - spec: [search_benchmark_zscore_stretch_live.yaml](../spec/search/search_benchmark_zscore_stretch_live.yaml)
   - status: `informative`
-  - why:
-    - current-contract BTC January 2025 live run produces a non-empty comparison artifact
-    - live foundation is `warn`, not `blocked`
-    - this is now the maintained live statistical-dislocation comparison slice
-  - current verified result:
-    - both hard-label and confidence-aware modes evaluate rows
-    - `selection_changed = false`
-    - `selection_outcome_changed = false`
+  - why: now the maintained live statistical-dislocation comparison slice
   - report locations:
     - `data/reports/context_mode_comparison/bench_zscore_stretch_btc_2025jan/context_mode_comparison.json`
     - `data/reports/live_foundation/bench_zscore_stretch_btc_2025jan/perp/BTCUSDT/5m/live_data_foundation_report.json`
+
+### Informative Live Liquidity-Dislocation Slice
+
+- `LIQUIDITY_GAP_PRINT`
+  - run: `bench_liq_gap_btc_2025jan`
+  - spec: [search_benchmark_liquidity_gap.yaml](../spec/search/search_benchmark_liquidity_gap.yaml)
+  - status: `informative`
+  - why: first maintained live liquidity-dislocation comparison slice
+  - report locations:
+    - `data/reports/context_mode_comparison/bench_liq_gap_btc_2025jan/context_mode_comparison.json`
+    - `data/reports/live_foundation/bench_liq_gap_btc_2025jan/perp/BTCUSDT/5m/live_data_foundation_report.json`
+
+### Informative Live Positioning-Extremes Slice
+
+- `OI_SPIKE_POSITIVE`
+  - run: `bench_positioning_btc_2025jan`
+  - spec: [search_benchmark_positioning.yaml](../spec/search/search_benchmark_positioning.yaml)
+  - status: `informative`
+  - why: first maintained live positioning-extremes comparison slice
+  - report locations:
+    - `data/reports/context_mode_comparison/bench_positioning_btc_2025jan/context_mode_comparison.json`
+    - `data/reports/live_foundation/bench_positioning_btc_2025jan/perp/BTCUSDT/5m/live_data_foundation_report.json`
+
+### Informative Live Execution-Friction Slice
+
+- `SPREAD_BLOWOUT`
+  - run: `bench_execution_btc_2025jan`
+  - spec: [search_benchmark_execution.yaml](../spec/search/search_benchmark_execution.yaml)
+  - status: `informative`
+  - why: first maintained live execution-friction comparison slice
+  - report locations:
+    - `data/reports/context_mode_comparison/bench_execution_btc_2025jan/context_mode_comparison.json`
+    - `data/reports/live_foundation/bench_execution_btc_2025jan/perp/BTCUSDT/5m/live_data_foundation_report.json`
 
 ### Quality-Boundary Comparison Slice
 
@@ -64,9 +112,7 @@ Use that review artifact as the concrete starting point for operator interpretat
   - run: `bench_false_breakout_btc_2024q1`
   - spec: [search_benchmark_false_breakout_quality_boundary.yaml](../spec/search/search_benchmark_false_breakout_quality_boundary.yaml)
   - status: `quality_boundary`
-  - why: with `min_sample_size = 34`, hard-label mode keeps the selected candidate valid while confidence-aware mode demotes the same selected hypothesis below the sample floor
-  - interpretation: this is a maintained decision-boundary slice, not just a sample-count delta slice
-  - current verified result: same selected hypothesis id, but different benchmark decision outcome
+  - why: maintained decision-boundary slice for context-quality demotion checks
   - report location:
     - `data/reports/context_mode_comparison/bench_false_breakout_btc_2024q1/context_mode_comparison.json`
 
@@ -76,7 +122,6 @@ Use that review artifact as the concrete starting point for operator interpretat
   - run: `synthetic_2025_full_year_v9`
   - spec: [search_benchmark_basis_disloc_synth.yaml](../spec/search/search_benchmark_basis_disloc_synth.yaml)
   - status: maintained synthetic authority for statistical-dislocation comparison
-  - why: this slice remains the clean synthetic comparison baseline for the family even after the live `ZSCORE_STRETCH` promotion
   - report location:
     - `data/reports/context_mode_comparison/synth_basis_disloc_2025_full_year_v9/context_mode_comparison.json`
 
@@ -84,22 +129,33 @@ Use that review artifact as the concrete starting point for operator interpretat
 
 - `FND_DISLOC`
   - prior run: `bench_fnd_disloc_btc_2024q1`
-  - prior status: `foundation_only`
-  - current policy:
-    - no longer part of the maintained matrix
-    - do not use it as the maintained live statistical-dislocation comparison benchmark
-  - why: `ZSCORE_STRETCH` on BTC January 2025 now provides a stronger current-contract live comparison surface
+  - current policy: retired from maintained matrix; superseded by `ZSCORE_STRETCH`
 
 ## Operator Rule
 
 When a new agent needs one benchmark per class:
 
-1. start with the latest verified matrix review artifact under `/tmp/benchmark_research_family_v1_post_zscore_20260318/`
+1. start with the latest verified matrix review artifact under `data/reports/benchmarks/latest/`
 2. use `VOL_SHOCK` for non-empty live context-comparison behavior in the volatility family
 3. use `ZSCORE_STRETCH` for the maintained live statistical-dislocation comparison slice
-4. use `FALSE_BREAKOUT` quality-boundary for confidence-aware demotion behavior
-5. use synthetic `BASIS_DISLOC` as the maintained synthetic statistical-dislocation authority
-6. do not route new operator work through live `FND_DISLOC` unless you are explicitly investigating that retired slot
+4. use `LIQUIDITY_GAP_PRINT` for the maintained live liquidity-dislocation comparison slice
+5. use `OI_SPIKE_POSITIVE` for the maintained live positioning-extremes comparison slice
+6. use `SPREAD_BLOWOUT` for the maintained live execution-friction comparison slice
+7. use `FALSE_BREAKOUT` quality-boundary for confidence-aware demotion behavior
+8. use synthetic `BASIS_DISLOC` as the maintained synthetic statistical-dislocation authority
+9. do not route new operator work through live `FND_DISLOC` unless you are explicitly investigating that retired slot
+
+## Current Coverage Boundary
+
+- the maintained set covers: `stability`, `quality-boundary demotion`, and `statistical-dislocation comparison`
+- the maintained set does NOT currently cover: `selection_changed = true` (cases where confidence-aware mode changes the winning hypothesis_id)
+
+## Platform Strategy Shift
+
+Effort is shifting from searching for selection flips in BTC history to broader live historical coverage:
+- focus on `LIQUIDITY_DISLOCATION`, `POSITIONING_EXTREMES`, and `EXECUTION_FRICTION` families
+- expand beyond BTC-first coverage
+- revisit selection-flip search only after new live data or materially different regime definitions are introduced
 
 ## Current Bottom Line
 
