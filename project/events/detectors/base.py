@@ -14,6 +14,7 @@ class BaseEventDetector(ABC):
     required_columns: tuple[str, ...] = ("timestamp",)
     timeframe_minutes: int = 5
     default_severity: str = "moderate"
+    causal: bool = True
 
     def check_required_columns(self, df: pd.DataFrame) -> None:
         missing = [column for column in self.required_columns if column not in df.columns]
@@ -96,7 +97,7 @@ class BaseEventDetector(ABC):
             current_event_type = self.compute_event_type(idx, features)
             severity = self.compute_severity(idx, intensity, features, **params)
             direction = self.compute_direction(idx, features, **params)
-            meta = self.compute_metadata(idx, features, **params)
+            meta = {"causal": bool(self.causal), **dict(self.compute_metadata(idx, features, **params))}
             
             row = emit_event(
                 event_type=current_event_type,
@@ -107,7 +108,7 @@ class BaseEventDetector(ABC):
                 severity=severity,
                 timeframe_minutes=self.timeframe_minutes,
                 direction=direction,
-                sign=1 if direction == "up" else -1 if direction == "down" else 0,
+                causal=self.causal,
                 metadata={
                     "event_idx": int(idx),
                     **meta

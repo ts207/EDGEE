@@ -131,7 +131,7 @@ class FlowExhaustionDetector(CompositeDetector):
     def compute_direction(self, idx: int, features: Mapping[str, pd.Series], **params: Any) -> str:
         del params
         direction = float(features["direction"].iloc[idx] if not pd.isna(features["direction"].iloc[idx]) else 0.0)
-        return "long" if direction < 0 else "short" if direction > 0 else "non_directional"
+        return "up" if direction < 0 else "down" if direction > 0 else "non_directional"
 
     def event_indices(self, df: pd.DataFrame, *, features: Mapping[str, pd.Series], **params: Any) -> list[int]:
         mask = self.compute_raw_mask(df, features=features, **params)
@@ -340,7 +340,7 @@ class PostDeleveragingReboundDetector(CompositeDetector):
     def compute_direction(self, idx: int, features: dict[str, pd.Series], **params: Any) -> str:
         del params
         rebound = float(features["rebound_ret"].iloc[idx] if not pd.isna(features["rebound_ret"].iloc[idx]) else 0.0)
-        return "long" if rebound > 0 else "short" if rebound < 0 else "non_directional"
+        return "up" if rebound > 0 else "down" if rebound < 0 else "non_directional"
 
 
 class TrendExhaustionDetector(CompositeDetector):
@@ -459,7 +459,7 @@ class TrendExhaustionDetector(CompositeDetector):
     def compute_direction(self, idx: int, features: Mapping[str, pd.Series], **params: Any) -> str:
         del params
         trend = float(features["trend"].iloc[idx] if not pd.isna(features["trend"].iloc[idx]) else 0.0)
-        return "short" if trend > 0 else "long" if trend < 0 else "non_directional"
+        return "down" if trend > 0 else "up" if trend < 0 else "non_directional"
 
     def event_indices(self, df: pd.DataFrame, *, features: Mapping[str, pd.Series], **params: Any) -> list[int]:
         mask = self.compute_raw_mask(df, features=features, **params)
@@ -559,7 +559,7 @@ class MomentumDivergenceDetector(ThresholdDetector):
     def compute_direction(self, idx: int, features: Mapping[str, pd.Series], **params: Any) -> str:
         del params
         accel = float(features["mom_fast"].iloc[idx] - features["mom_slow"].iloc[idx])
-        return "short" if accel < 0 else "long" if accel > 0 else "non_directional"
+        return "down" if accel < 0 else "up" if accel > 0 else "non_directional"
 
 
 class ClimaxVolumeDetector(ThresholdDetector):
@@ -686,9 +686,9 @@ class FailedContinuationDetector(ThresholdDetector):
     def compute_direction(self, idx: int, features: Mapping[str, pd.Series], **params: Any) -> str:
         del params
         if bool(features["failed_up"].iloc[idx]):
-            return "short"
+            return "down"
         if bool(features["failed_dn"].iloc[idx]):
-            return "long"
+            return "up"
         return "non_directional"
 
     def event_indices(self, df: pd.DataFrame, *, features: Mapping[str, pd.Series], **params: Any) -> list[int]:

@@ -43,6 +43,7 @@ Use these when the work touches policy defaults, package surfaces, or detector q
 
 - [Research Calibration Baseline](./RESEARCH_CALIBRATION_BASELINE.md)
 - [Future Milestones](./FUTURE_MILESTONES.md)
+- [Detector Hardening Guide](./DETECTOR_HARDENING_GUIDE.md)
 - [Architecture Surface Inventory](./ARCHITECTURE_SURFACE_INVENTORY.md)
 - [Architecture Maintenance Checklist](./ARCHITECTURE_MAINTENANCE_CHECKLIST.md)
 - [Detector Defect Ledger](./defect_ledger.md)

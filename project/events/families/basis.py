@@ -88,8 +88,8 @@ class BasisDislocationDetector(DislocationDetector):
                     intensity=float(np.nan_to_num(intensity.iloc[idx], nan=1.0)),
                     severity=severity,
                     timeframe_minutes=self.timeframe_minutes,
-                    direction='long' if basis_bps >= 0 else 'short',
-                    sign=1 if basis_bps >= 0 else -1,
+                    direction='up' if basis_bps >= 0 else 'down',
+                    causal=self.causal,
                     metadata={
                         'event_idx': int(idx),
                         'basis_bps': basis_bps,

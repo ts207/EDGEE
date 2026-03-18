@@ -207,6 +207,7 @@ class FeeRegimeChangeDetector(ThresholdDetector):
     """Detects discrete fee regime steps that persist beyond one bar."""
     event_type = 'FEE_REGIME_CHANGE_EVENT'
     required_columns = ('timestamp',)
+    causal = False
 
     def prepare_features(self, df: pd.DataFrame, **params: Any) -> dict[str, pd.Series]:
         if 'fee_bps' in df.columns:

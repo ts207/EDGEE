@@ -89,6 +89,7 @@ class FundingExtremeBreakoutDetector(BaseFundingDetector):
     def prepare_features(self, df: pd.DataFrame, **params: Any) -> dict[str, pd.Series]:
         funding_abs_pct = pd.to_numeric(df["funding_abs_pct"], errors="coerce").astype(float)
         funding_abs = pd.to_numeric(df["funding_abs"], errors="coerce").astype(float)
+        funding_signed = self._signed_funding(df)
         close = pd.to_numeric(df["close"], errors="coerce").astype(float)
         breakout_window = int(params.get("breakout_window", 96))
         breakout_ret_abs_th = float(params.get("breakout_ret_abs_th", 0.01))
@@ -103,6 +104,7 @@ class FundingExtremeBreakoutDetector(BaseFundingDetector):
         return {
             "funding_abs_pct": funding_abs_pct,
             "funding_abs": funding_abs,
+            "funding_signed": funding_signed,
             "ret_abs": ret_abs,
             "mask": mask,
         }
@@ -123,6 +125,7 @@ class FundingExtremeStagnationDetector(BaseFundingDetector):
     def prepare_features(self, df: pd.DataFrame, **params: Any) -> dict[str, pd.Series]:
         funding_abs_pct = pd.to_numeric(df["funding_abs_pct"], errors="coerce").astype(float)
         funding_abs = pd.to_numeric(df["funding_abs"], errors="coerce").astype(float)
+        funding_signed = self._signed_funding(df)
         close = pd.to_numeric(df["close"], errors="coerce").astype(float)
         stagnation_window = int(params.get("stagnation_window", 96))
         stagnation_ret_abs_th = float(params.get("stagnation_ret_abs_th", 0.005))
@@ -137,6 +140,7 @@ class FundingExtremeStagnationDetector(BaseFundingDetector):
         return {
             "funding_abs_pct": funding_abs_pct,
             "funding_abs": funding_abs,
+            "funding_signed": funding_signed,
             "ret_abs": ret_abs,
             "mask": mask,
         }

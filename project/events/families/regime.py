@@ -41,7 +41,7 @@ class VolRegimeShiftDetector(TransitionDetector):
         del params
         rv = features['rv_96'].iloc[idx]
         hi = features['rv_high_th'].iloc[idx]
-        return "long" if rv >= hi else "short"
+        return "up" if rv >= hi else "down"
 
 class TrendToChopDetector(TransitionDetector):
     event_type = 'TREND_TO_CHOP_SHIFT'

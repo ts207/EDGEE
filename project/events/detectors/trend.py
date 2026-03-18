@@ -194,11 +194,46 @@ class SREventDetector(TrendBase):
 
     def prepare_features(self, df: pd.DataFrame, **params: Any) -> dict[str, pd.Series]:
         close = df["close"]
-        return {"close": close}
+        trend_window = int(params.get("trend_window", 288))
+        breakout_z_threshold = float(params.get("breakout_z_threshold", 2.5))
+        min_periods = max(24, trend_window // 6)
+        rolling_high = close.rolling(trend_window, min_periods=min_periods).max().shift(1)
+        rolling_low = close.rolling(trend_window, min_periods=min_periods).min().shift(1)
+        ret_1 = close.pct_change(1)
+        vol = ret_1.rolling(trend_window, min_periods=min_periods).std().shift(1)
+        breakout_up = ((close - rolling_high) / close.replace(0.0, np.nan)).clip(lower=0.0)
+        breakout_down = ((rolling_low - close) / close.replace(0.0, np.nan)).clip(lower=0.0)
+        breakout_mag = pd.concat([breakout_up, breakout_down], axis=1).max(axis=1)
+        breakout_z = breakout_mag / vol.replace(0.0, np.nan)
+        return {
+            "close": close,
+            "rolling_high": rolling_high,
+            "rolling_low": rolling_low,
+            "breakout_up": breakout_up,
+            "breakout_down": breakout_down,
+            "breakout_z": breakout_z.replace([np.inf, -np.inf], np.nan).fillna(0.0),
+            "breakout_z_threshold": pd.Series(breakout_z_threshold, index=df.index, dtype=float),
+        }
 
     def compute_raw_mask(self, df: pd.DataFrame, *, features: dict[str, pd.Series], **params: Any) -> pd.Series:
         del df, params
-        return pd.Series(False, index=features["close"].index)
+        breaks_level = (
+            (features["close"] > features["rolling_high"]).fillna(False)
+            | (features["close"] < features["rolling_low"]).fillna(False)
+        )
+        return (breaks_level & (features["breakout_z"] >= features["breakout_z_threshold"]).fillna(False)).fillna(False)
+
+    def compute_intensity(self, df: pd.DataFrame, *, features: dict[str, pd.Series], **params: Any) -> pd.Series:
+        del df, params
+        return features["breakout_z"].fillna(0.0)
+
+    def compute_direction(self, idx: int, features: Mapping[str, pd.Series], **params: Any) -> str:
+        del params
+        if bool(features["breakout_up"].iloc[idx]):
+            return "up"
+        if bool(features["breakout_down"].iloc[idx]):
+            return "down"
+        return "non_directional"
 
 
 __all__ = [

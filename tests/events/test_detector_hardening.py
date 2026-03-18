@@ -6,10 +6,19 @@ import pytest
 from project.events.families.oi import DeleveragingWaveDetector
 from project.events.families.canonical_proxy import AbsorptionProxyDetector, DepthStressProxyDetector
 from project.events.families.canonical_proxy import PriceVolImbalanceProxyDetector
-from project.events.detectors.funding import FundingFlipDetector
+from project.events.detectors.funding import (
+    FundingFlipDetector,
+    FundingNormalizationDetector,
+    FundingPersistenceDetector,
+)
 from project.events.detectors.exhaustion import TrendExhaustionDetector, MomentumDivergenceDetector
 from project.events.families.temporal import SpreadRegimeWideningDetector
-from project.events.detectors.trend import TrendAccelerationDetector
+from project.events.detectors.trend import SREventDetector, TrendAccelerationDetector
+from project.events.policy import (
+    LIVE_SAFE_EVENT_TYPES,
+    RETROSPECTIVE_EVENT_TYPES,
+    is_legacy_event_type,
+)
 
 def create_mock_data(n=2000):
     rng = np.random.default_rng(42)
@@ -182,3 +191,85 @@ def test_spread_regime_widening_requires_friction_not_just_spread():
     events = SpreadRegimeWideningDetector().detect(df, symbol="BTCUSDT")
 
     assert len(events) <= 4
+
+
+def test_funding_persistence_preserves_sign_and_subtype():
+    n = 500
+    funding_rate_scaled = np.full(n, 0.0003, dtype=float)
+    funding_abs_pct = np.full(n, 10.0, dtype=float)
+    funding_abs = np.full(n, 0.0003, dtype=float)
+    funding_rate_scaled[320:333] = -0.0016
+    funding_abs_pct[320:333] = 97.0
+    funding_abs[320:333] = 0.0016
+
+    df = pd.DataFrame({
+        "timestamp": pd.date_range("2024-01-01", periods=n, freq="5min", tz="UTC"),
+        "funding_rate_scaled": funding_rate_scaled,
+        "funding_abs_pct": funding_abs_pct,
+        "funding_abs": funding_abs,
+    })
+
+    events = FundingPersistenceDetector().detect(df, symbol="BTCUSDT", persistence_pct=85.0, persistence_bars=8)
+
+    assert not events.empty
+    assert set(events["direction"]) == {"down"}
+    assert "funding_subtype" in events.columns
+    assert set(events["funding_subtype"]).issubset({"acceleration", "persistence"})
+    assert (events["fr_sign"] == -1.0).all()
+
+
+def test_funding_normalization_preserves_source_sign_and_semantic_intensity():
+    n = 420
+    funding_rate_scaled = np.full(n, 0.0002, dtype=float)
+    funding_abs_pct = np.full(n, 20.0, dtype=float)
+    funding_abs = np.full(n, 0.0002, dtype=float)
+    funding_rate_scaled[260:320] = 0.0015
+    funding_abs_pct[260:320] = 97.0
+    funding_abs[260:320] = 0.0015
+    funding_rate_scaled[320:] = 0.00025
+    funding_abs_pct[320:] = 25.0
+    funding_abs[320:] = 0.00025
+
+    df = pd.DataFrame({
+        "timestamp": pd.date_range("2024-01-01", periods=n, freq="5min", tz="UTC"),
+        "funding_rate_scaled": funding_rate_scaled,
+        "funding_abs_pct": funding_abs_pct,
+        "funding_abs": funding_abs,
+    })
+
+    events = FundingNormalizationDetector().detect(
+        df,
+        symbol="BTCUSDT",
+        extreme_pct=95.0,
+        normalization_pct=50.0,
+        normalization_lookback=96,
+    )
+
+    assert not events.empty
+    assert set(events["direction"]) == {"up"}
+    assert set(events["funding_subtype"]) == {"normalization"}
+    assert (events["prior_extreme_pct"] >= 95.0).all()
+    assert (events["evt_signal_intensity"] > 0.0).all()
+
+
+def test_support_resistance_break_is_implemented():
+    n = 420
+    close = np.full(n, 100.0, dtype=float)
+    close[:360] += np.linspace(0.0, 1.0, 360)
+    close[360:] = np.linspace(101.0, 106.0, n - 360)
+    df = pd.DataFrame({
+        "timestamp": pd.date_range("2024-01-01", periods=n, freq="5min", tz="UTC"),
+        "close": close,
+    })
+
+    events = SREventDetector().detect(df, symbol="BTCUSDT", trend_window=96, breakout_z_threshold=1.0)
+
+    assert not events.empty
+    assert set(events["direction"]) == {"up"}
+    assert (events["evt_signal_intensity"] > 0.0).all()
+
+
+def test_detector_policy_sets_are_explicit():
+    assert "SUPPORT_RESISTANCE_BREAK" in LIVE_SAFE_EVENT_TYPES
+    assert "FUNDING_FLIP" in RETROSPECTIVE_EVENT_TYPES
+    assert is_legacy_event_type("BASIS_SNAPBACK")
