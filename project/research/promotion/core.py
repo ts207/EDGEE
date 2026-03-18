@@ -108,6 +108,7 @@ def promote_candidates(
 
     audit_rows, promoted_rows = [], []
     ontology_hash = str(promotion_spec.get("ontology_spec_hash", ""))
+    is_reduced_evidence = bool(promotion_spec.get("is_reduced_evidence", False))
     promotion_confirmatory_gates = promotion_spec.get("promotion_confirmatory_gates")
 
     # Pre-cache benchmark certifications for involved families
@@ -165,6 +166,7 @@ def promote_candidates(
         merged["candidate_id"] = str(merged.get("candidate_id", "")).strip()
         merged["promotion_min_events_threshold"] = int(row_min_events)
         merged["promotion_profile"] = str(promotion_profile)
+        merged["is_reduced_evidence"] = is_reduced_evidence
         merged["ontology_hash"] = str(
             merged.get("ontology_spec_hash", ontology_hash)
         ).strip()

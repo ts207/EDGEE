@@ -342,7 +342,7 @@ def stabilize_promoted_output_schema(
 
     preferred_order = [
         "candidate_id", "run_id", "symbol", "event", "event_type", "status",
-        "promotion_decision", "promotion_tier", "promotion_track", "condition",
+        "promotion_decision", "promotion_tier", "promotion_track", "is_reduced_evidence", "condition",
         "action", "direction_rule", "horizon", "effective_lag_bars", "selection_score",
         "n_events", "gate_bridge_tradable", "gate_promo_retail_viability",
         "gate_promo_low_capital_viability",

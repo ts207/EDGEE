@@ -601,6 +601,7 @@ def execute_promotion(config: PromotionConfig) -> PromotionServiceResult:
             "candidate_origin_run_id": candidate_origin_run_id,
             "program_id": program_id,
             "promotion_basis": "confirmatory_only" if is_confirmatory else "direct",
+            "is_reduced_evidence": bool(is_exploratory),
             "promotion_confirmatory_gates": promotion_confirmatory_gates,
         }
         negative_control_summary = _load_negative_control_summary(config.run_id)

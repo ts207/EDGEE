@@ -494,7 +494,7 @@ The plan below assumes GitHub issues, but it also maps cleanly to Jira epics/tas
 * TICKET-001, 002, 004, 005, 007, 008, 009
 
 ### Sprint 2
-
+* [Plan: 2026-03-18-sprint-2-audit-remediation.md](file:///home/tstuv/workspace/trading/EDGEE/docs/superpowers/plans/2026-03-18-sprint-2-audit-remediation.md)
 * TICKET-006, 010, 011, 012, 013, 003
 
 ### Sprint 3

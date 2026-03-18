@@ -109,6 +109,7 @@ def build_promotion_statistical_audit(
 ) -> pd.DataFrame:
     cols = [
         "candidate_id", "event_type", "template_verb", "promotion_decision", "promotion_track",
+        "is_reduced_evidence",
         "fallback_used", "fallback_reason", "promotion_tier", "promotion_fail_gate_primary",
         "promotion_fail_reason_primary", "reject_reason", "bundle_rejection_reasons", "q_value",
         "n_events", "promotion_min_events_threshold", "stability_score", "sign_consistency",
@@ -213,6 +214,7 @@ def build_promotion_statistical_audit(
             {
                 "candidate_id": str(row.get("candidate_id", "")).strip(),
                 "event_type": str(row.get("event_type", row.get("event", ""))).strip(),
+                "is_reduced_evidence": bool(row.get("is_reduced_evidence", False)),
                 "template_verb": str(row.get("template_verb", "")).strip(),
                 "promotion_decision": decision,
                 "promotion_track": str(row.get("promotion_track", "")).strip(),
