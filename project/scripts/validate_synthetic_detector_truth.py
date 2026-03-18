@@ -112,6 +112,7 @@ def _build_event_reports(
     run_id: str,
     max_off_regime_rate: float,
     get_tolerance,
+    min_precision_fraction: float | None = None,
 ) -> list[dict[str, Any]]:
     event_reports: List[Dict[str, Any]] = []
     for event_type in event_types:
@@ -136,6 +137,11 @@ def _build_event_reports(
             off_regime_events = max(0, int(symbol_times.notna().sum()) - in_window_events)
             expected_windows = len(windows)
             off_regime_rate = float(off_regime_events / max(1, int(symbol_times.notna().sum())))
+            precision = float(in_window_events / max(1, int(symbol_times.notna().sum())))
+            passed_precision = (
+                bool(precision >= float(min_precision_fraction))
+                if min_precision_fraction is not None else None
+            )
             per_symbol.append(
                 {
                     "symbol": symbol,
@@ -144,8 +150,10 @@ def _build_event_reports(
                     "in_window_events": int(in_window_events),
                     "off_regime_events": int(off_regime_events),
                     "off_regime_rate": off_regime_rate,
+                    "precision": precision,
                     "passed_hit_requirement": bool(hit_windows > 0 if expected_windows > 0 else True),
                     "passed_off_regime_bound": bool(off_regime_rate <= float(max_off_regime_rate)),
+                    "passed_precision_bound": passed_precision,
                 }
             )
         event_reports.append(
@@ -166,7 +174,8 @@ def validate_detector_truth(
     run_id: str,
     truth_map_path: Path,
     tolerance_minutes: Union[int, Dict[str, int]] = 30,
-    max_off_regime_rate: float = 0.75,
+    max_off_regime_rate: float = 0.35,
+    min_precision_fraction: float | None = None,
     event_types: Iterable[str] | None = None,
     include_supporting_events: bool = False,
 ) -> Dict[str, Any]:
@@ -196,6 +205,7 @@ def validate_detector_truth(
         run_id=run_id,
         max_off_regime_rate=float(max_off_regime_rate),
         get_tolerance=_get_tolerance,
+        min_precision_fraction=min_precision_fraction,
     )
     supporting_event_reports = (
         _build_event_reports(
@@ -210,6 +220,7 @@ def validate_detector_truth(
             run_id=run_id,
             max_off_regime_rate=float(max_off_regime_rate),
             get_tolerance=_get_tolerance,
+            min_precision_fraction=min_precision_fraction,
         )
         if include_supporting_events
         else []
@@ -239,7 +250,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--truth_map_path", default=None)
     parser.add_argument("--data_root", default=None)
     parser.add_argument("--tolerance_minutes", type=int, default=30)
-    parser.add_argument("--max_off_regime_rate", type=float, default=0.75)
+    parser.add_argument("--max_off_regime_rate", type=float, default=0.35)
+    parser.add_argument("--min_precision_fraction", type=float, default=None,
+                        help="Minimum fraction of events that must fall inside regime windows")
     parser.add_argument("--event_types", nargs="+", default=None)
     parser.add_argument("--include_supporting_events", type=int, default=0)
     parser.add_argument("--json_out", default=None)
@@ -257,6 +270,7 @@ def main(argv: list[str] | None = None) -> int:
         truth_map_path=truth_map_path,
         tolerance_minutes=int(args.tolerance_minutes),
         max_off_regime_rate=float(args.max_off_regime_rate),
+        min_precision_fraction=args.min_precision_fraction,
         event_types=args.event_types,
         include_supporting_events=bool(args.include_supporting_events),
     )
