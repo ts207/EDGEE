@@ -7,7 +7,9 @@ from project.core.config import get_data_root
 
 DATA_ROOT = get_data_root()
 
-blueprints_file = DATA_ROOT / "reports" / "strategy_blueprints" / "multi_edge_portfolio" / "blueprints.jsonl"
+blueprints_file = (
+    DATA_ROOT / "reports" / "strategy_blueprints" / "multi_edge_portfolio" / "blueprints.jsonl"
+)
 blueprints = []
 with blueprints_file.open("r", encoding="utf-8") as f:
     for line in f:
@@ -19,10 +21,7 @@ params_by_strategy = {}
 for i, bp in enumerate(blueprints):
     strat_name = f"dsl_interpreter_v1__edge_{i}"
     strategies.append(strat_name)
-    params_by_strategy[strat_name] = {
-        "dsl_blueprint": bp,
-        "event_feature_ffill_bars": 12
-    }
+    params_by_strategy[strat_name] = {"dsl_blueprint": bp, "event_feature_ffill_bars": 12}
 
 print(f"Running backtest for {len(strategies)} strategies.")
 
@@ -48,7 +47,7 @@ results = run_engine(
     data_root=DATA_ROOT,
     timeframe="5m",
     start_ts=start_ts,
-    end_ts=end_ts
+    end_ts=end_ts,
 )
 
 print("\n--- Backtest Metrics ---")
@@ -56,7 +55,9 @@ print(json.dumps(results["metrics"]["portfolio"], indent=2))
 
 print("\n--- Strategy Contribution ---")
 for strat, metrics in results["metrics"]["strategies"].items():
-    print(f"{strat}: Total PnL = {metrics.get('total_pnl', 0.0):.4f}, Entries = {metrics.get('entries', 0)}")
+    print(
+        f"{strat}: Total PnL = {metrics.get('total_pnl', 0.0):.4f}, Entries = {metrics.get('entries', 0)}"
+    )
 
 engine_dir = results["engine_dir"]
 print(f"\nArtifacts saved to: {engine_dir}")

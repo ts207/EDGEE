@@ -74,7 +74,9 @@ class AllocationSpec(BaseModel):
             "max_strategy_gross": float(self.sizing_policy.max_gross_leverage),
             "max_symbol_gross": float(self.sizing_policy.symbol_risk_budget),
             "max_new_exposure_per_bar": float(constraints.get("max_new_exposure_per_bar", 10.0)),
-            "enable_correlation_allocation": bool(constraints.get("enable_correlation_allocation", False)),
+            "enable_correlation_allocation": bool(
+                constraints.get("enable_correlation_allocation", False)
+            ),
             "max_pairwise_correlation": constraints.get("max_pairwise_correlation"),
             "drawdown_limit": constraints.get("drawdown_limit"),
             "portfolio_max_drawdown": constraints.get("portfolio_max_drawdown"),

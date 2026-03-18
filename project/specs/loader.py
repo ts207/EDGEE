@@ -74,7 +74,8 @@ def load_global_defaults(
 
     if required:
         raise FileNotFoundError(
-            "Unable to locate global defaults spec. Checked: " + ", ".join(str(p) for p in candidates)
+            "Unable to locate global defaults spec. Checked: "
+            + ", ".join(str(p) for p in candidates)
         )
     return {}
 
@@ -99,7 +100,9 @@ def load_objective_spec(
     env_path = str(os.getenv(env_var, "")).strip()
     if env_path:
         candidates.append(Path(env_path))
-    candidates.append(Path(project_root).resolve().parent / "spec" / "objectives" / f"{resolved_name}.yaml")
+    candidates.append(
+        Path(project_root).resolve().parent / "spec" / "objectives" / f"{resolved_name}.yaml"
+    )
 
     for path in candidates:
         if path.exists():
@@ -144,7 +147,8 @@ def load_retail_profiles_spec(
 
     if required:
         raise FileNotFoundError(
-            "Unable to locate retail profiles spec. Checked: " + ", ".join(str(p) for p in candidates)
+            "Unable to locate retail profiles spec. Checked: "
+            + ", ".join(str(p) for p in candidates)
         )
     return {}
 

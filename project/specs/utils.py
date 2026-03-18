@@ -4,7 +4,11 @@ import hashlib
 from pathlib import Path
 from typing import Dict
 
-from project.spec_registry import canonical_yaml_hash, iter_spec_yaml_files, resolve_relative_spec_path
+from project.spec_registry import (
+    canonical_yaml_hash,
+    iter_spec_yaml_files,
+    resolve_relative_spec_path,
+)
 
 
 def get_spec_hashes(project_root: Path) -> Dict[str, str]:

@@ -5,11 +5,15 @@ import sys
 from pathlib import Path
 
 from project.core.config import get_data_root
-from project.research.services.confirmatory_candidate_service import write_adjacent_survivorship_report
+from project.research.services.confirmatory_candidate_service import (
+    write_adjacent_survivorship_report,
+)
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Report which exported survivors persist across an adjacent target window.")
+    parser = argparse.ArgumentParser(
+        description="Report which exported survivors persist across an adjacent target window."
+    )
     parser.add_argument("--origin_run_id", required=True)
     parser.add_argument("--target_run_id", required=True)
     parser.add_argument("--data_root", default=None)

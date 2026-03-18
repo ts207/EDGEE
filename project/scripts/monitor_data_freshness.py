@@ -10,6 +10,7 @@ Usage:
         --timeframe 5m \\
         --max_staleness_bars 3
 """
+
 from __future__ import annotations
 from project.core.config import get_data_root
 
@@ -17,9 +18,11 @@ import argparse
 import sys
 
 import pandas as pd
+
 DATA_ROOT = get_data_root()
 
 TIMEFRAME_MINUTES = {"1m": 1, "5m": 5, "15m": 15, "1h": 60}
+
 
 def check_symbol(symbol: str, timeframe: str, max_staleness_bars: int) -> tuple[bool, str]:
     bar_dir = DATA_ROOT / "lake" / "cleaned" / "perp" / symbol / f"bars_{timeframe}"
@@ -46,6 +49,7 @@ def check_symbol(symbol: str, timeframe: str, max_staleness_bars: int) -> tuple[
     )
     return ok, msg
 
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Monitor cleaned bar data freshness.")
     parser.add_argument("--symbols", required=True, help="Comma-separated symbol list")
@@ -62,6 +66,7 @@ def main() -> int:
         if not ok:
             all_ok = False
     return 0 if all_ok else 1
+
 
 if __name__ == "__main__":
     sys.exit(main())

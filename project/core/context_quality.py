@@ -74,10 +74,9 @@ def summarize_context_quality(frame: pd.DataFrame) -> dict[str, Any]:
         conf_col = columns["confidence"]
         entropy_col = columns["entropy"]
 
-        state = (
-            pd.to_numeric(frame.get(state_col, pd.Series(index=frame.index, dtype=float)), errors="coerce")
-            .astype(float)
-        )
+        state = pd.to_numeric(
+            frame.get(state_col, pd.Series(index=frame.index, dtype=float)), errors="coerce"
+        ).astype(float)
         confidence = pd.to_numeric(
             frame.get(conf_col, pd.Series(index=frame.index, dtype=float)),
             errors="coerce",
@@ -92,8 +91,14 @@ def summarize_context_quality(frame: pd.DataFrame) -> dict[str, Any]:
             _state_key(key): float(value)
             for key, value in valid_state.value_counts(normalize=True).sort_index().items()
         }
-        transitions = int((valid_state != valid_state.shift(1)).iloc[1:].sum()) if len(valid_state) >= 2 else 0
-        transition_rate = float(transitions / max(len(valid_state) - 1, 1)) if len(valid_state) >= 2 else 0.0
+        transitions = (
+            int((valid_state != valid_state.shift(1)).iloc[1:].sum())
+            if len(valid_state) >= 2
+            else 0
+        )
+        transition_rate = (
+            float(transitions / max(len(valid_state) - 1, 1)) if len(valid_state) >= 2 else 0.0
+        )
 
         dimensions[name] = {
             "state_column": state_col,

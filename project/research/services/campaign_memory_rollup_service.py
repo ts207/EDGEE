@@ -34,13 +34,23 @@ def build_campaign_memory_rollup(
     repeated_fail_regions: list[dict[str, Any]] = []
     latest_run_id = ""
     if not tested_regions.empty:
-        latest_run_id = str(tested_regions.get("run_id", pd.Series(dtype="object")).astype(str).iloc[-1])
+        latest_run_id = str(
+            tested_regions.get("run_id", pd.Series(dtype="object")).astype(str).iloc[-1]
+        )
         if "region_key" in tested_regions.columns and "run_id" in tested_regions.columns:
-            latest_by_region = tested_regions.groupby("region_key", dropna=False)["run_id"].transform("max")
-            superseded_rows = int((tested_regions["run_id"].astype(str) != latest_by_region.astype(str)).sum())
-        fail_gate_col = "primary_fail_gate" if "primary_fail_gate" in tested_regions.columns else None
+            latest_by_region = tested_regions.groupby("region_key", dropna=False)[
+                "run_id"
+            ].transform("max")
+            superseded_rows = int(
+                (tested_regions["run_id"].astype(str) != latest_by_region.astype(str)).sum()
+            )
+        fail_gate_col = (
+            "primary_fail_gate" if "primary_fail_gate" in tested_regions.columns else None
+        )
         if fail_gate_col:
-            rejected = tested_regions[tested_regions[fail_gate_col].astype(str).str.strip() != ""].copy()
+            rejected = tested_regions[
+                tested_regions[fail_gate_col].astype(str).str.strip() != ""
+            ].copy()
             if not rejected.empty:
                 grouped = (
                     rejected.groupby("region_key", dropna=False)
@@ -53,7 +63,9 @@ def build_campaign_memory_rollup(
                     .reset_index()
                 )
                 repeated = grouped[grouped["fail_count"] >= int(repeated_fail_threshold)]
-                repeated_fail_regions = repeated.sort_values("fail_count", ascending=False).to_dict(orient="records")
+                repeated_fail_regions = repeated.sort_values("fail_count", ascending=False).to_dict(
+                    orient="records"
+                )
 
     unresolved_repairs = []
     if not failures.empty:
@@ -67,7 +79,9 @@ def build_campaign_memory_rollup(
             "tested_region_rows": int(len(tested_regions)),
             "reflection_rows": int(len(reflections)),
             "failure_rows": int(len(failures)),
-            "unique_region_count": int(tested_regions["region_key"].nunique()) if "region_key" in tested_regions.columns and not tested_regions.empty else 0,
+            "unique_region_count": int(tested_regions["region_key"].nunique())
+            if "region_key" in tested_regions.columns and not tested_regions.empty
+            else 0,
             "superseded_region_rows": superseded_rows,
         },
         "top_events": _top_records(event_stats, "avg_after_cost_expectancy", limit=top_k),
@@ -92,7 +106,9 @@ def write_campaign_memory_rollup(
         repeated_fail_threshold=repeated_fail_threshold,
         top_k=top_k,
     )
-    report_dir = out_dir if out_dir is not None else data_root / "artifacts" / "experiments" / program_id
+    report_dir = (
+        out_dir if out_dir is not None else data_root / "artifacts" / "experiments" / program_id
+    )
     report_dir.mkdir(parents=True, exist_ok=True)
     out_path = report_dir / "campaign_memory_rollup.json"
     out_path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")

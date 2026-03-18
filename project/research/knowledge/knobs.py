@@ -101,7 +101,7 @@ def _parser_knobs(
                 mutability=_default_mutability(group, dest, cli_flag=flag),
                 risk=_default_risk(group, dest),
             )
-            )
+        )
     return rows
 
 
@@ -113,7 +113,10 @@ def _default_agent_level(group: str, name: str) -> str:
         return "advanced"
     if group == "promotion_timeframe_consensus":
         return "internal"
-    if any(key in token for key in ("retail_profiles", "objective", "phase2_gates", "shrinkage_parameters")):
+    if any(
+        key in token
+        for key in ("retail_profiles", "objective", "phase2_gates", "shrinkage_parameters")
+    ):
         return "advanced"
     return "advanced"
 
@@ -128,7 +131,10 @@ def _default_mutability(group: str, name: str, *, cli_flag: str = "") -> str:
         return "proposal_settable"
     if group in {"promotion_policy_resolution", "promotion_timeframe_consensus"}:
         return "inspect_only"
-    if any(key in token for key in ("retail_profiles", "objective", "phase2_gates", "shrinkage_parameters")):
+    if any(
+        key in token
+        for key in ("retail_profiles", "objective", "phase2_gates", "shrinkage_parameters")
+    ):
         return "inspect_only"
     return "inspect_only"
 
@@ -141,7 +147,10 @@ def _default_risk(group: str, name: str) -> str:
         return "medium"
     if group in {"promotion_policy_resolution", "promotion_timeframe_consensus"}:
         return "high"
-    if any(key in token for key in ("objective", "retail_profiles", "phase2_gates", "shrinkage_parameters")):
+    if any(
+        key in token
+        for key in ("objective", "retail_profiles", "phase2_gates", "shrinkage_parameters")
+    ):
         return "high"
     return "medium"
 

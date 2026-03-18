@@ -35,15 +35,27 @@ def query_static_rows(
 
     filtered = entities.copy()
     if event:
-        filtered = filtered[(filtered["entity_type"] == "event") & (filtered["name"].astype(str) == str(event))]
+        filtered = filtered[
+            (filtered["entity_type"] == "event") & (filtered["name"].astype(str) == str(event))
+        ]
     elif template:
-        filtered = filtered[(filtered["entity_type"] == "template") & (filtered["name"].astype(str) == str(template))]
+        filtered = filtered[
+            (filtered["entity_type"] == "template")
+            & (filtered["name"].astype(str) == str(template))
+        ]
     elif state:
-        filtered = filtered[(filtered["entity_type"] == "state") & (filtered["name"].astype(str) == str(state))]
+        filtered = filtered[
+            (filtered["entity_type"] == "state") & (filtered["name"].astype(str) == str(state))
+        ]
     elif detector:
-        filtered = filtered[(filtered["entity_type"] == "detector") & (filtered["name"].astype(str) == str(detector))]
+        filtered = filtered[
+            (filtered["entity_type"] == "detector")
+            & (filtered["name"].astype(str) == str(detector))
+        ]
     elif feature:
-        filtered = filtered[(filtered["entity_type"] == "feature") & (filtered["name"].astype(str) == str(feature))]
+        filtered = filtered[
+            (filtered["entity_type"] == "feature") & (filtered["name"].astype(str) == str(feature))
+        ]
     else:
         filtered = filtered.head(limit)
 
@@ -109,7 +121,9 @@ def query_memory_rows(
     if event_type and "event_type" in tested_regions.columns:
         tested_regions = tested_regions[tested_regions["event_type"].astype(str) == str(event_type)]
     if template_id and "template_id" in tested_regions.columns:
-        tested_regions = tested_regions[tested_regions["template_id"].astype(str) == str(template_id)]
+        tested_regions = tested_regions[
+            tested_regions["template_id"].astype(str) == str(template_id)
+        ]
     if failure_class and "failure_class" in failures.columns:
         failures = failures[failures["failure_class"].astype(str) == str(failure_class)]
 
@@ -136,15 +150,23 @@ def query_adjacent_regions(
     filtered = tested_regions[tested_regions["event_type"].astype(str) == str(event_type)]
     if template:
         filtered = filtered[filtered["template_id"].astype(str) == str(template)]
-    sort_cols = [column for column in ["gate_promo_statistical", "q_value", "after_cost_expectancy"] if column in filtered.columns]
+    sort_cols = [
+        column
+        for column in ["gate_promo_statistical", "q_value", "after_cost_expectancy"]
+        if column in filtered.columns
+    ]
     ascending = [False, True, False][: len(sort_cols)]
     if sort_cols:
         if "gate_promo_statistical" in sort_cols:
+
             def _gate_rank(val) -> int:
                 val = str(val).strip().lower()
-                if val in ("pass", "true", "1", "1.0"): return 2
-                if val in ("fail", "false", "0", "0.0"): return 1
+                if val in ("pass", "true", "1", "1.0"):
+                    return 2
+                if val in ("fail", "false", "0", "0.0"):
+                    return 1
                 return 0
+
             filtered["_gate_rank"] = filtered["gate_promo_statistical"].apply(_gate_rank)
             sort_cols[sort_cols.index("gate_promo_statistical")] = "_gate_rank"
 

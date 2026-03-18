@@ -112,9 +112,7 @@ def promote_candidates(
     promotion_confirmatory_gates = promotion_spec.get("promotion_confirmatory_gates")
 
     # Pre-cache benchmark certifications for involved families
-    unique_families = (
-        set(df["family"].dropna().unique()) if "family" in df.columns else set()
-    )
+    unique_families = set(df["family"].dropna().unique()) if "family" in df.columns else set()
     benchmark_certs = {}
     for fam in unique_families:
         benchmark_certs[fam] = get_benchmark_certification_for_family(family=fam)
@@ -155,21 +153,18 @@ def promote_candidates(
             enforce_baseline_beats_complexity=enforce_baseline_beats_complexity,
             enforce_placebo_controls=enforce_placebo_controls,
             enforce_timeframe_consensus=enforce_timeframe_consensus,
+            is_reduced_evidence=is_reduced_evidence,
             benchmark_certification=bench_cert,
         )
         merged = dict(row)
         merged.update(eval_row)
         merged["event"] = str(merged.get("event", merged.get("event_type", ""))).strip()
-        merged["event_type"] = str(
-            merged.get("event_type", merged.get("event", ""))
-        ).strip()
+        merged["event_type"] = str(merged.get("event_type", merged.get("event", ""))).strip()
         merged["candidate_id"] = str(merged.get("candidate_id", "")).strip()
         merged["promotion_min_events_threshold"] = int(row_min_events)
         merged["promotion_profile"] = str(promotion_profile)
         merged["is_reduced_evidence"] = is_reduced_evidence
-        merged["ontology_hash"] = str(
-            merged.get("ontology_spec_hash", ontology_hash)
-        ).strip()
+        merged["ontology_hash"] = str(merged.get("ontology_spec_hash", ontology_hash)).strip()
 
         audit_rows.append(merged)
         if merged["promotion_decision"] == "promoted":
@@ -202,9 +197,9 @@ def promote_candidates(
         if c in audit_df.columns
     ]
     if not audit_df.empty:
-        audit_df = audit_df.sort_values(
-            sort_cols, ascending=[False] * len(sort_cols)
-        ).reset_index(drop=True)
+        audit_df = audit_df.sort_values(sort_cols, ascending=[False] * len(sort_cols)).reset_index(
+            drop=True
+        )
 
     overlap_dropped_df = pd.DataFrame(
         columns=[
@@ -224,17 +219,17 @@ def promote_candidates(
         )
         if not overlap_dropped_df.empty:
             dropped_ids = set(overlap_dropped_df["candidate_id"].tolist())
-            audit_df.loc[
-                audit_df["candidate_id"].isin(dropped_ids), "gate_promo_redundancy"
-            ] = False
-            audit_df.loc[
-                audit_df["candidate_id"].isin(dropped_ids), "reject_reason"
-            ] = audit_df.loc[
-                audit_df["candidate_id"].isin(dropped_ids), "reject_reason"
-            ].map(
-                lambda x: "|".join(sorted(set(str(x).split("|") + ["portfolio_overlap"])))
-                if x
-                else "portfolio_overlap"
+            audit_df.loc[audit_df["candidate_id"].isin(dropped_ids), "gate_promo_redundancy"] = (
+                False
+            )
+            audit_df.loc[audit_df["candidate_id"].isin(dropped_ids), "reject_reason"] = (
+                audit_df.loc[audit_df["candidate_id"].isin(dropped_ids), "reject_reason"].map(
+                    lambda x: (
+                        "|".join(sorted(set(str(x).split("|") + ["portfolio_overlap"])))
+                        if x
+                        else "portfolio_overlap"
+                    )
+                )
             )
 
     audit_df, promoted_df, tier_counts = assign_and_validate_promotion_tiers(
@@ -269,6 +264,7 @@ def ensure_candidate_schema(df: pd.DataFrame) -> pd.DataFrame:
     from project.research.research_core import ensure_candidate_schema as _ensure
 
     return _ensure(df)
+
 
 __all__ = [
     "_ReasonRecorder",

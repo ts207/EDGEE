@@ -46,11 +46,11 @@ def validate_stage_manifest_on_disk(
     if not isinstance(payload, dict):
         return False, f"manifest payload must be an object: {manifest_path}"
     try:
-        validate_stage_manifest_contract(
-            payload, allow_failed_minimal=allow_failed_minimal
-        )
+        validate_stage_manifest_contract(payload, allow_failed_minimal=allow_failed_minimal)
     except ValueError as exc:
-        raise DataIntegrityError(f"manifest schema validation failed ({manifest_path}): {exc}") from exc
+        raise DataIntegrityError(
+            f"manifest schema validation failed ({manifest_path}): {exc}"
+        ) from exc
     return True, ""
 
 
@@ -74,7 +74,8 @@ def synthesize_stage_manifest_if_missing(
         "stage": stage,
         "stage_name": stage,
         "stage_instance_id": stage_instance_id,
-        "pipeline_session_id": str(os.environ.get("BACKTEST_PIPELINE_SESSION_ID", "")).strip() or None,
+        "pipeline_session_id": str(os.environ.get("BACKTEST_PIPELINE_SESSION_ID", "")).strip()
+        or None,
         "started_at": _utc_now_iso(),
         "finished_at": _utc_now_iso(),
         "ended_at": _utc_now_iso(),
@@ -113,6 +114,7 @@ def manifest_declared_outputs_exist(
     payload: Mapping[str, object],
 ) -> bool:
     from project import PROJECT_ROOT
+
     outputs = payload.get("outputs")
     if not isinstance(outputs, list) or not outputs:
         return False
@@ -127,6 +129,9 @@ def manifest_declared_outputs_exist(
             if not candidate.exists():
                 return False
             continue
-        if not (manifest_path.parent / candidate).exists() and not (PROJECT_ROOT.parent / candidate).exists():
+        if (
+            not (manifest_path.parent / candidate).exists()
+            and not (PROJECT_ROOT.parent / candidate).exists()
+        ):
             return False
     return True

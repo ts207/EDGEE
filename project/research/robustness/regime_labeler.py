@@ -9,6 +9,7 @@ across four dimensions: volatility, funding, trend, spread.
 Label format: "high_vol.funding_pos.trend.tight" (dot-separated dimension values).
 Unknown dimension (state column missing) produces "unknown_<dim>".
 """
+
 from __future__ import annotations
 
 import pandas as pd

@@ -9,6 +9,7 @@ from typing import Any, Dict, Iterable, List
 
 import yaml
 from project import PROJECT_ROOT
+
 REPO_ROOT = PROJECT_ROOT.parent
 
 from project.events.registry import EVENT_REGISTRY_SPECS
@@ -20,14 +21,17 @@ from project.specs.ontology import (
     state_id_to_context_column,
 )
 
+
 def _load_yaml(path: Path) -> Dict[str, Any]:
     if not path.exists():
         return {}
     payload = yaml.safe_load(path.read_text(encoding="utf-8"))
     return payload if isinstance(payload, dict) else {}
 
+
 def _norm(value: Any) -> str:
     return str(value or "").strip().upper()
+
 
 def _iter_family_events(doc: Dict[str, Any]) -> List[str]:
     out: List[str] = []
@@ -55,6 +59,7 @@ def _iter_family_events(doc: Dict[str, Any]) -> List[str]:
                     out.append(ev)
     return out
 
+
 def _collect_events_from_list(doc: Dict[str, Any], key: str) -> set[str]:
     out: set[str] = set()
     values = doc.get(key, [])
@@ -62,8 +67,11 @@ def _collect_events_from_list(doc: Dict[str, Any], key: str) -> set[str]:
         out = {_norm(x) for x in values if _norm(x)}
     return out
 
+
 def _collect_declared_implemented(doc: Dict[str, Any]) -> set[str]:
-    out = _collect_events_from_list(doc, "implemented_events") | _collect_events_from_list(doc, "implemented_event_types")
+    out = _collect_events_from_list(doc, "implemented_events") | _collect_events_from_list(
+        doc, "implemented_event_types"
+    )
     by_event = doc.get("implementation_status_by_event", {})
     if isinstance(by_event, dict):
         for ev, status in by_event.items():
@@ -84,13 +92,18 @@ def _collect_declared_implemented(doc: Dict[str, Any]) -> set[str]:
                 ev = _norm(row.get("event_type") or row.get("event_id") or row.get("id"))
                 if not ev:
                     continue
-                status = str(row.get("implementation_status", row.get("status", ""))).strip().lower()
+                status = (
+                    str(row.get("implementation_status", row.get("status", ""))).strip().lower()
+                )
                 if status in {"implemented", "active"} or bool(row.get("implemented")):
                     out.add(ev)
     return {ev for ev in out if ev}
 
+
 def _collect_planned(doc: Dict[str, Any]) -> set[str]:
-    out = _collect_events_from_list(doc, "planned_events") | _collect_events_from_list(doc, "planned_event_types")
+    out = _collect_events_from_list(doc, "planned_events") | _collect_events_from_list(
+        doc, "planned_event_types"
+    )
     by_event = doc.get("implementation_status_by_event", {})
     if isinstance(by_event, dict):
         for ev, status in by_event.items():
@@ -111,10 +124,13 @@ def _collect_planned(doc: Dict[str, Any]) -> set[str]:
                 ev = _norm(row.get("event_type") or row.get("event_id") or row.get("id"))
                 if not ev:
                     continue
-                status = str(row.get("implementation_status", row.get("status", ""))).strip().lower()
+                status = (
+                    str(row.get("implementation_status", row.get("status", ""))).strip().lower()
+                )
                 if status in {"planned", "roadmap", "future"}:
                     out.add(ev)
     return {ev for ev in out if ev}
+
 
 def _active_event_yaml_specs(spec_dir: Path) -> Dict[str, Dict[str, Any]]:
     specs: Dict[str, Dict[str, Any]] = {}
@@ -131,6 +147,7 @@ def _active_event_yaml_specs(spec_dir: Path) -> Dict[str, Dict[str, Any]]:
             specs[ev] = doc
     return specs
 
+
 def _script_declares_event_type(path: Path) -> bool:
     if not path.exists():
         return False
@@ -141,6 +158,7 @@ def _script_declares_event_type(path: Path) -> bool:
         r"\.assign\(\s*event_type\s*=",
     ]
     return any(re.search(p, text) for p in patterns)
+
 
 def run_audit(repo_root: Path) -> Dict[str, Any]:
     repo_root = Path(repo_root).resolve()
@@ -195,7 +213,9 @@ def run_audit(repo_root: Path) -> Dict[str, Any]:
     taxonomy_declared_implemented = _collect_declared_implemented(taxonomy)
     canonical_declared_implemented = _collect_declared_implemented(canonical)
     declared_implemented = sorted(taxonomy_declared_implemented | canonical_declared_implemented)
-    declared_implemented_missing_in_registry = sorted(set(declared_implemented) - set(registry_backed))
+    declared_implemented_missing_in_registry = sorted(
+        set(declared_implemented) - set(registry_backed)
+    )
 
     planned_events = _collect_planned(taxonomy) | _collect_planned(canonical)
     if (
@@ -208,7 +228,8 @@ def run_audit(repo_root: Path) -> Dict[str, Any]:
     taxonomy_not_implemented = sorted(set(taxonomy_events) - set(registry_backed))
     canonical_not_implemented = sorted(set(canonical_events) - set(registry_backed))
     planned_backlog = sorted(
-        ev for ev in set(taxonomy_not_implemented) | set(canonical_not_implemented)
+        ev
+        for ev in set(taxonomy_not_implemented) | set(canonical_not_implemented)
         if ev in planned_events
     )
 
@@ -217,26 +238,29 @@ def run_audit(repo_root: Path) -> Dict[str, Any]:
     registry_state_ids = {state["state_id"] for state in states}
     registry_materialized_ids = sorted(registry_state_ids & materialized_ids)
     state_registry_not_materialized = sorted(
-        state["state_id"] for state in states
-        if state["state_id"] not in materialized_ids
+        state["state_id"] for state in states if state["state_id"] not in materialized_ids
     )
     materialized_not_in_registry = sorted(materialized_ids - registry_state_ids)
     states_with_missing_source_event = sorted(
-        state["state_id"] for state in states
+        state["state_id"]
+        for state in states
         if state["source_event_type"] not in set(canonical_events)
     )
     materialized_state_columns = {
-        state_id: state_id_to_context_column(state_id)
-        for state_id in registry_materialized_ids
+        state_id: state_id_to_context_column(state_id) for state_id in registry_materialized_ids
     }
 
     failures: List[str] = []
     if missing_phase2_chain_entries:
         failures.append(f"missing_phase2_chain_entries={','.join(missing_phase2_chain_entries)}")
     if chain_entries_with_missing_specs:
-        failures.append(f"chain_entries_with_missing_specs={','.join(chain_entries_with_missing_specs)}")
+        failures.append(
+            f"chain_entries_with_missing_specs={','.join(chain_entries_with_missing_specs)}"
+        )
     if missing_analyzer_per_event:
-        failures.append("missing_analyzer_per_event=" + ",".join(sorted(missing_analyzer_per_event.keys())))
+        failures.append(
+            "missing_analyzer_per_event=" + ",".join(sorted(missing_analyzer_per_event.keys()))
+        )
     if multi_type_analyzers_missing_event_type:
         failures.append(
             "multi_type_analyzers_missing_event_type="
@@ -246,7 +270,8 @@ def run_audit(repo_root: Path) -> Dict[str, Any]:
         failures.append("active_specs_without_registry=" + ",".join(active_specs_without_registry))
     if declared_implemented_missing_in_registry:
         failures.append(
-            "declared_implemented_missing_in_registry=" + ",".join(declared_implemented_missing_in_registry)
+            "declared_implemented_missing_in_registry="
+            + ",".join(declared_implemented_missing_in_registry)
         )
     if materialized_not_in_registry:
         failures.append(
@@ -293,6 +318,7 @@ def run_audit(repo_root: Path) -> Dict[str, Any]:
         "failures": failures,
     }
 
+
 def _print_text(report: Dict[str, Any]) -> None:
     counts = report.get("counts", {})
     implemented = report.get("implemented_contract", {})
@@ -320,7 +346,9 @@ def _print_text(report: Dict[str, Any]) -> None:
     )
     print("")
     print("Missing phase2 chain entries:", implemented.get("missing_phase2_chain_entries", []))
-    print("Chain entries with missing specs:", implemented.get("chain_entries_with_missing_specs", []))
+    print(
+        "Chain entries with missing specs:", implemented.get("chain_entries_with_missing_specs", [])
+    )
     print("Missing analyzer per event:", implemented.get("missing_analyzer_per_event", {}))
     print(
         "Multi-type analyzers missing event_type:",
@@ -341,17 +369,22 @@ def _print_text(report: Dict[str, Any]) -> None:
         print("")
         print("No fail-closed contract issues detected.")
 
+
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Audit ontology consistency against implemented event contract.")
+    parser = argparse.ArgumentParser(
+        description="Audit ontology consistency against implemented event contract."
+    )
     parser.add_argument("--repo-root", default=str(REPO_ROOT))
     parser.add_argument("--output", default="")
     parser.add_argument("--format", choices=["text", "json"], default="text")
     parser.add_argument("--fail-on-missing", action="store_true")
-    parser.add_argument("--check", action="store_true", help="Fail if generated files drift from disk.")
+    parser.add_argument(
+        "--check", action="store_true", help="Fail if generated files drift from disk."
+    )
     args = parser.parse_args()
 
     report = run_audit(Path(args.repo_root))
-    
+
     if args.check and args.output:
         path = Path(args.output)
         content = json.dumps(report, indent=2, sort_keys=True)
@@ -373,13 +406,16 @@ def main() -> int:
 
     # Strictly enforce that active specs must be mapped, preventing silent drops
     implemented = report.get("implemented_contract", {})
-    if implemented.get("active_specs_without_registry") or implemented.get("missing_phase2_chain_entries"):
+    if implemented.get("active_specs_without_registry") or implemented.get(
+        "missing_phase2_chain_entries"
+    ):
         print("\nFATAL: Unmapped active event detected. Failing audit closed.", file=sys.stderr)
         return 1
 
     if args.fail_on_missing and report.get("failures"):
         return 1
     return 0
+
 
 if __name__ == "__main__":
     sys.exit(main())

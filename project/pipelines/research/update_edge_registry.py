@@ -30,12 +30,12 @@ from project.specs.manifest import finalize_manifest, start_manifest
 from project.research.edge_identity import edge_id_from_row, structural_edge_components
 
 
-
 def _normalize_event_type(row: Dict[str, Any]) -> str:
     token = str(
         row.get("canonical_event_type", row.get("event_type", row.get("event", "")))
     ).strip()
     return token or "UNKNOWN_EVENT"
+
 
 def _load_table(path: Path) -> pd.DataFrame:
     if not path.exists():
@@ -54,6 +54,7 @@ def _load_history(path: Path) -> pd.DataFrame:
     if df.empty:
         return pd.DataFrame()
     return df
+
 
 def _load_capital_footprint(path: Path) -> pd.DataFrame:
     df = _load_table(path)
@@ -82,6 +83,7 @@ def _load_capital_footprint(path: Path) -> pd.DataFrame:
     out = out[keep].drop_duplicates(subset=["candidate_id", "event_type"], keep="last")
     return out
 
+
 def _effect_value(row: Dict[str, Any]) -> float:
     for key in (
         "effect_shrunk_state",
@@ -105,6 +107,7 @@ def _template_id(row: Dict[str, Any]) -> str:
     ).strip()
     return token or "UNKNOWN_TEMPLATE"
 
+
 def _run_sort_value(value: str) -> Tuple[int, str]:
     token = str(value or "").strip()
     digits = "".join(ch for ch in token if ch.isdigit())
@@ -114,6 +117,7 @@ def _run_sort_value(value: str) -> Tuple[int, str]:
         except ValueError:
             pass
     return (0, token)
+
 
 def _effect_decay(values: Iterable[float]) -> float:
     y = np.asarray([safe_float(v, np.nan) for v in values], dtype=float)
@@ -130,6 +134,7 @@ def _effect_decay(values: Iterable[float]) -> float:
     if not np.isfinite(slope):
         return 0.0
     return float(slope)
+
 
 def _build_observations(
     *,
@@ -173,12 +178,14 @@ def _build_observations(
         record["template_family"] = comps.template_family
         record["direction_rule"] = comps.direction_rule
         record["signal_polarity_logic"] = comps.signal_polarity_logic
-        record["promotion_decision"] = str(
-            record.get("promotion_decision", record.get("status", "rejected"))
-        ).strip().lower()
+        record["promotion_decision"] = (
+            str(record.get("promotion_decision", record.get("status", "rejected"))).strip().lower()
+        )
         if record["promotion_decision"] not in {"promoted", "rejected"}:
             record["promotion_decision"] = (
-                "promoted" if str(record.get("status", "")).strip().upper() == "PROMOTED" else "rejected"
+                "promoted"
+                if str(record.get("status", "")).strip().upper() == "PROMOTED"
+                else "rejected"
             )
         record["promotion_score"] = coerce_numeric_nan(record.get("promotion_score"))
         record["effect_value"] = _effect_value(record)
@@ -187,9 +194,7 @@ def _build_observations(
         record["estimated_position_notional_usd"] = safe_float(
             record.get("estimated_position_notional_usd"), np.nan
         )
-        record["slot_pressure_fraction"] = safe_float(
-            record.get("slot_pressure_fraction"), np.nan
-        )
+        record["slot_pressure_fraction"] = safe_float(record.get("slot_pressure_fraction"), np.nan)
         record["leverage_usage_fraction"] = safe_float(
             record.get("leverage_usage_fraction"), np.nan
         )
@@ -201,16 +206,29 @@ def _build_observations(
         )
 
         record["observed_at_utc"] = observed_at
-        record["ontology_spec_hash"] = str(record.get("ontology_spec_hash", ontology_spec_hash)).strip()
+        record["ontology_spec_hash"] = str(
+            record.get("ontology_spec_hash", ontology_spec_hash)
+        ).strip()
         rows.append(record)
     if not rows:
         return pd.DataFrame()
     out = pd.DataFrame(rows)
     # Drop complex object columns that cause Parquet serialization errors
-    cols_to_drop = [c for c in out.columns if "schema" in c or "trace" in c or c == "audit_statuses" or out[c].dtype == object and isinstance(out[c].dropna().iloc[0] if not out[c].dropna().empty else None, (list, dict, np.ndarray))]
+    cols_to_drop = [
+        c
+        for c in out.columns
+        if "schema" in c
+        or "trace" in c
+        or c == "audit_statuses"
+        or out[c].dtype == object
+        and isinstance(
+            out[c].dropna().iloc[0] if not out[c].dropna().empty else None, (list, dict, np.ndarray)
+        )
+    ]
     out = out.drop(columns=cols_to_drop, errors="ignore")
     out = out.drop_duplicates(subset=["run_id", "candidate_id", "event_type"], keep="last")
     return out
+
 
 def _aggregate_registry(observations: pd.DataFrame) -> pd.DataFrame:
     DATA_ROOT = get_data_root()
@@ -226,27 +244,47 @@ def _aggregate_registry(observations: pd.DataFrame) -> pd.DataFrame:
         ordered = sub.sort_values(by=["run_sort", "observed_at_utc", "candidate_id"], kind="stable")
         first = ordered.iloc[0]
         last = ordered.iloc[-1]
-        effect_series = pd.to_numeric(ordered["effect_value"], errors="coerce").replace([np.inf, -np.inf], np.nan).dropna()
-        stability_series = pd.to_numeric(ordered["stability_score"], errors="coerce").replace([np.inf, -np.inf], np.nan).dropna()
-        slot_pressure_series = pd.to_numeric(
-            ordered.get("slot_pressure_fraction", pd.Series(dtype=float)),
-            errors="coerce",
-        ).replace([np.inf, -np.inf], np.nan).dropna()
-        leverage_usage_series = pd.to_numeric(
-            ordered.get("leverage_usage_fraction", pd.Series(dtype=float)),
-            errors="coerce",
-        ).replace([np.inf, -np.inf], np.nan).dropna()
+        effect_series = (
+            pd.to_numeric(ordered["effect_value"], errors="coerce")
+            .replace([np.inf, -np.inf], np.nan)
+            .dropna()
+        )
+        stability_series = (
+            pd.to_numeric(ordered["stability_score"], errors="coerce")
+            .replace([np.inf, -np.inf], np.nan)
+            .dropna()
+        )
+        slot_pressure_series = (
+            pd.to_numeric(
+                ordered.get("slot_pressure_fraction", pd.Series(dtype=float)),
+                errors="coerce",
+            )
+            .replace([np.inf, -np.inf], np.nan)
+            .dropna()
+        )
+        leverage_usage_series = (
+            pd.to_numeric(
+                ordered.get("leverage_usage_fraction", pd.Series(dtype=float)),
+                errors="coerce",
+            )
+            .replace([np.inf, -np.inf], np.nan)
+            .dropna()
+        )
         rows.append(
             {
                 "edge_id": str(edge_id),
                 "candidate_id": str(last.get("candidate_id", "")).strip(),
                 "promotion_score": coerce_numeric_nan(last.get("promotion_score")),
-                "promotion_decision": str(last.get("promotion_decision", "rejected")).strip().lower(),
+                "promotion_decision": str(last.get("promotion_decision", "rejected"))
+                .strip()
+                .lower(),
                 "event_type": str(last.get("event_type", "UNKNOWN_EVENT")).strip(),
                 "template_id": str(last.get("template_id", "UNKNOWN_TEMPLATE")).strip(),
                 "template_family": str(last.get("template_family", "UNKNOWN_TEMPLATE")).strip(),
                 "direction_rule": str(last.get("direction_rule", "UNKNOWN_DIRECTION")).strip(),
-                "signal_polarity_logic": str(last.get("signal_polarity_logic", "UNKNOWN_POLARITY")).strip(),
+                "signal_polarity_logic": str(
+                    last.get("signal_polarity_logic", "UNKNOWN_POLARITY")
+                ).strip(),
                 "first_seen_run": str(first.get("run_id", "")).strip(),
                 "last_seen_run": str(last.get("run_id", "")).strip(),
                 "times_promoted": int(ordered["is_promoted"].sum()),
@@ -258,18 +296,22 @@ def _aggregate_registry(observations: pd.DataFrame) -> pd.DataFrame:
                 "capital_slot_pressure_max": nanmax_or_nan(slot_pressure_series),
                 "capital_leverage_usage_median": nanmedian_or_nan(leverage_usage_series),
                 "capital_leverage_usage_max": nanmax_or_nan(leverage_usage_series),
-
                 "capital_slot_limit_breaches": int((slot_pressure_series > 1.0).sum()),
                 "capital_leverage_budget_breaches": int((leverage_usage_series > 1.0).sum()),
             }
         )
     out = pd.DataFrame(rows)
-    out = out.sort_values(by=["event_type", "template_id", "edge_id"], kind="stable").reset_index(drop=True)
+    out = out.sort_values(by=["event_type", "template_id", "edge_id"], kind="stable").reset_index(
+        drop=True
+    )
     return out
+
 
 def main(argv: List[str] | None = None) -> int:
     DATA_ROOT = get_data_root()
-    parser = argparse.ArgumentParser(description="Append promoted-candidate lineage and aggregate edge registry.")
+    parser = argparse.ArgumentParser(
+        description="Append promoted-candidate lineage and aggregate edge registry."
+    )
     parser.add_argument("--run_id", required=True)
     parser.add_argument("--promoted_candidates_path", default=None)
     parser.add_argument("--promotion_audit_path", default=None)
@@ -389,7 +431,9 @@ def main(argv: List[str] | None = None) -> int:
                 observations_new["ontology_spec_hash"].astype(str).str.strip() != ontology_spec_hash
             ]
             if not mismatch.empty:
-                raise ValueError("Ontology hash mismatch inside promotion artifacts for edge registry update.")
+                raise ValueError(
+                    "Ontology hash mismatch inside promotion artifacts for edge registry update."
+                )
 
         history_existing = _load_history(baseline_observations_path)
         if history_existing.empty:
@@ -477,6 +521,7 @@ def main(argv: List[str] | None = None) -> int:
     except Exception as exc:
         finalize_manifest(manifest, "failed", error=str(exc))
         return 1
+
 
 if __name__ == "__main__":
     sys.exit(main())

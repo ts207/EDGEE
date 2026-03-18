@@ -38,7 +38,10 @@ _EXPORTS = {
         "project.research.knowledge.memory",
         "build_tested_regions_snapshot",
     ),
-    "compute_context_statistics": ("project.research.knowledge.memory", "compute_context_statistics"),
+    "compute_context_statistics": (
+        "project.research.knowledge.memory",
+        "compute_context_statistics",
+    ),
     "compute_event_statistics": ("project.research.knowledge.memory", "compute_event_statistics"),
     "compute_region_statistics": ("project.research.knowledge.memory", "compute_region_statistics"),
     "compute_template_statistics": (

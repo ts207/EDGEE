@@ -26,7 +26,9 @@ class BaseLiquidityStressDetector(CompositeDetector):
     default_major_intensity_threshold = 6.0
     default_extreme_intensity_threshold = 12.0
 
-    def compute_raw_mask(self, df: pd.DataFrame, *, features: dict[str, pd.Series], **params: Any) -> pd.Series:
+    def compute_raw_mask(
+        self, df: pd.DataFrame, *, features: dict[str, pd.Series], **params: Any
+    ) -> pd.Series:
         del df
         depth = features["depth"]
         spread = features["spread"]
@@ -34,13 +36,19 @@ class BaseLiquidityStressDetector(CompositeDetector):
         spread_med = features["spread_median"]
         imbalance = features["imbalance"]
         canonical_spread_wide = features.get("canonical_spread_wide")
-        
-        depth_collapse_th = float(params.get("depth_collapse_th", self.default_depth_collapse_threshold))
+
+        depth_collapse_th = float(
+            params.get("depth_collapse_th", self.default_depth_collapse_threshold)
+        )
         spread_spike_th = float(params.get("spread_spike_th", self.default_spread_spike_threshold))
-        imbalance_sensitivity = float(params.get("imbalance_sensitivity", self.default_imbalance_sensitivity))
+        imbalance_sensitivity = float(
+            params.get("imbalance_sensitivity", self.default_imbalance_sensitivity)
+        )
         imbalance_th = float(params.get("imbalance_threshold", self.default_imbalance_threshold))
-        
-        dynamic_spread_th = spread_spike_th * (1.0 - imbalance_sensitivity * (imbalance.abs() > imbalance_th).astype(float))
+
+        dynamic_spread_th = spread_spike_th * (
+            1.0 - imbalance_sensitivity * (imbalance.abs() > imbalance_th).astype(float)
+        )
         mask = (
             depth.notna()
             & spread.notna()
@@ -55,16 +63,18 @@ class BaseLiquidityStressDetector(CompositeDetector):
             mask = mask & canonical_spread_wide.fillna(False)
         return mask.fillna(False)
 
-    def compute_intensity(self, df: pd.DataFrame, *, features: dict[str, pd.Series], **params: Any) -> pd.Series:
+    def compute_intensity(
+        self, df: pd.DataFrame, *, features: dict[str, pd.Series], **params: Any
+    ) -> pd.Series:
         del df
         depth = features["depth"]
         spread = features["spread"]
         depth_med = features["depth_median"].replace(0.0, np.nan)
         spread_med = features["spread_median"].replace(0.0, np.nan)
         imbalance = features["imbalance"]
-        
+
         depth_floor = float(params.get("depth_floor", self.default_depth_floor))
-        
+
         depth_ratio = depth / depth_med
         spread_ratio = spread / spread_med
         score = spread_ratio * (1.0 / depth_ratio.clip(lower=depth_floor)) * (1.0 + imbalance.abs())
@@ -90,13 +100,15 @@ class BaseLiquidityStressDetector(CompositeDetector):
             return "major"
         return "moderate"
 
-    def compute_metadata(self, idx: int, features: dict[str, pd.Series], **params: Any) -> dict[str, Any]:
+    def compute_metadata(
+        self, idx: int, features: dict[str, pd.Series], **params: Any
+    ) -> dict[str, Any]:
         del params
         depth_val = features["depth"].iloc[idx]
         depth_med = features["depth_median"].iloc[idx]
         spread_val = features["spread"].iloc[idx]
         spread_med = features["spread_median"].iloc[idx]
-        
+
         return {
             "evidence_tier": str(features["evidence_tier"].iloc[idx]),
             "depth_source": str(features["depth_source"].iloc[idx]),
@@ -122,8 +134,12 @@ class DirectLiquidityStressDetector(BaseLiquidityStressDetector):
 
         depth = pd.to_numeric(df["depth_usd"], errors="coerce").astype(float)
         spread = pd.to_numeric(df["spread_bps"], errors="coerce").abs().astype(float)
-        
-        imbalance_raw = df["ms_imbalance_24"] if "ms_imbalance_24" in df.columns else pd.Series(0.0, index=df.index)
+
+        imbalance_raw = (
+            df["ms_imbalance_24"]
+            if "ms_imbalance_24" in df.columns
+            else pd.Series(0.0, index=df.index)
+        )
         imbalance = pd.to_numeric(imbalance_raw, errors="coerce").fillna(0.0).astype(float)
         canonical_spread_wide = state_at_least(
             df,
@@ -132,12 +148,12 @@ class DirectLiquidityStressDetector(BaseLiquidityStressDetector):
             min_confidence=float(params.get("context_min_confidence", 0.55)),
             max_entropy=float(params.get("context_max_entropy", 0.90)),
         )
-        
-        # micro_spread_stress is already a ratio, but we compute rolling medians for consistency 
+
+        # micro_spread_stress is already a ratio, but we compute rolling medians for consistency
         # with the Base class which expects raw units to be compared against medians.
         depth_med = depth.shift(1).rolling(window=window, min_periods=min_periods).median()
         spread_med = spread.shift(1).rolling(window=window, min_periods=min_periods).median()
-        
+
         return {
             "depth": depth,
             "spread": spread,
@@ -162,14 +178,14 @@ class ProxyLiquidityStressDetector(BaseLiquidityStressDetector):
         min_periods = int(params.get("min_periods", max(24, window // 12)))
 
         depth = pd.to_numeric(df["quote_volume"], errors="coerce").astype(float)
-        
+
         high = pd.to_numeric(df["high"], errors="coerce").astype(float)
         low = pd.to_numeric(df["low"], errors="coerce").astype(float)
         close = pd.to_numeric(df["close"], errors="coerce").replace(0.0, np.nan).astype(float)
-        
+
         bp_scale = float(params.get("bp_scale", 10000.0))
-        spread = ((high - low) / close).abs() * bp_scale # bar range in bps
-        
+        spread = ((high - low) / close).abs() * bp_scale  # bar range in bps
+
         imbalance = pd.Series(0.0, index=df.index)
         canonical_spread_wide = state_at_least(
             df,
@@ -178,10 +194,10 @@ class ProxyLiquidityStressDetector(BaseLiquidityStressDetector):
             min_confidence=float(params.get("context_min_confidence", 0.55)),
             max_entropy=float(params.get("context_max_entropy", 0.90)),
         )
-        
+
         depth_med = depth.shift(1).rolling(window=window, min_periods=min_periods).median()
         spread_med = spread.shift(1).rolling(window=window, min_periods=min_periods).median()
-        
+
         return {
             "depth": depth,
             "spread": spread,
@@ -212,7 +228,6 @@ class LiquidityStressDetector(BaseLiquidityStressDetector):
         return "LIQUIDITY_STRESS_PROXY"
 
 
-
 class DepthCollapseDetector(ThresholdDetector):
     event_type = "DEPTH_COLLAPSE"
     required_columns = ("timestamp", "spread_zscore", "rv_96")
@@ -222,11 +237,11 @@ class DepthCollapseDetector(ThresholdDetector):
         rv_96 = df["rv_96"].ffill()
         lookback = int(params.get("lookback_window", 288))
         rv_z = rolling_mean_std_zscore(rv_96, window=lookback)
-        
+
         threshold_window = int(params.get("threshold_window", 2880))
         q_spread = float(params.get("spread_quantile", 0.90))
         q_rv = float(params.get("rv_quantile", 0.70))
-        
+
         spread_q90 = lagged_rolling_quantile(
             spread_z,
             window=threshold_window,
@@ -254,16 +269,19 @@ class DepthCollapseDetector(ThresholdDetector):
             "canonical_spread_wide": canonical_spread_wide,
         }
 
-    def compute_raw_mask(self, df: pd.DataFrame, *, features: dict[str, pd.Series], **params: Any) -> pd.Series:
+    def compute_raw_mask(
+        self, df: pd.DataFrame, *, features: dict[str, pd.Series], **params: Any
+    ) -> pd.Series:
         del df, params
         return (
             features["canonical_spread_wide"].fillna(False)
-            & 
-            (features["spread_z"] >= features["spread_q90"]).fillna(False)
+            & (features["spread_z"] >= features["spread_q90"]).fillna(False)
             & (features["rv_z"] >= features["rv_q70"]).fillna(False)
         ).fillna(False)
 
-    def compute_intensity(self, df: pd.DataFrame, *, features: dict[str, pd.Series], **params: Any) -> pd.Series:
+    def compute_intensity(
+        self, df: pd.DataFrame, *, features: dict[str, pd.Series], **params: Any
+    ) -> pd.Series:
         del df, params
         return features["spread_z"].abs()
 
@@ -277,7 +295,7 @@ class SpreadBlowoutDetector(ThresholdDetector):
         lookback = int(params.get("lookback_window", 288))
         threshold_window = int(params.get("threshold_window", 2880))
         q_spread = float(params.get("z_quantile", params.get("spread_quantile", 0.97)))
-        
+
         spread_q97 = lagged_rolling_quantile(
             spread_z,
             window=threshold_window,
@@ -297,19 +315,22 @@ class SpreadBlowoutDetector(ThresholdDetector):
             "canonical_spread_wide": canonical_spread_wide,
         }
 
-    def compute_raw_mask(self, df: pd.DataFrame, *, features: dict[str, pd.Series], **params: Any) -> pd.Series:
+    def compute_raw_mask(
+        self, df: pd.DataFrame, *, features: dict[str, pd.Series], **params: Any
+    ) -> pd.Series:
         del df
         spread_z = features["spread_z"]
         spread_q97 = features["spread_q97"]
-        
+
         z_floor = float(params.get("z_threshold", 2.0))
         threshold = spread_q97.where(spread_q97 >= z_floor, z_floor)
         return (
-            features["canonical_spread_wide"].fillna(False)
-            & (spread_z >= threshold).fillna(False)
+            features["canonical_spread_wide"].fillna(False) & (spread_z >= threshold).fillna(False)
         ).fillna(False)
 
-    def compute_intensity(self, df: pd.DataFrame, *, features: dict[str, pd.Series], **params: Any) -> pd.Series:
+    def compute_intensity(
+        self, df: pd.DataFrame, *, features: dict[str, pd.Series], **params: Any
+    ) -> pd.Series:
         del df, params
         return features["spread_z"].abs()
 
@@ -321,14 +342,14 @@ class OrderflowImbalanceDetector(CompositeDetector):
     def prepare_features(self, df: pd.DataFrame, **params: Any) -> dict[str, pd.Series]:
         ret_abs = df["close"].pct_change(1).abs()
         rv_96 = df["rv_96"].ffill()
-        
+
         lookback = int(params.get("lookback_window", 288))
         rv_z = rolling_mean_std_zscore(rv_96, window=lookback)
-        
+
         threshold_window = int(params.get("threshold_window", 2880))
         q_ret = float(params.get("ret_quantile", 0.99))
         q_rv = float(params.get("rv_quantile", 0.70))
-        
+
         ret_q99 = lagged_rolling_quantile(
             ret_abs,
             window=threshold_window,
@@ -343,14 +364,18 @@ class OrderflowImbalanceDetector(CompositeDetector):
         )
         return {"ret_abs": ret_abs, "rv_z": rv_z, "ret_q99": ret_q99, "rv_q70": rv_q70}
 
-    def compute_raw_mask(self, df: pd.DataFrame, *, features: dict[str, pd.Series], **params: Any) -> pd.Series:
+    def compute_raw_mask(
+        self, df: pd.DataFrame, *, features: dict[str, pd.Series], **params: Any
+    ) -> pd.Series:
         del df, params
         return (
             (features["ret_abs"] >= features["ret_q99"]).fillna(False)
             & (features["rv_z"] >= features["rv_q70"]).fillna(False)
         ).fillna(False)
 
-    def compute_intensity(self, df: pd.DataFrame, *, features: dict[str, pd.Series], **params: Any) -> pd.Series:
+    def compute_intensity(
+        self, df: pd.DataFrame, *, features: dict[str, pd.Series], **params: Any
+    ) -> pd.Series:
         del df
         bp_scale = float(params.get("bp_scale", 10000.0))
         return features["ret_abs"] * bp_scale
@@ -369,12 +394,12 @@ class StopRunDetector(CompositeDetector):
         wick_down = np.minimum(open_proxy, close) - low
         wick = (wick_up + wick_down) / close.replace(0.0, np.nan)
         ret_abs = close.pct_change(1).abs()
-        
+
         lookback = int(params.get("lookback_window", 288))
         threshold_window = int(params.get("threshold_window", 2880))
         q_wick = float(params.get("wick_quantile", 0.97))
         q_ret = float(params.get("ret_quantile", 0.90))
-        
+
         wick_q97 = lagged_rolling_quantile(
             wick.astype(float),
             window=threshold_window,
@@ -389,14 +414,18 @@ class StopRunDetector(CompositeDetector):
         )
         return {"wick": wick, "ret_abs": ret_abs, "wick_q97": wick_q97, "ret_q90": ret_q90}
 
-    def compute_raw_mask(self, df: pd.DataFrame, *, features: dict[str, pd.Series], **params: Any) -> pd.Series:
+    def compute_raw_mask(
+        self, df: pd.DataFrame, *, features: dict[str, pd.Series], **params: Any
+    ) -> pd.Series:
         del df, params
         return (
             (features["wick"] >= features["wick_q97"]).fillna(False)
             & (features["ret_abs"] >= features["ret_q90"]).fillna(False)
         ).fillna(False)
 
-    def compute_intensity(self, df: pd.DataFrame, *, features: dict[str, pd.Series], **params: Any) -> pd.Series:
+    def compute_intensity(
+        self, df: pd.DataFrame, *, features: dict[str, pd.Series], **params: Any
+    ) -> pd.Series:
         del df, params
         return features["wick"].abs() * 100.0
 
@@ -411,12 +440,12 @@ class AbsorptionDetector(CompositeDetector):
         rv_96 = df["rv_96"].ffill()
         lookback = int(params.get("lookback_window", 288))
         rv_z = rolling_mean_std_zscore(rv_96, window=lookback)
-        
+
         threshold_window = int(params.get("threshold_window", 2880))
         q_ret = float(params.get("ret_quantile", 0.35))
         q_spread = float(params.get("spread_quantile", 0.80))
         q_rv = float(params.get("rv_quantile", 0.70))
-        
+
         ret_q35 = lagged_rolling_quantile(
             ret_abs,
             window=threshold_window,
@@ -452,17 +481,20 @@ class AbsorptionDetector(CompositeDetector):
             "canonical_spread_wide": canonical_spread_wide,
         }
 
-    def compute_raw_mask(self, df: pd.DataFrame, *, features: dict[str, pd.Series], **params: Any) -> pd.Series:
+    def compute_raw_mask(
+        self, df: pd.DataFrame, *, features: dict[str, pd.Series], **params: Any
+    ) -> pd.Series:
         del df, params
         return (
             features["canonical_spread_wide"].fillna(False)
-            &
-            (features["ret_abs"] <= features["ret_q35"]).fillna(False)
+            & (features["ret_abs"] <= features["ret_q35"]).fillna(False)
             & (features["spread_z"] >= features["spread_q80"]).fillna(False)
             & (features["rv_z"] >= features["rv_q70"]).fillna(False)
         ).fillna(False)
 
-    def compute_intensity(self, df: pd.DataFrame, *, features: dict[str, pd.Series], **params: Any) -> pd.Series:
+    def compute_intensity(
+        self, df: pd.DataFrame, *, features: dict[str, pd.Series], **params: Any
+    ) -> pd.Series:
         del df, params
         return features["spread_z"].abs() + features["rv_z"].abs()
 
@@ -473,11 +505,11 @@ class LiquidityGapDetector(ThresholdDetector):
 
     def prepare_features(self, df: pd.DataFrame, **params: Any) -> dict[str, pd.Series]:
         ret_abs = df["close"].pct_change(1).abs()
-        
+
         lookback = int(params.get("lookback_window", 288))
         threshold_window = int(params.get("threshold_window", 2880))
         q_ret = float(params.get("ret_quantile", 0.995))
-        
+
         ret_q995 = lagged_rolling_quantile(
             ret_abs,
             window=threshold_window,
@@ -486,11 +518,15 @@ class LiquidityGapDetector(ThresholdDetector):
         )
         return {"ret_abs": ret_abs, "ret_q995": ret_q995}
 
-    def compute_raw_mask(self, df: pd.DataFrame, *, features: dict[str, pd.Series], **params: Any) -> pd.Series:
+    def compute_raw_mask(
+        self, df: pd.DataFrame, *, features: dict[str, pd.Series], **params: Any
+    ) -> pd.Series:
         del df, params
         return (features["ret_abs"] >= features["ret_q995"]).fillna(False)
 
-    def compute_intensity(self, df: pd.DataFrame, *, features: dict[str, pd.Series], **params: Any) -> pd.Series:
+    def compute_intensity(
+        self, df: pd.DataFrame, *, features: dict[str, pd.Series], **params: Any
+    ) -> pd.Series:
         del df
         bp_scale = float(params.get("bp_scale", 10000.0))
         return features["ret_abs"] * bp_scale
@@ -501,9 +537,16 @@ class LiquidityVacuumDetector(ThresholdDetector):
     required_columns = ("timestamp", "close", "high", "low", "volume")
 
     def detect(self, df: pd.DataFrame, *, symbol: str, **params: Any) -> pd.DataFrame:
-        from project.features.liquidity_vacuum import LiquidityVacuumConfig, detect_liquidity_vacuum_events
+        from project.features.liquidity_vacuum import (
+            LiquidityVacuumConfig,
+            detect_liquidity_vacuum_events,
+        )
 
-        cfg_dict = {key: value for key, value in params.items() if key in LiquidityVacuumConfig.__dataclass_fields__}
+        cfg_dict = {
+            key: value
+            for key, value in params.items()
+            if key in LiquidityVacuumConfig.__dataclass_fields__
+        }
         cfg = LiquidityVacuumConfig(**cfg_dict)
         t_shock = params.get("t_shock")
         return detect_liquidity_vacuum_events(df, symbol=symbol, cfg=cfg, t_shock=t_shock)

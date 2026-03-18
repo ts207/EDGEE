@@ -14,17 +14,20 @@ try:
 except ImportError:  # pragma: no cover - optional dependency
     HAS_PYARROW = False
 
+
 def ensure_dir(path: Path) -> None:
     """
     Ensure a directory exists.
     """
     path.mkdir(parents=True, exist_ok=True)
 
+
 def run_scoped_lake_path(data_root: Path, run_id: str, *parts: str) -> Path:
     """
     Build a run-scoped lake path under ``data/lake/runs/<run_id>/...``.
     """
     return Path(data_root) / "lake" / "runs" / str(run_id) / Path(*parts)
+
 
 def _force_csv_fallback_enabled() -> bool:
     return str(os.getenv("BACKTEST_FORCE_CSV_FALLBACK", "0")).strip() in {
@@ -34,6 +37,7 @@ def _force_csv_fallback_enabled() -> bool:
         "yes",
         "YES",
     }
+
 
 def _strict_run_scoped_reads_enabled() -> bool:
     """
@@ -49,6 +53,7 @@ def _strict_run_scoped_reads_enabled() -> bool:
         "yes",
         "YES",
     }
+
 
 def choose_partition_dir(candidates: Sequence[Path]) -> Path | None:
     """
@@ -94,6 +99,7 @@ def choose_partition_dir(candidates: Sequence[Path]) -> Path | None:
 
     return None
 
+
 def list_parquet_files(path: Path) -> List[Path]:
     """
     Recursively list all parquet files under a directory.
@@ -111,7 +117,10 @@ def list_parquet_files(path: Path) -> List[Path]:
     csv_only_partitions = [p for p in csv_files if p.parent not in parquet_dirs]
     return sorted(parquet_files + csv_only_partitions)
 
-def read_parquet(files: Iterable[Path] | Path | str, columns: List[str] | None = None) -> pd.DataFrame:
+
+def read_parquet(
+    files: Iterable[Path] | Path | str, columns: List[str] | None = None
+) -> pd.DataFrame:
     """
     Read multiple Parquet (or CSV fallback) files into a single DataFrame.
     """
@@ -155,6 +164,7 @@ def read_table_auto(path: Path | str, columns: List[str] | None = None) -> pd.Da
     except Exception:
         return pd.DataFrame()
 
+
 def write_parquet(df: pd.DataFrame, path: Path, skip_lock: bool = False) -> Tuple[Path, str]:
     """
     Write a DataFrame to a Parquet file if available; otherwise fall back to CSV.
@@ -162,11 +172,12 @@ def write_parquet(df: pd.DataFrame, path: Path, skip_lock: bool = False) -> Tupl
     Returns the actual path written and the storage format ("parquet" or "csv").
     """
     ensure_dir(path.parent)
-    
+
     if skip_lock:
         return _write_parquet_impl(df, path)
-        
+
     import fcntl
+
     lock_path = path.with_suffix(path.suffix + ".lock")
     with open(lock_path, "w") as lock_file:
         try:
@@ -178,6 +189,7 @@ def write_parquet(df: pd.DataFrame, path: Path, skip_lock: bool = False) -> Tupl
                 os.remove(lock_path)
             except Exception:
                 pass
+
 
 def _write_parquet_impl(df: pd.DataFrame, path: Path) -> Tuple[Path, str]:
     if HAS_PYARROW and not _force_csv_fallback_enabled():
@@ -193,6 +205,8 @@ def _write_parquet_impl(df: pd.DataFrame, path: Path) -> Tuple[Path, str]:
     temp_path.replace(csv_path)
     return csv_path, "csv"
 
+
 def sorted_glob(paths):
     import glob
+
     return sorted(glob.glob(paths))

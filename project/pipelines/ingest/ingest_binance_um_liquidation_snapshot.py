@@ -39,12 +39,15 @@ CM_SYMBOL_MAP = {
     "SOLUSD_PERP": "SOLUSD_PERP",
 }
 
+
 def _parse_date(value: str) -> datetime:
     return datetime.strptime(value, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+
 
 def _month_start(ts: datetime) -> datetime:
     ts = ts.astimezone(timezone.utc)
     return ts.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
 
 def _next_month(ts: datetime) -> datetime:
     ts = ts.astimezone(timezone.utc)
@@ -56,6 +59,7 @@ def _next_month(ts: datetime) -> datetime:
         m += 1
     return ts.replace(year=y, month=m, day=1, hour=0, minute=0, second=0, microsecond=0)
 
+
 def _iter_months(start: datetime, end: datetime) -> List[datetime]:
     out: List[datetime] = []
     cur = _month_start(start)
@@ -64,16 +68,16 @@ def _iter_months(start: datetime, end: datetime) -> List[datetime]:
         cur = _next_month(cur)
     return out
 
+
 def _iter_days(start: datetime, end_exclusive: datetime) -> Iterable[datetime]:
-    cur = start.astimezone(timezone.utc).replace(
-        hour=0, minute=0, second=0, microsecond=0
-    )
+    cur = start.astimezone(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
     end_exclusive = end_exclusive.astimezone(timezone.utc).replace(
         hour=0, minute=0, second=0, microsecond=0
     )
     while cur < end_exclusive:
         yield cur
         cur += timedelta(days=1)
+
 
 def _to_cm_contract(symbol: str) -> str:
     s = str(symbol or "").strip().upper()
@@ -93,8 +97,10 @@ def _to_cm_contract(symbol: str) -> str:
         return f"{s}_PERP"
     return s
 
+
 # All recognized CM perpetual contract names — used for pre-ingest mapping validation.
 _KNOWN_CM_CONTRACTS: frozenset = frozenset(CM_SYMBOL_MAP.values())
+
 
 def _assert_cm_mapping_complete(symbols: List[str]) -> None:
     """Raise ValueError if any symbol has no recognized CM perpetual contract mapping.
@@ -112,6 +118,7 @@ def _assert_cm_mapping_complete(symbols: List[str]) -> None:
         "Add entries to CM_SYMBOL_MAP or restrict --symbols to supported CM contracts "
         f"(currently: {sorted(_KNOWN_CM_CONTRACTS)})."
     )
+
 
 def _assert_events_per_symbol(events_per_symbol: Dict[str, int]) -> None:
     """Raise ValueError if any symbol contributed 0 liquidation events after ingestion.
@@ -134,6 +141,7 @@ def _assert_events_per_symbol(events_per_symbol: Dict[str, int]) -> None:
         "supported CM perpetual (BTCUSD_PERP, ETHUSD_PERP)."
     )
 
+
 def _to_float(value: object) -> float | None:
     if value is None:
         return None
@@ -148,6 +156,7 @@ def _to_float(value: object) -> float | None:
         return None
     return float(out)
 
+
 def _pick_first_numeric(df: pd.DataFrame, keys: List[str]) -> pd.Series:
     out = pd.Series([pd.NA] * len(df), index=df.index, dtype="Float64")
     for key in keys:
@@ -156,11 +165,13 @@ def _pick_first_numeric(df: pd.DataFrame, keys: List[str]) -> pd.Series:
             out = out.fillna(vals)
     return out
 
+
 def _normalize_side(value: object) -> str:
     s = str(value or "").strip().upper()
     if s in {"BUY", "SELL"}:
         return s
     return "UNKNOWN"
+
 
 def _read_csv_from_zip(path: Path) -> pd.DataFrame:
     with ZipFile(path) as zf:
@@ -192,13 +203,23 @@ def _read_csv_from_zip(path: Path) -> pd.DataFrame:
                 )
     return df
 
+
 def _parse_liquidation_from_zip(
     path: Path, symbol: str, source: str = "binance_data_vision_cm_liquidation_snapshot"
 ) -> pd.DataFrame:
     raw = _read_csv_from_zip(path)
     if raw.empty:
         return pd.DataFrame(
-            columns=["timestamp", "symbol", "side", "price", "qty", "notional", "event_count", "source"]
+            columns=[
+                "timestamp",
+                "symbol",
+                "side",
+                "price",
+                "qty",
+                "notional",
+                "event_count",
+                "source",
+            ]
         )
 
     # Normalize to lowercase columns so historical name variants are handled.
@@ -211,7 +232,16 @@ def _parse_liquidation_from_zip(
             break
     if ts_col is None:
         return pd.DataFrame(
-            columns=["timestamp", "symbol", "side", "price", "qty", "notional", "event_count", "source"]
+            columns=[
+                "timestamp",
+                "symbol",
+                "side",
+                "price",
+                "qty",
+                "notional",
+                "event_count",
+                "source",
+            ]
         )
 
     ts_numeric = pd.to_numeric(raw[ts_col], errors="coerce")
@@ -225,9 +255,7 @@ def _parse_liquidation_from_zip(
         else pd.Series(["UNKNOWN"] * len(raw), index=raw.index)
     )
 
-    price = _pick_first_numeric(
-        raw, ["average_price", "price", "avgprice", "avg_price"]
-    )
+    price = _pick_first_numeric(raw, ["average_price", "price", "avgprice", "avg_price"])
     qty = _pick_first_numeric(
         raw,
         [
@@ -261,7 +289,16 @@ def _parse_liquidation_from_zip(
     out = out.dropna(subset=["timestamp", "notional"]).copy()
     if out.empty:
         return pd.DataFrame(
-            columns=["timestamp", "symbol", "side", "price", "qty", "notional", "event_count", "source"]
+            columns=[
+                "timestamp",
+                "symbol",
+                "side",
+                "price",
+                "qty",
+                "notional",
+                "event_count",
+                "source",
+            ]
         )
 
     out["price"] = pd.to_numeric(out["price"], errors="coerce")
@@ -276,6 +313,7 @@ def _parse_liquidation_from_zip(
         .reset_index(drop=True)
     )
     return out[["timestamp", "symbol", "side", "price", "qty", "notional", "event_count", "source"]]
+
 
 def _list_available_day_set(
     cm_contract: str,
@@ -318,9 +356,7 @@ def _list_available_day_set(
                 time.sleep(retry_backoff_sec * (2**attempt))
 
         if payload_text is None:
-            raise RuntimeError(
-                f"Failed listing archive keys for {cm_contract}: {last_error}"
-            )
+            raise RuntimeError(f"Failed listing archive keys for {cm_contract}: {last_error}")
 
         root = ET.fromstring(payload_text)
         ns = {"s3": "http://s3.amazonaws.com/doc/2006-03-01/"}
@@ -351,6 +387,7 @@ def _list_available_day_set(
 
     return out
 
+
 def _fetch_symbol_binance_daily(
     session: requests.Session,
     *,
@@ -365,9 +402,7 @@ def _fetch_symbol_binance_daily(
     max_retries: int,
     retry_backoff_sec: float,
 ) -> Tuple[pd.DataFrame, Dict[str, int], List[str]]:
-    end_exclusive = (end + timedelta(days=1)).replace(
-        hour=0, minute=0, second=0, microsecond=0
-    )
+    end_exclusive = (end + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
 
     available_days: Set[str] = set()
     if int(prelist_available):
@@ -400,9 +435,7 @@ def _fetch_symbol_binance_daily(
 
         stats["days_considered"] += 1
         filename = f"{cm_contract}-liquidationSnapshot-{day_str}.zip"
-        url = join_url(
-            archive_base, "daily", "liquidationSnapshot", cm_contract, filename
-        )
+        url = join_url(archive_base, "daily", "liquidationSnapshot", cm_contract, filename)
 
         with tempfile.TemporaryDirectory() as tmpdir:
             out_zip = Path(tmpdir) / filename
@@ -431,7 +464,16 @@ def _fetch_symbol_binance_daily(
         pd.concat(frames, ignore_index=True)
         if frames
         else pd.DataFrame(
-            columns=["timestamp", "symbol", "side", "price", "qty", "notional", "event_count", "source"]
+            columns=[
+                "timestamp",
+                "symbol",
+                "side",
+                "price",
+                "qty",
+                "notional",
+                "event_count",
+                "source",
+            ]
         )
     )
     if not data.empty:
@@ -442,6 +484,7 @@ def _fetch_symbol_binance_daily(
             .reset_index(drop=True)
         )
     return data, stats, missing_files
+
 
 def _partition_has_rows(path: Path) -> bool:
     target = path
@@ -456,6 +499,7 @@ def _partition_has_rows(path: Path) -> bool:
     except Exception:
         return False
     return int(len(df)) > 0
+
 
 def main() -> int:
     data_root = get_data_root()
@@ -642,6 +686,7 @@ def main() -> int:
         logging.exception("Liquidation snapshot ingest failed")
         finalize_manifest(manifest, "failed", error=str(exc), stats=stats)
         return 1
+
 
 if __name__ == "__main__":
     raise SystemExit(main())

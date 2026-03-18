@@ -36,11 +36,13 @@ HORIZON_BARS_BY_TIMEFRAME: Dict[str, int] = {
 # Default horizon grid for event quality / conditional analysis at 5m base bars.
 DEFAULT_EVENT_HORIZON_BARS: List[int] = [1, 3, 12]
 
+
 def bars_per_year_for_timeframe(timeframe: str, default: int | None = None) -> int:
     key = str(timeframe or "").strip().lower()
     if default is None:
         default = BARS_PER_YEAR_BY_TIMEFRAME["5m"]
     return int(BARS_PER_YEAR_BY_TIMEFRAME.get(key, int(default)))
+
 
 def horizon_bars_for_label(horizon: str, default: int = 12) -> int:
     key = str(horizon or "").strip().lower()

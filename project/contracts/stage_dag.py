@@ -17,16 +17,16 @@ class StageSpecContract:
     stage_patterns: tuple[str, ...]
     script_patterns: tuple[str, ...]
     owner_service: str
-    schema_version: str = 'phase5_stage_contract_v1'
+    schema_version: str = "phase5_stage_contract_v1"
     is_legacy: bool = False
 
 
 def _owner_service_for_family(family: str) -> str:
     mapping = {
-        'phase2_discovery': 'project.research.services.candidate_discovery_service',
-        'promotion': 'project.research.services.promotion_service',
+        "phase2_discovery": "project.research.services.candidate_discovery_service",
+        "promotion": "project.research.services.promotion_service",
     }
-    return mapping.get(family, 'project.pipelines.run_all')
+    return mapping.get(family, "project.pipelines.run_all")
 
 
 def build_stage_specs() -> tuple[StageSpecContract, ...]:

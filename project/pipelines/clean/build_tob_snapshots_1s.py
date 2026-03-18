@@ -19,6 +19,7 @@ from project.io.utils import (
 )
 from project.specs.manifest import finalize_manifest, start_manifest
 
+
 def main() -> int:
     data_root = get_data_root()
     parser = argparse.ArgumentParser(description="Build 1s ToB snapshots from bookTicker")
@@ -33,7 +34,9 @@ def main() -> int:
     if args.log_path:
         ensure_dir(Path(args.log_path).parent)
         log_handlers.append(logging.FileHandler(args.log_path))
-    logging.basicConfig(level=logging.INFO, handlers=log_handlers, format="%(asctime)s %(levelname)s %(message)s")
+    logging.basicConfig(
+        level=logging.INFO, handlers=log_handlers, format="%(asctime)s %(levelname)s %(message)s"
+    )
 
     params = {
         "symbols": symbols,
@@ -58,10 +61,12 @@ def main() -> int:
                 if data.empty:
                     continue
 
-                inputs.append({
-                    "path": str(file_path),
-                    "rows": int(len(data)),
-                })
+                inputs.append(
+                    {
+                        "path": str(file_path),
+                        "rows": int(len(data)),
+                    }
+                )
 
                 data["timestamp"] = pd.to_datetime(data["timestamp"], utc=True)
                 data = data.sort_values("timestamp")
@@ -69,41 +74,39 @@ def main() -> int:
                 start_ts = data["timestamp"].min().floor("1s")
                 end_ts = data["timestamp"].max().ceil("1s")
                 full_index = pd.date_range(start=start_ts, end=end_ts, freq="1s", tz=timezone.utc)
-                
+
                 grid = pd.DataFrame({"timestamp": full_index})
                 resampled = pd.merge_asof(
-                    grid,
-                    data,
-                    on="timestamp",
-                    direction="backward",
-                    tolerance=pd.Timedelta("5s")
+                    grid, data, on="timestamp", direction="backward", tolerance=pd.Timedelta("5s")
                 )
-                
+
                 first_ts = data["timestamp"].min()
                 month_key = f"{first_ts.year}-{first_ts.month:02d}"
-                
+
                 out_dir = (
-                    data_root 
-                    / "lake" 
-                    / "cleaned" 
-                    / "perp" 
-                    / symbol 
-                    / "tob_1s" 
-                    / f"year={first_ts.year}" 
+                    data_root
+                    / "lake"
+                    / "cleaned"
+                    / "perp"
+                    / symbol
+                    / "tob_1s"
+                    / f"year={first_ts.year}"
                     / f"month={first_ts.month:02d}"
                 )
                 out_path = out_dir / f"tob_{symbol}_1s_{month_key}.parquet"
-                
+
                 ensure_dir(out_dir)
                 written, storage = write_parquet(resampled, out_path)
-                outputs.append({
-                    "path": str(written),
-                    "rows": int(len(resampled)),
-                    "start_ts": resampled["timestamp"].min().isoformat(),
-                    "end_ts": resampled["timestamp"].max().isoformat(),
-                    "storage": storage,
-                })
-                
+                outputs.append(
+                    {
+                        "path": str(written),
+                        "rows": int(len(resampled)),
+                        "start_ts": resampled["timestamp"].min().isoformat(),
+                        "end_ts": resampled["timestamp"].max().isoformat(),
+                        "storage": storage,
+                    }
+                )
+
                 stats["symbols"].setdefault(symbol, {})[month_key] = {
                     "raw_rows": int(len(data)),
                     "snapshot_rows": int(len(resampled)),
@@ -115,6 +118,7 @@ def main() -> int:
         logging.exception("ToB snapshot build failed")
         finalize_manifest(manifest, "failed", error=str(exc), stats=stats)
         return 1
+
 
 if __name__ == "__main__":
     sys.exit(main())

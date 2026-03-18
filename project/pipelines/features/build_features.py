@@ -17,7 +17,12 @@ from project.core.validation import ts_ns_utc
 from project.core.feature_registry import ensure_core_feature_definitions_registered
 from project.core.feature_quality import summarize_feature_quality
 from project.core.feature_schema import feature_dataset_dir_name, normalize_feature_schema_version
-from project.core.timeframes import bars_dataset_name, funding_dataset_name, normalize_timeframe, timeframe_to_minutes
+from project.core.timeframes import (
+    bars_dataset_name,
+    funding_dataset_name,
+    normalize_timeframe,
+    timeframe_to_minutes,
+)
 from project.features.microstructure import (
     calculate_imbalance,
 )
@@ -34,7 +39,9 @@ from project.specs.manifest import finalize_manifest, start_manifest
 _FUNDING_MAX_STALENESS_H = 8
 _OI_MAX_STALENESS_H = 4
 _ZSCORE_WINDOW = 96
-_BASE_WINDOW_MINUTES = 5  # legacy 5m semantic baseline, converted to active timeframe via _duration_to_bars
+_BASE_WINDOW_MINUTES = (
+    5  # legacy 5m semantic baseline, converted to active timeframe via _duration_to_bars
+)
 _WARMUP_COL_PATTERN = re.compile(r"_\d+$")
 
 
@@ -83,7 +90,15 @@ def _load_baseline_features(
             timeframe,
             feature_dataset_dir_name(feature_schema_version),
         ),
-        data_root / "lake" / "runs" / run_id / "features" / market / symbol / timeframe / feature_dataset_dir_name(feature_schema_version),
+        data_root
+        / "lake"
+        / "runs"
+        / run_id
+        / "features"
+        / market
+        / symbol
+        / timeframe
+        / feature_dataset_dir_name(feature_schema_version),
     ]
     path_dir = choose_partition_dir(candidates)
     if not path_dir:
@@ -182,13 +197,13 @@ def _add_basis_features(
         timeframe=timeframe,
         min_bars=2,
     )
-    
+
     # SF-001: Replace Gaussian standard deviation with robust median absolute deviation (MAD)
     # or direct quantile standardization to handle fat-tailed distributions smoothly.
     roll_median = out["basis_bps"].rolling(zscore_window, min_periods=2).median()
     roll_mad = (out["basis_bps"] - roll_median).abs().rolling(zscore_window, min_periods=2).median()
     # Approx convert MAD to std equivalent (1.4826) to maintain existing signal scales
-    roll_robust_std = roll_mad * 1.4826 
+    roll_robust_std = roll_mad * 1.4826
     out["basis_zscore"] = (out["basis_bps"] - roll_median) / roll_robust_std.replace(0.0, np.nan)
 
     if "spread_bps" in out.columns:
@@ -279,7 +294,7 @@ def _merge_optional_oi_liquidation(
     # Use consistent lake paths
     oi_dataset = "open_interest"
     liq_dataset = "liquidations"
-    
+
     oi_paths = [
         run_scoped_lake_path(data_root, run_id, "raw", "binance", market, symbol, oi_dataset),
         data_root / "lake" / "raw" / "binance" / market / symbol / oi_dataset,
@@ -287,14 +302,18 @@ def _merge_optional_oi_liquidation(
     liq_paths = [
         run_scoped_lake_path(data_root, run_id, "raw", "binance", market, symbol, liq_dataset),
         data_root / "lake" / "raw" / "binance" / market / symbol / liq_dataset,
-        run_scoped_lake_path(data_root, run_id, "raw", "binance", market, symbol, "liquidation_snapshot"),
+        run_scoped_lake_path(
+            data_root, run_id, "raw", "binance", market, symbol, "liquidation_snapshot"
+        ),
         data_root / "lake" / "raw" / "binance" / market / symbol / "liquidation_snapshot",
     ]
 
     # Open interest
     oi_period = "5m"
     oi_paths = [
-        run_scoped_lake_path(data_root, run_id, "raw", "binance", market, symbol, oi_dataset, oi_period),
+        run_scoped_lake_path(
+            data_root, run_id, "raw", "binance", market, symbol, oi_dataset, oi_period
+        ),
         data_root / "lake" / "raw" / "binance" / market / symbol / oi_dataset / oi_period,
         run_scoped_lake_path(data_root, run_id, "raw", "binance", market, symbol, oi_dataset),
         data_root / "lake" / "raw" / "binance" / market / symbol / oi_dataset,
@@ -354,8 +373,10 @@ def _merge_optional_oi_liquidation(
         liq_ts_col = "timestamp" if "timestamp" in liq.columns else "time"
         liq_notional_col = "notional"
         if "notional" not in liq.columns:
-            if "notional_usd" in liq.columns: liq_notional_col = "notional_usd"
-            elif "amount" in liq.columns: liq_notional_col = "amount"
+            if "notional_usd" in liq.columns:
+                liq_notional_col = "notional_usd"
+            elif "amount" in liq.columns:
+                liq_notional_col = "amount"
 
         liq = liq.copy()
         liq["timestamp"] = ts_ns_utc(pd.to_datetime(liq[liq_ts_col], utc=True, errors="coerce"))
@@ -373,7 +394,11 @@ def _merge_optional_oi_liquidation(
         if in_window.any():
             liq_notional = np.zeros(len(out))
             liq_count = np.zeros(len(out))
-            liq_vals = pd.to_numeric(liq[liq_notional_col], errors="coerce").fillna(0.0).to_numpy(dtype=float)
+            liq_vals = (
+                pd.to_numeric(liq[liq_notional_col], errors="coerce")
+                .fillna(0.0)
+                .to_numpy(dtype=float)
+            )
             np.add.at(liq_notional, idx[in_window], liq_vals[in_window])
             np.add.at(liq_count, idx[in_window], 1)
             out["liquidation_notional"] = liq_notional
@@ -396,7 +421,9 @@ def _ensure_feature_contract_columns(frame: pd.DataFrame, *, timeframe: str) -> 
     if "taker_base_volume" not in out.columns:
         out["taker_base_volume"] = (volume / 2.0).fillna(0.0)
     else:
-        out["taker_base_volume"] = pd.to_numeric(out["taker_base_volume"], errors="coerce").fillna(0.0)
+        out["taker_base_volume"] = pd.to_numeric(out["taker_base_volume"], errors="coerce").fillna(
+            0.0
+        )
 
     funding_scaled = pd.to_numeric(
         out.get("funding_rate_scaled", pd.Series(np.nan, index=out.index)), errors="coerce"
@@ -411,7 +438,9 @@ def _ensure_feature_contract_columns(frame: pd.DataFrame, *, timeframe: str) -> 
     if "funding_rate_realized" not in out.columns:
         out["funding_rate_realized"] = 0.0
     else:
-        out["funding_rate_realized"] = pd.to_numeric(out["funding_rate_realized"], errors="coerce").fillna(0.0)
+        out["funding_rate_realized"] = pd.to_numeric(
+            out["funding_rate_realized"], errors="coerce"
+        ).fillna(0.0)
 
     if "is_gap" not in out.columns:
         out["is_gap"] = False
@@ -432,9 +461,13 @@ def _ensure_feature_contract_columns(frame: pd.DataFrame, *, timeframe: str) -> 
         lambda n: _revision_lag_minutes(int(n), timeframe=timeframe)
     )
 
-    buy_volume = pd.to_numeric(out["taker_base_volume"], errors="coerce").fillna(0.0).clip(lower=0.0)
+    buy_volume = (
+        pd.to_numeric(out["taker_base_volume"], errors="coerce").fillna(0.0).clip(lower=0.0)
+    )
     total_volume = volume.fillna(0.0).clip(lower=0.0)
-    buy_volume = pd.Series(np.minimum(buy_volume.to_numpy(), total_volume.to_numpy()), index=out.index)
+    buy_volume = pd.Series(
+        np.minimum(buy_volume.to_numpy(), total_volume.to_numpy()), index=out.index
+    )
     sell_volume = pd.Series(
         np.maximum(total_volume.to_numpy() - buy_volume.to_numpy(), 0.0), index=out.index
     )
@@ -444,17 +477,27 @@ def _ensure_feature_contract_columns(frame: pd.DataFrame, *, timeframe: str) -> 
     # PIT safety verification: ensure key indicators that should be lagged are indeed shifted.
     # This is a defensive check to prevent look-ahead bias during feature evolution.
     _PIT_LAGGED_FEATURES = {
-        "rv_96", "rv_pct_17280", "funding_abs", "funding_abs_pct", 
-        "basis_bps", "basis_zscore", "ms_imbalance_24", "oi_delta_1h",
-        "range_med_2880", "spread_zscore", "cross_exchange_spread_z"
+        "rv_96",
+        "rv_pct_17280",
+        "funding_abs",
+        "funding_abs_pct",
+        "basis_bps",
+        "basis_zscore",
+        "ms_imbalance_24",
+        "oi_delta_1h",
+        "range_med_2880",
+        "spread_zscore",
+        "cross_exchange_spread_z",
     }
     for feat in _PIT_LAGGED_FEATURES:
         if feat in out.columns and len(out) > 5:
             # Audit Pattern B: Heuristic check — a lagged rolling indicator MUST
             # start with at least one NaN if correctly shifted.
             if pd.notna(out[feat].iloc[0]):
-                logging.warning(f"PIT Violation Risk: Feature '{feat}' is not NaN at index 0. "
-                                "It may be missing a .shift(1) lag.")
+                logging.warning(
+                    f"PIT Violation Risk: Feature '{feat}' is not NaN at index 0. "
+                    "It may be missing a .shift(1) lag."
+                )
 
     return out
 
@@ -530,14 +573,14 @@ def build_features(
     # Add funding absolute and percentile features
     if "funding_rate_scaled" in out.columns:
         funding_abs = out["funding_rate_scaled"].astype(float).abs().fillna(0.0)
-        out["funding_abs"] = funding_abs.shift(1) # Lag raw magnitude too if used for thresholds
+        out["funding_abs"] = funding_abs.shift(1)  # Lag raw magnitude too if used for thresholds
         funding_abs_window = _duration_to_bars(
             minutes=96 * _BASE_WINDOW_MINUTES,
             timeframe=tf,
             min_bars=1,
         )
-        out["funding_abs_pct"] = _rolling_percentile(funding_abs, window=funding_abs_window).shift(1).fillna(
-            0.0
+        out["funding_abs_pct"] = (
+            _rolling_percentile(funding_abs, window=funding_abs_window).shift(1).fillna(0.0)
         )
     else:
         out["funding_abs"] = 0.0
@@ -613,7 +656,9 @@ def main() -> int:
     )
 
     params = vars(args)
-    manifest = start_manifest(f"build_features_{tf}" + ("_spot" if market == "spot" else ""), run_id, params, [], [])
+    manifest = start_manifest(
+        f"build_features_{tf}" + ("_spot" if market == "spot" else ""), run_id, params, [], []
+    )
     stats: dict[str, object] = {"symbols": {}}
 
     try:
@@ -632,7 +677,9 @@ def main() -> int:
             bars = read_parquet(list_parquet_files(bars_dir))
             bars = _filter_time_window(bars, start=args.start, end=args.end)
             if bars.empty:
-                logging.warning(f"No cleaned bars remain for {symbol} {tf} after start/end filtering")
+                logging.warning(
+                    f"No cleaned bars remain for {symbol} {tf} after start/end filtering"
+                )
                 continue
 
             # Load funding (only for perp)
@@ -640,9 +687,21 @@ def main() -> int:
             if market == "perp":
                 funding_paths = [
                     run_scoped_lake_path(
-                        data_root, run_id, "raw", "binance", "perp", symbol, funding_dataset_name(tf)
+                        data_root,
+                        run_id,
+                        "raw",
+                        "binance",
+                        "perp",
+                        symbol,
+                        funding_dataset_name(tf),
                     ),
-                    data_root / "lake" / "raw" / "binance" / "perp" / symbol / funding_dataset_name(tf),
+                    data_root
+                    / "lake"
+                    / "raw"
+                    / "binance"
+                    / "perp"
+                    / symbol
+                    / funding_dataset_name(tf),
                     run_scoped_lake_path(
                         data_root, run_id, "raw", "binance", "perp", symbol, "funding"
                     ),
@@ -691,7 +750,10 @@ def main() -> int:
                     [out["timestamp"].dt.year, out["timestamp"].dt.month]
                 ):
                     out_dir = out_root / f"year={year}" / f"month={month:02d}"
-                    out_path = out_dir / f"features_{symbol}_{feature_schema_version}_{year}-{month:02d}.parquet"
+                    out_path = (
+                        out_dir
+                        / f"features_{symbol}_{feature_schema_version}_{year}-{month:02d}.parquet"
+                    )
                     write_parquet(group, out_path)
                     logging.info(f"Wrote features for {symbol} {year}-{month:02d} to {out_path}")
 

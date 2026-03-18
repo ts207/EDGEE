@@ -8,11 +8,13 @@ from pydantic import BaseModel, Field
 from project.domain.compiled_registry import get_domain_registry
 from project.core.exceptions import ConfigurationError
 
+
 class TemplateParameter(BaseModel):
     name: str
     type: str
     default: Any
     description: str = ""
+
 
 class TemplateSpec(BaseModel):
     name: str
@@ -23,20 +25,25 @@ class TemplateSpec(BaseModel):
     default_stop_bps: float = 50.0
     default_target_bps: float = 100.0
 
+
 class TemplateRegistry:
     """
     Registry for strategy templates defined in YAML.
     Enables declarative strategy building from event concepts.
     """
+
     _TEMPLATES: Dict[str, TemplateSpec] = {}
-    
+
     @classmethod
     def load_from_yaml(cls, path: Optional[Path] = None) -> None:
         del path
         try:
             registry = get_domain_registry()
             cls._TEMPLATES = {}
-            for family_name in registry.searchable_event_families or registry.unified_payload.get("families", {}).keys():
+            for family_name in (
+                registry.searchable_event_families
+                or registry.unified_payload.get("families", {}).keys()
+            ):
                 family = str(family_name).strip().upper()
                 if not family:
                     continue

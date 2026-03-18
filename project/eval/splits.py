@@ -7,6 +7,7 @@ from typing import List
 import numpy as np
 import pandas as pd
 
+
 @dataclass(frozen=True)
 class SplitWindow:
     label: str
@@ -16,6 +17,7 @@ class SplitWindow:
     def to_dict(self) -> dict:
         return {"label": self.label, "start": self.start.isoformat(), "end": self.end.isoformat()}
 
+
 def _normalize_ts(value: str | pd.Timestamp) -> pd.Timestamp:
     ts = pd.Timestamp(value)
     if ts.tz is None:
@@ -23,6 +25,7 @@ def _normalize_ts(value: str | pd.Timestamp) -> pd.Timestamp:
     else:
         ts = ts.tz_convert("UTC")
     return ts
+
 
 def build_time_splits(
     *,
@@ -77,6 +80,7 @@ def build_time_splits(
         raise ValueError("Split generation failed: missing train window")
     return windows
 
+
 def build_time_splits_with_purge(
     *,
     start: str | pd.Timestamp,
@@ -95,8 +99,10 @@ def build_time_splits_with_purge(
     if int(purge_bars) < 0:
         raise ValueError("purge_bars must be >= 0")
     windows = build_time_splits(
-        start=start, end=end,
-        train_frac=train_frac, validation_frac=validation_frac,
+        start=start,
+        end=end,
+        train_frac=train_frac,
+        validation_frac=validation_frac,
         embargo_days=embargo_days,
     )
     if int(purge_bars) == 0:
@@ -116,6 +122,7 @@ def build_time_splits_with_purge(
                 )
             result.append(SplitWindow(w.label, w.start, new_end))
     return result
+
 
 def build_repeated_walk_forward_folds(
     *,
@@ -137,14 +144,14 @@ def build_repeated_walk_forward_folds(
     full_duration = end_ts - start_ts
     # Each fold uses a window of (train + val + test + 2*embargo)
     # For repeated folds, we shift the window by a small increment
-    shift_delta = full_duration * 0.05 # 5% shift per fold
-    
+    shift_delta = full_duration * 0.05  # 5% shift per fold
+
     all_folds = []
     for i in range(int(n_folds)):
         f_start = start_ts + i * shift_delta
         if f_start + (full_duration * 0.5) > end_ts:
-            break # Not enough data for more folds
-            
+            break  # Not enough data for more folds
+
         try:
             folds = build_time_splits_with_purge(
                 start=f_start,
@@ -153,13 +160,14 @@ def build_repeated_walk_forward_folds(
                 validation_frac=validation_frac,
                 embargo_days=embargo_days,
                 purge_bars=purge_bars,
-                bar_duration_minutes=bar_duration_minutes
+                bar_duration_minutes=bar_duration_minutes,
             )
             all_folds.append(folds)
         except Exception:
             continue
-            
+
     return all_folds
+
 
 def build_walk_forward_split_labels(
     df: pd.DataFrame,
@@ -188,7 +196,11 @@ def build_walk_forward_split_labels(
     val_end = min_ts + duration * float(train_frac + validation_frac)
 
     # Add proportional embargo around boundaries (Finding 90)
-    embargo = min(pd.Timedelta(days=float(embargo_days)), duration * 0.05) if duration.total_seconds() > 0 else pd.Timedelta(0)
+    embargo = (
+        min(pd.Timedelta(days=float(embargo_days)), duration * 0.05)
+        if duration.total_seconds() > 0
+        else pd.Timedelta(0)
+    )
 
     train_mask = ts < train_end
     val_mask = (ts >= train_end + embargo) & (ts < val_end)

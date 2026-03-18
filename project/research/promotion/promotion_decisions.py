@@ -54,6 +54,7 @@ def evaluate_row(
     enforce_regime_stability: bool = True,
     policy_version: str = "phase4_pr5_v1",
     bundle_version: str = "phase4_bundle_v1",
+    is_reduced_evidence: bool = False,
     benchmark_certification: Dict[str, Any] | None = None,
 ) -> Dict[str, Any]:
     try:
@@ -62,7 +63,7 @@ def evaluate_row(
 
         reasons = _ReasonRecorder.create()
         event_type = str(row.get("event_type", row.get("event", ""))).strip() or "UNKNOWN_EVENT"
-        
+
         # Benchmark Certification Gate
         bench_pass = True
         if benchmark_certification:
@@ -73,7 +74,7 @@ def evaluate_row(
                     promo_fail_reason="gate_promo_benchmark_certification",
                     category="benchmark_integrity",
                 )
-        
+
         plan_row_id = str(row.get("plan_row_id", "")).strip()
         n_events = _quiet_int(row.get("n_events", row.get("sample_size", 0)), 0)
         q_value = coerce_numeric_nan(row.get("q_value"))
@@ -212,9 +213,12 @@ def evaluate_row(
             is_trade_trigger=is_trade_trigger,
             max_q_value=max_q_value,
             promotion_profile=promotion_profile,
+            is_reduced_evidence=is_reduced_evidence,
             benchmark_pass=bench_pass,
         )
-        result["is_continuation_template_family"] = continuation_eval["is_continuation_template_family"]
+        result["is_continuation_template_family"] = continuation_eval[
+            "is_continuation_template_family"
+        ]
         result["gate_bridge_tradable"] = "pass" if continuation_eval["bridge_tradable"] else "fail"
 
         merged_for_bundle = dict(row)
@@ -251,7 +255,9 @@ def evaluate_row(
         bundle_decision = evaluate_promotion_bundle(bundle, policy)
         bundle["promotion_decision"] = dict(bundle_decision)
         bundle["rejection_reasons"] = list(bundle_decision.get("rejection_reasons", []))
-        return _restore_boolean_compat_gates(_apply_bundle_policy_result(result, bundle, bundle_decision))
+        return _restore_boolean_compat_gates(
+            _apply_bundle_policy_result(result, bundle, bundle_decision)
+        )
     except Exception as e:
         if isinstance(e, PromotionDecisionError):
             raise

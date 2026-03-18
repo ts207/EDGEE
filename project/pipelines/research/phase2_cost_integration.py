@@ -10,6 +10,7 @@ from project.pipelines.research.phase2_event_analyzer import ActionSpec
 
 COST_INPUT_COVERAGE_MIN = 0.80
 
+
 def turnover_proxy_for_action(action: ActionSpec, n: int) -> np.ndarray:
     if n <= 0:
         return np.array([], dtype=float)
@@ -31,6 +32,7 @@ def turnover_proxy_for_action(action: ActionSpec, n: int) -> np.ndarray:
     if action.name == "no_action":
         return np.full(n, 1.0, dtype=float)
     return np.full(n, 1.0, dtype=float)
+
 
 def candidate_cost_fields(
     *,
@@ -60,7 +62,9 @@ def candidate_cost_fields(
     idx = sub.index
     spread = pd.to_numeric(sub.get("spread_bps", pd.Series(np.nan, index=idx)), errors="coerce")
     atr = pd.to_numeric(sub.get("atr_14", pd.Series(np.nan, index=idx)), errors="coerce")
-    quote_volume = pd.to_numeric(sub.get("quote_volume", pd.Series(np.nan, index=idx)), errors="coerce")
+    quote_volume = pd.to_numeric(
+        sub.get("quote_volume", pd.Series(np.nan, index=idx)), errors="coerce"
+    )
     close = pd.to_numeric(sub.get("close", pd.Series(np.nan, index=idx)), errors="coerce")
     high = pd.to_numeric(sub.get("high", pd.Series(np.nan, index=idx)), errors="coerce")
     low = pd.to_numeric(sub.get("low", pd.Series(np.nan, index=idx)), errors="coerce")
@@ -90,7 +94,9 @@ def candidate_cost_fields(
     cost_per_trade = float(np.nanmean((cost_values * turnover) / 10_000.0))
     cost_per_trade = max(0.0, cost_per_trade)
     after_cost = float(expectancy_per_trade - cost_per_trade)
-    stressed_after_cost = float(expectancy_per_trade - (float(stressed_cost_multiplier) * cost_per_trade))
+    stressed_after_cost = float(
+        expectancy_per_trade - (float(stressed_cost_multiplier) * cost_per_trade)
+    )
     gross_proxy = max(1e-9, abs(float(expectancy_per_trade)) + cost_per_trade)
     cost_ratio = float(min(2.0, max(0.0, cost_per_trade / gross_proxy)))
     return {

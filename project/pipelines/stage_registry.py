@@ -4,7 +4,9 @@ from pathlib import Path
 from typing import List, Sequence
 
 from project.contracts.artifacts import validate_artifact_registry_definitions
-from project.contracts.stage_dag import validate_stage_plan_contract as _validate_stage_plan_contract
+from project.contracts.stage_dag import (
+    validate_stage_plan_contract as _validate_stage_plan_contract,
+)
 from project.contracts.stage_dag import validate_stage_registry_definitions
 from project.pipelines.stage_bootstrap import assert_stage_registry_contract
 from project.pipelines.stage_definitions import StageSpec
@@ -24,9 +26,9 @@ def validate_stage_plan_contract(stages: Sequence[StageSpec], project_root: Path
 
 
 __all__ = [
-    'validate_stage_registry_definitions',
-    'validate_stage_artifact_registry_definitions',
-    'validate_stage_plan_contract',
-    'validate_stage_dataflow_dag',
-    'assert_registry_contract',
+    "validate_stage_registry_definitions",
+    "validate_stage_artifact_registry_definitions",
+    "validate_stage_plan_contract",
+    "validate_stage_dataflow_dag",
+    "assert_registry_contract",
 ]

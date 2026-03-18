@@ -23,7 +23,10 @@ from project.research.promotion.blueprint_promotion import (
 from project.eval.redundancy import greedy_diversified_subset
 from project.eval.selection_bias import probabilistic_sharpe_ratio, deflated_sharpe_ratio
 
-def _fragility_gate(row_or_pnl, stats_or_min_pass_rate=None, *, min_pass_rate: float = 0.60, n_iterations: int = 100) -> bool:
+
+def _fragility_gate(
+    row_or_pnl, stats_or_min_pass_rate=None, *, min_pass_rate: float = 0.60, n_iterations: int = 100
+) -> bool:
     """Dual-mode fragility gate.
 
     Old style: _fragility_gate(row: dict, stats: dict)
@@ -32,6 +35,7 @@ def _fragility_gate(row_or_pnl, stats_or_min_pass_rate=None, *, min_pass_rate: f
     DATA_ROOT = get_data_root()
     if isinstance(row_or_pnl, pd.Series):
         from project.eval.robustness import simulate_parameter_perturbation
+
         pnl = row_or_pnl
         if isinstance(stats_or_min_pass_rate, float):
             min_pass_rate = stats_or_min_pass_rate
@@ -42,6 +46,7 @@ def _fragility_gate(row_or_pnl, stats_or_min_pass_rate=None, *, min_pass_rate: f
     # Old style
     return fragility_gate(row_or_pnl, stats_or_min_pass_rate or {})
 
+
 def main() -> int:
     DATA_ROOT = get_data_root()
     parser = argparse.ArgumentParser(description="Promote blueprints.")
@@ -51,9 +56,11 @@ def main() -> int:
     parser.add_argument("--out_dir", default=None)
     args = parser.parse_args()
 
-    out_dir = Path(args.out_dir) if args.out_dir else DATA_ROOT / "reports" / "promotions" / args.run_id
+    out_dir = (
+        Path(args.out_dir) if args.out_dir else DATA_ROOT / "reports" / "promotions" / args.run_id
+    )
     ensure_dir(out_dir)
-    
+
     manifest = start_manifest("promote_blueprints", args.run_id, vars(args), [], [])
 
     try:
@@ -64,6 +71,7 @@ def main() -> int:
         logging.exception("Promotion failed")
         finalize_manifest(manifest, "failed", error=str(exc))
         return 1
+
 
 if __name__ == "__main__":
     sys.exit(main())

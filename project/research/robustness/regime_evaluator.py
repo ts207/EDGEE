@@ -6,6 +6,7 @@ Evaluates a single HypothesisSpec within each discrete regime segment,
 returning per-regime performance metrics. Used as the foundation for
 the regime-aware robustness score and stress tests.
 """
+
 from __future__ import annotations
 
 import logging
@@ -86,26 +87,32 @@ def evaluate_by_regime(
         n = len(fire_indices)
 
         if n < min_n_per_regime:
-            rows.append({
-                "regime": regime, "n": n,
-                "mean_return_bps": float("nan"),
-                "t_stat": float("nan"),
-                "hit_rate": float("nan"),
-                "valid": False,
-            })
+            rows.append(
+                {
+                    "regime": regime,
+                    "n": n,
+                    "mean_return_bps": float("nan"),
+                    "t_stat": float("nan"),
+                    "hit_rate": float("nan"),
+                    "valid": False,
+                }
+            )
             continue
 
         # Extract forward returns at fire bars
         event_returns = fwd[combined].dropna()
         n_valid = len(event_returns)
         if n_valid < min_n_per_regime:
-            rows.append({
-                "regime": regime, "n": n_valid,
-                "mean_return_bps": float("nan"),
-                "t_stat": float("nan"),
-                "hit_rate": float("nan"),
-                "valid": False,
-            })
+            rows.append(
+                {
+                    "regime": regime,
+                    "n": n_valid,
+                    "mean_return_bps": float("nan"),
+                    "t_stat": float("nan"),
+                    "hit_rate": float("nan"),
+                    "valid": False,
+                }
+            )
             continue
 
         signed = event_returns * direction_sign
@@ -114,13 +121,15 @@ def evaluate_by_regime(
         t = mean_r / (std_r / np.sqrt(n_valid)) if std_r > 1e-10 else 0.0
         hit_rate = float((signed > 0).mean())
 
-        rows.append({
-            "regime": regime,
-            "n": n_valid,
-            "mean_return_bps": round(mean_r * _BPS, 4),
-            "t_stat": round(t, 4),
-            "hit_rate": round(hit_rate, 4),
-            "valid": True,
-        })
+        rows.append(
+            {
+                "regime": regime,
+                "n": n_valid,
+                "mean_return_bps": round(mean_r * _BPS, 4),
+                "t_stat": round(t, 4),
+                "hit_rate": round(hit_rate, 4),
+                "valid": True,
+            }
+        )
 
     return pd.DataFrame(rows) if rows else pd.DataFrame()

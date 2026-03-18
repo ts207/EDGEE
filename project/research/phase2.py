@@ -36,10 +36,12 @@ from project.research.holdout_integrity import assert_holdout_split_integrity
 
 log = logging.getLogger(__name__)
 
+
 def load_template_verb_lexicon(repo_root: Path) -> Dict[str, Any]:
     """Load the template verb lexicon from the compiled domain registry."""
     del repo_root
     return {"operators": get_domain_registry().operator_rows()}
+
 
 def operator_registry(verb_lexicon: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
     """Extract operator definitions from the verb lexicon."""
@@ -51,6 +53,7 @@ def operator_registry(verb_lexicon: Dict[str, Any]) -> Dict[str, Dict[str, Any]]
             if str(key).strip() and isinstance(value, dict)
         }
     return get_domain_registry().operator_rows()
+
 
 def validate_operator_for_event(
     *,
@@ -72,11 +75,12 @@ def validate_operator_for_event(
             )
     return op
 
+
 def load_features(
-    data_root: Path, 
-    run_id: str, 
-    symbol: str, 
-    timeframe: str = "5m", 
+    data_root: Path,
+    run_id: str,
+    symbol: str,
+    timeframe: str = "5m",
     higher_timeframes: List[str] | None = None,
     market: str = "perp",
 ) -> pd.DataFrame:
@@ -97,7 +101,7 @@ def load_features(
     df = read_parquet(files)
     if df.empty or "timestamp" not in df.columns:
         return pd.DataFrame()
-    
+
     df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True, errors="coerce")
     out = df.dropna(subset=["timestamp"]).sort_values("timestamp").reset_index(drop=True)
 
@@ -118,7 +122,8 @@ def load_features(
                 out = pd.merge_asof(
                     out.sort_values("timestamp"),
                     ms_df[new_cols].sort_values("timestamp"),
-                    on="timestamp", direction="backward"
+                    on="timestamp",
+                    direction="backward",
                 )
 
     # 2. Merge Microstructure Context
@@ -132,13 +137,16 @@ def load_features(
         if micro_files:
             micro_df = read_parquet(micro_files)
             if not micro_df.empty and "timestamp" in micro_df.columns:
-                micro_df["timestamp"] = pd.to_datetime(micro_df["timestamp"], utc=True, errors="coerce")
+                micro_df["timestamp"] = pd.to_datetime(
+                    micro_df["timestamp"], utc=True, errors="coerce"
+                )
                 # Filter to only new columns
                 new_cols = [c for c in micro_df.columns if c not in out.columns or c == "timestamp"]
                 out = pd.merge_asof(
                     out.sort_values("timestamp"),
                     micro_df[new_cols].sort_values("timestamp"),
-                    on="timestamp", direction="backward"
+                    on="timestamp",
+                    direction="backward",
                 )
 
     if higher_timeframes:
@@ -148,8 +156,10 @@ def load_features(
             htf_df = load_features(data_root, run_id, symbol, timeframe=htf, market=mkt)
             if htf_df.empty:
                 continue
-            
-            htf_df = htf_df.rename(columns={c: f"{c}_{htf}" for c in htf_df.columns if c != "timestamp"})
+
+            htf_df = htf_df.rename(
+                columns={c: f"{c}_{htf}" for c in htf_df.columns if c != "timestamp"}
+            )
             out = pd.merge_asof(
                 out,
                 htf_df,
@@ -157,6 +167,7 @@ def load_features(
                 direction="backward",
             )
     return out
+
 
 def prepare_events_dataframe(
     *,
@@ -177,12 +188,12 @@ def prepare_events_dataframe(
     bar_duration_minutes = int(timeframe_to_minutes(timeframe))
 
     event_types = [event_type] if isinstance(event_type, str) else event_type
-    
+
     all_events_frames = []
-    
+
     # We will accumulate these flags over all event types. If ANY was loaded from fallback, we set it to True.
     loaded_from_fallback_file = False
-    
+
     for et in event_types:
         if et not in event_registry_specs:
             logger.warning(f"Event type {et} not found in specs. Skipping.")
@@ -190,7 +201,7 @@ def prepare_events_dataframe(
                 # Only raise if it was strictly requested as a single string (legacy behavior)
                 raise KeyError(event_type)
             continue
-            
+
         spec = event_registry_specs[et]
         phase1_reports_root = data_root / "reports" / spec.reports_dir / run_id
         events_path = phase1_reports_root / spec.events_file
@@ -201,7 +212,7 @@ def prepare_events_dataframe(
             event_type=et,
             symbols=symbols,
         )
-        
+
         if df.empty:
             try:
                 df = _read_csv_or_parquet(events_path)
@@ -212,12 +223,12 @@ def prepare_events_dataframe(
                     df = df[df["symbol"].astype(str).str.upper().isin(symbol_set)].copy()
             except pd.errors.EmptyDataError:
                 df = pd.DataFrame()
-        
+
         if not df.empty:
             if "event_type" not in df.columns:
                 df["event_type"] = et
             all_events_frames.append(df)
-            
+
     resplit_attempted = False
     holdout_integrity_failed = False
     returned_empty_due_to_holdout = False
@@ -238,7 +249,9 @@ def prepare_events_dataframe(
                 holdout_integrity_failed=False,
                 resplit_attempted=False,
                 returned_empty_due_to_holdout=False,
-                min_validation_events=max(1, safe_int(fam_config.get("min_holdout_validation_events", 1), 1)),
+                min_validation_events=max(
+                    1, safe_int(fam_config.get("min_holdout_validation_events", 1), 1)
+                ),
                 min_test_events=max(1, safe_int(fam_config.get("min_holdout_test_events", 1), 1)),
                 returned_rows=0,
             ),
@@ -248,11 +261,10 @@ def prepare_events_dataframe(
     raw_event_count = int(len(events_df))
 
     if "symbol" not in events_df.columns:
-         # Edge case: all loaded dfs missing symbol
-         return events_df # Diagnostics attached below anyway if needed
-    
-    # ... rest of the function remains similar but handles combined events_df ...
+        # Edge case: all loaded dfs missing symbol
+        return events_df  # Diagnostics attached below anyway if needed
 
+    # ... rest of the function remains similar but handles combined events_df ...
 
     if "enter_ts" not in events_df.columns:
         for col in ("timestamp", "anchor_ts", "event_ts"):
@@ -260,7 +272,9 @@ def prepare_events_dataframe(
                 events_df["enter_ts"] = events_df[col]
                 break
         if "enter_ts" not in events_df.columns:
-            logger.warning("No enter_ts (or fallback) found in events. Market state conditioning skipped.")
+            logger.warning(
+                "No enter_ts (or fallback) found in events. Market state conditioning skipped."
+            )
             return attach_prepare_events_diagnostics(
                 events_df,
                 build_prepare_events_diagnostics(
@@ -274,8 +288,12 @@ def prepare_events_dataframe(
                     holdout_integrity_failed=False,
                     resplit_attempted=False,
                     returned_empty_due_to_holdout=False,
-                    min_validation_events=max(1, safe_int(fam_config.get("min_holdout_validation_events", 1), 1)),
-                    min_test_events=max(1, safe_int(fam_config.get("min_holdout_test_events", 1), 1)),
+                    min_validation_events=max(
+                        1, safe_int(fam_config.get("min_holdout_validation_events", 1), 1)
+                    ),
+                    min_test_events=max(
+                        1, safe_int(fam_config.get("min_holdout_test_events", 1), 1)
+                    ),
                     returned_rows=int(len(events_df)),
                 ),
             )
@@ -299,20 +317,25 @@ def prepare_events_dataframe(
 
     # Feature audit and context merge (condensed for brevity, should use audited_join)
     from project.features.audit import FeatureAuditRegistry
+
     audit_registry = FeatureAuditRegistry()
-    
+
     merged_dfs: List[pd.DataFrame] = []
     for sym in events_df["symbol"].dropna().unique():
         sym_events = events_df[events_df["symbol"] == sym].copy()
         null_enter_ts = sym_events[sym_events["enter_ts"].isna()].copy()
-        sym_events = sym_events.dropna(subset=["enter_ts"]).sort_values("enter_ts").reset_index(drop=True)
+        sym_events = (
+            sym_events.dropna(subset=["enter_ts"]).sort_values("enter_ts").reset_index(drop=True)
+        )
         if sym_events.empty:
             if not null_enter_ts.empty:
                 merged_dfs.append(null_enter_ts)
             continue
 
         # Market State merge
-        ms_path = run_scoped_lake_path(data_root, run_id, "context", "market_state", sym, f"{timeframe}.parquet")
+        ms_path = run_scoped_lake_path(
+            data_root, run_id, "context", "market_state", sym, f"{timeframe}.parquet"
+        )
         if not ms_path.exists():
             ms_path = data_root / "lake" / "context" / "market_state" / sym / f"{timeframe}.parquet"
         if ms_path.exists():
@@ -320,51 +343,73 @@ def prepare_events_dataframe(
             if "timestamp" in ms_df.columns:
                 ms_df["timestamp"] = pd.to_datetime(ms_df["timestamp"], utc=True, errors="coerce")
                 from project.core.audited_join import audited_merge_asof
+
                 sym_events = audited_merge_asof(
-                    sym_events, ms_df, left_on="enter_ts", right_on="timestamp",
-                    direction="backward", tolerance=pd.Timedelta("1h"),
-                    feature_name="market_state", stale_threshold_seconds=3600,
-                    audit_registry=audit_registry, symbol=sym, run_id=run_id
+                    sym_events,
+                    ms_df,
+                    left_on="enter_ts",
+                    right_on="timestamp",
+                    direction="backward",
+                    tolerance=pd.Timedelta("1h"),
+                    feature_name="market_state",
+                    stale_threshold_seconds=3600,
+                    audit_registry=audit_registry,
+                    symbol=sym,
+                    run_id=run_id,
                 )
                 if "timestamp" in sym_events.columns:
                     sym_events = sym_events.drop(columns=["timestamp"])
 
         # Microstructure merge
-        micro_path = run_scoped_lake_path(data_root, run_id, "context", "microstructure", sym, f"{timeframe}.parquet")
+        micro_path = run_scoped_lake_path(
+            data_root, run_id, "context", "microstructure", sym, f"{timeframe}.parquet"
+        )
         if not micro_path.exists():
-            micro_path = data_root / "lake" / "context" / "microstructure" / sym / f"{timeframe}.parquet"
+            micro_path = (
+                data_root / "lake" / "context" / "microstructure" / sym / f"{timeframe}.parquet"
+            )
         if micro_path.exists():
             micro_df = _read_csv_or_parquet(micro_path)
             if "timestamp" in micro_df.columns:
-                micro_df["timestamp"] = pd.to_datetime(micro_df["timestamp"], utc=True, errors="coerce")
+                micro_df["timestamp"] = pd.to_datetime(
+                    micro_df["timestamp"], utc=True, errors="coerce"
+                )
                 from project.core.audited_join import audited_merge_asof
+
                 sym_events = audited_merge_asof(
-                    sym_events, micro_df, left_on="enter_ts", right_on="timestamp",
-                    direction="backward", tolerance=pd.Timedelta("15min"),
-                    feature_name="microstructure", stale_threshold_seconds=900,
-                    audit_registry=audit_registry, symbol=sym, run_id=run_id
+                    sym_events,
+                    micro_df,
+                    left_on="enter_ts",
+                    right_on="timestamp",
+                    direction="backward",
+                    tolerance=pd.Timedelta("15min"),
+                    feature_name="microstructure",
+                    stale_threshold_seconds=900,
+                    audit_registry=audit_registry,
+                    symbol=sym,
+                    run_id=run_id,
                 )
                 if "timestamp" in sym_events.columns:
                     sym_events = sym_events.drop(columns=["timestamp"])
 
         if not null_enter_ts.empty:
-            sym_events = pd.concat([sym_events, null_enter_ts], ignore_index=True).sort_values("enter_ts", na_position="last").reset_index(drop=True)
+            sym_events = (
+                pd.concat([sym_events, null_enter_ts], ignore_index=True)
+                .sort_values("enter_ts", na_position="last")
+                .reset_index(drop=True)
+            )
         merged_dfs.append(sym_events)
 
     if merged_dfs:
         events_df = pd.concat(merged_dfs, ignore_index=True)
-    
+
     # Feature audit artifacts
     audit_dir = data_root / "reports" / "feature_audit" / run_id
     audit_registry.write_artifacts(audit_dir)
 
     # Holdout validation and fail-closed logic
-    min_validation_events = max(
-        1, safe_int(fam_config.get("min_holdout_validation_events", 1), 1)
-    )
-    min_test_events = max(
-        1, safe_int(fam_config.get("min_holdout_test_events", 1), 1)
-    )
+    min_validation_events = max(1, safe_int(fam_config.get("min_holdout_validation_events", 1), 1))
+    min_test_events = max(1, safe_int(fam_config.get("min_holdout_test_events", 1), 1))
 
     split_diag = assert_holdout_split_integrity(
         events_df, time_col="enter_ts", split_col="split_label"
@@ -381,9 +426,7 @@ def prepare_events_dataframe(
             "deploy",
         }
         if is_promo:
-            raise ValueError(
-                f"Holdout fail-closed for {event_type}: insufficent OOS events."
-            )
+            raise ValueError(f"Holdout fail-closed for {event_type}: insufficent OOS events.")
 
         # When we only have a fallback file (no registry anchors), keep the
         # data but warn – we don't want to silently discard all events that
@@ -426,9 +469,7 @@ def prepare_events_dataframe(
 
         try:
             resplit_attempted = True
-            max_h = max(
-                [HORIZON_BARS_BY_TIMEFRAME.get(h, 0) for h in horizons] or [0]
-            )
+            max_h = max([HORIZON_BARS_BY_TIMEFRAME.get(h, 0) for h in horizons] or [0])
             purge_bars = int(max_h) + int(entry_lag_bars)
             events_df = assign_event_split_labels(
                 events_df,
@@ -443,9 +484,7 @@ def prepare_events_dataframe(
             split_diag = assert_holdout_split_integrity(
                 events_df, time_col="enter_ts", split_col="split_label"
             )
-            validation_count = safe_int(
-                split_diag.get("counts", {}).get("validation", 0), 0
-            )
+            validation_count = safe_int(split_diag.get("counts", {}).get("validation", 0), 0)
             test_count = safe_int(split_diag.get("counts", {}).get("test", 0), 0)
         except Exception:
             # If resplitting fails, treat this configuration as non-promotable
@@ -514,6 +553,7 @@ def prepare_events_dataframe(
         ),
     )
 
+
 def assign_event_split_labels(
     events: pd.DataFrame,
     *,
@@ -563,6 +603,7 @@ def assign_event_split_labels(
         out["split_label"] = "train"
         out["non_promotable"] = True
     return out
+
 
 def populate_fail_reasons(df: pd.DataFrame) -> pd.DataFrame:
     """Populate primary failure reasons for rejected candidates.
@@ -629,6 +670,7 @@ def populate_fail_reasons(df: pd.DataFrame) -> pd.DataFrame:
 
     return df
 
+
 def write_gate_summary(df: pd.DataFrame, out_path: Path) -> None:
     """Write Phase 2 gating summary to JSON."""
     if df.empty:
@@ -637,11 +679,16 @@ def write_gate_summary(df: pd.DataFrame, out_path: Path) -> None:
     summary = {
         "candidates_total": len(df),
         "pass_all_gates": int(df.get("gate_phase2_final", pd.Series(0)).sum()),
-        "per_gate_pass_count": {c: int(df[c].sum()) for c in gate_cols if df[c].dtype in (bool, int)},
-        "per_gate_fail_count": {c: int((~df[c].astype(bool)).sum()) for c in gate_cols if df[c].dtype in (bool, int)},
+        "per_gate_pass_count": {
+            c: int(df[c].sum()) for c in gate_cols if df[c].dtype in (bool, int)
+        },
+        "per_gate_fail_count": {
+            c: int((~df[c].astype(bool)).sum()) for c in gate_cols if df[c].dtype in (bool, int)
+        },
     }
     with open(out_path, "w", encoding="utf-8") as handle:
         json.dump(summary, handle, indent=2)
+
 
 def _read_csv_or_parquet(path: Path) -> pd.DataFrame:
     """Internal helper to load data from CSV or Parquet."""

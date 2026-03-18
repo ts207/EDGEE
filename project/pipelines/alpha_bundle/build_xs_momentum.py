@@ -26,8 +26,10 @@ from project.io.utils import ensure_dir, read_parquet, write_parquet
 from project.specs.manifest import finalize_manifest, start_manifest
 from project.core.validation import ensure_utc_timestamp
 
+
 def _safe_log_ratio(a: pd.Series, b: pd.Series, eps: float = 1e-12) -> pd.Series:
     return np.log((a.astype(float) + eps) / (b.astype(float) + eps))
+
 
 def main() -> int:
     p = argparse.ArgumentParser(description="Build XS momentum (rank-based)")
@@ -35,13 +37,17 @@ def main() -> int:
     p.add_argument("--universe_snapshot_path", required=True)
     p.add_argument("--cleaned_root", required=False, default=None)
     p.add_argument("--bar_interval", default="15m")
-    p.add_argument("--lookback_bars", type=int, default=60 * 24 * 4, help="Default ~60d on 15m bars")
+    p.add_argument(
+        "--lookback_bars", type=int, default=60 * 24 * 4, help="Default ~60d on 15m bars"
+    )
     p.add_argument("--out_dir", default=None)
     args = p.parse_args()
 
     run_id = args.run_id
     data_root = get_data_root()
-    cleaned_root = Path(args.cleaned_root) if args.cleaned_root else (data_root / "lake" / "cleaned")
+    cleaned_root = (
+        Path(args.cleaned_root) if args.cleaned_root else (data_root / "lake" / "cleaned")
+    )
 
     out_dir = Path(args.out_dir) if args.out_dir else (data_root / "feature_store" / "signals")
     ensure_dir(out_dir)
@@ -74,7 +80,9 @@ def main() -> int:
         bars = read_parquet([Path(p) for p in files])
         tcol = "ts_event" if "ts_event" in bars.columns else "timestamp"
         bars[tcol] = ensure_utc_timestamp(bars[tcol], tcol)
-        price_col = "mid" if "mid" in bars.columns else ("close" if "close" in bars.columns else None)
+        price_col = (
+            "mid" if "mid" in bars.columns else ("close" if "close" in bars.columns else None)
+        )
         if price_col is None:
             continue
         bars = bars.sort_values(tcol, kind="mergesort").reset_index(drop=True)
@@ -131,6 +139,7 @@ def main() -> int:
         stats={"rows": int(len(out)), "out": str(out_path), "base_written": len(written_base)},
     )
     return 0
+
 
 if __name__ == "__main__":
     raise SystemExit(main())

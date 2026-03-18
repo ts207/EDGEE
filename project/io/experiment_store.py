@@ -5,8 +5,10 @@ import sqlite3
 from pathlib import Path
 from typing import Any, Dict
 
+
 def _db_path(data_root: Path) -> Path:
     return Path(data_root) / "runs" / "experiment_store.sqlite"
+
 
 def _connect(data_root: Path) -> sqlite3.Connection:
     db_path = _db_path(data_root)
@@ -15,6 +17,7 @@ def _connect(data_root: Path) -> sqlite3.Connection:
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA synchronous=NORMAL")
     return conn
+
 
 def ensure_schema(data_root: Path) -> None:
     conn = _connect(data_root)
@@ -48,12 +51,11 @@ def ensure_schema(data_root: Path) -> None:
             )
             """
         )
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_stage_status ON stage_manifests(status)"
-        )
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_stage_status ON stage_manifests(status)")
         conn.commit()
     finally:
         conn.close()
+
 
 def upsert_run_manifest(data_root: Path, run_id: str, payload: Dict[str, Any]) -> None:
     ensure_schema(data_root)
@@ -97,6 +99,7 @@ def upsert_run_manifest(data_root: Path, run_id: str, payload: Dict[str, Any]) -
         conn.commit()
     finally:
         conn.close()
+
 
 def upsert_stage_manifest(
     data_root: Path,

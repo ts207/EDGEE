@@ -9,7 +9,9 @@ from project.research.services.live_data_foundation_service import write_live_da
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Build a BTC-first live data foundation report from existing quality artifacts.")
+    parser = argparse.ArgumentParser(
+        description="Build a BTC-first live data foundation report from existing quality artifacts."
+    )
     parser.add_argument("--run_id", required=True)
     parser.add_argument("--symbol", default="BTCUSDT")
     parser.add_argument("--market", default="perp")

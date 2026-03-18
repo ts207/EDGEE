@@ -3,6 +3,7 @@
 Shared utilities for hypothesis evaluation.
 Broken out from evaluator.py to avoid circular imports.
 """
+
 from __future__ import annotations
 
 import logging
@@ -60,10 +61,7 @@ def forward_log_returns(close: pd.Series, horizon_bars: int) -> pd.Series:
 
 
 def excursion_stats(
-    close: pd.Series, 
-    mask: pd.Series, 
-    horizon_bars: int, 
-    direction_sign: float
+    close: pd.Series, mask: pd.Series, horizon_bars: int, direction_sign: float
 ) -> Tuple[pd.Series, pd.Series]:
     """
     Calculate Max Adverse Excursion (MAE) and Max Favorable Excursion (MFE)
@@ -71,25 +69,25 @@ def excursion_stats(
     """
     if not mask.any():
         return pd.Series(dtype=float), pd.Series(dtype=float)
-    
+
     indices = np.where(mask)[0]
     maes = []
     mfes = []
-    
+
     close_vals = close.values
     for idx in indices:
         if idx + horizon_bars >= len(close_vals):
             maes.append(np.nan)
             mfes.append(np.nan)
             continue
-            
+
         window = close_vals[idx : idx + horizon_bars + 1]
         returns = np.log(window / close_vals[idx])
         signed_returns = returns * direction_sign
-        
+
         maes.append(np.nanmin(signed_returns))
         mfes.append(np.nanmax(signed_returns))
-        
+
     return pd.Series(maes, index=mask[mask].index), pd.Series(mfes, index=mask[mask].index)
 
 
@@ -137,7 +135,8 @@ def trigger_mask(spec: HypothesisSpec, features: pd.DataFrame) -> pd.Series:
             return was_from & is_to
         log.debug(
             "Transition columns for %r→%r not found in features",
-            t.from_state, t.to_state,
+            t.from_state,
+            t.to_state,
         )
         return false_mask
 
@@ -150,11 +149,16 @@ def trigger_mask(spec: HypothesisSpec, features: pd.DataFrame) -> pd.Series:
             return false_mask
         vals = pd.to_numeric(features[feat], errors="coerce")
         op, thr = t.operator, t.threshold
-        if op == ">=": return vals >= thr
-        if op == "<=": return vals <= thr
-        if op == ">":  return vals > thr
-        if op == "<":  return vals < thr
-        if op == "==": return vals == thr
+        if op == ">=":
+            return vals >= thr
+        if op == "<=":
+            return vals <= thr
+        if op == ">":
+            return vals > thr
+        if op == "<":
+            return vals < thr
+        if op == "==":
+            return vals == thr
         return false_mask
 
     if ttype == TriggerType.SEQUENCE:
@@ -221,7 +225,9 @@ def context_mask(
         cols = ColumnRegistry.state_cols(state_id)
         col = next((c for c in cols if c in features.columns), None)
         if col is None:
-            log.debug("Context state column %r not found in features — context unresolvable", state_id)
+            log.debug(
+                "Context state column %r not found in features — context unresolvable", state_id
+            )
             return None
         vals = pd.to_numeric(features[col], errors="coerce").fillna(0)
         quality_mask = pd.Series(True, index=features.index)
@@ -238,9 +244,9 @@ def context_mask(
             entropy_col = _CONTEXT_ENTROPY_COLUMN_BY_FAMILY.get(family_key)
             if entropy_col and entropy_col in features.columns:
                 entropy = pd.to_numeric(features[entropy_col], errors="coerce")
-                quality_mask = quality_mask & (
-                    entropy <= _DEFAULT_CONTEXT_MAX_ENTROPY
-                ).fillna(False)
+                quality_mask = quality_mask & (entropy <= _DEFAULT_CONTEXT_MAX_ENTROPY).fillna(
+                    False
+                )
 
         combined = combined & (vals == 1) & quality_mask
     return combined

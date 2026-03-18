@@ -15,6 +15,7 @@ from project.strategy.dsl.schema import (
     SymbolScopeSpec,
 )
 
+
 def build_blueprint(raw: Dict[str, object]) -> Blueprint:
     """
     Canonicalizes blueprint/DSL objects from loose config.
@@ -28,7 +29,7 @@ def build_blueprint(raw: Dict[str, object]) -> Blueprint:
     eval_spec = raw.get("evaluation", {})
     lineage = raw.get("lineage", {})
     overlays = raw.get("overlays", [])
-    
+
     if (
         not isinstance(scope, dict)
         or not isinstance(entry, dict)
@@ -42,9 +43,7 @@ def build_blueprint(raw: Dict[str, object]) -> Blueprint:
         if not isinstance(row, dict):
             raise ValueError("overlay row must be an object")
         overlay_rows.append(
-            OverlaySpec(
-                name=str(row.get("name", "")), params=dict(row.get("params", {}))
-            )
+            OverlaySpec(name=str(row.get("name", "")), params=dict(row.get("params", {})))
         )
 
     condition_nodes: List[ConditionNodeSpec] = []
@@ -59,9 +58,7 @@ def build_blueprint(raw: Dict[str, object]) -> Blueprint:
                     operator=str(row.get("operator", "")),  # type: ignore[arg-type]
                     value=float(row.get("value", 0.0)),
                     value_high=(
-                        None
-                        if row.get("value_high") is None
-                        else float(row.get("value_high"))
+                        None if row.get("value_high") is None else float(row.get("value_high"))
                     ),
                     lookback_bars=int(row.get("lookback_bars", 0)),
                     window_bars=int(row.get("window_bars", 0)),
@@ -70,16 +67,19 @@ def build_blueprint(raw: Dict[str, object]) -> Blueprint:
 
     # Auto-normalize legacy string conditions
     from project.strategy.dsl.conditions import ConditionRegistry
+
     legacy_conditions = entry.get("conditions", [])
     if isinstance(legacy_conditions, list):
         for cond_str in legacy_conditions:
-            if not isinstance(cond_str, str): continue
-            if cond_str.lower() == "all": continue
+            if not isinstance(cond_str, str):
+                continue
+            if cond_str.lower() == "all":
+                continue
             nodes = ConditionRegistry.resolve(cond_str)
             if nodes:
                 condition_nodes.extend(nodes)
             elif cond_str.lower().startswith("symbol_"):
-                # Symbol overrides are handled at normalization/routing time, 
+                # Symbol overrides are handled at normalization/routing time,
                 # but we keep them in conditions for now or drop if unused.
                 pass
             else:
@@ -135,9 +135,7 @@ def build_blueprint(raw: Dict[str, object]) -> Blueprint:
                 else float(sizing.get("risk_per_trade"))
             ),
             target_vol=(
-                None
-                if sizing.get("target_vol") is None
-                else float(sizing.get("target_vol"))
+                None if sizing.get("target_vol") is None else float(sizing.get("target_vol"))
             ),
             max_gross_leverage=float(sizing.get("max_gross_leverage", 0.0)),
             max_position_scale=float(sizing.get("max_position_scale", 1.0)),

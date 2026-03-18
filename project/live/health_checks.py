@@ -14,10 +14,11 @@ class DataHealthMonitor:
     """
     Supervises data feed freshness and connection heartbeats.
     """
+
     def __init__(self, stale_threshold_sec: float = 10.0):
         self.stale_threshold_sec = stale_threshold_sec
         self.last_update_times: Dict[str, datetime] = {}
-        self.status: Dict[str, str] = {} # "HEALTHY" | "STALE" | "DISCONNECTED"
+        self.status: Dict[str, str] = {}  # "HEALTHY" | "STALE" | "DISCONNECTED"
 
     def on_event(self, symbol: str, stream: str):
         """Record the arrival of a new data event."""
@@ -32,27 +33,29 @@ class DataHealthMonitor:
         """
         now = datetime.now(timezone.utc)
         stale_streams = []
-        
+
         for key, last_time in self.last_update_times.items():
             diff = (now - last_time).total_seconds()
             if diff > self.stale_threshold_sec:
                 self.status[key] = "STALE"
-                stale_streams.append({
-                    "stream": key,
-                    "last_seen_sec_ago": float(diff),
-                })
+                stale_streams.append(
+                    {
+                        "stream": key,
+                        "last_seen_sec_ago": float(diff),
+                    }
+                )
             else:
                 self.status[key] = "HEALTHY"
-                
+
         is_healthy = len(stale_streams) == 0
         max_last_seen_sec_ago = max(
             [float(item["last_seen_sec_ago"]) for item in stale_streams],
             default=0.0,
         )
-        
+
         if not is_healthy:
             _LOG.warning(f"Data Health Degradation: {len(stale_streams)} stale streams detected.")
-            
+
         return {
             "is_healthy": bool(is_healthy),
             "freshness_status": "healthy" if is_healthy else "stale",
@@ -77,15 +80,15 @@ def check_kill_switch_triggers(
     # 1. Expectancy Breach
     expectancy_ratio = live_performance_expectancy / max(1e-6, research_mean_expectancy)
     expectancy_kill = expectancy_ratio < 0.5
-    
+
     # 2. Drawdown Breach
     drawdown_kill = current_drawdown > max_drawdown_limit
-    
+
     # 3. Invalidation Streak (Repeated failures)
     streak_kill = recent_invalidation_streak >= streak_threshold
-    
+
     should_kill = expectancy_kill or drawdown_kill or streak_kill
-    
+
     return {
         "should_kill": bool(should_kill),
         "reasons": [
@@ -157,6 +160,7 @@ def build_runtime_certification_manifest(
         "certification_checks": certification_checks,
     }
 
+
 def validate_market_microstructure(
     spread_bps: float,
     max_spread_bps: float,
@@ -168,7 +172,7 @@ def validate_market_microstructure(
     """
     spread_ok = spread_bps <= max_spread_bps
     liquidity_ok = liquidity_available >= min_liquidity_usd
-    
+
     return {
         "is_safe": bool(spread_ok and liquidity_ok),
         "spread_ok": bool(spread_ok),

@@ -71,7 +71,11 @@ def audit_features() -> Dict[str, Any]:
     specs = get_yaml_specs("features")
     issues: List[Dict[str, str]] = []
     families = sorted(
-        {str(spec.get("feature_family", "")).strip() for spec in specs.values() if isinstance(spec, dict)}
+        {
+            str(spec.get("feature_family", "")).strip()
+            for spec in specs.values()
+            if isinstance(spec, dict)
+        }
     )
     impl_dir = PROJECT_DIR / "features"
     missing_family_impls: set[str] = set()
@@ -148,7 +152,15 @@ def audit_events() -> Dict[str, Any]:
     specs = get_yaml_specs("events")
     issues: List[Dict[str, str]] = []
     required = {"event_type", "reports_dir", "events_file", "signal_column"}
-    skipped_files = {"registry", "event_registry_unified", "compatibility", "precedence", "_defaults", "_families", "DESIGN"}
+    skipped_files = {
+        "registry",
+        "event_registry_unified",
+        "compatibility",
+        "precedence",
+        "_defaults",
+        "_families",
+        "DESIGN",
+    }
 
     for name, spec in specs.items():
         if "__load_error__" in spec:

@@ -53,11 +53,20 @@ def _normalize_trigger_space(values: Any) -> Dict[str, Any]:
     if not isinstance(values, dict):
         raise ValueError("trigger_space must be an object")
     payload = dict(values)
-    allowed = _as_str_list(payload.get("allowed_trigger_types"), field_name="trigger_space.allowed_trigger_types")
+    allowed = _as_str_list(
+        payload.get("allowed_trigger_types"), field_name="trigger_space.allowed_trigger_types"
+    )
     if not allowed:
         raise ValueError("trigger_space.allowed_trigger_types must be provided")
     payload["allowed_trigger_types"] = [value.upper() for value in allowed]
-    for key in ("events", "states", "sequences", "transitions", "feature_predicates", "interactions"):
+    for key in (
+        "events",
+        "states",
+        "sequences",
+        "transitions",
+        "feature_predicates",
+        "interactions",
+    ):
         payload.setdefault(key, {})
     return payload
 
@@ -139,7 +148,8 @@ def load_agent_proposal(path_or_payload: str | Path | Dict[str, Any]) -> AgentPr
         raise ValueError("Proposal must be a JSON/YAML object")
 
     objective_name = str(
-        raw.get("objective_name", raw.get("objective", "retail_profitability")) or "retail_profitability"
+        raw.get("objective_name", raw.get("objective", "retail_profitability"))
+        or "retail_profitability"
     ).strip()
     promotion_profile = _normalize_promotion_profile(
         raw.get("promotion_profile", raw.get("promotion_mode", "research"))
@@ -150,9 +160,7 @@ def load_agent_proposal(path_or_payload: str | Path | Dict[str, Any]) -> AgentPr
     allowed_knobs = _proposal_settable_knobs()
     invalid_knobs = sorted(str(key) for key in knobs if str(key) not in allowed_knobs)
     if invalid_knobs:
-        raise ValueError(
-            "Proposal contains non-settable knobs: " + ", ".join(invalid_knobs)
-        )
+        raise ValueError("Proposal contains non-settable knobs: " + ", ".join(invalid_knobs))
 
     proposal = AgentProposal(
         program_id=str(raw.get("program_id", "")).strip(),
@@ -207,6 +215,7 @@ def _validate_proposal(proposal: AgentProposal) -> None:
 def _load_proxy_event_types() -> set[str]:
     """Return event types with evidence_tier=proxy from canonical_event_registry.yaml."""
     from project.spec_registry import load_yaml_relative
+
     registry = load_yaml_relative("spec/events/canonical_event_registry.yaml")
     meta = registry.get("event_metadata", {})
     return {
@@ -227,9 +236,7 @@ def validate_proposal_with_warnings(
     proposal = load_agent_proposal(path_or_payload)
     warnings: list[str] = []
     proxy_events = _load_proxy_event_types()
-    included_events = set(
-        proposal.trigger_space.get("events", {}).get("include", [])
-    )
+    included_events = set(proposal.trigger_space.get("events", {}).get("include", []))
     for event_type in sorted(included_events & proxy_events):
         warnings.append(
             f"[PROXY_TIER] {event_type} resolves to a proxy detector "

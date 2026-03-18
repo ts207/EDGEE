@@ -197,13 +197,17 @@ def load_retail_profiles_spec(
                 return profiles
     if required:
         raise FileNotFoundError(
-            "Unable to locate retail profile spec. Checked: " + ", ".join(str(p) for p in candidates)
+            "Unable to locate retail profile spec. Checked: "
+            + ", ".join(str(p) for p in candidates)
         )
     return {}
 
 
 def load_retail_profile(
-    *, profile_name: str = "capital_constrained", explicit_path: str | Path | None = None, required: bool = False
+    *,
+    profile_name: str = "capital_constrained",
+    explicit_path: str | Path | None = None,
+    required: bool = False,
 ) -> Dict[str, Any]:
     resolved_name = str(profile_name).strip() or "capital_constrained"
     profiles = load_retail_profiles_spec(explicit_path=explicit_path, required=required)
@@ -250,11 +254,17 @@ def load_event_spec(event_type: str) -> Dict[str, Any]:
 
 
 def ontology_spec_paths(repo_root: Path | None = None) -> Dict[str, Path]:
-    return {key: resolve_relative_spec_path(rel, repo_root=repo_root) for key, rel in ONTOLOGY_SPEC_RELATIVE_PATHS.items()}
+    return {
+        key: resolve_relative_spec_path(rel, repo_root=repo_root)
+        for key, rel in ONTOLOGY_SPEC_RELATIVE_PATHS.items()
+    }
 
 
 def runtime_spec_paths(repo_root: Path | None = None) -> Dict[str, Path]:
-    return {key: resolve_relative_spec_path(rel, repo_root=repo_root) for key, rel in RUNTIME_SPEC_RELATIVE_PATHS.items()}
+    return {
+        key: resolve_relative_spec_path(rel, repo_root=repo_root)
+        for key, rel in RUNTIME_SPEC_RELATIVE_PATHS.items()
+    }
 
 
 def feature_schema_registry_path(version: str | None = None) -> Path:
@@ -278,14 +288,20 @@ def load_feature_schema_registry(version: str | None = None) -> Dict[str, Any]:
 
 
 def iter_spec_yaml_files(repo_root: Path | None = None) -> list[Path]:
-    base = spec_root() if repo_root is None else resolve_relative_spec_path("spec", repo_root=repo_root)
+    base = (
+        spec_root()
+        if repo_root is None
+        else resolve_relative_spec_path("spec", repo_root=repo_root)
+    )
     files = [p for p in base.rglob("*.yaml") if p.is_file()]
     return sorted(files)
 
 
 def canonical_yaml_hash(path: Path) -> str:
     payload = load_yaml_path(path)
-    return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False, default=str)
+    return json.dumps(
+        payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False, default=str
+    )
 
 
 def compute_spec_digest(relative_paths: Iterable[str | Path]) -> str:

@@ -125,8 +125,17 @@ class ExecutableStrategySpec(BaseModel):
                 "cooldown_bars": int(self.entry.cooldown_bars),
                 "condition_logic": self.entry.condition_logic,
                 "condition_nodes": [],
-                "arm_bars": max(0, int(self.execution.policy_executor_config.get("entry_delay_bars", self.entry.delay_bars))),
-                "reentry_lockout_bars": int(self.execution.throttles.get("cooldown_bars", self.entry.cooldown_bars)),
+                "arm_bars": max(
+                    0,
+                    int(
+                        self.execution.policy_executor_config.get(
+                            "entry_delay_bars", self.entry.delay_bars
+                        )
+                    ),
+                ),
+                "reentry_lockout_bars": int(
+                    self.execution.throttles.get("cooldown_bars", self.entry.cooldown_bars)
+                ),
             },
             "exit": {
                 "time_stop_bars": int(self.exit.time_stop_bars),
@@ -259,8 +268,12 @@ class ExecutableStrategySpec(BaseModel):
                     "fee_tier": default_fee_tier,
                 },
                 throttles={
-                    "one_trade_per_episode": bool(constraints.get("variant_one_trade_per_episode", False)),
-                    "cooldown_bars": int(constraints.get("variant_cooldown_bars", blueprint.entry.cooldown_bars)),
+                    "one_trade_per_episode": bool(
+                        constraints.get("variant_one_trade_per_episode", False)
+                    ),
+                    "cooldown_bars": int(
+                        constraints.get("variant_cooldown_bars", blueprint.entry.cooldown_bars)
+                    ),
                     "max_concurrent_positions": effective_max_concurrent_positions,
                 },
             ),

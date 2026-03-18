@@ -5,8 +5,11 @@ from pathlib import Path
 
 import pandas as pd
 
+
 def _make_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Show top discovery candidates across phase2 outputs.")
+    parser = argparse.ArgumentParser(
+        description="Show top discovery candidates across phase2 outputs."
+    )
     parser.add_argument(
         "--base-dir",
         default="data/reports/phase2",
@@ -14,6 +17,7 @@ def _make_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--top-k", type=int, default=20)
     return parser
+
 
 def main() -> int:
     args = _make_parser().parse_args()
@@ -52,9 +56,15 @@ def main() -> int:
     ]
     cols = [c for c in preferred if c in all_cands.columns]
     sort_col = "phase2_quality_score" if "phase2_quality_score" in all_cands.columns else cols[-1]
-    print(all_cands[cols].sort_values(sort_col, ascending=False).head(max(1, int(args.top_k))).to_markdown(index=False))
+    print(
+        all_cands[cols]
+        .sort_values(sort_col, ascending=False)
+        .head(max(1, int(args.top_k)))
+        .to_markdown(index=False)
+    )
     print(f"\nTotal Discoveries: {len(all_cands)}")
     return 0
+
 
 if __name__ == "__main__":
     raise SystemExit(main())

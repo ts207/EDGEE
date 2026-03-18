@@ -156,7 +156,10 @@ def _build_market_context(symbol: str, features: pd.DataFrame) -> pd.DataFrame:
         out["spread_elevated_state"] = 0.0
 
     quote_volume = pd.to_numeric(
-        out.get("quote_volume", out.get("volume", pd.Series(np.nan, index=out.index)) * out.get("close", 1.0)),
+        out.get(
+            "quote_volume",
+            out.get("volume", pd.Series(np.nan, index=out.index)) * out.get("close", 1.0),
+        ),
         errors="coerce",
     ).astype(float)
     liq_probs = calculate_ms_liq_probabilities(quote_volume)
@@ -274,15 +277,18 @@ def main() -> int:
     symbols = [s.strip().upper() for s in args.symbols.split(",") if s.strip()]
     tf = args.timeframe
     market = args.market
-    
+
     from project.core.config import get_data_root
+
     data_root = get_data_root()
 
     log_handlers = [logging.StreamHandler(sys.stdout)]
     if args.log_path:
         ensure_dir(Path(args.log_path).parent)
         log_handlers.append(logging.FileHandler(args.log_path))
-    logging.basicConfig(level=logging.INFO, handlers=log_handlers, format="%(asctime)s %(levelname)s %(message)s")
+    logging.basicConfig(
+        level=logging.INFO, handlers=log_handlers, format="%(asctime)s %(levelname)s %(message)s"
+    )
 
     manifest = start_manifest("build_market_context", run_id, vars(args), [], [])
     stats: dict[str, object] = {"symbols": {}}
@@ -291,7 +297,9 @@ def main() -> int:
         for symbol in symbols:
             feature_dataset = feature_dataset_dir_name()
             feat_paths = [
-                run_scoped_lake_path(data_root, run_id, "features", market, symbol, tf, feature_dataset),
+                run_scoped_lake_path(
+                    data_root, run_id, "features", market, symbol, tf, feature_dataset
+                ),
                 data_root / "lake" / "features" / market / symbol / tf / feature_dataset,
             ]
             feat_dir = choose_partition_dir(feat_paths)
@@ -299,22 +307,28 @@ def main() -> int:
                 logging.warning(f"No {feature_dataset} found for {symbol} {tf}")
                 continue
             features = read_parquet(list_parquet_files(feat_dir))
-            
-            # build_market_context expects bars and funding? 
+
+            # build_market_context expects bars and funding?
             # Actually, _build_market_context expects the features DataFrame which ALREADY has funding_rate_scaled.
             result = _build_market_context(symbol, features)
-            
+
             if not result.empty:
                 result["timestamp"] = pd.to_datetime(result["timestamp"], utc=True)
                 result["symbol"] = symbol
-                
+
                 # Write to lake
-                out_root = run_scoped_lake_path(data_root, run_id, "features", market, symbol, tf, "market_context")
-                for (year, month), group in result.groupby([result["timestamp"].dt.year, result["timestamp"].dt.month]):
+                out_root = run_scoped_lake_path(
+                    data_root, run_id, "features", market, symbol, tf, "market_context"
+                )
+                for (year, month), group in result.groupby(
+                    [result["timestamp"].dt.year, result["timestamp"].dt.month]
+                ):
                     out_dir = out_root / f"year={year}" / f"month={month:02d}"
                     out_path = out_dir / f"market_context_{symbol}_{year}-{month:02d}.parquet"
                     write_parquet(group, out_path)
-                    logging.info(f"Wrote market context for {symbol} {year}-{month:02d} to {out_path}")
+                    logging.info(
+                        f"Wrote market context for {symbol} {year}-{month:02d} to {out_path}"
+                    )
 
                 report_path = _context_quality_report_path(
                     data_root,

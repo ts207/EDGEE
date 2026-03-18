@@ -22,12 +22,18 @@ wipe_contents() {
 
 case "$MODE" in
   runtime)
-    echo "Cleaning runtime artifacts (runs, reports, lake/runs, lake/trades, events)..."
+    echo "Cleaning runtime artifacts (runs, reports, lake/runs, lake/trades, events, synthetic)..."
     wipe_contents "data/runs"
     wipe_contents "data/reports"
     wipe_contents "data/events"
+    wipe_contents "data/synthetic"
     if [[ -d "data/lake/runs" ]]; then rm -rf data/lake/runs; mkdir -p data/lake/runs; fi
     if [[ -d "data/lake/trades" ]]; then rm -rf data/lake/trades; mkdir -p data/lake/trades; fi
+    ;;
+  data)
+    echo "Cleaning run data and synthetic data..."
+    wipe_contents "data/runs"
+    wipe_contents "data/synthetic"
     ;;
   all)
     echo "Cleaning ALL data and research artifacts..."

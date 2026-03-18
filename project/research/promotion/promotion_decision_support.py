@@ -90,9 +90,7 @@ def _apply_bundle_policy_result(
     merged["bundle_policy_overrode_decision"] = bool(
         merged["promotion_decision"] != pre_bundle_decision
     )
-    merged["bundle_policy_overrode_track"] = bool(
-        merged["promotion_track"] != pre_bundle_track
-    )
+    merged["bundle_policy_overrode_track"] = bool(merged["promotion_track"] != pre_bundle_track)
     merged["bundle_policy_overrode_score"] = bool(
         float(merged["promotion_score"]) != pre_bundle_score
     )

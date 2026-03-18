@@ -7,6 +7,7 @@ from project.spec_registry import load_template_registry
 
 _LOG = logging.getLogger(__name__)
 
+
 def validate_agent_selections(
     *,
     events: Optional[List[str]] = None,
@@ -15,7 +16,7 @@ def validate_agent_selections(
 ) -> Dict[str, Any]:
     """
     Validates agent-provided subsets against the authoritative registry.
-    
+
     Returns a dict with validated subsets or raises ValueError if invalid selections are made.
     """
     registry = load_template_registry()
@@ -33,7 +34,7 @@ def validate_agent_selections(
         allowed_templates.update(fam.get("templates", []))
     for evt in registry.get("events", {}).values():
         allowed_templates.update(evt.get("templates", []))
-        
+
     allowed_horizons = set(registry.get("defaults", {}).get("horizons", []))
     for evt in registry.get("events", {}).values():
         allowed_horizons.update(evt.get("horizons", []))
@@ -44,7 +45,7 @@ def validate_agent_selections(
             if evt not in allowed_events:
                 raise ValueError(f"Event ID '{evt}' is not in the authoritative registry.")
             validated_events.append(evt)
-    
+
     validated_templates = []
     if templates:
         for tpl in templates:
@@ -57,7 +58,9 @@ def validate_agent_selections(
         for hz in horizons:
             if hz not in allowed_horizons:
                 # Some horizons might be dynamic, but we should at least log or check common ones
-                _LOG.info("Horizon '%s' not explicitly in registry defaults, allowing as dynamic.", hz)
+                _LOG.info(
+                    "Horizon '%s' not explicitly in registry defaults, allowing as dynamic.", hz
+                )
             validated_horizons.append(hz)
 
     return {
@@ -66,6 +69,7 @@ def validate_agent_selections(
         "horizons": validated_horizons if validated_horizons else None,
     }
 
+
 def filter_event_chain(
     full_chain: List[tuple[str, str, List[str]]],
     selected_events: Optional[List[str]] = None,
@@ -73,6 +77,6 @@ def filter_event_chain(
     """Filters the PHASE2_EVENT_CHAIN based on agent-selected events."""
     if not selected_events:
         return full_chain
-    
+
     selected_set = set(selected_events)
     return [item for item in full_chain if item[0] in selected_set]

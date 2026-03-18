@@ -39,8 +39,10 @@ SOFT_DEFAULT_CONDITION_KEYS = {
     "vpin",
 }
 
+
 def _norm(value: object) -> str:
     return str(value or "").strip()
+
 
 def _collect_columns_from_partition_candidates(paths: Iterable[Path]) -> Set[str]:
     out: Set[str] = set()
@@ -54,6 +56,7 @@ def _collect_columns_from_partition_candidates(paths: Iterable[Path]) -> Set[str
     out.update({_norm(col) for col in frame.columns if _norm(col)})
     return out
 
+
 def _collect_columns_from_file_candidates(paths: Iterable[Path]) -> Set[str]:
     out: Set[str] = set()
     for path in paths:
@@ -65,6 +68,7 @@ def _collect_columns_from_file_candidates(paths: Iterable[Path]) -> Set[str]:
         out.update({_norm(col) for col in frame.columns if _norm(col)})
         break
     return out
+
 
 def load_symbol_joined_condition_contract(
     *,
@@ -105,6 +109,7 @@ def load_symbol_joined_condition_contract(
         "event_keys": set(CANONICAL_EVENT_JOIN_KEYS),
     }
 
+
 def load_symbol_joined_condition_keys(
     *,
     data_root: Path,
@@ -124,6 +129,7 @@ def load_symbol_joined_condition_keys(
         keys.update(SOFT_DEFAULT_CONDITION_KEYS)
     return keys
 
+
 def normalize_condition_keys(keys: Iterable[str]) -> Set[str]:
     out: Set[str] = set()
     for key in keys:
@@ -142,6 +148,7 @@ def normalize_condition_keys(keys: Iterable[str]) -> Set[str]:
                 out.add(alias_key.lower())
     return out
 
+
 def missing_condition_keys(required_keys: Iterable[str], available_keys: Iterable[str]) -> Set[str]:
     available_norm = normalize_condition_keys(available_keys)
     missing: Set[str] = set()
@@ -158,6 +165,7 @@ def missing_condition_keys(required_keys: Iterable[str], available_keys: Iterabl
             continue
         missing.add(token)
     return missing
+
 
 def format_available_key_sample(keys: Iterable[str], limit: int = 50) -> str:
     values = sorted({_norm(key) for key in keys if _norm(key)})

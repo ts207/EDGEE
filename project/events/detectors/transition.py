@@ -10,7 +10,9 @@ from project.events.detectors.threshold import ThresholdDetector
 class TransitionDetector(ThresholdDetector):
     transition_mode: str = "rising"
 
-    def compute_raw_mask(self, df: pd.DataFrame, *, features: Mapping[str, pd.Series], **params: Any) -> pd.Series:
+    def compute_raw_mask(
+        self, df: pd.DataFrame, *, features: Mapping[str, pd.Series], **params: Any
+    ) -> pd.Series:
         base = super().compute_raw_mask(df, features=features, **params)
         mode = str(params.get("transition_mode", self.transition_mode)).lower()
         if mode == "rising":

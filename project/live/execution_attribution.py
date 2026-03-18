@@ -56,8 +56,12 @@ def build_execution_attribution_record(
     side_norm = str(side).strip().upper()
     realized_slippage_bps = signed_slippage_bps if side_norm == "BUY" else -signed_slippage_bps
     realized_total_cost_bps = float(realized_fee_bps) + float(realized_slippage_bps)
-    expected_net_edge_bps = float(expected_return_bps) - float(expected_adverse_bps) - float(expected_cost_bps)
-    realized_net_edge_bps = float(expected_return_bps) - float(expected_adverse_bps) - realized_total_cost_bps
+    expected_net_edge_bps = (
+        float(expected_return_bps) - float(expected_adverse_bps) - float(expected_cost_bps)
+    )
+    realized_net_edge_bps = (
+        float(expected_return_bps) - float(expected_adverse_bps) - realized_total_cost_bps
+    )
     edge_decay_bps = realized_net_edge_bps - expected_net_edge_bps
     return ExecutionAttributionRecord(
         client_order_id=str(client_order_id),
@@ -113,7 +117,9 @@ def summarize_execution_attribution(records: List[ExecutionAttributionRecord]) -
     }
 
 
-def summarize_execution_attribution_by(records: List[ExecutionAttributionRecord], key: str) -> Dict[str, Dict[str, float]]:
+def summarize_execution_attribution_by(
+    records: List[ExecutionAttributionRecord], key: str
+) -> Dict[str, Dict[str, float]]:
     grouped: Dict[str, List[ExecutionAttributionRecord]] = {}
     for record in records:
         group_value = str(getattr(record, key, "") or "")

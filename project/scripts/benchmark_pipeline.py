@@ -9,7 +9,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from statistics import median
 from typing import Dict, List
+
 DATA_ROOT = get_data_root()
+
 
 def _load_manifest(path: Path) -> Dict[str, object]:
     try:
@@ -17,6 +19,7 @@ def _load_manifest(path: Path) -> Dict[str, object]:
     except Exception:
         return {}
     return payload if isinstance(payload, dict) else {}
+
 
 def _collect_run_ids(explicit: List[str]) -> List[str]:
     if explicit:
@@ -30,9 +33,14 @@ def _collect_run_ids(explicit: List[str]) -> List[str]:
             out.append(run_dir.name)
     return out
 
+
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Benchmark pipeline stage timings from run manifests.")
-    parser.add_argument("--run_id", action="append", default=[], help="Run ID to include (repeatable).")
+    parser = argparse.ArgumentParser(
+        description="Benchmark pipeline stage timings from run manifests."
+    )
+    parser.add_argument(
+        "--run_id", action="append", default=[], help="Run ID to include (repeatable)."
+    )
     parser.add_argument(
         "--out_dir",
         default=None,
@@ -46,7 +54,11 @@ def main() -> int:
         return 1
 
     benchmark_id = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-    out_dir = Path(args.out_dir) if args.out_dir else DATA_ROOT / "reports" / "perf_benchmarks" / benchmark_id
+    out_dir = (
+        Path(args.out_dir)
+        if args.out_dir
+        else DATA_ROOT / "reports" / "perf_benchmarks" / benchmark_id
+    )
     out_dir.mkdir(parents=True, exist_ok=True)
 
     stage_rows: List[Dict[str, object]] = []
@@ -84,7 +96,9 @@ def main() -> int:
                 "failed_stage": str(manifest.get("failed_stage", "")),
                 "total_stage_time_sec": round(total, 3),
                 "stage_count": len(stage_timings),
-                "symbols": list(manifest.get("symbols", [])) if isinstance(manifest.get("symbols"), list) else [],
+                "symbols": list(manifest.get("symbols", []))
+                if isinstance(manifest.get("symbols"), list)
+                else [],
                 "start": str(manifest.get("start", "")),
                 "end": str(manifest.get("end", "")),
             }
@@ -111,7 +125,9 @@ def main() -> int:
         "stage_summary": stage_summary,
     }
 
-    (out_dir / "summary.json").write_text(json.dumps(summary, indent=2, sort_keys=True), encoding="utf-8")
+    (out_dir / "summary.json").write_text(
+        json.dumps(summary, indent=2, sort_keys=True), encoding="utf-8"
+    )
     with (out_dir / "stages.csv").open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=["run_id", "stage", "duration_sec", "status"])
         writer.writeheader()
@@ -139,6 +155,7 @@ def main() -> int:
     print(f"[bench] wrote summary to {out_dir / 'summary.json'}")
     print(f"[bench] wrote stage rows to {out_dir / 'stages.csv'}")
     return 0
+
 
 if __name__ == "__main__":
     raise SystemExit(main())

@@ -5,6 +5,7 @@ from typing import Optional, Tuple
 
 import numpy as np
 
+
 @dataclass(frozen=True)
 class BootstrapMeanResult:
     p_value: float
@@ -13,6 +14,7 @@ class BootstrapMeanResult:
     mean: float
     n: int
     n_boot: int
+
 
 def stationary_block_bootstrap_mean(
     values: np.ndarray,

@@ -123,23 +123,27 @@ def aggregate_strategy_results(
         initial_equity=initial_equity,
     )
 
-    out = pd.DataFrame(
-        {
-            "timestamp": aligned.index,
-            "portfolio_gross_pnl": _sum_metric("gross_pnl").values,
-            "portfolio_net_pnl": portfolio_net_pnl.values,
-            "portfolio_transaction_cost": _sum_metric("transaction_cost").values,
-            "portfolio_slippage_cost": _sum_metric("slippage_cost").values,
-            "portfolio_funding_pnl": _sum_metric("funding_pnl").values,
-            "portfolio_borrow_cost": _sum_metric("borrow_cost").values,
-            "portfolio_gross_exposure": _sum_metric("gross_exposure").values,
-            "portfolio_net_exposure": _sum_metric("net_exposure").values,
-            "portfolio_turnover": _sum_metric("turnover").values,
-            "portfolio_capital_base": capital_reference.values,
-            "portfolio_equity": portfolio_equity.values,
-            "portfolio_equity_return": portfolio_equity_return.values,
-        }
-    ).sort_values("timestamp").reset_index(drop=True)
+    out = (
+        pd.DataFrame(
+            {
+                "timestamp": aligned.index,
+                "portfolio_gross_pnl": _sum_metric("gross_pnl").values,
+                "portfolio_net_pnl": portfolio_net_pnl.values,
+                "portfolio_transaction_cost": _sum_metric("transaction_cost").values,
+                "portfolio_slippage_cost": _sum_metric("slippage_cost").values,
+                "portfolio_funding_pnl": _sum_metric("funding_pnl").values,
+                "portfolio_borrow_cost": _sum_metric("borrow_cost").values,
+                "portfolio_gross_exposure": _sum_metric("gross_exposure").values,
+                "portfolio_net_exposure": _sum_metric("net_exposure").values,
+                "portfolio_turnover": _sum_metric("turnover").values,
+                "portfolio_capital_base": capital_reference.values,
+                "portfolio_equity": portfolio_equity.values,
+                "portfolio_equity_return": portfolio_equity_return.values,
+            }
+        )
+        .sort_values("timestamp")
+        .reset_index(drop=True)
+    )
     return out
 
 
@@ -152,8 +156,14 @@ def build_strategy_contributions(
         return pd.DataFrame()
     prior_equity = portfolio[["timestamp", "portfolio_equity"]].copy()
     prior_equity["timestamp"] = pd.to_datetime(prior_equity["timestamp"], utc=True)
-    prior_equity["prior_portfolio_equity"] = prior_equity["portfolio_equity"].shift(1).fillna(prior_equity["portfolio_equity"].iloc[0] - portfolio["portfolio_net_pnl"].iloc[0])
-    prior_equity["prior_portfolio_equity"] = prior_equity["prior_portfolio_equity"].replace(0.0, np.nan)
+    prior_equity["prior_portfolio_equity"] = (
+        prior_equity["portfolio_equity"]
+        .shift(1)
+        .fillna(prior_equity["portfolio_equity"].iloc[0] - portfolio["portfolio_net_pnl"].iloc[0])
+    )
+    prior_equity["prior_portfolio_equity"] = prior_equity["prior_portfolio_equity"].replace(
+        0.0, np.nan
+    )
     prior_equity = prior_equity[["timestamp", "prior_portfolio_equity"]]
 
     for strategy_name, frame in strategy_frames.items():
@@ -167,8 +177,10 @@ def build_strategy_contributions(
     contrib = pd.concat(parts, ignore_index=True)
     contrib = contrib.merge(prior_equity, on="timestamp", how="left")
     contrib["equity_return_contribution"] = (
-        contrib["net_pnl"] / contrib["prior_portfolio_equity"]
-    ).replace([np.inf, -np.inf], np.nan).fillna(0.0)
+        (contrib["net_pnl"] / contrib["prior_portfolio_equity"])
+        .replace([np.inf, -np.inf], np.nan)
+        .fillna(0.0)
+    )
     rename_map = {
         "gross_pnl": "strategy_gross_pnl",
         "net_pnl": "strategy_net_pnl",
@@ -193,8 +205,14 @@ def build_symbol_contributions(
         return pd.DataFrame()
     prior_equity = portfolio[["timestamp", "portfolio_equity"]].copy()
     prior_equity["timestamp"] = pd.to_datetime(prior_equity["timestamp"], utc=True)
-    prior_equity["prior_portfolio_equity"] = prior_equity["portfolio_equity"].shift(1).fillna(prior_equity["portfolio_equity"].iloc[0] - portfolio["portfolio_net_pnl"].iloc[0])
-    prior_equity["prior_portfolio_equity"] = prior_equity["prior_portfolio_equity"].replace(0.0, np.nan)
+    prior_equity["prior_portfolio_equity"] = (
+        prior_equity["portfolio_equity"]
+        .shift(1)
+        .fillna(prior_equity["portfolio_equity"].iloc[0] - portfolio["portfolio_net_pnl"].iloc[0])
+    )
+    prior_equity["prior_portfolio_equity"] = prior_equity["prior_portfolio_equity"].replace(
+        0.0, np.nan
+    )
     prior_equity = prior_equity[["timestamp", "prior_portfolio_equity"]]
 
     frames = [frame for frame in strategy_frames.values() if not frame.empty]
@@ -204,8 +222,10 @@ def build_symbol_contributions(
     grouped = _aggregate_frame(combined, extra_group_cols=("symbol",), capital_mode="sum")
     grouped = grouped.merge(prior_equity, on="timestamp", how="left")
     grouped["equity_return_contribution"] = (
-        grouped["net_pnl"] / grouped["prior_portfolio_equity"]
-    ).replace([np.inf, -np.inf], np.nan).fillna(0.0)
+        (grouped["net_pnl"] / grouped["prior_portfolio_equity"])
+        .replace([np.inf, -np.inf], np.nan)
+        .fillna(0.0)
+    )
     rename_map = {
         "gross_pnl": "symbol_gross_pnl",
         "net_pnl": "symbol_net_pnl",

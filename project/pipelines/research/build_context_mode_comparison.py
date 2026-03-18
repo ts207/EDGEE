@@ -11,7 +11,9 @@ from project.research.services.context_mode_comparison_service import (
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Compare hard-label and confidence-aware context evaluation on the same hypothesis slice.")
+    parser = argparse.ArgumentParser(
+        description="Compare hard-label and confidence-aware context evaluation on the same hypothesis slice."
+    )
     parser.add_argument("--run_id", required=True)
     parser.add_argument("--symbols", required=True)
     parser.add_argument("--timeframe", default="5m")
@@ -22,7 +24,11 @@ def main() -> int:
     args = parser.parse_args()
 
     data_root = Path(args.data_root) if args.data_root else get_data_root()
-    out_dir = Path(args.out_dir) if args.out_dir else data_root / "reports" / "context_mode_comparison" / args.run_id
+    out_dir = (
+        Path(args.out_dir)
+        if args.out_dir
+        else data_root / "reports" / "context_mode_comparison" / args.run_id
+    )
     symbols = [s.strip().upper() for s in str(args.symbols).split(",") if s.strip()]
 
     comparison = build_context_mode_comparison_payload(

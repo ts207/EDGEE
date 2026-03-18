@@ -26,6 +26,7 @@ Usage (in eval/ablation.py, before writing lift_claim_report.parquet):
     # result.evaluation_mode is True iff all invariants passed.
     # Raises EvaluationModeViolation if any invariant fails.
 """
+
 from __future__ import annotations
 
 from project import PROJECT_ROOT
@@ -43,6 +44,7 @@ import pandas as pd
 # ---------------------------------------------------------------------------
 # Public exception
 # ---------------------------------------------------------------------------
+
 
 class EvaluationModeViolation(RuntimeError):
     """
@@ -73,9 +75,11 @@ class EvaluationModeViolation(RuntimeError):
             lines.append(f"    remediation : {inv.remediation}\n")
         super().__init__("\n".join(lines))
 
+
 # ---------------------------------------------------------------------------
 # Result dataclasses
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class InvariantResult:
@@ -83,9 +87,7 @@ class InvariantResult:
     passed: bool
     failure_reason: Optional[str] = None
     remediation: Optional[str] = None
-    checked_at: str = field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
+    checked_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
     def to_dict(self) -> dict:
         return {
@@ -96,13 +98,12 @@ class InvariantResult:
             "checked_at": self.checked_at,
         }
 
+
 @dataclass
 class EvaluationModeResult:
     evaluation_mode: bool
     invariant_results: list[InvariantResult]
-    checked_at: str = field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
+    checked_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     hypothesis_spec_path: str = ""
 
     def to_manifest_dict(self) -> dict:
@@ -110,14 +111,14 @@ class EvaluationModeResult:
             "evaluation_mode": self.evaluation_mode,
             "evaluation_mode_checked_at": self.checked_at,
             "evaluation_mode_hypothesis_spec": self.hypothesis_spec_path,
-            "evaluation_mode_invariant_results": [
-                r.to_dict() for r in self.invariant_results
-            ],
+            "evaluation_mode_invariant_results": [r.to_dict() for r in self.invariant_results],
         }
+
 
 # ---------------------------------------------------------------------------
 # Core public function
 # ---------------------------------------------------------------------------
+
 
 def check_evaluation_mode(
     *,
@@ -171,48 +172,34 @@ def check_evaluation_mode(
     EvaluationModeViolation
         If raise_on_failure is True and any required invariant fails.
     """
-    hypothesis_spec_path = (
-        project_root / "spec" / "hypotheses" / "lift_state_conditioned_v1.yaml"
-    )
+    hypothesis_spec_path = project_root / "spec" / "hypotheses" / "lift_state_conditioned_v1.yaml"
 
     results: list[InvariantResult] = []
     skip_set = set(skip_invariants)
 
     # --- INV_HYPOTHESIS_REGISTERED -------------------------------------------
     if "INV_HYPOTHESIS_REGISTERED" not in skip_set:
-        results.append(
-            _check_hypothesis_registered(hypothesis_spec_path)
-        )
+        results.append(_check_hypothesis_registered(hypothesis_spec_path))
 
     # --- INV_NO_FALLBACK_IN_MEASUREMENT --------------------------------------
     if "INV_NO_FALLBACK_IN_MEASUREMENT" not in skip_set:
-        results.append(
-            _check_no_fallback_in_measurement(blueprints_path)
-        )
+        results.append(_check_no_fallback_in_measurement(blueprints_path))
 
     # --- INV_BH_APPLIED_TO_LIFT ----------------------------------------------
     if "INV_BH_APPLIED_TO_LIFT" not in skip_set:
-        results.append(
-            _check_bh_applied_to_lift(ablation_report_path)
-        )
+        results.append(_check_bh_applied_to_lift(ablation_report_path))
 
     # --- INV_SYMBOL_STRATIFIED_FAMILY ----------------------------------------
     if "INV_SYMBOL_STRATIFIED_FAMILY" not in skip_set:
-        results.append(
-            _check_symbol_stratified_family(phase2_report_root, run_id)
-        )
+        results.append(_check_symbol_stratified_family(phase2_report_root, run_id))
 
     # --- INV_EMBARGO_NONZERO -------------------------------------------------
     if "INV_EMBARGO_NONZERO" not in skip_set:
-        results.append(
-            _check_embargo_nonzero(embargo_days)
-        )
+        results.append(_check_embargo_nonzero(embargo_days))
 
     # --- INV_COST_DIGEST_UNIFORM ---------------------------------------------
     if "INV_COST_DIGEST_UNIFORM" not in skip_set:
-        results.append(
-            _check_cost_digest_uniform(blueprints_path, cost_config_digest)
-        )
+        results.append(_check_cost_digest_uniform(blueprints_path, cost_config_digest))
 
     # --- Build result --------------------------------------------------------
     failed = [r for r in results if not r.passed]
@@ -232,9 +219,11 @@ def check_evaluation_mode(
 
     return result
 
+
 # ---------------------------------------------------------------------------
 # Individual invariant checks
 # ---------------------------------------------------------------------------
+
 
 def _check_hypothesis_registered(spec_path: Path) -> InvariantResult:
     inv_id = "INV_HYPOTHESIS_REGISTERED"
@@ -250,7 +239,11 @@ def _check_hypothesis_registered(spec_path: Path) -> InvariantResult:
             remediation=remediation,
         )
     try:
-        spec = load_hypothesis_spec("lift_state_conditioned_v1") if spec_path.name == "lift_state_conditioned_v1.yaml" else load_yaml_path(spec_path)
+        spec = (
+            load_hypothesis_spec("lift_state_conditioned_v1")
+            if spec_path.name == "lift_state_conditioned_v1.yaml"
+            else load_yaml_path(spec_path)
+        )
         status = str(spec.get("status", "")).strip().lower()
         if status != "active":
             return InvariantResult(
@@ -267,6 +260,7 @@ def _check_hypothesis_registered(spec_path: Path) -> InvariantResult:
             remediation=remediation,
         )
     return InvariantResult(id=inv_id, passed=True)
+
 
 def _check_no_fallback_in_measurement(blueprints_path: Optional[Path]) -> InvariantResult:
     inv_id = "INV_NO_FALLBACK_IN_MEASUREMENT"
@@ -306,6 +300,7 @@ def _check_no_fallback_in_measurement(blueprints_path: Optional[Path]) -> Invari
         )
     return InvariantResult(id=inv_id, passed=True)
 
+
 def _check_bh_applied_to_lift(ablation_path: Optional[Path]) -> InvariantResult:
     inv_id = "INV_BH_APPLIED_TO_LIFT"
     remediation = (
@@ -343,6 +338,7 @@ def _check_bh_applied_to_lift(ablation_path: Optional[Path]) -> InvariantResult:
             remediation=remediation,
         )
     return InvariantResult(id=inv_id, passed=True)
+
 
 def _check_symbol_stratified_family(
     phase2_report_root: Optional[Path], run_id: str
@@ -392,6 +388,7 @@ def _check_symbol_stratified_family(
                             break
             else:
                 import csv
+
                 with open(candidate_path, newline="") as fh:
                     reader = csv.DictReader(fh)
                     for row in reader:
@@ -451,6 +448,7 @@ def _check_symbol_stratified_family(
         )
     return InvariantResult(id=inv_id, passed=True)
 
+
 def _check_embargo_nonzero(embargo_days: int) -> InvariantResult:
     inv_id = "INV_EMBARGO_NONZERO"
     remediation = (
@@ -470,6 +468,7 @@ def _check_embargo_nonzero(embargo_days: int) -> InvariantResult:
             remediation=remediation,
         )
     return InvariantResult(id=inv_id, passed=True)
+
 
 def _check_cost_digest_uniform(
     blueprints_path: Optional[Path], expected_digest: Optional[str]

@@ -39,11 +39,42 @@ def _default_report_paths(
 ) -> Dict[str, Path]:
     schema_version = normalize_feature_schema_version(feature_schema_version)
     return {
-        "cleaned_quality": data_root / "reports" / "data_quality" / run_id / "cleaned" / market / symbol / f"bars_{timeframe}_quality.json",
-        "data_validation": data_root / "reports" / "data_quality" / run_id / "validation" / f"validate_data_coverage_{timeframe}.json",
-        "feature_quality": data_root / "reports" / "feature_quality" / run_id / market / symbol / timeframe / f"feature_quality_{schema_version}.json",
-        "feature_validation": data_root / "reports" / "feature_quality" / run_id / "validation" / f"validate_feature_integrity_{timeframe}.json",
-        "context_quality": data_root / "reports" / "context_quality" / run_id / market / symbol / timeframe / "context_quality_report_v1.json",
+        "cleaned_quality": data_root
+        / "reports"
+        / "data_quality"
+        / run_id
+        / "cleaned"
+        / market
+        / symbol
+        / f"bars_{timeframe}_quality.json",
+        "data_validation": data_root
+        / "reports"
+        / "data_quality"
+        / run_id
+        / "validation"
+        / f"validate_data_coverage_{timeframe}.json",
+        "feature_quality": data_root
+        / "reports"
+        / "feature_quality"
+        / run_id
+        / market
+        / symbol
+        / timeframe
+        / f"feature_quality_{schema_version}.json",
+        "feature_validation": data_root
+        / "reports"
+        / "feature_quality"
+        / run_id
+        / "validation"
+        / f"validate_feature_integrity_{timeframe}.json",
+        "context_quality": data_root
+        / "reports"
+        / "context_quality"
+        / run_id
+        / market
+        / symbol
+        / timeframe
+        / "context_quality_report_v1.json",
     }
 
 
@@ -93,7 +124,8 @@ def build_live_data_foundation_payload(
 
     return {
         "schema_version": "live_data_foundation_report_v1",
-        "foundation_id": str(cfg.get("foundation_id", "btc_live_foundation")).strip() or "btc_live_foundation",
+        "foundation_id": str(cfg.get("foundation_id", "btc_live_foundation")).strip()
+        or "btc_live_foundation",
         "description": str(cfg.get("description", "")).strip(),
         "run_id": run_id,
         "market": market,
@@ -138,7 +170,11 @@ def write_live_data_foundation_report(
         feature_schema_version=feature_schema_version,
         config=config,
     )
-    report_dir = out_dir if out_dir is not None else data_root / "reports" / "live_foundation" / run_id / market / symbol / timeframe
+    report_dir = (
+        out_dir
+        if out_dir is not None
+        else data_root / "reports" / "live_foundation" / run_id / market / symbol / timeframe
+    )
     report_dir.mkdir(parents=True, exist_ok=True)
     out_path = report_dir / "live_data_foundation_report.json"
     out_path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")

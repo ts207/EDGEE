@@ -8,6 +8,7 @@ and event coverage in supporting regimes.
 
 Score is in [0, 1]. Score >= 0.7 suggests cross-regime stability.
 """
+
 from __future__ import annotations
 
 import numpy as np
@@ -52,16 +53,20 @@ def compute_robustness_score(
     if len(t_stats) > 0:
         signed_t = t_stats * overall_direction
         min_signed_t = float(signed_t.min())
-        
-        # Audit 1.5: Use non-linear mapping or multi-segment to distinguish 
+
+        # Audit 1.5: Use non-linear mapping or multi-segment to distinguish
         # "slightly negative" from "structural reversal"
         if min_signed_t < 0:
             # Reversal gets 0-0.3 score
-            min_t_score = 0.3 * (1.0 - min_signed_t / min_t_floor) if min_signed_t > min_t_floor else 0.0
+            min_t_score = (
+                0.3 * (1.0 - min_signed_t / min_t_floor) if min_signed_t > min_t_floor else 0.0
+            )
         else:
             # Positive min_t gets 0.3-1.0 score
-            min_t_score = 0.3 + 0.7 * (min_signed_t / min_t_target) if min_signed_t < min_t_target else 1.0
-            
+            min_t_score = (
+                0.3 + 0.7 * (min_signed_t / min_t_target) if min_signed_t < min_t_target else 1.0
+            )
+
         min_t_score = float(np.clip(min_t_score, 0.0, 1.0))
     else:
         min_t_score = 0.0

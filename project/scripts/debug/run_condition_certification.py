@@ -18,6 +18,7 @@ Usage
 
 Prints a table of the audit rows and returns exit code 0 if all assertions pass.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -76,6 +77,7 @@ CANDIDATES = [
 
 # ── Run certification ────────────────────────────────────────────────────────
 
+
 def run_certification() -> int:
     print("\n" + "=" * 70)
     print("CONDITION ENFORCEMENT CERTIFICATION BATCH")
@@ -113,14 +115,16 @@ def run_certification() -> int:
         # Candidates blocked here don't reach compile
         if not compile_eligible:
             print(f"   → BLOCKED (not compiled, as expected)")
-            audit_rows.append({
-                "candidate_id": cid,
-                "blueprint_id": f"bp_cert_{cid}",
-                "condition": condition_str,
-                "num_condition_nodes": 0,
-                "condition_source": source,
-                "compile_reason": "blocked_non_executable_condition",
-            })
+            audit_rows.append(
+                {
+                    "candidate_id": cid,
+                    "blueprint_id": f"bp_cert_{cid}",
+                    "condition": condition_str,
+                    "num_condition_nodes": 0,
+                    "condition_source": source,
+                    "compile_reason": "blocked_non_executable_condition",
+                }
+            )
             continue
 
         # Assert condition_str doesn't contain legacy '__' or rule template names
@@ -157,27 +161,33 @@ def run_certification() -> int:
             print(f"   FAIL: {msg}")
 
         # Audit gate check (simulate what compile does)
-        if condition_str not in ("all", "") and not condition_str.startswith("symbol_") and num_nodes == 0:
+        if (
+            condition_str not in ("all", "")
+            and not condition_str.startswith("symbol_")
+            and num_nodes == 0
+        ):
             if is_executable_condition(condition_str):
                 msg = f"{cid}: AUDIT GATE FAIL — runtime condition '{condition_str}' has 0 nodes"
                 failures.append(msg)
                 print(f"   FAIL: {msg}")
 
         nodes_hash = hashlib.sha256(
-            json.dumps([
-                {"feature": n.feature, "operator": n.operator, "value": n.value}
-                for n in nodes
-            ], sort_keys=True).encode()
+            json.dumps(
+                [{"feature": n.feature, "operator": n.operator, "value": n.value} for n in nodes],
+                sort_keys=True,
+            ).encode()
         ).hexdigest()[:16]
 
-        audit_rows.append({
-            "candidate_id": cid,
-            "blueprint_id": f"bp_cert_{cid}",
-            "condition": canonical,
-            "num_condition_nodes": num_nodes,
-            "condition_source": source,
-            "compile_reason": "compiled",
-        })
+        audit_rows.append(
+            {
+                "candidate_id": cid,
+                "blueprint_id": f"bp_cert_{cid}",
+                "condition": canonical,
+                "num_condition_nodes": num_nodes,
+                "condition_source": source,
+                "compile_reason": "compiled",
+            }
+        )
 
         status = "PASS" if not [f for f in failures if f.startswith(cid)] else "FAIL"
         print(f"   Status: {status}")
@@ -187,7 +197,9 @@ def run_certification() -> int:
     print("\n" + "=" * 70)
     print("AUDIT TABLE (compiled_blueprints_condition_audit columns)")
     print("=" * 70)
-    print(f"{'candidate_id':<12} {'condition':<22} {'num_nodes':>9} {'condition_source':<22} {'compile_reason'}")
+    print(
+        f"{'candidate_id':<12} {'condition':<22} {'num_nodes':>9} {'condition_source':<22} {'compile_reason'}"
+    )
     print("-" * 100)
     for row in audit_rows:
         print(
@@ -209,6 +221,7 @@ def run_certification() -> int:
         print("  ✓ cert_03: severity_bucket → all, 0 nodes, bucket_non_runtime")
         print("  ✓ cert_04: xyz_unknown → BLOCKED, compile_eligible=False")
         return 0
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run condition enforcement certification.")

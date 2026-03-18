@@ -8,6 +8,7 @@ from project.specs.loader import load_global_defaults
 
 DEFAULT_UNIVERSE = ["BTCUSDT", "ETHUSDT", "SOLUSDT"]
 
+
 def load_hypothesis_defaults(project_root: Path) -> Dict[str, object]:
     defaults = load_global_defaults(project_root=project_root)
     horizons = defaults.get("horizons", ["5m", "15m", "60m"])
@@ -24,6 +25,7 @@ def load_hypothesis_defaults(project_root: Path) -> Dict[str, object]:
         "rule_templates": [str(x) for x in rule_templates],
         "conditioning": dict(conditioning) if isinstance(conditioning, dict) else {},
     }
+
 
 def parse_symbols_filter(assets_filter: str, universe: Sequence[str]) -> List[str]:
     normalized_universe = [str(s).strip().upper() for s in universe if str(s).strip()]
@@ -46,6 +48,7 @@ def parse_symbols_filter(assets_filter: str, universe: Sequence[str]) -> List[st
                 selected.append(symbol)
                 break
     return selected
+
 
 def extract_event_type(statement: str) -> Optional[str]:
     text = str(statement or "")

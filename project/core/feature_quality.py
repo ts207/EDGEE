@@ -99,7 +99,9 @@ def summarize_feature_quality(
     if baseline_frame is not None:
         payload["baseline"] = {
             "label": str(baseline_label or "").strip(),
-            "feature_count_compared": len([col for col in numeric_cols if col in baseline_frame.columns]),
+            "feature_count_compared": len(
+                [col for col in numeric_cols if col in baseline_frame.columns]
+            ),
             "drift_flag_count": drift_flag_count,
         }
     return payload

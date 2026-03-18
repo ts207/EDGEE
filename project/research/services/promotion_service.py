@@ -57,7 +57,11 @@ class PromotionConfig:
 
     def resolved_out_dir(self) -> Path:
         data_root = get_data_root()
-        return self.out_dir if self.out_dir is not None else data_root / "reports" / "promotions" / self.run_id
+        return (
+            self.out_dir
+            if self.out_dir is not None
+            else data_root / "reports" / "promotions" / self.run_id
+        )
 
     def manifest_params(self) -> Dict[str, Any]:
         return {
@@ -153,9 +157,28 @@ def _classify_rejection(row: Dict[str, Any], failed_stages: List[str]) -> str:
     reject_reason = str(row.get("reject_reason", "")).strip().lower()
     combined = " ".join([primary_gate, primary_reason, reject_reason, " ".join(failed_stages)])
 
-    if any(token in combined for token in ["spec hash mismatch", "missing", "audit", "bridge_evaluation_failed", "unlocked candidates", "contract"]):
+    if any(
+        token in combined
+        for token in [
+            "spec hash mismatch",
+            "missing",
+            "audit",
+            "bridge_evaluation_failed",
+            "unlocked candidates",
+            "contract",
+        ]
+    ):
         return "contract_failure"
-    if any(token in combined for token in ["oos_validation", "confirmatory", "validation", "test_support", "multiplicity_strict"]):
+    if any(
+        token in combined
+        for token in [
+            "oos_validation",
+            "confirmatory",
+            "validation",
+            "test_support",
+            "multiplicity_strict",
+        ]
+    ):
         return "weak_holdout_support"
     if any(
         token in combined
@@ -260,19 +283,13 @@ def _build_promotion_decision_diagnostics(audit_df: pd.DataFrame) -> Dict[str, A
         .str.strip()
     )
     fail_reasons = (
-        rejected.get("primary_reject_reason", pd.Series(dtype="object"))
-        .astype(str)
-        .str.strip()
+        rejected.get("primary_reject_reason", pd.Series(dtype="object")).astype(str).str.strip()
     )
     rejection_classes = (
-        rejected.get("rejection_classification", pd.Series(dtype="object"))
-        .astype(str)
-        .str.strip()
+        rejected.get("rejection_classification", pd.Series(dtype="object")).astype(str).str.strip()
     )
     next_actions = (
-        rejected.get("recommended_next_action", pd.Series(dtype="object"))
-        .astype(str)
-        .str.strip()
+        rejected.get("recommended_next_action", pd.Series(dtype="object")).astype(str).str.strip()
     )
     stage_counter: Counter[str] = Counter()
     for value in rejected.get("failed_gate_list", pd.Series(dtype="object")).astype(str):
@@ -286,8 +303,7 @@ def _build_promotion_decision_diagnostics(audit_df: pd.DataFrame) -> Dict[str, A
         "promoted_count": int(decision_counts.get("promoted", 0)),
         "rejected_count": int(decision_counts.get("rejected", 0)),
         "primary_fail_gate_counts": {
-            str(k): int(v)
-            for k, v in fail_gates[fail_gates != ""].value_counts().to_dict().items()
+            str(k): int(v) for k, v in fail_gates[fail_gates != ""].value_counts().to_dict().items()
         },
         "primary_reject_reason_counts": {
             str(k): int(v)
@@ -304,7 +320,9 @@ def _build_promotion_decision_diagnostics(audit_df: pd.DataFrame) -> Dict[str, A
         },
         "mean_failed_gate_count_rejected": 0.0
         if rejected.empty
-        else float(pd.to_numeric(rejected.get("failed_gate_count", 0), errors="coerce").fillna(0).mean()),
+        else float(
+            pd.to_numeric(rejected.get("failed_gate_count", 0), errors="coerce").fillna(0).mean()
+        ),
     }
 
 
@@ -331,9 +349,7 @@ def _load_bridge_metrics(bridge_root: Path, symbol: str | None = None) -> pd.Dat
     versioned_files = list(bridge_root.rglob("*_v1.csv"))
     parquet_files = list(bridge_root.rglob("bridge_evaluation.parquet"))
     fallback_csv_files = [
-        path
-        for path in bridge_root.rglob("*.csv")
-        if path not in versioned_files
+        path for path in bridge_root.rglob("*.csv") if path not in versioned_files
     ]
     ordered_files = [*versioned_files, *parquet_files, *fallback_csv_files]
     if not ordered_files:
@@ -351,13 +367,22 @@ def _merge_bridge_metrics(phase2_df: pd.DataFrame, bridge_df: pd.DataFrame) -> p
         return phase2_df
     out = pd.merge(
         phase2_df,
-        bridge_df[["candidate_id", "event_type", "gate_bridge_tradable", "bridge_validation_after_cost_bps"]],
+        bridge_df[
+            [
+                "candidate_id",
+                "event_type",
+                "gate_bridge_tradable",
+                "bridge_validation_after_cost_bps",
+            ]
+        ],
         on=["candidate_id", "event_type"],
         how="left",
         suffixes=("", "_bridge"),
     )
     if "gate_bridge_tradable_bridge" in out.columns:
-        out["gate_bridge_tradable"] = out["gate_bridge_tradable_bridge"].combine_first(out["gate_bridge_tradable"])
+        out["gate_bridge_tradable"] = out["gate_bridge_tradable_bridge"].combine_first(
+            out["gate_bridge_tradable"]
+        )
         out = out.drop(columns=["gate_bridge_tradable_bridge"])
     return out
 
@@ -452,7 +477,9 @@ def _load_dynamic_min_events_by_event(spec_root: str | Path) -> Dict[str, int]:
     for state_row in data.get("states", []):
         event_type = state_row.get("source_event_type")
         if event_type:
-            out[event_type] = max(out.get(event_type, default_min), state_row.get("min_events", default_min))
+            out[event_type] = max(
+                out.get(event_type, default_min), state_row.get("min_events", default_min)
+            )
     return out
 
 
@@ -476,7 +503,9 @@ def _resolve_promotion_policy(
     base_min_events = int(config.min_events)
     dynamic_min_events: Dict[str, int] = {}
 
-    min_net_expectancy_bps = float(max(0.0, float(getattr(contract, "min_net_expectancy_bps", 0.0) or 0.0)))
+    min_net_expectancy_bps = float(
+        max(0.0, float(getattr(contract, "min_net_expectancy_bps", 0.0) or 0.0))
+    )
     max_fee_plus_slippage_bps = getattr(contract, "max_fee_plus_slippage_bps", None)
     max_daily_turnover_multiple = getattr(contract, "max_daily_turnover_multiple", None)
     require_retail_viability = bool(getattr(contract, "require_retail_viability", False))
@@ -527,13 +556,21 @@ def execute_promotion(config: PromotionConfig) -> PromotionServiceResult:
         source_manifest = load_run_manifest(config.run_id)
         source_run_mode = str(source_manifest.get("run_mode", "")).strip().lower()
         source_profile = str(source_manifest.get("discovery_profile", "")).strip().lower()
-        confirmatory_rerun_run_id = str(source_manifest.get("confirmatory_rerun_run_id", "")).strip()
+        confirmatory_rerun_run_id = str(
+            source_manifest.get("confirmatory_rerun_run_id", "")
+        ).strip()
         candidate_origin_run_id = str(source_manifest.get("candidate_origin_run_id", "")).strip()
         program_id = str(source_manifest.get("program_id", config.program_id)).strip()
         if source_run_mode in {"discovery", "research"}:
             source_run_mode = "exploratory"
         is_exploratory = source_run_mode == "exploratory"
-        is_confirmatory = source_run_mode in {"confirmatory", "production", "certification", "promotion", "deploy"}
+        is_confirmatory = source_run_mode in {
+            "confirmatory",
+            "production",
+            "certification",
+            "promotion",
+            "deploy",
+        }
         run_symbols = _parse_run_symbols(config.symbols or source_manifest.get("symbols"))
         if is_exploratory and not config.allow_discovery_promotion:
             raise ValueError(
@@ -551,7 +588,13 @@ def execute_promotion(config: PromotionConfig) -> PromotionServiceResult:
             retail_profiles_spec_path=config.retail_profiles_spec,
             required=True,
         )
-        candidates_path = data_root / "reports" / "edge_candidates" / config.run_id / "edge_candidates_normalized.parquet"
+        candidates_path = (
+            data_root
+            / "reports"
+            / "edge_candidates"
+            / config.run_id
+            / "edge_candidates_normalized.parquet"
+        )
         if not candidates_path.exists():
             candidates_path = candidates_path.with_suffix(".csv")
         if candidates_path.exists():
@@ -583,16 +626,15 @@ def execute_promotion(config: PromotionConfig) -> PromotionServiceResult:
         ontology_hash = ontology_spec_hash(PROJECT_ROOT.parent)
         gate_spec = _load_gates_spec(PROJECT_ROOT.parent)
         promotion_confirmatory_gates = gate_spec.get("promotion_confirmatory_gates", {})
-        hyp_registry_path = data_root / "reports" / "phase2" / config.run_id / "hypothesis_registry.parquet"
+        hyp_registry_path = (
+            data_root / "reports" / "phase2" / config.run_id / "hypothesis_registry.parquet"
+        )
         hypothesis_index = {}
         if not hyp_registry_path.exists():
             hyp_registry_path = hyp_registry_path.with_suffix(".csv")
         if hyp_registry_path.exists():
             hyp_df = _read_csv_or_parquet(hyp_registry_path)
-            hypothesis_index = {
-                row["hypothesis_id"]: row.to_dict()
-                for _, row in hyp_df.iterrows()
-            }
+            hypothesis_index = {row["hypothesis_id"]: row.to_dict() for _, row in hyp_df.iterrows()}
         promotion_spec = {
             "ontology_spec_hash": ontology_hash,
             "source_run_mode": source_run_mode,
@@ -694,6 +736,7 @@ def execute_promotion(config: PromotionConfig) -> PromotionServiceResult:
                 "rejection_reasons",
                 "policy_version",
                 "bundle_version",
+                "is_reduced_evidence",
             ]
             if column in evidence_bundle_summary.columns
         ]
@@ -709,7 +752,9 @@ def execute_promotion(config: PromotionConfig) -> PromotionServiceResult:
                 event_type = str(row.get("event_type", "")).strip()
                 trace = row.get("promotion_metrics_trace", "{}")
                 try:
-                    trace_payload = json.loads(trace) if isinstance(trace, str) else dict(trace or {})
+                    trace_payload = (
+                        json.loads(trace) if isinstance(trace, str) else dict(trace or {})
+                    )
                 except (json.JSONDecodeError, TypeError, ValueError):
                     trace_payload = {}
                 for stage, meta in sorted(trace_payload.items()):
@@ -722,7 +767,9 @@ def execute_promotion(config: PromotionConfig) -> PromotionServiceResult:
                             "stage": stage,
                             "statistic": json.dumps(observed, sort_keys=True),
                             "threshold": json.dumps(thresholds, sort_keys=True),
-                            "pass_fail": bool(meta.get("passed", False)) if isinstance(meta, dict) else False,
+                            "pass_fail": bool(meta.get("passed", False))
+                            if isinstance(meta, dict)
+                            else False,
                         }
                     )
             summary_rows = pd.DataFrame(stage_rows)

@@ -33,4 +33,3 @@ __all__ = [
     "validate_grammar",
     "validate_ontology",
 ]
-

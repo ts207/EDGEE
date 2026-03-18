@@ -7,6 +7,7 @@ tests/events/test_detector_precision_recall.py (regression tests).
 Placement in project/scripts/ (not project/events/) avoids circular import risk:
 some family modules import from project.research at module level.
 """
+
 from __future__ import annotations
 
 import json
@@ -45,6 +46,7 @@ SYNTHETIC_LIVE_ONLY_EVENT_TYPES = {
 # Data structures
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class DetectorMetrics:
     event_type: str
@@ -75,6 +77,7 @@ class DetectorMetrics:
 # Classification
 # ---------------------------------------------------------------------------
 
+
 def _classify(precision: float, recall: float, expected_windows: int) -> str:
     """Classify a detector result into one of five classes."""
     if expected_windows == 0:
@@ -93,6 +96,7 @@ def _classify(precision: float, recall: float, expected_windows: int) -> str:
 # ---------------------------------------------------------------------------
 # Data loading
 # ---------------------------------------------------------------------------
+
 
 def load_manifest(data_root: Path, run_id: str) -> Dict[str, Any]:
     """Load synthetic_generation_manifest.json for a run_id."""
@@ -154,10 +158,7 @@ def build_symbol_df(symbol_entry: Dict[str, Any]) -> pd.DataFrame:
         funding = pd.read_parquet(funding_path)
         funding["timestamp"] = pd.to_datetime(funding["timestamp"], utc=True, errors="coerce")
         if "funding_rate_scaled" in funding.columns:
-            funding = (
-                funding[["timestamp", "funding_rate_scaled"]]
-                .sort_values("timestamp")
-            )
+            funding = funding[["timestamp", "funding_rate_scaled"]].sort_values("timestamp")
             perp = pd.merge_asof(
                 perp.sort_values("timestamp"),
                 funding,
@@ -173,7 +174,10 @@ def build_symbol_df(symbol_entry: Dict[str, Any]) -> pd.DataFrame:
 # Measurement
 # ---------------------------------------------------------------------------
 
-def _get_tolerance_td(event_type: str, tolerance_minutes: Union[int, Dict[str, int]]) -> pd.Timedelta:
+
+def _get_tolerance_td(
+    event_type: str, tolerance_minutes: Union[int, Dict[str, int]]
+) -> pd.Timedelta:
     if isinstance(tolerance_minutes, dict):
         minutes = tolerance_minutes.get(event_type, 30)
     else:
@@ -257,7 +261,9 @@ def _enrich_df(df: pd.DataFrame) -> pd.DataFrame:
             depth = None
         if depth is not None:
             baseline = depth.rolling(24, min_periods=1).mean().shift(1).fillna(depth)
-            df["micro_depth_depletion"] = (1.0 - (depth / baseline.replace(0.0, np.nan))).fillna(0.0)
+            df["micro_depth_depletion"] = (1.0 - (depth / baseline.replace(0.0, np.nan))).fillna(
+                0.0
+            )
 
     # range_96: high/low ratio over 96 bars (lagged 1)
     if "range_96" not in df.columns and "high" in df.columns and "low" in df.columns:
@@ -268,11 +274,7 @@ def _enrich_df(df: pd.DataFrame) -> pd.DataFrame:
     # range_med_2880: rolling median of range_96 over 2880 bars (lagged 1)
     if "range_med_2880" not in df.columns and "range_96" in df.columns:
         df["range_med_2880"] = (
-            df["range_96"]
-            .rolling(2880, min_periods=1)
-            .median()
-            .shift(1)
-            .fillna(0.0)
+            df["range_96"].rolling(2880, min_periods=1).median().shift(1).fillna(0.0)
         )
 
     return df
@@ -339,11 +341,7 @@ def measure_detector(
     expected_windows = len(truth_windows)
 
     precision = float(in_window / total_events) if total_events > 0 else 0.0
-    recall = (
-        float(windows_hit / expected_windows)
-        if expected_windows > 0
-        else float("nan")
-    )
+    recall = float(windows_hit / expected_windows) if expected_windows > 0 else float("nan")
 
     recall_for_classify = 0.0 if math.isnan(recall) else recall
     classification = _classify(precision, recall_for_classify, expected_windows)

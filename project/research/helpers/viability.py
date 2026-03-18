@@ -37,6 +37,7 @@ def _delay_expectancy_map(row: Mapping[str, Any]) -> Dict[int, float]:
         out[int(delay)] = float(val)
     return out
 
+
 def _to_bps(value: float) -> float:
     if not np.isfinite(value):
         return float(np.nan)
@@ -44,6 +45,7 @@ def _to_bps(value: float) -> float:
     if abs(value) <= 2.0:
         return float(value * 10_000.0)
     return float(value)
+
 
 def evaluate_low_capital_viability(
     row: Mapping[str, Any],
@@ -74,21 +76,13 @@ def evaluate_low_capital_viability(
             "low_capital_estimated_position_notional_source": None,
         }
 
-    baseline_bps = safe_float(
-        baseline_after_cost_bps, default=np.nan
-    )
+    baseline_bps = safe_float(baseline_after_cost_bps, default=np.nan)
     if not np.isfinite(baseline_bps):
-        baseline_bps = safe_float(
-            row.get("bridge_validation_after_cost_bps"), default=np.nan
-        )
+        baseline_bps = safe_float(row.get("bridge_validation_after_cost_bps"), default=np.nan)
     if not np.isfinite(baseline_bps):
-        baseline_bps = safe_float(
-            row.get("net_expectancy_bps"), default=np.nan
-        )
+        baseline_bps = safe_float(row.get("net_expectancy_bps"), default=np.nan)
     if not np.isfinite(baseline_bps):
-        baseline_bps = safe_float(
-            row.get("after_cost_expectancy_per_trade"), default=np.nan
-        )
+        baseline_bps = safe_float(row.get("after_cost_expectancy_per_trade"), default=np.nan)
         if np.isfinite(baseline_bps):
             baseline_bps = float(baseline_bps * 10_000.0)
 
@@ -107,8 +101,16 @@ def evaluate_low_capital_viability(
     if not np.isfinite(turnover):
         turnover = safe_float(row.get("turnover_proxy_mean"), default=np.nan)
 
-    stress_2x_bps = baseline_bps - eff_cost_bps if np.isfinite(baseline_bps) and np.isfinite(eff_cost_bps) else float(np.nan)
-    stress_3x_bps = baseline_bps - (2.0 * eff_cost_bps) if np.isfinite(baseline_bps) and np.isfinite(eff_cost_bps) else float(np.nan)
+    stress_2x_bps = (
+        baseline_bps - eff_cost_bps
+        if np.isfinite(baseline_bps) and np.isfinite(eff_cost_bps)
+        else float(np.nan)
+    )
+    stress_3x_bps = (
+        baseline_bps - (2.0 * eff_cost_bps)
+        if np.isfinite(baseline_bps) and np.isfinite(eff_cost_bps)
+        else float(np.nan)
+    )
 
     default_delay = safe_int(contract.get("entry_delay_bars_default"), 1)
     stress_delay = safe_int(contract.get("entry_delay_bars_stress"), max(2, default_delay))
@@ -126,16 +128,16 @@ def evaluate_low_capital_viability(
     if not np.isfinite(min_notional_margin) or min_notional_margin <= 0.0:
         min_notional_margin = 1.0
     min_notional_required = (
-        float(min_notional * min_notional_margin)
-        if np.isfinite(min_notional)
-        else float(np.nan)
+        float(min_notional * min_notional_margin) if np.isfinite(min_notional) else float(np.nan)
     )
 
     account_equity = safe_float(contract.get("account_equity_usd"), default=np.nan)
     max_position_notional = safe_float(contract.get("max_position_notional_usd"), default=np.nan)
     max_trades_per_day = safe_float(contract.get("max_trades_per_day"), default=np.nan)
     max_turnover_per_day = safe_float(contract.get("max_turnover_per_day"), default=np.nan)
-    estimated_position_notional = safe_float(row.get("estimated_position_notional_usd"), default=np.nan)
+    estimated_position_notional = safe_float(
+        row.get("estimated_position_notional_usd"), default=np.nan
+    )
     estimated_position_notional_source = "row"
     if not np.isfinite(estimated_position_notional):
         turnover_for_est = turnover if np.isfinite(turnover) else max_turnover_per_day
@@ -176,9 +178,7 @@ def evaluate_low_capital_viability(
 
     max_turnover_day = safe_float(contract.get("max_turnover_per_day"))
     gate_turnover = bool(
-        np.isfinite(turnover)
-        and np.isfinite(max_turnover_day)
-        and turnover <= max_turnover_day
+        np.isfinite(turnover) and np.isfinite(max_turnover_day) and turnover <= max_turnover_day
     )
 
     min_tob_coverage = safe_float(contract.get("require_top_book_coverage"))
@@ -232,6 +232,7 @@ def evaluate_low_capital_viability(
         or "unknown",
     }
 
+
 def evaluate_retail_constraints(
     row: Mapping[str, Any],
     *,
@@ -277,10 +278,7 @@ def evaluate_retail_constraints(
         )
 
     gate_turnover = True
-    if (
-        max_daily_turnover_multiple is not None
-        and float(max_daily_turnover_multiple) > 0.0
-    ):
+    if max_daily_turnover_multiple is not None and float(max_daily_turnover_multiple) > 0.0:
         gate_turnover = bool(
             np.isfinite(turnover_proxy_mean)
             and float(turnover_proxy_mean) <= float(max_daily_turnover_multiple)

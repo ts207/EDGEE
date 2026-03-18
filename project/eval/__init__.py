@@ -17,4 +17,3 @@ __all__ = [
     "build_walk_forward_split_labels",
     "multiplicity",
 ]
-

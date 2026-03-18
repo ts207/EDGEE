@@ -1,2 +1,1 @@
 """Report stage package."""
-

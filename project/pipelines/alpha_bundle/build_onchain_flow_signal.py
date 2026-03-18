@@ -33,6 +33,7 @@ from project.io.utils import ensure_dir, read_parquet, write_parquet
 from project.specs.manifest import finalize_manifest, start_manifest
 from project.core.validation import ensure_utc_timestamp
 
+
 def robust_z(series: pd.Series, window: int, eps: float = 1e-12) -> pd.Series:
     def _rz(x: np.ndarray) -> float:
         x = x.copy()
@@ -41,23 +42,31 @@ def robust_z(series: pd.Series, window: int, eps: float = 1e-12) -> pd.Series:
         med = np.median(x)
         mad = np.median(np.abs(x - med))
         return float((x[-1] - med) / (1.4826 * mad + eps))
+
     return series.rolling(window=window, min_periods=window).apply(_rz, raw=True)
 
+
 def main() -> int:
-    p = argparse.ArgumentParser(description="Build on-chain flow signal (netflow standardized by mcap)")
+    p = argparse.ArgumentParser(
+        description="Build on-chain flow signal (netflow standardized by mcap)"
+    )
     p.add_argument("--run_id", required=True)
     p.add_argument("--onchain_path", required=True, help="Parquet/CSV with OnChainFlow schema")
     p.add_argument("--cleaned_root", required=False, default=None)
     p.add_argument("--bar_interval", default="15m")
     p.add_argument("--quote_suffix", default="USDT")
-    p.add_argument("--asset_to_symbol_json", default=None, help="Optional JSON mapping asset->symbol")
+    p.add_argument(
+        "--asset_to_symbol_json", default=None, help="Optional JSON mapping asset->symbol"
+    )
     p.add_argument("--window", type=int, default=30)
     p.add_argument("--out_dir", default=None)
     args = p.parse_args()
 
     run_id = args.run_id
     data_root = get_data_root()
-    cleaned_root = Path(args.cleaned_root) if args.cleaned_root else (data_root / "lake" / "cleaned")
+    cleaned_root = (
+        Path(args.cleaned_root) if args.cleaned_root else (data_root / "lake" / "cleaned")
+    )
 
     out_dir = Path(args.out_dir) if args.out_dir else (data_root / "feature_store" / "signals")
     ensure_dir(out_dir)
@@ -78,7 +87,9 @@ def main() -> int:
         oc = pd.read_csv(path)
 
     if oc.empty:
-        finalize_manifest(manifest, status="success", stats={"rows": 0, "note": "empty onchain input"})
+        finalize_manifest(
+            manifest, status="success", stats={"rows": 0, "note": "empty onchain input"}
+        )
         return 0
 
     oc["ts_event"] = ensure_utc_timestamp(oc["ts_event"], "ts_event")
@@ -108,12 +119,19 @@ def main() -> int:
         bars = read_parquet([Path(p) for p in files])
         tcol = "ts_event" if "ts_event" in bars.columns else "timestamp"
         bars[tcol] = ensure_utc_timestamp(bars[tcol], tcol)
-        price_col = "mid" if "mid" in bars.columns else ("close" if "close" in bars.columns else None)
+        price_col = (
+            "mid" if "mid" in bars.columns else ("close" if "close" in bars.columns else None)
+        )
         if price_col is None:
             continue
         bars = bars.sort_values(tcol, kind="mergesort").reset_index(drop=True)
         gb = g.sort_values("ts_event", kind="mergesort").reset_index(drop=True)
-        merged = pd.merge_asof(gb[["ts_event", "netflow_coin", "mcap_usd"]], bars[[tcol, price_col]].rename(columns={tcol: "ts_event"}), on="ts_event", direction="backward")
+        merged = pd.merge_asof(
+            gb[["ts_event", "netflow_coin", "mcap_usd"]],
+            bars[[tcol, price_col]].rename(columns={tcol: "ts_event"}),
+            on="ts_event",
+            direction="backward",
+        )
         px = merged[price_col].astype(float)
         flow_usd = merged["netflow_coin"].astype(float) * px
         f = flow_usd / (merged["mcap_usd"].astype(float) + 1e-12)
@@ -123,7 +141,9 @@ def main() -> int:
         out_rows.append(tmp)
 
     if not out_rows:
-        finalize_manifest(manifest, status="success", stats={"rows": 0, "note": "no symbols matched bars"})
+        finalize_manifest(
+            manifest, status="success", stats={"rows": 0, "note": "no symbols matched bars"}
+        )
         return 0
 
     out = pd.concat(out_rows, ignore_index=True)
@@ -132,8 +152,11 @@ def main() -> int:
     out_path = out_dir / "onchain_flow_mc.parquet"
     write_parquet(out, out_path)
 
-    finalize_manifest(manifest, status="success", stats={"rows": int(len(out)), "out": str(out_path)})
+    finalize_manifest(
+        manifest, status="success", stats={"rows": int(len(out)), "out": str(out_path)}
+    )
     return 0
+
 
 if __name__ == "__main__":
     raise SystemExit(main())

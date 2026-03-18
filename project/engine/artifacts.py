@@ -35,7 +35,6 @@ class ArtifactRecord:
     columns: list[str]
 
 
-
 def _json_safe(value: Any) -> Any:
     if isinstance(value, dict):
         return {str(k): _json_safe(v) for k, v in value.items()}
@@ -44,7 +43,11 @@ def _json_safe(value: Any) -> Any:
     if isinstance(value, Path):
         return str(value)
     if isinstance(value, (pd.Timestamp, datetime)):
-        ts = value.tz_convert("UTC") if isinstance(value, pd.Timestamp) and value.tzinfo is not None else value
+        ts = (
+            value.tz_convert("UTC")
+            if isinstance(value, pd.Timestamp) and value.tzinfo is not None
+            else value
+        )
         if isinstance(ts, pd.Timestamp):
             return ts.isoformat()
         return ts.astimezone(timezone.utc).isoformat() if ts.tzinfo else ts.isoformat()
@@ -54,10 +57,13 @@ def _json_safe(value: Any) -> Any:
         return float(value)
     if isinstance(value, (np.bool_,)):
         return bool(value)
-    if pd.isna(value) if not isinstance(value, (str, bytes, dict, list, tuple, set, Path)) else False:
+    if (
+        pd.isna(value)
+        if not isinstance(value, (str, bytes, dict, list, tuple, set, Path))
+        else False
+    ):
         return None
     return value
-
 
 
 def write_engine_dataframe(
@@ -79,7 +85,6 @@ def write_engine_dataframe(
         rows=int(len(df)),
         columns=[str(c) for c in df.columns],
     )
-
 
 
 def build_engine_run_manifest(
@@ -181,7 +186,6 @@ def build_engine_run_manifest(
         "metrics": _json_safe(metrics),
     }
     return manifest
-
 
 
 def write_engine_run_manifest(manifest: dict[str, Any], *, engine_dir: Path) -> Path:

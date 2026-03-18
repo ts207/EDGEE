@@ -72,9 +72,7 @@ def resolve_phase2_gate_params(
     event_type: str,
 ) -> Dict[str, Any]:
     event_overrides = (
-        gate_v1_phase2.get("event_overrides", {})
-        if isinstance(gate_v1_phase2, dict)
-        else {}
+        gate_v1_phase2.get("event_overrides", {}) if isinstance(gate_v1_phase2, dict) else {}
     )
     per_event = event_overrides.get(event_type, {}) if isinstance(event_overrides, dict) else {}
     if not isinstance(per_event, dict):
@@ -107,14 +105,10 @@ def resolve_phase2_gate_params(
         and conditioned_bucket_min_samples_override <= 0
     ):
         conditioned_bucket_min_samples_override = None
-    timeframe_consensus_timeframes = _pick(
-        "timeframe_consensus_timeframes", ["1m", "5m", "15m"]
-    )
+    timeframe_consensus_timeframes = _pick("timeframe_consensus_timeframes", ["1m", "5m", "15m"])
     if isinstance(timeframe_consensus_timeframes, str):
         timeframe_consensus_timeframes = [
-            token.strip()
-            for token in timeframe_consensus_timeframes.split(",")
-            if token.strip()
+            token.strip() for token in timeframe_consensus_timeframes.split(",") if token.strip()
         ]
     if not isinstance(timeframe_consensus_timeframes, list):
         timeframe_consensus_timeframes = ["1m", "5m", "15m"]
@@ -134,21 +128,15 @@ def resolve_phase2_gate_params(
         "regime_ess_min_per_regime": float(_pick("regime_ess_min_per_regime", 1.0)),
         "regime_ess_min_regimes": int(_pick("regime_ess_min_regimes", 1) or 1),
         "timeframe_consensus_timeframes": timeframe_consensus_timeframes,
-        "timeframe_consensus_min_ratio": float(
-            _pick("timeframe_consensus_min_ratio", 0.0)
-        ),
+        "timeframe_consensus_min_ratio": float(_pick("timeframe_consensus_min_ratio", 0.0)),
         "timeframe_consensus_min_timeframes": int(
             _pick("timeframe_consensus_min_timeframes", 1) or 1
         ),
         "multiplicity_enable_cluster_adjusted": bool(
             _pick("multiplicity_enable_cluster_adjusted", True)
         ),
-        "multiplicity_cluster_threshold": float(
-            _pick("multiplicity_cluster_threshold", 0.85)
-        ),
-        "multiplicity_enable_by_diagnostic": bool(
-            _pick("multiplicity_enable_by_diagnostic", True)
-        ),
+        "multiplicity_cluster_threshold": float(_pick("multiplicity_cluster_threshold", 0.85)),
+        "multiplicity_enable_by_diagnostic": bool(_pick("multiplicity_enable_by_diagnostic", True)),
     }
 
 
@@ -177,21 +165,11 @@ def select_bridge_gate_spec(gates_spec: Dict[str, Any]) -> Dict[str, Any]:
         "edge_cost_k": float(bridge_cfg.get("edge_cost_k", 2.0)),
         "stressed_cost_multiplier": float(bridge_cfg.get("stressed_cost_multiplier", 1.5)),
         "min_validation_trades": int(bridge_cfg.get("min_validation_trades", 20) or 20),
-        "micro_max_spread_stress": float(
-            bridge_cfg.get("micro_max_spread_stress", 2.0)
-        ),
-        "micro_max_depth_depletion": float(
-            bridge_cfg.get("micro_max_depth_depletion", 0.70)
-        ),
-        "micro_max_sweep_pressure": float(
-            bridge_cfg.get("micro_max_sweep_pressure", 2.5)
-        ),
-        "micro_max_abs_imbalance": float(
-            bridge_cfg.get("micro_max_abs_imbalance", 0.90)
-        ),
-        "micro_min_feature_coverage": float(
-            bridge_cfg.get("micro_min_feature_coverage", 0.25)
-        ),
+        "micro_max_spread_stress": float(bridge_cfg.get("micro_max_spread_stress", 2.0)),
+        "micro_max_depth_depletion": float(bridge_cfg.get("micro_max_depth_depletion", 0.70)),
+        "micro_max_sweep_pressure": float(bridge_cfg.get("micro_max_sweep_pressure", 2.5)),
+        "micro_max_abs_imbalance": float(bridge_cfg.get("micro_max_abs_imbalance", 0.90)),
+        "micro_min_feature_coverage": float(bridge_cfg.get("micro_min_feature_coverage", 0.25)),
     }
 
 

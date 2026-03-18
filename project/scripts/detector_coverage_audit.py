@@ -8,7 +8,11 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 from project.events.detectors.base import BaseEventDetector
-from project.events.detectors.registry import get_detector, list_registered_event_types, load_all_detectors
+from project.events.detectors.registry import (
+    get_detector,
+    list_registered_event_types,
+    load_all_detectors,
+)
 from project.events.event_aliases import resolve_event_alias
 from project.events.event_specs import EVENT_REGISTRY_SPECS
 
@@ -19,7 +23,10 @@ import sys
 DETECTOR_AUDIT_SCHEMA_VERSION = "detector_coverage_audit_v2"
 
 # Regex to find numerical literals that aren't 0, 1, 2, -1, or very small epsilon
-_HARDCODED_NUM_REGEX = re.compile(r"(?<![a-zA-Z0-9_])(?!0|1|2|-1|1e-12|1\.0|0\.0|2\.0|0\.1|0\.5|10000\.0|100\.0)\d+\.\d+\b")
+_HARDCODED_NUM_REGEX = re.compile(
+    r"(?<![a-zA-Z0-9_])(?!0|1|2|-1|1e-12|1\.0|0\.0|2\.0|0\.1|0\.5|10000\.0|100\.0)\d+\.\d+\b"
+)
+
 
 def _has_hardcoded_parameters(detector_cls: type[BaseEventDetector]) -> bool:
     try:
@@ -63,7 +70,11 @@ def _maturity_tier(detector_cls: type[BaseEventDetector]) -> str:
 
     if "stub detector" in doc or "stub detector" in source:
         return "placeholder"
-    if "canonical_proxy" in module_name or "proxy" in event_name or "evidence_tier': 'proxy'" in source:
+    if (
+        "canonical_proxy" in module_name
+        or "proxy" in event_name
+        or "evidence_tier': 'proxy'" in source
+    ):
         return "proxy"
     if "milestone-6 liquidity stress detector" in doc or "liquidity stress detector" in doc:
         return "production"
@@ -149,7 +160,7 @@ def run_audit() -> Dict[str, Any]:
                     path=row.get("path", ""),
                 )
             )
-        
+
         detector = get_detector(row["event_type"])
         if detector and _has_hardcoded_parameters(type(detector)):
             issues.append(
@@ -223,14 +234,18 @@ def _write_output(path: Path, content: str) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Audit detector coverage against active event specs.")
+    parser = argparse.ArgumentParser(
+        description="Audit detector coverage against active event specs."
+    )
     parser.add_argument("--json-out", default=None, help="Write machine-readable audit JSON")
     parser.add_argument("--md-out", default=None, help="Write human-readable audit Markdown")
-    parser.add_argument("--check", action="store_true", help="Fail if generated files drift from disk.")
+    parser.add_argument(
+        "--check", action="store_true", help="Fail if generated files drift from disk."
+    )
     args = parser.parse_args(argv)
 
     report = run_audit()
-    
+
     expected: list[tuple[Path, str]] = []
     if args.json_out:
         expected.append((Path(args.json_out), json.dumps(report, indent=2, sort_keys=True) + "\n"))

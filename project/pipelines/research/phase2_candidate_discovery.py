@@ -8,7 +8,9 @@ from typing import List, Optional
 
 
 def _make_parser() -> argparse.ArgumentParser:
-    from project.pipelines.research.cli.candidate_discovery_cli import build_candidate_discovery_parser
+    from project.pipelines.research.cli.candidate_discovery_cli import (
+        build_candidate_discovery_parser,
+    )
 
     return build_candidate_discovery_parser()
 

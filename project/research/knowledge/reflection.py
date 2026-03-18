@@ -89,7 +89,11 @@ def _dominant_value(series: pd.Series) -> str:
 
 def _expected_artifacts(manifest: Dict[str, Any], *, data_root: Path) -> List[tuple[str, Path]]:
     run_id = str(manifest.get("run_id", "")).strip()
-    planned = {str(stage).strip() for stage in manifest.get("planned_stages", []) or [] if str(stage).strip()}
+    planned = {
+        str(stage).strip()
+        for stage in manifest.get("planned_stages", []) or []
+        if str(stage).strip()
+    }
     expected: List[tuple[str, Path]] = []
     if "phase2_search_engine" in planned or "summarize_discovery_quality" in planned:
         expected.append(
@@ -102,14 +106,22 @@ def _expected_artifacts(manifest: Dict[str, Any], *, data_root: Path) -> List[tu
         expected.append(
             (
                 "edge_candidates.normalized",
-                data_root / "reports" / "edge_candidates" / run_id / "edge_candidates_normalized.parquet",
+                data_root
+                / "reports"
+                / "edge_candidates"
+                / run_id
+                / "edge_candidates_normalized.parquet",
             )
         )
     if "promote_candidates" in planned:
         expected.append(
             (
                 "promotion.audit",
-                data_root / "reports" / "promotions" / run_id / "promotion_statistical_audit.parquet",
+                data_root
+                / "reports"
+                / "promotions"
+                / run_id
+                / "promotion_statistical_audit.parquet",
             )
         )
     return expected
@@ -129,9 +141,13 @@ def _classify_mechanical_outcome(
         failed_stage = ""
     stage_statuses = [str(row.get("status", "")).strip().lower() for row in stage_manifests]
     failed_stage_count = sum(1 for status in stage_statuses if status == "failed")
-    warning_stage_count = sum(1 for status in stage_statuses if status == "warning") + len(feature_warnings)
+    warning_stage_count = sum(1 for status in stage_statuses if status == "warning") + len(
+        feature_warnings
+    )
     completed_stage_count = sum(1 for status in stage_statuses if status in {"success", "warning"})
-    planned_stage_count = len([stage for stage in manifest.get("planned_stages", []) or [] if str(stage).strip()])
+    planned_stage_count = len(
+        [stage for stage in manifest.get("planned_stages", []) or [] if str(stage).strip()]
+    )
 
     if failed_stage or run_status == "failed" or failed_stage_count > 0:
         outcome = "mechanical_failure"
@@ -173,8 +189,14 @@ def _classify_statistical_outcome(
     if not promotion_audit.empty:
         candidate_count = int(len(promotion_audit))
         if "promotion_decision" in promotion_audit.columns:
-            promoted_count = int((promotion_audit["promotion_decision"].astype(str) == "promoted").sum())
-        fail_col = "promotion_fail_gate_primary" if "promotion_fail_gate_primary" in promotion_audit.columns else "primary_fail_gate"
+            promoted_count = int(
+                (promotion_audit["promotion_decision"].astype(str) == "promoted").sum()
+            )
+        fail_col = (
+            "promotion_fail_gate_primary"
+            if "promotion_fail_gate_primary" in promotion_audit.columns
+            else "primary_fail_gate"
+        )
         if fail_col in promotion_audit.columns:
             primary_fail_gate = _dominant_value(promotion_audit[fail_col])
         if "event_type" in promotion_audit.columns:
@@ -198,7 +220,10 @@ def _classify_statistical_outcome(
     elif discovery_summary:
         candidate_count = _int_like(discovery_summary.get("total_candidates", 0))
 
-    if mechanical_outcome in {"mechanical_failure", "artifact_contract_failure"} and candidate_count == 0:
+    if (
+        mechanical_outcome in {"mechanical_failure", "artifact_contract_failure"}
+        and candidate_count == 0
+    ):
         outcome = "not_evaluable"
     elif promoted_count > 0:
         outcome = "deploy_promising"
@@ -312,12 +337,16 @@ def _build_market_findings(
         if "gate_bridge_tradable" in promotion_audit.columns:
             tradable_candidates = int((promotion_audit["gate_bridge_tradable"] == "pass").sum())
         if "net_expectancy_bps" in promotion_audit.columns:
-            positive_after_cost = int((pd.to_numeric(promotion_audit["net_expectancy_bps"], errors="coerce") > 0).sum())
+            positive_after_cost = int(
+                (pd.to_numeric(promotion_audit["net_expectancy_bps"], errors="coerce") > 0).sum()
+            )
     elif not edge_candidates.empty:
         if "gate_bridge_tradable" in edge_candidates.columns:
             tradable_candidates = int((edge_candidates["gate_bridge_tradable"] == "pass").sum())
         if "after_cost_expectancy" in edge_candidates.columns:
-            positive_after_cost = int((pd.to_numeric(edge_candidates["after_cost_expectancy"], errors="coerce") > 0).sum())
+            positive_after_cost = int(
+                (pd.to_numeric(edge_candidates["after_cost_expectancy"], errors="coerce") > 0).sum()
+            )
     payload = {
         "candidate_count": int(statistical["candidate_count"]),
         "promoted_count": int(statistical["promoted_count"]),
@@ -356,14 +385,20 @@ def _build_belief_update(
     primary_fail_gate: str,
     top_event: str,
 ) -> str:
-    if mechanical_outcome in {"mechanical_failure", "artifact_contract_failure", "data_quality_failure"}:
+    if mechanical_outcome in {
+        "mechanical_failure",
+        "artifact_contract_failure",
+        "data_quality_failure",
+    }:
         return "system reliability limits interpretation; prioritize repair before updating market beliefs"
     if statistical_outcome == "deploy_promising":
         return f"{top_event or 'top candidate'} has deployable evidence; preserve region and tighten deployment validation"
     if statistical_outcome == "research_promising":
         return f"{top_event or 'top candidate'} remains research-promising; iterate adjacent contexts before broadening"
     if statistical_outcome == "inconclusive_due_to_sample":
-        return "sample support is too thin; retain scope but extend history or broaden sample capture"
+        return (
+            "sample support is too thin; retain scope but extend history or broaden sample capture"
+        )
     if primary_fail_gate:
         return f"candidate quality is limited mainly by {primary_fail_gate}; use that gate as the next search discriminator"
     return "no durable market edge was established in this run"
@@ -374,7 +409,11 @@ def _recommend_next_action(
     mechanical_outcome: str,
     statistical_outcome: str,
 ) -> str:
-    if mechanical_outcome in {"mechanical_failure", "artifact_contract_failure", "data_quality_failure"}:
+    if mechanical_outcome in {
+        "mechanical_failure",
+        "artifact_contract_failure",
+        "data_quality_failure",
+    }:
         return "repair_pipeline"
     if statistical_outcome == "deploy_promising":
         return "exploit_promising_region"
@@ -397,7 +436,9 @@ def _recommend_next_experiment(
         "event_type": str(statistical["top_event"] or ""),
         "primary_fail_gate": str(statistical["primary_fail_gate"] or ""),
         "symbols": str(manifest.get("symbols", "")).strip(),
-        "promotion_profile": "deploy" if recommended_next_action == "exploit_promising_region" else "research",
+        "promotion_profile": "deploy"
+        if recommended_next_action == "exploit_promising_region"
+        else "research",
         "reason": recommended_next_action,
     }
     return canonical_json(payload)
@@ -434,12 +475,22 @@ def build_run_reflection(
     manifest = _load_run_manifest_local(run_id, data_root=resolved_data_root)
     stage_manifests = _load_stage_manifests(run_dir)
 
-    discovery_summary = _read_json(reports_root / "phase2" / run_id / "discovery_quality_summary.json")
-    promotion_audit = _read_optional_table(reports_root / "promotions" / run_id / "promotion_statistical_audit.parquet")
-    edge_candidates = _read_optional_table(reports_root / "edge_candidates" / run_id / "edge_candidates_normalized.parquet")
-    feature_manifests = [_read_json(path) for path in sorted(run_dir.glob("validate_feature_integrity_*.json"))]
+    discovery_summary = _read_json(
+        reports_root / "phase2" / run_id / "discovery_quality_summary.json"
+    )
+    promotion_audit = _read_optional_table(
+        reports_root / "promotions" / run_id / "promotion_statistical_audit.parquet"
+    )
+    edge_candidates = _read_optional_table(
+        reports_root / "edge_candidates" / run_id / "edge_candidates_normalized.parquet"
+    )
+    feature_manifests = [
+        _read_json(path) for path in sorted(run_dir.glob("validate_feature_integrity_*.json"))
+    ]
     feature_warnings = [
-        payload for payload in feature_manifests if str(payload.get("status", "")).strip().lower() == "warning"
+        payload
+        for payload in feature_manifests
+        if str(payload.get("status", "")).strip().lower() == "warning"
     ]
 
     missing_artifacts = [

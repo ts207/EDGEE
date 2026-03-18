@@ -8,6 +8,7 @@ import pandas as pd
 
 _LOG = logging.getLogger(__name__)
 
+
 def calculate_feature_drift(
     research_feature_samples: pd.Series,
     live_feature_samples: pd.Series,
@@ -18,20 +19,21 @@ def calculate_feature_drift(
     """
     if research_feature_samples.empty or live_feature_samples.empty:
         return {}
-        
+
     # Simplified drift check: Z-score of mean
     res_mean = research_feature_samples.mean()
     res_std = research_feature_samples.std()
     live_mean = live_feature_samples.mean()
-    
+
     drift_score = abs(live_mean - res_mean) / max(1e-6, res_std)
-    
+
     return {
         "drift_score": float(drift_score),
-        "is_drifting": bool(drift_score > threshold * 3.0), # Example threshold scaling
+        "is_drifting": bool(drift_score > threshold * 3.0),  # Example threshold scaling
         "research_mean": float(res_mean),
         "live_mean": float(live_mean),
     }
+
 
 def monitor_execution_drift(
     research_slippage_bps: float,
@@ -44,7 +46,7 @@ def monitor_execution_drift(
     """
     slippage_drift = live_slippage_bps / max(1.0, research_slippage_bps)
     fill_rate_drift = live_fill_rate / max(1e-6, research_fill_rate)
-    
+
     return {
         "slippage_drift_ratio": float(slippage_drift),
         "fill_rate_drift_ratio": float(fill_rate_drift),

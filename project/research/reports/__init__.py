@@ -6,4 +6,3 @@ from project.research.reports.strategy_report import (
 )
 
 __all__ = ["generate_strategy_summary", "write_promotion_rationale"]
-

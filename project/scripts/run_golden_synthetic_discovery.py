@@ -57,12 +57,23 @@ def _render_required_outputs(raw_outputs: object, *, run_id: str) -> list[str]:
 
 
 def _candidate_summary(search_candidates_path: Path) -> Dict[str, Any]:
-    if not search_candidates_path.exists() and not search_candidates_path.with_suffix(".csv").exists():
+    if (
+        not search_candidates_path.exists()
+        and not search_candidates_path.with_suffix(".csv").exists()
+    ):
         return {"candidate_rows": 0, "candidate_event_types": []}
-    frame = read_parquet(search_candidates_path if search_candidates_path.exists() else search_candidates_path.with_suffix(".csv"))
+    frame = read_parquet(
+        search_candidates_path
+        if search_candidates_path.exists()
+        else search_candidates_path.with_suffix(".csv")
+    )
     return {
         "candidate_rows": int(len(frame)),
-        "candidate_event_types": sorted(frame.get("event_type", pd.Series(dtype=str)).astype(str).unique().tolist()) if not frame.empty and "event_type" in frame.columns else [],
+        "candidate_event_types": sorted(
+            frame.get("event_type", pd.Series(dtype=str)).astype(str).unique().tolist()
+        )
+        if not frame.empty and "event_type" in frame.columns
+        else [],
     }
 
 
@@ -94,9 +105,10 @@ def run_golden_synthetic_discovery(
     contexts = _normalized_list(config.get("contexts"))
     entry_lags = _normalized_list(config.get("entry_lags"))
     search_budget = config.get("search_budget")
-    interpretation_scope = str(
-        config.get("interpretation_scope", "full_discovery_validation")
-    ).strip() or "full_discovery_validation"
+    interpretation_scope = (
+        str(config.get("interpretation_scope", "full_discovery_validation")).strip()
+        or "full_discovery_validation"
+    )
 
     synthetic_manifest = generate_synthetic_crypto_run(
         run_id=run_id,
@@ -112,35 +124,66 @@ def run_golden_synthetic_discovery(
         shutil.rmtree(preseeded_clean_root)
 
     pipeline_args = [
-        "--run_id", run_id,
-        "--symbols", symbols,
-        "--start", start_date,
-        "--end", end_date,
-        "--timeframes", ",".join(timeframes),
-        "--skip_ingest_ohlcv", "1",
-        "--skip_ingest_funding", "1",
-        "--skip_ingest_spot_ohlcv", "1",
-        "--run_phase2_conditional", "1",
-        "--phase2_event_type", "all" if not events else events[0],
-        "--run_bridge_eval_phase2", "0",
-        "--run_candidate_promotion", "0",
-        "--run_recommendations_checklist", "0",
-        "--run_strategy_builder", "0",
-        "--run_strategy_blueprint_compiler", "0",
-        "--run_profitable_selector", "0",
-        "--run_interaction_lift", "0",
-        "--run_promotion_audit", "0",
-        "--run_edge_registry_update", "0",
-        "--run_edge_candidate_universe", "0",
-        "--run_discovery_quality_summary", "0",
-        "--run_naive_entry_eval", "0",
-        "--runtime_invariants_mode", "off",
-        "--funding_scale", "decimal",
-        "--discovery_profile", discovery_profile,
-        "--phase2_gate_profile", phase2_gate_profile,
-        "--search_spec", search_spec,
-        "--search_min_n", str(search_min_n),
-        "--config", "project/configs/pipeline.yaml",
+        "--run_id",
+        run_id,
+        "--symbols",
+        symbols,
+        "--start",
+        start_date,
+        "--end",
+        end_date,
+        "--timeframes",
+        ",".join(timeframes),
+        "--skip_ingest_ohlcv",
+        "1",
+        "--skip_ingest_funding",
+        "1",
+        "--skip_ingest_spot_ohlcv",
+        "1",
+        "--run_phase2_conditional",
+        "1",
+        "--phase2_event_type",
+        "all" if not events else events[0],
+        "--run_bridge_eval_phase2",
+        "0",
+        "--run_candidate_promotion",
+        "0",
+        "--run_recommendations_checklist",
+        "0",
+        "--run_strategy_builder",
+        "0",
+        "--run_strategy_blueprint_compiler",
+        "0",
+        "--run_profitable_selector",
+        "0",
+        "--run_interaction_lift",
+        "0",
+        "--run_promotion_audit",
+        "0",
+        "--run_edge_registry_update",
+        "0",
+        "--run_edge_candidate_universe",
+        "0",
+        "--run_discovery_quality_summary",
+        "0",
+        "--run_naive_entry_eval",
+        "0",
+        "--runtime_invariants_mode",
+        "off",
+        "--funding_scale",
+        "decimal",
+        "--discovery_profile",
+        discovery_profile,
+        "--phase2_gate_profile",
+        phase2_gate_profile,
+        "--search_spec",
+        search_spec,
+        "--search_min_n",
+        str(search_min_n),
+        "--feature_schema_version",
+        "v2",
+        "--config",
+        "project/configs/pipeline.yaml",
     ]
     if events:
         pipeline_args.extend(["--events", *events])
@@ -171,9 +214,17 @@ def run_golden_synthetic_discovery(
         truth_map_path=truth_map_path,
         event_types=events or None,
     )
-    search_diag_path = root / "reports" / "phase2" / run_id / "search_engine" / "phase2_diagnostics.json"
-    search_diag = json.loads(search_diag_path.read_text(encoding="utf-8")) if search_diag_path.exists() else {}
-    candidate_summary = _candidate_summary(root / "reports" / "phase2" / run_id / "search_engine" / "phase2_candidates.parquet")
+    search_diag_path = (
+        root / "reports" / "phase2" / run_id / "search_engine" / "phase2_diagnostics.json"
+    )
+    search_diag = (
+        json.loads(search_diag_path.read_text(encoding="utf-8"))
+        if search_diag_path.exists()
+        else {}
+    )
+    candidate_summary = _candidate_summary(
+        root / "reports" / "phase2" / run_id / "search_engine" / "phase2_candidates.parquet"
+    )
 
     payload = {
         "workflow_id": str(config.get("workflow_id", "golden_synthetic_discovery_v1")),
@@ -199,7 +250,9 @@ def run_golden_synthetic_discovery(
         "truth_validation": truth_validation,
         "search_engine_diagnostics": search_diag,
         "candidate_summary": candidate_summary,
-        "required_outputs": _render_required_outputs(config.get("required_outputs", []), run_id=run_id),
+        "required_outputs": _render_required_outputs(
+            config.get("required_outputs", []), run_id=run_id
+        ),
     }
     out_path = root / "reliability" / "golden_synthetic_discovery_summary.json"
     out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -226,7 +279,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--entry_lags", nargs="+", type=int, default=None)
     args = parser.parse_args(argv)
 
-    root = Path(args.root) if args.root else (PROJECT_ROOT.parent / "artifacts" / "golden_synthetic_discovery")
+    root = (
+        Path(args.root)
+        if args.root
+        else (PROJECT_ROOT.parent / "artifacts" / "golden_synthetic_discovery")
+    )
     overrides = {
         "run_id": args.run_id,
         "symbols": args.symbols,

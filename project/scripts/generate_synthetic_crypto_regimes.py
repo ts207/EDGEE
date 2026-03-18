@@ -26,18 +26,17 @@ FIVE_MINUTES = pd.Timedelta(minutes=5)
 FUNDING_INTERVAL = pd.Timedelta(hours=8)
 
 
-
 def _resolve_profile_settings(volatility_profile: str) -> Dict[str, Any]:
     try:
         return PROFILE_SETTINGS[str(volatility_profile)]
     except KeyError as exc:
         choices = ", ".join(sorted(PROFILE_SETTINGS))
-        raise ValueError(f"unknown volatility_profile={volatility_profile!r}; expected one of: {choices}") from exc
+        raise ValueError(
+            f"unknown volatility_profile={volatility_profile!r}; expected one of: {choices}"
+        ) from exc
 
 
 @dataclass
-
-
 @dataclass(frozen=True)
 class RegimeSegment:
     regime_type: str
@@ -107,19 +106,19 @@ def _build_index(start_ts: pd.Timestamp, end_exclusive: pd.Timestamp) -> pd.Date
     return pd.date_range(start=start_ts, end=end_exclusive - FIVE_MINUTES, freq="5min", tz="UTC")
 
 
-
-
-def build_regime_schedule(symbol: str, index: pd.DatetimeIndex, volatility_profile: str = "default") -> List[RegimeSegment]:
+def build_regime_schedule(
+    symbol: str, index: pd.DatetimeIndex, volatility_profile: str = "default"
+) -> List[RegimeSegment]:
     start_ts = index[0]
     last_ts = index[-1]
     total_days = (last_ts - start_ts).days
     end_exclusive = last_ts + FIVE_MINUTES
     schedule: List[RegimeSegment] = []
-    
+
     settings = _resolve_profile_settings(volatility_profile)
     cycle_days = int(settings.get("schedule_cycle_days", 60))
     num_cycles = (total_days // cycle_days) + 1
-    
+
     # Base segments from offsets
     for cycle in range(num_cycles):
         cycle_offset_days = cycle * cycle_days
@@ -128,7 +127,7 @@ def build_regime_schedule(symbol: str, index: pd.DatetimeIndex, volatility_profi
                 actual_day_offset = cycle_offset_days + day_offset
                 seg_start = start_ts + pd.Timedelta(days=actual_day_offset)
                 seg_end = seg_start + pd.Timedelta(hours=duration_hours)
-                
+
                 if seg_start > last_ts:
                     continue
                 seg_end = min(seg_end, end_exclusive)
@@ -142,7 +141,7 @@ def build_regime_schedule(symbol: str, index: pd.DatetimeIndex, volatility_profi
                         amplitude=amplitude * float(settings.get("regime_amplitude_mult", 1.0)),
                     )
                 )
-            
+
     # Add post-deleveraging rebounds
     rebound_hours = 4
     bursts = [s for s in schedule if s.regime_type == "deleveraging_burst"]
@@ -150,18 +149,18 @@ def build_regime_schedule(symbol: str, index: pd.DatetimeIndex, volatility_profi
         relief_start = burst.start_ts + (burst.end_ts - burst.start_ts) * 0.70
         start_ts_reb = relief_start
         end_ts_reb = min(start_ts_reb + pd.Timedelta(hours=rebound_hours), end_exclusive)
-        
+
         schedule.append(
             RegimeSegment(
                 regime_type="post_deleveraging_rebound",
                 symbol=symbol,
                 start_ts=start_ts_reb,
                 end_ts=end_ts_reb,
-                sign=-burst.sign, # Rebound is opposite direction of burst
+                sign=-burst.sign,  # Rebound is opposite direction of burst
                 amplitude=burst.amplitude,
             )
         )
-        
+
     return sorted(schedule, key=lambda seg: (seg.start_ts, seg.regime_type))
 
 
@@ -169,8 +168,12 @@ def _segment_mask(index: pd.DatetimeIndex, segment: RegimeSegment) -> np.ndarray
     return np.asarray((index >= segment.start_ts) & (index < segment.end_ts), dtype=bool)
 
 
-def _funding_mask(index: pd.DatetimeIndex, segment: RegimeSegment, funding_index: pd.DatetimeIndex) -> np.ndarray:
-    return np.asarray((funding_index >= segment.start_ts) & (funding_index < segment.end_ts), dtype=bool)
+def _funding_mask(
+    index: pd.DatetimeIndex, segment: RegimeSegment, funding_index: pd.DatetimeIndex
+) -> np.ndarray:
+    return np.asarray(
+        (funding_index >= segment.start_ts) & (funding_index < segment.end_ts), dtype=bool
+    )
 
 
 def generate_symbol_frames(
@@ -183,7 +186,9 @@ def generate_symbol_frames(
     volatility_profile: str = "default",
 ) -> Dict[str, Any]:
     index = _build_index(start_ts, end_exclusive)
-    funding_index = pd.date_range(start=start_ts, end=end_exclusive - FUNDING_INTERVAL, freq="8h", tz="UTC")
+    funding_index = pd.date_range(
+        start=start_ts, end=end_exclusive - FUNDING_INTERVAL, freq="8h", tz="UTC"
+    )
     rng = np.random.default_rng(seed)
     n = len(index)
 
@@ -212,16 +217,21 @@ def generate_symbol_frames(
     base_drift = 0.00015 * float(settings.get("drift_mult", 1.0))
     returns = rng.normal(0.0, 0.00075 * eff_noise, n)
     returns += base_drift * np.sin(np.linspace(0.0, 10.0 * np.pi, n))
-    basis_bps = rng.normal(0.0, 5.0 * eff_noise, n) + (6.0 * float(settings.get("basis_wave_mult", 1.0))) * np.sin(np.linspace(0.0, 4.0 * np.pi, n))
-    spread_bps = np.full(n, (2.8 if symbol.upper() == "BTCUSDT" else 3.6) * float(settings.get("spread_mult", 1.0)), dtype=float)
+    basis_bps = rng.normal(0.0, 5.0 * eff_noise, n) + (
+        6.0 * float(settings.get("basis_wave_mult", 1.0))
+    ) * np.sin(np.linspace(0.0, 4.0 * np.pi, n))
+    spread_bps = np.full(
+        n,
+        (2.8 if symbol.upper() == "BTCUSDT" else 3.6) * float(settings.get("spread_mult", 1.0)),
+        dtype=float,
+    )
     if symbol.upper() == "SOLUSDT":
         spread_bps = np.full(n, 5.5 * float(settings.get("spread_mult", 1.0)), dtype=float)
-    spread_bps += (
-        0.45 * np.abs(np.sin(np.linspace(0.0, 8.0 * np.pi, n)))
-        + np.abs(rng.normal(0.0, 0.12 * eff_noise, n))
+    spread_bps += 0.45 * np.abs(np.sin(np.linspace(0.0, 8.0 * np.pi, n))) + np.abs(
+        rng.normal(0.0, 0.12 * eff_noise, n)
     )
     spread_bps = np.clip(spread_bps, 0.6, None)
-    
+
     volume_mult = np.ones(n, dtype=float) * float(settings.get("volume_mult", 1.0))
     wick_mult = np.ones(n, dtype=float)
     depth_mult = np.ones(n, dtype=float)
@@ -240,7 +250,9 @@ def generate_symbol_frames(
         window_len = int(mask.sum())
         phase = np.linspace(0.0, 1.0, window_len)
         if segment.regime_type == "basis_desync":
-            basis_bps[mask] += segment.sign * segment.amplitude * (0.6 + 0.4 * np.sin(np.pi * phase))
+            basis_bps[mask] += (
+                segment.sign * segment.amplitude * (0.6 + 0.4 * np.sin(np.pi * phase))
+            )
             spread_bps[mask] += 1.5
         elif segment.regime_type == "funding_dislocation":
             fmask = _funding_mask(index, segment, funding_index)
@@ -256,12 +268,17 @@ def generate_symbol_frames(
             returns[mask] += local
             volume_mult[mask] *= 1.25
             wick_mult[mask] *= 1.15
-            orderflow_bias[mask] += segment.sign * np.concatenate(
-                [
-                    np.full(accel, 0.08 * segment.amplitude),
-                    np.linspace(0.06 * segment.amplitude, -0.10 * segment.amplitude, window_len - accel),
-                ]
-            )[:window_len]
+            orderflow_bias[mask] += (
+                segment.sign
+                * np.concatenate(
+                    [
+                        np.full(accel, 0.08 * segment.amplitude),
+                        np.linspace(
+                            0.06 * segment.amplitude, -0.10 * segment.amplitude, window_len - accel
+                        ),
+                    ]
+                )[:window_len]
+            )
         elif segment.regime_type == "breakout_failure":
             compression_len = int(max(24, np.floor(window_len * 0.60)))
             breakout_len = int(max(2, np.ceil(window_len * 0.15)))
@@ -311,10 +328,18 @@ def generate_symbol_frames(
             local = np.concatenate([shock_returns, stress_returns, absorption_returns])[:window_len]
             returns[mask] += local
 
-            shock_spread = 24.0 + 20.0 * np.abs(np.sin(np.linspace(0.0, 2.5 * np.pi, shock_len, endpoint=False)))
-            stress_spread = 20.0 + 10.0 * np.abs(np.sin(np.linspace(0.0, 2.0 * np.pi, stress_len, endpoint=False)))
-            absorption_spread = 16.0 + 5.0 * np.abs(np.sin(np.linspace(0.0, 1.5 * np.pi, absorption_len, endpoint=False)))
-            spread_profile = np.concatenate([shock_spread, stress_spread, absorption_spread])[:window_len]
+            shock_spread = 24.0 + 20.0 * np.abs(
+                np.sin(np.linspace(0.0, 2.5 * np.pi, shock_len, endpoint=False))
+            )
+            stress_spread = 20.0 + 10.0 * np.abs(
+                np.sin(np.linspace(0.0, 2.0 * np.pi, stress_len, endpoint=False))
+            )
+            absorption_spread = 16.0 + 5.0 * np.abs(
+                np.sin(np.linspace(0.0, 1.5 * np.pi, absorption_len, endpoint=False))
+            )
+            spread_profile = np.concatenate([shock_spread, stress_spread, absorption_spread])[
+                :window_len
+            ]
             spread_bps[mask] += spread_profile * segment.amplitude
 
             shock_wick = np.full(shock_len, 3.3)
@@ -326,23 +351,32 @@ def generate_symbol_frames(
             shock_volume = np.full(shock_len, 0.10)
             stress_volume = np.linspace(0.12, 0.18, stress_len, endpoint=False)
             absorption_volume = np.linspace(0.16, 0.22, absorption_len)
-            volume_profile = np.concatenate([shock_volume, stress_volume, absorption_volume])[:window_len]
+            volume_profile = np.concatenate([shock_volume, stress_volume, absorption_volume])[
+                :window_len
+            ]
             volume_mult[mask] *= volume_profile
 
             shock_depth = np.full(shock_len, 0.025)
             stress_depth = np.linspace(0.04, 0.07, stress_len, endpoint=False)
             absorption_depth = np.linspace(0.18, 0.30, absorption_len)
-            depth_profile = np.concatenate([shock_depth, stress_depth, absorption_depth])[:window_len]
+            depth_profile = np.concatenate([shock_depth, stress_depth, absorption_depth])[
+                :window_len
+            ]
             depth_mult[mask] *= depth_profile
 
-            basis_bps[mask] += segment.sign * np.concatenate(
-                [
-                    np.full(shock_len, 14.0 * segment.amplitude),
-                    np.full(stress_len, 10.0 * segment.amplitude),
-                    np.full(absorption_len, 6.0 * segment.amplitude),
-                ]
-            )[:window_len]
-            absorption_bias = 0.015 * np.sin(np.linspace(0.0, 3.0 * np.pi, absorption_len, endpoint=False))
+            basis_bps[mask] += (
+                segment.sign
+                * np.concatenate(
+                    [
+                        np.full(shock_len, 14.0 * segment.amplitude),
+                        np.full(stress_len, 10.0 * segment.amplitude),
+                        np.full(absorption_len, 6.0 * segment.amplitude),
+                    ]
+                )[:window_len]
+            )
+            absorption_bias = 0.015 * np.sin(
+                np.linspace(0.0, 3.0 * np.pi, absorption_len, endpoint=False)
+            )
             orderflow_bias[mask] += np.concatenate(
                 [
                     np.full(shock_len, segment.sign * 0.32 * segment.amplitude),
@@ -361,7 +395,11 @@ def generate_symbol_frames(
             oi_profile = np.concatenate(
                 [
                     np.linspace(0.0, base_oi * 0.08 * segment.amplitude, shock_len, endpoint=False),
-                    np.linspace(base_oi * 0.08 * segment.amplitude, base_oi * 0.05 * segment.amplitude, relief_len),
+                    np.linspace(
+                        base_oi * 0.08 * segment.amplitude,
+                        base_oi * 0.05 * segment.amplitude,
+                        relief_len,
+                    ),
                 ]
             )
             liq_profile = np.concatenate(
@@ -418,8 +456,12 @@ def generate_symbol_frames(
     intrabar_noise = np.abs(rng.normal(0.0012 * eff_noise, 0.00045 * eff_noise, n)) * wick_mult
     high = np.maximum(open_, close) * (1.0 + intrabar_noise)
     low = np.minimum(open_, close) * (1.0 - intrabar_noise * 0.96)
-    volume = np.clip(base_volume * volume_mult * (1.0 + rng.normal(0.0, 0.22 * eff_noise, n)), 1.0, None)
-    trade_count = np.clip(base_trade_count * volume_mult * (1.0 + rng.normal(0.0, 0.18 * eff_noise, n)), 10.0, None).astype(int)
+    volume = np.clip(
+        base_volume * volume_mult * (1.0 + rng.normal(0.0, 0.22 * eff_noise, n)), 1.0, None
+    )
+    trade_count = np.clip(
+        base_trade_count * volume_mult * (1.0 + rng.normal(0.0, 0.18 * eff_noise, n)), 10.0, None
+    ).astype(int)
     quote_volume = volume * close
     taker_ratio = np.clip(
         0.52
@@ -446,10 +488,10 @@ def generate_symbol_frames(
     )
     bid_depth_usd = depth_usd * bid_depth_share
     ask_depth_usd = depth_usd - bid_depth_usd
-    
+
     depth_ser = pd.Series(depth_usd)
     spread_ser = pd.Series(spread_bps)
-    
+
     perp = pd.DataFrame(
         {
             "timestamp": index,
@@ -467,8 +509,10 @@ def generate_symbol_frames(
             "bid_depth_usd": bid_depth_usd,
             "ask_depth_usd": ask_depth_usd,
             "imbalance": imbalance,
-            "micro_depth_depletion": 1.0 - (depth_ser / (depth_ser.rolling(24).mean().shift(1).fillna(depth_ser))),
-            "micro_spread_stress": spread_ser / (spread_ser.rolling(288).median().shift(1).fillna(spread_ser)),
+            "micro_depth_depletion": 1.0
+            - (depth_ser / (depth_ser.rolling(24).mean().shift(1).fillna(depth_ser))),
+            "micro_spread_stress": spread_ser
+            / (spread_ser.rolling(288).median().shift(1).fillna(spread_ser)),
             "is_synthetic": True,
             "symbol": symbol,
         }
@@ -536,7 +580,9 @@ def generate_symbol_frames(
     }
 
 
-def _write_monthly_partitions(df: pd.DataFrame, output_dir: Path, filename_prefix: str) -> List[str]:
+def _write_monthly_partitions(
+    df: pd.DataFrame, output_dir: Path, filename_prefix: str
+) -> List[str]:
     written: List[str] = []
     if df.empty:
         return written
@@ -545,7 +591,9 @@ def _write_monthly_partitions(df: pd.DataFrame, output_dir: Path, filename_prefi
     for (year, month), chunk in keyed.groupby(["_year", "_month"], dropna=True):
         target_dir = output_dir / f"year={int(year):04d}" / f"month={int(month):02d}"
         filename = f"{filename_prefix}_{int(year):04d}-{int(month):02d}.parquet"
-        actual_path, _ = write_parquet(chunk.drop(columns=["_year", "_month"]), target_dir / filename)
+        actual_path, _ = write_parquet(
+            chunk.drop(columns=["_year", "_month"]), target_dir / filename
+        )
         written.append(str(actual_path))
     return written
 
@@ -587,16 +635,30 @@ def generate_synthetic_crypto_run(
         )
         perp_dir = run_scoped_lake_path(root, run_id, "cleaned", "perp", symbol, "bars_5m")
         spot_dir = run_scoped_lake_path(root, run_id, "cleaned", "spot", symbol, "bars_5m")
-        raw_perp_dir = run_scoped_lake_path(root, run_id, "raw", "binance", "perp", symbol, "ohlcv_5m")
-        raw_spot_dir = run_scoped_lake_path(root, run_id, "raw", "binance", "spot", symbol, "ohlcv_5m")
-        funding_dir = run_scoped_lake_path(root, run_id, "raw", "binance", "perp", symbol, "funding")
-        oi_dir = run_scoped_lake_path(root, run_id, "raw", "binance", "perp", symbol, "open_interest", "5m")
-        liq_dir = run_scoped_lake_path(root, run_id, "raw", "binance", "perp", symbol, "liquidations")
+        raw_perp_dir = run_scoped_lake_path(
+            root, run_id, "raw", "binance", "perp", symbol, "ohlcv_5m"
+        )
+        raw_spot_dir = run_scoped_lake_path(
+            root, run_id, "raw", "binance", "spot", symbol, "ohlcv_5m"
+        )
+        funding_dir = run_scoped_lake_path(
+            root, run_id, "raw", "binance", "perp", symbol, "funding"
+        )
+        oi_dir = run_scoped_lake_path(
+            root, run_id, "raw", "binance", "perp", symbol, "open_interest", "5m"
+        )
+        liq_dir = run_scoped_lake_path(
+            root, run_id, "raw", "binance", "perp", symbol, "liquidations"
+        )
 
         perp_files = _write_monthly_partitions(payload["perp"], perp_dir, f"bars_{symbol}_5m")
         spot_files = _write_monthly_partitions(payload["spot"], spot_dir, f"bars_{symbol}_spot_5m")
-        raw_perp_files = _write_monthly_partitions(payload["raw_perp"], raw_perp_dir, f"ohlcv_{symbol}_5m")
-        raw_spot_files = _write_monthly_partitions(payload["raw_spot"], raw_spot_dir, f"ohlcv_{symbol}_spot_5m")
+        raw_perp_files = _write_monthly_partitions(
+            payload["raw_perp"], raw_perp_dir, f"ohlcv_{symbol}_5m"
+        )
+        raw_spot_files = _write_monthly_partitions(
+            payload["raw_spot"], raw_spot_dir, f"ohlcv_{symbol}_spot_5m"
+        )
         funding_path, _ = write_parquet(payload["funding"], funding_dir / "funding.parquet")
         oi_path, _ = write_parquet(payload["open_interest"], oi_dir / "open_interest.parquet")
         liq_path, _ = write_parquet(payload["liquidations"], liq_dir / "liquidations.parquet")
@@ -624,12 +686,13 @@ def generate_synthetic_crypto_run(
     ensure_dir(synth_dir)
     regimes_path = synth_dir / "synthetic_regime_segments.json"
     manifest_path = synth_dir / "synthetic_generation_manifest.json"
-    regimes_path.write_text(json.dumps({"run_id": run_id, "segments": regime_records}, indent=2), encoding="utf-8")
+    regimes_path.write_text(
+        json.dumps({"run_id": run_id, "segments": regime_records}, indent=2), encoding="utf-8"
+    )
     manifest["regime_segments_path"] = str(regimes_path)
     manifest["truth_map_path"] = str(regimes_path)
     manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
     return manifest
-
 
 
 def generate_synthetic_dataset_suite(
@@ -670,7 +733,9 @@ def generate_synthetic_dataset_suite(
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Generate deterministic event-aware synthetic BTC/ETH lake data.")
+    parser = argparse.ArgumentParser(
+        description="Generate deterministic event-aware synthetic BTC/ETH lake data."
+    )
     parser.add_argument("--run_id", required=True)
     parser.add_argument("--start_date", default="2026-01-01")
     parser.add_argument("--end_date", default="2026-02-28")
@@ -678,7 +743,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--noise_scale", type=float, default=1.0)
     parser.add_argument("--volatility_profile", default="default", choices=sorted(PROFILE_SETTINGS))
     parser.add_argument("--data_root", default=None)
-    parser.add_argument("--suite_config", default=None, help="Optional YAML file describing multiple synthetic datasets to generate.")
+    parser.add_argument(
+        "--suite_config",
+        default=None,
+        help="Optional YAML file describing multiple synthetic datasets to generate.",
+    )
     args = parser.parse_args(argv)
 
     data_root = Path(args.data_root) if args.data_root else get_data_root()

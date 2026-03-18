@@ -12,6 +12,7 @@ from project.research.services.promotion_readiness_service import (
     render_promotion_readiness_markdown,
 )
 
+
 def _load_json(path: Path) -> Dict[str, Any]:
     if not path.exists():
         return {}
@@ -19,6 +20,7 @@ def _load_json(path: Path) -> Dict[str, Any]:
         return json.loads(path.read_text(encoding="utf-8"))
     except Exception:
         return {}
+
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Show combined promotion readiness report.")
@@ -34,7 +36,7 @@ def main() -> int:
     DEFAULT_DIR = data_root / "reports" / "benchmarks" / "latest"
     review_path = Path(args.review) if args.review else DEFAULT_DIR / "benchmark_review.json"
     cert_path = Path(args.cert) if args.cert else DEFAULT_DIR / "benchmark_certification.json"
-    
+
     if not review_path.exists():
         print(f"Error: Review file not found: {review_path}")
         return 1
@@ -44,14 +46,15 @@ def main() -> int:
 
     review = _load_json(review_path)
     cert = _load_json(cert_path)
-    
+
     conf_plan = _load_json(Path(args.conf_plan)) if args.conf_plan else None
-    
+
     promotion_audit = None
     if args.audit:
         audit_path = Path(args.audit)
         if audit_path.exists():
             import pandas as pd
+
             if audit_path.suffix == ".parquet":
                 promotion_audit = pd.read_parquet(audit_path).to_dict(orient="records")
             else:
@@ -69,12 +72,18 @@ def main() -> int:
     if args.out_dir:
         out_dir = Path(args.out_dir)
         out_dir.mkdir(parents=True, exist_ok=True)
-        (out_dir / "promotion_readiness.json").write_text(json.dumps(report, indent=2, sort_keys=True), encoding="utf-8")
-        (out_dir / "promotion_readiness.md").write_text(render_promotion_readiness_markdown(report), encoding="utf-8")
+        (out_dir / "promotion_readiness.json").write_text(
+            json.dumps(report, indent=2, sort_keys=True), encoding="utf-8"
+        )
+        (out_dir / "promotion_readiness.md").write_text(
+            render_promotion_readiness_markdown(report), encoding="utf-8"
+        )
         print(f"Wrote reports to: {out_dir}")
 
     return 0
 
+
 if __name__ == "__main__":
     import sys
+
     sys.exit(main())

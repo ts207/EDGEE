@@ -4,6 +4,7 @@ from typing import List
 
 import pandas as pd
 
+
 def greedy_diversified_subset(
     pnl_matrix: pd.DataFrame,
     max_corr: float = 0.70,
@@ -37,8 +38,7 @@ def greedy_diversified_subset(
             selected.append(candidate)
             continue
         max_with_selected = max(
-            float(corr.loc[candidate, s]) for s in selected
-            if candidate != s and s in corr.columns
+            float(corr.loc[candidate, s]) for s in selected if candidate != s and s in corr.columns
         )
         if max_with_selected < float(max_corr):
             selected.append(candidate)

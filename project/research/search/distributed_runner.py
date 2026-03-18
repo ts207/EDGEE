@@ -4,6 +4,7 @@ Distributed hypothesis search runner.
 Partitions a list of HypothesisSpec instances into chunks and evaluates each
 chunk via multiprocessing.Pool. Optimized to avoid redundant to_dict calls.
 """
+
 from __future__ import annotations
 
 import logging
@@ -57,8 +58,7 @@ def run_distributed_search(
         effective_workers = 1
 
     chunks: list[list[HypothesisSpec]] = [
-        hypotheses[i : i + int(chunk_size)]
-        for i in range(0, len(hypotheses), int(chunk_size))
+        hypotheses[i : i + int(chunk_size)] for i in range(0, len(hypotheses), int(chunk_size))
     ]
     if not chunks:
         return pd.DataFrame(columns=METRICS_COLUMNS)
@@ -76,36 +76,36 @@ def run_distributed_search(
     else:
         try:
             # Note: Passing DataFrame directly works efficiently on Unix via fork (copy-on-write).
-            # On Windows/MacOS (spawn), this will pickle the DataFrame which is still 
+            # On Windows/MacOS (spawn), this will pickle the DataFrame which is still
             # more efficient than to_dict("records").
             with multiprocessing.Pool(effective_workers) as pool:
-                # OOM Fix (SL-001): Only pass the subset of columns that these specific hypotheses need 
+                # OOM Fix (SL-001): Only pass the subset of columns that these specific hypotheses need
                 # rather than the full feature dataframe. This prevents massive memory duplication.
                 args_list = []
                 for chunk in chunks:
                     # Determine required columns for this chunk
                     req_cols = set(["symbol", "time_open", "time_close"])
                     for h in chunk:
-                        if hasattr(h, 'features'):
+                        if hasattr(h, "features"):
                             req_cols.update(h.features)
-                        if hasattr(h, 'feature_weights'):
+                        if hasattr(h, "feature_weights"):
                             req_cols.update(h.feature_weights.keys())
-                    
+
                     # Filter to available columns to avoid KeyError
                     valid_cols = [c for c in req_cols if c in features.columns]
                     chunk_features = features[valid_cols] if valid_cols else features
-                    
+
                     args_list.append((chunk, chunk_features, min_sample_size, use_context_quality))
-                
+
                 parts = pool.map(_evaluate_chunk, args_list)
         except Exception as exc:
             log.warning(
                 "Multiprocessing in run_distributed_search (workers=%d, chunks=%d) failed: %s. "
                 "Falling back to sequential execution.",
-                effective_workers, 
+                effective_workers,
                 len(chunks),
                 exc,
-                exc_info=True
+                exc_info=True,
             )
             parts = [
                 evaluate_hypothesis_batch(

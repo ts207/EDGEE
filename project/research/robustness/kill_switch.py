@@ -8,6 +8,7 @@ where the hypothesis should be avoided entirely.
 
 Uses a brute-force sweep over candidate features and threshold levels.
 """
+
 from __future__ import annotations
 
 import logging
@@ -21,6 +22,7 @@ from project.domain.hypotheses import HypothesisSpec
 from project.research.search.evaluator_utils import trigger_mask, forward_log_returns
 
 log = logging.getLogger(__name__)
+
 
 # Features to check for kill-switch conditions.
 # We check both > and < operators for each.
@@ -67,7 +69,6 @@ def detect_kill_switches(
     if candidates is None:
         candidates = KILL_SWITCH_CANDIDATE_FEATURES
 
-
     if features.empty or "close" not in features.columns:
         return pd.DataFrame()
 
@@ -79,7 +80,6 @@ def detect_kill_switches(
         mask = mask_raw.astype("boolean").shift(spec.entry_lag, fill_value=False).astype(bool)
     else:
         mask = mask_raw
-
 
     if spec.feature_condition is not None:
         fc_spec = HypothesisSpec(
@@ -126,18 +126,22 @@ def detect_kill_switches(
 
                 if accuracy >= min_accuracy:
                     lift = accuracy / base_failure_rate if base_failure_rate > 0 else 0.0
-                    results.append({
-                        "feature": feat,
-                        "operator": op_name,
-                        "threshold": round(float(thr), 6),
-                        "n": n,
-                        "accuracy": round(accuracy, 4),
-                        "lift": round(lift, 4),
-                        "coverage": round(n / base_n, 4),
-                    })
+                    results.append(
+                        {
+                            "feature": feat,
+                            "operator": op_name,
+                            "threshold": round(float(thr), 6),
+                            "n": n,
+                            "accuracy": round(accuracy, 4),
+                            "lift": round(lift, 4),
+                            "coverage": round(n / base_n, 4),
+                        }
+                    )
 
     if not results:
-        return pd.DataFrame(columns=["feature", "operator", "threshold", "n", "accuracy", "lift", "coverage"])
+        return pd.DataFrame(
+            columns=["feature", "operator", "threshold", "n", "accuracy", "lift", "coverage"]
+        )
 
     res_df = pd.DataFrame(results).sort_values("lift", ascending=False)
     # Deduplicate: if multiple thresholds for same feature/op are similar, keep best

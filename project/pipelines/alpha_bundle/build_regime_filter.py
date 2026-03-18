@@ -30,12 +30,16 @@ from project.io.utils import ensure_dir, read_parquet, write_parquet
 from project.specs.manifest import finalize_manifest, start_manifest
 from project.core.validation import ensure_utc_timestamp
 
+
 def rolling_rank(x: pd.Series, window: int) -> pd.Series:
     """Rolling percentile rank of the last value within the window."""
+
     def _rank(a: np.ndarray) -> float:
         last = a[-1]
         return float(np.sum(a <= last) / len(a))
+
     return x.rolling(window=window, min_periods=window).apply(_rank, raw=True)
+
 
 def main() -> int:
     p = argparse.ArgumentParser(description="Build volatility regime gating series")
@@ -44,13 +48,17 @@ def main() -> int:
     p.add_argument("--bar_interval", default="15m")
     p.add_argument("--market_symbol", default="BTCUSDT")
     p.add_argument("--rv_window", type=int, default=20 * 24 * 4, help="Default ~20d on 15m bars")
-    p.add_argument("--long_window", type=int, default=252 * 24 * 4, help="Default ~252d on 15m bars")
+    p.add_argument(
+        "--long_window", type=int, default=252 * 24 * 4, help="Default ~252d on 15m bars"
+    )
     p.add_argument("--out_dir", default=None)
     args = p.parse_args()
 
     run_id = args.run_id
     data_root = get_data_root()
-    cleaned_root = Path(args.cleaned_root) if args.cleaned_root else (data_root / "lake" / "cleaned")
+    cleaned_root = (
+        Path(args.cleaned_root) if args.cleaned_root else (data_root / "lake" / "cleaned")
+    )
 
     out_dir = Path(args.out_dir) if args.out_dir else (data_root / "feature_store" / "regimes")
     ensure_dir(out_dir)
@@ -100,7 +108,9 @@ def main() -> int:
     out = pd.DataFrame({"ts_event": bars[tcol], "regime_label": regime, "gate_scalar": gate})
     out = out.dropna().copy()
     if out.empty:
-        finalize_manifest(manifest, status="success", stats={"rows": 0, "note": "insufficient history"})
+        finalize_manifest(
+            manifest, status="success", stats={"rows": 0, "note": "insufficient history"}
+        )
         return 0
 
     out["ts_event"] = ensure_utc_timestamp(out["ts_event"], "ts_event")
@@ -108,8 +118,11 @@ def main() -> int:
     out_path = out_dir / "vol_regime.parquet"
     write_parquet(out, out_path)
 
-    finalize_manifest(manifest, status="success", stats={"rows": int(len(out)), "out": str(out_path)})
+    finalize_manifest(
+        manifest, status="success", stats={"rows": int(len(out)), "out": str(out_path)}
+    )
     return 0
+
 
 if __name__ == "__main__":
     raise SystemExit(main())

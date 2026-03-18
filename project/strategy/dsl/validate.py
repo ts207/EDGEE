@@ -5,9 +5,8 @@ from typing import Dict, List
 from project.strategy.dsl.schema import OverlaySpec, Blueprint
 from project.strategy.dsl.references import REGISTRY_SIGNAL_COLUMNS
 
-def validate_signal_columns(
-    merged: pd.DataFrame, signals: List[str], blueprint_id: str
-) -> None:
+
+def validate_signal_columns(merged: pd.DataFrame, signals: List[str], blueprint_id: str) -> None:
     """
     Validates that the merged frame has all required columns for the entry signals.
     """
@@ -73,12 +72,12 @@ def validate_signal_columns(
 
     if missing_by_signal:
         detail = "; ".join(
-            f"{name}: {', '.join(cols)}"
-            for name, cols in sorted(missing_by_signal.items())
+            f"{name}: {', '.join(cols)}" for name, cols in sorted(missing_by_signal.items())
         )
         raise ValueError(
             f"Blueprint `{blueprint_id}` missing required columns for entry signals -> {detail}"
         )
+
 
 def validate_overlay_columns(
     frame: pd.DataFrame, overlays: List[OverlaySpec], blueprint_id: str
@@ -114,9 +113,7 @@ def validate_overlay_columns(
             missing[overlay.name] = sorted(set(missing_cols))
 
     if missing:
-        detail = "; ".join(
-            f"{name}: {', '.join(cols_)}" for name, cols_ in sorted(missing.items())
-        )
+        detail = "; ".join(f"{name}: {', '.join(cols_)}" for name, cols_ in sorted(missing.items()))
         raise ValueError(
             f"Blueprint `{blueprint_id}` missing required columns for overlays -> {detail}"
         )

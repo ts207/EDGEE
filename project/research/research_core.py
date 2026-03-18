@@ -61,6 +61,7 @@ CANONICAL_CANDIDATE_COLUMNS = [
     "gate_promo_hypothesis_audit",
 ]
 
+
 def ensure_candidate_schema(df: pd.DataFrame) -> pd.DataFrame:
     """
     Ensure DataFrame matches the canonical candidate schema.
@@ -94,16 +95,25 @@ def ensure_candidate_schema(df: pd.DataFrame) -> pd.DataFrame:
     for col in bool_cols & set(out.columns):
         if out[col].dtype == bool:
             # Map legacy booleans to the new string contract
-            out[col] = out[col].map({True: "pass", False: "fail", pd.NA: "missing_evidence"}).fillna("missing_evidence")
+            out[col] = (
+                out[col]
+                .map({True: "pass", False: "fail", pd.NA: "missing_evidence"})
+                .fillna("missing_evidence")
+            )
         else:
             out[col] = out[col].fillna("missing_evidence").astype(str)
 
     for col in numeric_cols & set(out.columns):
         out[col] = pd.to_numeric(out[col], errors="coerce")
 
-    return out[CANONICAL_CANDIDATE_COLUMNS + [c for c in out.columns if c not in CANONICAL_CANDIDATE_COLUMNS]]
+    return out[
+        CANONICAL_CANDIDATE_COLUMNS
+        + [c for c in out.columns if c not in CANONICAL_CANDIDATE_COLUMNS]
+    ]
+
 
 # --- Edge Identity ---
+
 
 @dataclass(frozen=True)
 class StructuralEdgeComponents:
@@ -111,6 +121,7 @@ class StructuralEdgeComponents:
     template_family: str
     direction_rule: str
     signal_polarity_logic: str
+
 
 def structural_edge_components(row: Mapping[str, Any]) -> StructuralEdgeComponents:
     def _norm_token(value: Any, *, default: str) -> str:
@@ -137,7 +148,9 @@ def structural_edge_components(row: Mapping[str, Any]) -> StructuralEdgeComponen
         default="UNKNOWN_DIRECTION",
     )
     signal_polarity_logic = _norm_token(
-        _first_present(row, "signal_polarity_logic", "side_policy", "polarity_logic", "signal_polarity"),
+        _first_present(
+            row, "signal_polarity_logic", "side_policy", "polarity_logic", "signal_polarity"
+        ),
         default="UNKNOWN_POLARITY",
     )
     return StructuralEdgeComponents(
@@ -146,6 +159,7 @@ def structural_edge_components(row: Mapping[str, Any]) -> StructuralEdgeComponen
         direction_rule=direction_rule,
         signal_polarity_logic=signal_polarity_logic,
     )
+
 
 def edge_id_from_components(components: StructuralEdgeComponents) -> str:
     payload = {
@@ -157,8 +171,10 @@ def edge_id_from_components(components: StructuralEdgeComponents) -> str:
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return "edge_" + hashlib.sha256(encoded).hexdigest()[:20]
 
+
 def edge_id_from_row(row: Mapping[str, Any]) -> str:
     return edge_id_from_components(structural_edge_components(row))
+
 
 def write_research_integrity_report(
     run_id: str,
@@ -171,7 +187,7 @@ def write_research_integrity_report(
     """
     out_dir = data_root / "reports" / "integrity" / run_id
     out_dir.mkdir(parents=True, exist_ok=True)
-    
+
     report = {
         "run_id": run_id,
         "timestamp": pd.Timestamp.now(tz="UTC").isoformat(),
@@ -184,12 +200,12 @@ def write_research_integrity_report(
         "null_control_diagnostics": stats.get("null_controls", {}),
         "bias_accounting": {
             "exploratory_vs_confirmatory": str(stats.get("run_mode", "unknown")),
-            "selection_bias_est_bps": float(stats.get("est_selection_bias_bps", 0.0))
-        }
+            "selection_bias_est_bps": float(stats.get("est_selection_bias_bps", 0.0)),
+        },
     }
-    
+
     report_path = out_dir / "research_integrity_report.json"
     with open(report_path, "w") as f:
         json.dump(report, f, indent=2)
-        
+
     return report_path

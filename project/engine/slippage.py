@@ -10,6 +10,7 @@ from project.engine.fills import OrderUrgency, ExecutionProfile
 
 _LOG = logging.getLogger(__name__)
 
+
 def calculate_slippage_bps(
     order_size: float,
     spread_bps: float,
@@ -24,13 +25,13 @@ def calculate_slippage_bps(
     # Base slippage components
     # Aggressive takes half spread + impact
     # Passive might have zero or negative slippage but higher fill risk
-    
+
     if urgency == OrderUrgency.AGGRESSIVE:
         base_slippage = spread_bps * 0.5
     elif urgency == OrderUrgency.PASSIVE:
-        base_slippage = 0.0 # Ideal passive
+        base_slippage = 0.0  # Ideal passive
     elif urgency == OrderUrgency.DELAYED_AGGRESSIVE:
-        base_slippage = spread_bps * 0.7 # Delayed often means worse price
+        base_slippage = spread_bps * 0.7  # Delayed often means worse price
     else:
         base_slippage = spread_bps * 0.5
 
@@ -48,13 +49,14 @@ def calculate_slippage_bps(
     # Impact calculation (Square root model)
     participation_rate = order_size / max(1.0, liquidity_available)
     impact_bps = np.sqrt(participation_rate) * impact_sqrt_mult
-    
+
     # Volatility impact (higher vol -> wider uncertainty / slippage)
     vol_impact_bps = vol_regime_bps * 0.1
 
     total_slippage_bps = (base_slippage + impact_bps + vol_impact_bps) * profile_mult
-    
+
     return float(np.clip(total_slippage_bps, 0.0, 1000.0))
+
 
 def calculate_fill_price(
     base_price: float,

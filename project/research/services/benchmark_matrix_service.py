@@ -111,7 +111,15 @@ def render_benchmark_summary_markdown(summary: Dict[str, Any]) -> str:
     ]
     for key, value in dict(summary.get("status_counts", {})).items():
         lines.append(f"- `{key}`: `{value}`")
-    lines.extend(["", "## Slices", "", "| Run | Family | Template | Context | Status |", "| --- | --- | --- | --- | --- |"])
+    lines.extend(
+        [
+            "",
+            "## Slices",
+            "",
+            "| Run | Family | Template | Context | Status |",
+            "| --- | --- | --- | --- | --- |",
+        ]
+    )
     for row in summary.get("slices", []):
         lines.append(
             f"| `{row.get('run_id', '')}` | `{row.get('family', '')}` | `{row.get('template', '')}` | "

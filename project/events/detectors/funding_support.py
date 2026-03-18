@@ -5,6 +5,7 @@ import pandas as pd
 from typing import Any, Mapping
 from project.events.thresholding import percentile_rank_historical
 
+
 def run_length(mask: pd.Series) -> pd.Series:
     """Compute run lengths of True values in a boolean series."""
     out = []
@@ -14,16 +15,17 @@ def run_length(mask: pd.Series) -> pd.Series:
         out.append(streak)
     return pd.Series(out, index=mask.index)
 
+
 def prepare_funding_persistence_features(
     df: pd.DataFrame,
     funding_signed: pd.Series,
     defaults: Mapping[str, Any],
-    params: Mapping[str, Any]
+    params: Mapping[str, Any],
 ) -> dict[str, pd.Series]:
     """Extracted feature preparation for FundingPersistenceDetector."""
     f_pct = pd.to_numeric(df["funding_abs_pct"], errors="coerce").astype(float)
     f_abs = pd.to_numeric(df["funding_abs"], errors="coerce").astype(float)
-    
+
     accel_pct = float(params.get("accel_pct", defaults["accel_pct"]))
     accel_lookback = int(params.get("accel_lookback", 12))
     persistence_pct = float(params.get("persistence_pct", defaults["persistence_pct"]))
@@ -32,12 +34,20 @@ def prepare_funding_persistence_features(
 
     accel = f_abs - f_abs.shift(accel_lookback)
     accel = accel.where(accel > 0.0)
-    accel_rank = percentile_rank_historical(accel, window=threshold_window, min_periods=max(24, accel_lookback))
+    accel_rank = percentile_rank_historical(
+        accel, window=threshold_window, min_periods=max(24, accel_lookback)
+    )
     accel_raw = ((accel_rank >= accel_pct) & (accel_rank.shift(1) < accel_pct)).fillna(False)
 
-    fp_active = pd.to_numeric(df.get("fp_active", pd.Series(np.nan, index=df.index)), errors="coerce")
-    fp_age_bars = pd.to_numeric(df.get("fp_age_bars", pd.Series(np.nan, index=df.index)), errors="coerce")
-    fp_severity = pd.to_numeric(df.get("fp_severity", pd.Series(np.nan, index=df.index)), errors="coerce")
+    fp_active = pd.to_numeric(
+        df.get("fp_active", pd.Series(np.nan, index=df.index)), errors="coerce"
+    )
+    fp_age_bars = pd.to_numeric(
+        df.get("fp_age_bars", pd.Series(np.nan, index=df.index)), errors="coerce"
+    )
+    fp_severity = pd.to_numeric(
+        df.get("fp_severity", pd.Series(np.nan, index=df.index)), errors="coerce"
+    )
 
     if fp_active.notna().any():
         persistence_raw = (fp_active.fillna(0.0) > 0).astype(bool)
@@ -56,10 +66,10 @@ def prepare_funding_persistence_features(
     signal_intensity = pd.Series(0.0, index=df.index, dtype=float)
     signal_intensity = signal_intensity.where(~accel_raw, accel_intensity.fillna(0.0))
     signal_intensity = signal_intensity.where(~persistence_raw, persistence_intensity.fillna(0.0))
-    
+
     return {
-        "funding_abs_pct": f_pct, 
-        "funding_abs": f_abs, 
+        "funding_abs_pct": f_pct,
+        "funding_abs": f_abs,
         "funding_signed": funding_signed,
         "run_len": run_len.astype(float),
         "accel_rank": accel_rank.fillna(0.0),
@@ -68,16 +78,17 @@ def prepare_funding_persistence_features(
         "mask": (accel_raw | persistence_raw).fillna(False),
     }
 
+
 def prepare_funding_normalization_features(
     df: pd.DataFrame,
     funding_signed: pd.Series,
     defaults: Mapping[str, Any],
-    params: Mapping[str, Any]
+    params: Mapping[str, Any],
 ) -> dict[str, pd.Series]:
     """Extracted feature preparation for FundingNormalizationDetector."""
     f_pct = pd.to_numeric(df["funding_abs_pct"], errors="coerce").astype(float)
     f_abs = pd.to_numeric(df["funding_abs"], errors="coerce").astype(float)
-    
+
     extreme_pct = float(params.get("extreme_pct", defaults["extreme_pct"]))
     normalization_pct = float(params.get("normalization_pct", defaults["normalization_pct"]))
     normalization_lookback = int(
@@ -99,12 +110,10 @@ def prepare_funding_normalization_features(
         .fillna(0.0)
     )
     mask = (
-        (f_pct <= normalization_pct)
-        & (f_pct.shift(1) > normalization_pct)
-        & recent_extreme
+        (f_pct <= normalization_pct) & (f_pct.shift(1) > normalization_pct) & recent_extreme
     ).fillna(False)
     release_intensity = ((prior_extreme_pct - f_pct).clip(lower=0.0) / 100.0).fillna(0.0)
-    
+
     return {
         "funding_abs_pct": f_pct,
         "funding_abs": f_abs,

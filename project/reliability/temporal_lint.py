@@ -5,6 +5,7 @@ from typing import List, Tuple
 SUSPICIOUS_METHODS = {"quantile", "mean", "std", "median", "ffill"}
 ALLOWED_WRAPPERS = {"rolling", "expanding", "shift", "trailing_"}
 
+
 class TemporalLintVisitor(ast.NodeVisitor):
     def __init__(self, filename: str):
         self.filename = filename
@@ -23,14 +24,17 @@ class TemporalLintVisitor(ast.NodeVisitor):
                         is_safe = True
                         break
                     current = current.func.value
-                
+
                 if not is_safe:
-                    self.errors.append((
-                        node.lineno,
-                        f"Potentially unsafe full-sample operation: '{method_name}'. "
-                        f"Consider using a rolling/trailing primitive."
-                    ))
+                    self.errors.append(
+                        (
+                            node.lineno,
+                            f"Potentially unsafe full-sample operation: '{method_name}'. "
+                            f"Consider using a rolling/trailing primitive.",
+                        )
+                    )
         self.generic_visit(node)
+
 
 def lint_file(filepath: str) -> List[Tuple[int, str]]:
     with open(filepath, "r") as f:
@@ -39,15 +43,17 @@ def lint_file(filepath: str) -> List[Tuple[int, str]]:
     visitor.visit(tree)
     return visitor.errors
 
+
 if __name__ == "__main__":
     import sys
+
     if len(sys.argv) < 2:
         print("Usage: python temporal_lint.py <file_or_dir>")
         sys.exit(1)
-        
+
     target = sys.argv[1]
     all_errors = []
-    
+
     if os.path.isfile(target):
         files = [target]
     else:
@@ -56,13 +62,13 @@ if __name__ == "__main__":
             for f in filenames:
                 if f.endswith(".py"):
                     files.append(os.path.join(root, f))
-                    
+
     for f in files:
         errors = lint_file(f)
         for line, msg in errors:
             print(f"{f}:{line}: {msg}")
             all_errors.append((f, line, msg))
-            
+
     if all_errors:
         sys.exit(1)
     else:

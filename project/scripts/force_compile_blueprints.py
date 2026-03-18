@@ -11,9 +11,9 @@ DATA_ROOT = get_data_root()
 
 selected = [
     ("synthetic_2025_full_year_v9", "BTCUSDT::hyp_1750dbb1563b501aceb9"),
-    ("synthetic_2025_full_year_v9", "SOLUSDT::hyp_1185ad1b630e353df2f9"), # Changed from v10
+    ("synthetic_2025_full_year_v9", "SOLUSDT::hyp_1185ad1b630e353df2f9"),  # Changed from v10
     ("synthetic_2025_stress_crash_v4", "ETHUSDT::hyp_9cd1674f4a0833aaf9aa"),
-    ("synthetic_2025_stress_crash", "BTCUSDT::hyp_193d04253dd22a18bed7")
+    ("synthetic_2025_stress_crash", "BTCUSDT::hyp_193d04253dd22a18bed7"),
 ]
 
 blueprints = []
@@ -23,11 +23,11 @@ for run_id, candidate_id in selected:
     path = DATA_ROOT / "reports" / "phase2" / run_id / "search_engine" / "phase2_candidates.parquet"
     if not path.exists():
         path = DATA_ROOT / "reports" / "phase2" / run_id / "phase2_candidates.parquet"
-    
+
     df = pd.read_parquet(path)
     row = df[df["candidate_id"] == candidate_id].iloc[0].to_dict()
     row["source_path"] = str(path)
-    
+
     bp, _ = compile_blueprint(
         merged_row=row,
         run_id=run_id,

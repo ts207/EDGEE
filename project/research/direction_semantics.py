@@ -46,14 +46,14 @@ def resolve_effect_sign(
     if evt_sign == 0:
         evt_sign = 1 if int(fallback_sign) >= 0 else -1
 
-    # Absolute policy semantics: 
+    # Absolute policy semantics:
     # 'directional' follows the event direction.
     # 'contrarian' always flips the event direction.
     if policy == "directional":
         return int(evt_sign)
     if policy == "contrarian":
         return int(-evt_sign)
-    
+
     # Default 'both' policy — assume directional for effect sign resolution
     return int(evt_sign)
 

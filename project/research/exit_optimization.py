@@ -139,11 +139,13 @@ def analyze_exit_efficiency(
         direction = pd.to_numeric(trades.get("direction", 1.0), errors="coerce").fillna(1.0)
         post_exit_return = ((post - exit_) / exit_.replace(0.0, np.nan)) * direction
 
-    df = pd.DataFrame({
-        "exit_return": exit_return,
-        "max_favorable": max_favorable,
-        "post_exit_return": post_exit_return,
-    }).replace([np.inf, -np.inf], np.nan)
+    df = pd.DataFrame(
+        {
+            "exit_return": exit_return,
+            "max_favorable": max_favorable,
+            "post_exit_return": post_exit_return,
+        }
+    ).replace([np.inf, -np.inf], np.nan)
     df = df.dropna(subset=["exit_return"])
     if df.empty:
         return {}
@@ -151,11 +153,17 @@ def analyze_exit_efficiency(
     denom = df["max_favorable"].where(df["max_favorable"].abs() > 1e-12)
     efficiency = (df["exit_return"] / denom).clip(lower=0.0, upper=1.5)
     early_exit_rate = float((df["post_exit_return"].fillna(0.0) > 0.0).mean())
-    late_exit_rate = float(((df["exit_return"] < 0.0) & (df["post_exit_return"].fillna(0.0) <= 0.0)).mean())
+    late_exit_rate = float(
+        ((df["exit_return"] < 0.0) & (df["post_exit_return"].fillna(0.0) <= 0.0)).mean()
+    )
 
     return {
-        "avg_exit_efficiency": float(efficiency.dropna().mean()) if efficiency.notna().any() else 0.0,
-        "median_exit_efficiency": float(efficiency.dropna().median()) if efficiency.notna().any() else 0.0,
+        "avg_exit_efficiency": float(efficiency.dropna().mean())
+        if efficiency.notna().any()
+        else 0.0,
+        "median_exit_efficiency": float(efficiency.dropna().median())
+        if efficiency.notna().any()
+        else 0.0,
         "early_exit_rate": early_exit_rate,
         "late_exit_rate": late_exit_rate,
         "n_trades": int(len(df)),

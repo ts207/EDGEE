@@ -3,6 +3,7 @@ Lambda state persistence: load previous run's shrinkage lambdas, build snapshot.
 
 Extracted from phase2_candidate_discovery.py — pure functions.
 """
+
 from __future__ import annotations
 
 from project.core.coercion import safe_float, safe_int, as_bool
@@ -17,6 +18,7 @@ import numpy as np
 import pandas as pd
 
 log = logging.getLogger(__name__)
+
 
 def _load_previous_lambda_maps(
     *,
@@ -49,12 +51,11 @@ def _load_previous_lambda_maps(
     if df.empty or "level" not in df.columns or "lambda_value" not in df.columns:
         return out, source
 
-    
     # Vectorized: process each level as a filtered DataFrame slice
     for _level, _key_cols in [
         ("family", ["template_verb", "horizon"]),
-        ("event",  ["template_verb", "horizon", "canonical_family"]),
-        ("state",  ["template_verb", "horizon", "canonical_family", "canonical_event_type"]),
+        ("event", ["template_verb", "horizon", "canonical_family"]),
+        ("state", ["template_verb", "horizon", "canonical_family", "canonical_event_type"]),
     ]:
         _sub = df[df["level"].astype(str).str.strip().str.lower() == _level].copy()
         if _sub.empty:
@@ -79,9 +80,14 @@ def _load_previous_lambda_maps(
     total_keys = sum(len(v) for v in out.values())
     log.info(
         "Loaded previous lambda state from %s: family=%d event=%d state=%d (total=%d)",
-        source, len(out["family"]), len(out["event"]), len(out["state"]), total_keys,
+        source,
+        len(out["family"]),
+        len(out["event"]),
+        len(out["state"]),
+        total_keys,
     )
     return out, source
+
 
 def _build_lambda_snapshot(fdr_df: pd.DataFrame) -> pd.DataFrame:
     if fdr_df.empty:
@@ -103,49 +109,92 @@ def _build_lambda_snapshot(fdr_df: pd.DataFrame) -> pd.DataFrame:
     fam_cols = ["template_verb", "horizon", "lambda_family", "lambda_family_status"]
     _fam = fdr_df[[c for c in fam_cols if c in fdr_df.columns]].drop_duplicates().copy()
     if not _fam.empty:
-        _fam_out = pd.DataFrame({
-            "level": "family",
-            "template_verb": _fam.get("template_verb", "").fillna("").astype(str),
-            "horizon": _fam.get("horizon", "").fillna("").astype(str),
-            "canonical_family": "",
-            "canonical_event_type": "",
-            "lambda_value": pd.to_numeric(_fam.get("lambda_family", 0.0), errors="coerce").fillna(0.0),
-            "lambda_status": _fam.get("lambda_family_status", "").fillna("").astype(str),
-        })
+        _fam_out = pd.DataFrame(
+            {
+                "level": "family",
+                "template_verb": _fam.get("template_verb", "").fillna("").astype(str),
+                "horizon": _fam.get("horizon", "").fillna("").astype(str),
+                "canonical_family": "",
+                "canonical_event_type": "",
+                "lambda_value": pd.to_numeric(
+                    _fam.get("lambda_family", 0.0), errors="coerce"
+                ).fillna(0.0),
+                "lambda_status": _fam.get("lambda_family_status", "").fillna("").astype(str),
+            }
+        )
         level_frames.append(_fam_out)
 
-    evt_cols = ["template_verb", "horizon", "canonical_family", "lambda_event", "lambda_event_status"]
+    evt_cols = [
+        "template_verb",
+        "horizon",
+        "canonical_family",
+        "lambda_event",
+        "lambda_event_status",
+    ]
     _evt = fdr_df[[c for c in evt_cols if c in fdr_df.columns]].drop_duplicates().copy()
     if not _evt.empty:
-        _evt_out = pd.DataFrame({
-            "level": "event",
-            "template_verb": _evt.get("template_verb", "").fillna("").astype(str),
-            "horizon": _evt.get("horizon", "").fillna("").astype(str),
-            "canonical_family": _evt.get("canonical_family", "").fillna("").astype(str).str.upper(),
-            "canonical_event_type": "",
-            "lambda_value": pd.to_numeric(_evt.get("lambda_event", 0.0), errors="coerce").fillna(0.0),
-            "lambda_status": _evt.get("lambda_event_status", "").fillna("").astype(str),
-        })
+        _evt_out = pd.DataFrame(
+            {
+                "level": "event",
+                "template_verb": _evt.get("template_verb", "").fillna("").astype(str),
+                "horizon": _evt.get("horizon", "").fillna("").astype(str),
+                "canonical_family": _evt.get("canonical_family", "")
+                .fillna("")
+                .astype(str)
+                .str.upper(),
+                "canonical_event_type": "",
+                "lambda_value": pd.to_numeric(
+                    _evt.get("lambda_event", 0.0), errors="coerce"
+                ).fillna(0.0),
+                "lambda_status": _evt.get("lambda_event_status", "").fillna("").astype(str),
+            }
+        )
         level_frames.append(_evt_out)
-    st_cols = ["template_verb", "horizon", "canonical_family", "canonical_event_type", "lambda_state", "lambda_state_status"]
+    st_cols = [
+        "template_verb",
+        "horizon",
+        "canonical_family",
+        "canonical_event_type",
+        "lambda_state",
+        "lambda_state_status",
+    ]
     _st = fdr_df[[c for c in st_cols if c in fdr_df.columns]].drop_duplicates().copy()
     if not _st.empty:
-        _st_out = pd.DataFrame({
-            "level": "state",
-            "template_verb": _st.get("template_verb", "").fillna("").astype(str),
-            "horizon": _st.get("horizon", "").fillna("").astype(str),
-            "canonical_family": _st.get("canonical_family", "").fillna("").astype(str).str.upper(),
-            "canonical_event_type": _st.get("canonical_event_type", "").fillna("").astype(str).str.upper(),
-            "lambda_value": pd.to_numeric(_st.get("lambda_state", 0.0), errors="coerce").fillna(0.0),
-            "lambda_status": _st.get("lambda_state_status", "").fillna("").astype(str),
-        })
+        _st_out = pd.DataFrame(
+            {
+                "level": "state",
+                "template_verb": _st.get("template_verb", "").fillna("").astype(str),
+                "horizon": _st.get("horizon", "").fillna("").astype(str),
+                "canonical_family": _st.get("canonical_family", "")
+                .fillna("")
+                .astype(str)
+                .str.upper(),
+                "canonical_event_type": _st.get("canonical_event_type", "")
+                .fillna("")
+                .astype(str)
+                .str.upper(),
+                "lambda_value": pd.to_numeric(_st.get("lambda_state", 0.0), errors="coerce").fillna(
+                    0.0
+                ),
+                "lambda_status": _st.get("lambda_state_status", "").fillna("").astype(str),
+            }
+        )
         level_frames.append(_st_out)
 
     if not level_frames:
-        return pd.DataFrame(columns=["level", "template_verb", "horizon",
-                                     "canonical_family", "canonical_event_type",
-                                     "lambda_value", "lambda_status"])
+        return pd.DataFrame(
+            columns=[
+                "level",
+                "template_verb",
+                "horizon",
+                "canonical_family",
+                "canonical_event_type",
+                "lambda_value",
+                "lambda_status",
+            ]
+        )
     return pd.concat(level_frames, ignore_index=True)
+
 
 def save_lambda_state_json(
     fdr_df: pd.DataFrame,

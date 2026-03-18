@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Dict, Iterable, List, Mapping, Tuple
 
+
 @dataclass(frozen=True)
 class AccessRequest:
     role: str
@@ -10,11 +11,13 @@ class AccessRequest:
     is_exec_state: bool
     event_id: str
 
+
 def _str_list(value) -> List[str]:
     if isinstance(value, list):
         return [str(x).strip().lower() for x in value if str(x).strip()]
     token = str(value).strip().lower()
     return [token] if token else []
+
 
 def evaluate_access(
     request: AccessRequest,
@@ -35,13 +38,24 @@ def evaluate_access(
         )
     allow_exec_state = bool(role_cfg.get("allow_exec_state", False))
     if request.is_exec_state and not allow_exec_state:
-        return False, f"role={request.role} cannot access execution state for event_id={request.event_id}"
+        return (
+            False,
+            f"role={request.role} cannot access execution state for event_id={request.event_id}",
+        )
     constraints = firewall_spec.get("constraints")
     if isinstance(constraints, Mapping):
         forbid_posttrade_for_alpha = bool(constraints.get("forbid_posttrade_for_alpha", False))
-        if forbid_posttrade_for_alpha and request.role == "alpha" and request.provenance == "execution":
-            return False, f"alpha role cannot read post-trade execution provenance for event_id={request.event_id}"
+        if (
+            forbid_posttrade_for_alpha
+            and request.role == "alpha"
+            and request.provenance == "execution"
+        ):
+            return (
+                False,
+                f"alpha role cannot read post-trade execution provenance for event_id={request.event_id}",
+            )
     return True, ""
+
 
 def audit_access_requests(
     requests: Iterable[AccessRequest],

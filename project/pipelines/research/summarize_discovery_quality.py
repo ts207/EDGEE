@@ -11,15 +11,20 @@ from typing import Dict, List
 
 import pandas as pd
 
+
 def _utc_now_iso() -> str:
     DATA_ROOT = get_data_root()
     return datetime.now(timezone.utc).isoformat()
 
+
 def _sanitize(value: str) -> str:
     return re.sub(r"[^a-z0-9_]+", "_", str(value).strip().lower()).strip("_")
 
+
 def _parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Summarize phase2 discovery quality across event families.")
+    parser = argparse.ArgumentParser(
+        description="Summarize phase2 discovery quality across event families."
+    )
     parser.add_argument("--run_id", required=True)
     parser.add_argument(
         "--phase2_root",
@@ -38,6 +43,7 @@ def _parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--top_fail_reasons", type=int, default=10)
     return parser.parse_args()
+
 
 def _load_candidates(path: Path) -> pd.DataFrame:
     path_parquet = path.with_suffix(".parquet")
@@ -83,6 +89,7 @@ def _phase2_event_roots(phase2_root: Path) -> Dict[str, list[Path]]:
             event_roots[event_dir.name].extend(timeframe_dirs)
     return event_roots
 
+
 def _load_json_object(path: Path) -> Dict[str, object]:
     if not path.exists():
         return {}
@@ -94,16 +101,14 @@ def _load_json_object(path: Path) -> Dict[str, object]:
         return {}
     return payload
 
+
 def _external_validation_summary_paths(run_id: str) -> List[Path]:
     DATA_ROOT = get_data_root()
     return [
-        DATA_ROOT
-        / "reports"
-        / "external_validation"
-        / run_id
-        / "external_validation_summary.json",
+        DATA_ROOT / "reports" / "external_validation" / run_id / "external_validation_summary.json",
         DATA_ROOT / "reports" / "eval" / run_id / "walkforward_summary.json",
     ]
+
 
 def _load_jsonl_rows(path: Path) -> List[Dict[str, object]]:
     if not path.exists():
@@ -120,6 +125,7 @@ def _load_jsonl_rows(path: Path) -> List[Dict[str, object]]:
             rows.append(payload)
     return rows
 
+
 def _split_fail_reasons(series: pd.Series) -> List[str]:
     out: List[str] = []
     for raw in series.fillna("").astype(str):
@@ -129,9 +135,12 @@ def _split_fail_reasons(series: pd.Series) -> List[str]:
                 out.append(reason)
     return out
 
+
 def _gate_pass_series(df: pd.DataFrame) -> pd.Series:
     if "gate_phase2_final" in df.columns:
-        return pd.to_numeric(df["gate_phase2_final"], errors="coerce").fillna(0.0).astype(float) > 0.0
+        return (
+            pd.to_numeric(df["gate_phase2_final"], errors="coerce").fillna(0.0).astype(float) > 0.0
+        )
     if "gate_pass" in df.columns:
         return pd.to_numeric(df["gate_pass"], errors="coerce").fillna(0.0).astype(float) > 0.0
     if "gate_all" in df.columns:
@@ -164,12 +173,17 @@ def _apply_bridge_metrics_from_frame(family_row: Dict[str, object], frame: pd.Da
         eval_mask = frame["bridge_eval_status"].astype(str).str.strip().ne("")
         family_row["bridge_evaluable"] = int(eval_mask.sum())
     if "gate_bridge_tradable" in frame.columns:
-        family_row["bridge_pass_val"] = int(frame["gate_bridge_tradable"].apply(_is_pass_value).sum())
+        family_row["bridge_pass_val"] = int(
+            frame["gate_bridge_tradable"].apply(_is_pass_value).sum()
+        )
     if "bridge_fail_reasons" in frame.columns:
-        missing_base_mask = frame["bridge_fail_reasons"].astype(str).str.contains(
-            "gate_bridge_missing_overlay_base", regex=False, na=False
+        missing_base_mask = (
+            frame["bridge_fail_reasons"]
+            .astype(str)
+            .str.contains("gate_bridge_missing_overlay_base", regex=False, na=False)
         )
         family_row["overlay_kill_by_missing_base_count"] = int(missing_base_mask.sum())
+
 
 def _event_summary(df: pd.DataFrame) -> Dict[str, float | int]:
     total = int(len(df))
@@ -181,6 +195,7 @@ def _event_summary(df: pd.DataFrame) -> Dict[str, float | int]:
         "gate_pass_count": pass_count,
         "gate_pass_rate": pass_rate,
     }
+
 
 def _family_defaults() -> Dict[str, object]:
     return {
@@ -198,6 +213,7 @@ def _family_defaults() -> Dict[str, object]:
         "wf_survivors": 0,
         "top_failure_reasons": [],
     }
+
 
 def build_summary(*, run_id: str, phase2_root: Path, top_fail_reasons: int) -> dict:
     DATA_ROOT = get_data_root()
@@ -247,10 +263,14 @@ def build_summary(*, run_id: str, phase2_root: Path, top_fail_reasons: int) -> d
                 family_row["phase2_candidates"] = int(len(frame))
                 family_row["phase2_gate_all_pass"] = int(_gate_pass_series(frame).sum())
                 _apply_bridge_metrics_from_frame(family_row, frame)
-                phase2_reasons = _split_fail_reasons(frame.get("fail_reasons", pd.Series(dtype=str)))
+                phase2_reasons = _split_fail_reasons(
+                    frame.get("fail_reasons", pd.Series(dtype=str))
+                )
                 family_fail_counter[event_type].update(phase2_reasons)
                 global_fail_counter.update(phase2_reasons)
-                bridge_reasons = _split_fail_reasons(frame.get("bridge_fail_reasons", pd.Series(dtype=str)))
+                bridge_reasons = _split_fail_reasons(
+                    frame.get("bridge_fail_reasons", pd.Series(dtype=str))
+                )
                 family_fail_counter[event_type].update(bridge_reasons)
                 global_fail_counter.update(bridge_reasons)
                 by_event_family[event_type] = family_row
@@ -311,12 +331,19 @@ def build_summary(*, run_id: str, phase2_root: Path, top_fail_reasons: int) -> d
                 bridge_df = pd.concat(bridge_frames, ignore_index=True)
         if not bridge_df.empty:
             _apply_bridge_metrics_from_frame(family_row, bridge_df)
-            if "bridge_fail_reasons" not in bridge_df.columns and "bridge_eval_status" in bridge_df.columns:
-                missing_base_mask = bridge_df["bridge_eval_status"].astype(str).str.contains(
-                    "missing_overlay_base", regex=False, na=False
+            if (
+                "bridge_fail_reasons" not in bridge_df.columns
+                and "bridge_eval_status" in bridge_df.columns
+            ):
+                missing_base_mask = (
+                    bridge_df["bridge_eval_status"]
+                    .astype(str)
+                    .str.contains("missing_overlay_base", regex=False, na=False)
                 )
                 family_row["overlay_kill_by_missing_base_count"] = int(missing_base_mask.sum())
-            bridge_reasons = _split_fail_reasons(bridge_df.get("bridge_fail_reasons", pd.Series(dtype=str)))
+            bridge_reasons = _split_fail_reasons(
+                bridge_df.get("bridge_fail_reasons", pd.Series(dtype=str))
+            )
             family_fail_counter[family].update(bridge_reasons)
             global_fail_counter.update(bridge_reasons)
 
@@ -330,10 +357,14 @@ def build_summary(*, run_id: str, phase2_root: Path, top_fail_reasons: int) -> d
         if not family:
             continue
         by_event_family.setdefault(family, _family_defaults())
-        by_event_family[family]["compiled_bases"] = int(by_event_family[family].get("compiled_bases", 0)) + 1
+        by_event_family[family]["compiled_bases"] = (
+            int(by_event_family[family].get("compiled_bases", 0)) + 1
+        )
         overlays = row.get("overlays", [])
         overlay_count = len(overlays) if isinstance(overlays, list) else 0
-        by_event_family[family]["compiled_overlays"] = int(by_event_family[family].get("compiled_overlays", 0)) + int(overlay_count)
+        by_event_family[family]["compiled_overlays"] = int(
+            by_event_family[family].get("compiled_overlays", 0)
+        ) + int(overlay_count)
 
         bp_id = str(row.get("id", "")).strip()
         if bp_id:
@@ -357,9 +388,13 @@ def build_summary(*, run_id: str, phase2_root: Path, top_fail_reasons: int) -> d
             has_test = isinstance(split_payload.get("test"), dict)
             if has_validation and has_test:
                 by_event_family.setdefault(family, _family_defaults())
-                by_event_family[family]["wf_tested"] = int(by_event_family[family].get("wf_tested", 0)) + 1
+                by_event_family[family]["wf_tested"] = (
+                    int(by_event_family[family].get("wf_tested", 0)) + 1
+                )
 
-    promotion_report = _load_json_object(DATA_ROOT / "reports" / "promotions" / run_id / "promotion_report.json")
+    promotion_report = _load_json_object(
+        DATA_ROOT / "reports" / "promotions" / run_id / "promotion_report.json"
+    )
     tested_rows = promotion_report.get("tested", [])
     if isinstance(tested_rows, list):
         for row in tested_rows:
@@ -373,7 +408,9 @@ def build_summary(*, run_id: str, phase2_root: Path, top_fail_reasons: int) -> d
                 continue
             by_event_family.setdefault(family, _family_defaults())
             if bool(row.get("promoted", False)):
-                by_event_family[family]["wf_survivors"] = int(by_event_family[family].get("wf_survivors", 0)) + 1
+                by_event_family[family]["wf_survivors"] = (
+                    int(by_event_family[family].get("wf_survivors", 0)) + 1
+                )
             reasons = row.get("fail_reasons", [])
             if isinstance(reasons, list):
                 tokens = [str(x).strip() for x in reasons if str(x).strip()]
@@ -388,8 +425,12 @@ def build_summary(*, run_id: str, phase2_root: Path, top_fail_reasons: int) -> d
         ]
 
     event_families = sorted(by_event_family.keys())
-    total_candidates = int(sum(int(by_event_family[f].get("total_candidates", 0)) for f in event_families))
-    gate_pass_count = int(sum(int(by_event_family[f].get("gate_pass_count", 0)) for f in event_families))
+    total_candidates = int(
+        sum(int(by_event_family[f].get("total_candidates", 0)) for f in event_families)
+    )
+    gate_pass_count = int(
+        sum(int(by_event_family[f].get("gate_pass_count", 0)) for f in event_families)
+    )
     gate_pass_rate = float(gate_pass_count / total_candidates) if total_candidates else 0.0
 
     top_reasons = [
@@ -410,7 +451,10 @@ def build_summary(*, run_id: str, phase2_root: Path, top_fail_reasons: int) -> d
         "by_event_family": by_event_family,
     }
 
-def _build_funnel_payload(summary: Dict[str, object], *, top_fail_reasons: int) -> Dict[str, object]:
+
+def _build_funnel_payload(
+    summary: Dict[str, object], *, top_fail_reasons: int
+) -> Dict[str, object]:
     by_event_family = summary.get("by_event_family", {})
     if not isinstance(by_event_family, dict):
         by_event_family = {}
@@ -438,7 +482,9 @@ def _build_funnel_payload(summary: Dict[str, object], *, top_fail_reasons: int) 
             "phase2_gate_all_pass": int(row.get("phase2_gate_all_pass", 0) or 0),
             "bridge_evaluable": int(row.get("bridge_evaluable", 0) or 0),
             "bridge_pass_val": int(row.get("bridge_pass_val", 0) or 0),
-            "overlay_kill_by_missing_base_count": int(row.get("overlay_kill_by_missing_base_count", 0) or 0),
+            "overlay_kill_by_missing_base_count": int(
+                row.get("overlay_kill_by_missing_base_count", 0) or 0
+            ),
             "compiled_bases": int(row.get("compiled_bases", 0) or 0),
             "compiled_overlays": int(row.get("compiled_overlays", 0) or 0),
             "wf_tested": int(row.get("wf_tested", 0) or 0),
@@ -477,11 +523,18 @@ def _build_funnel_payload(summary: Dict[str, object], *, top_fail_reasons: int) 
     }
     return payload
 
+
 def main() -> int:
     DATA_ROOT = get_data_root()
     args = _parse_args()
-    phase2_root = Path(args.phase2_root) if args.phase2_root else DATA_ROOT / "reports" / "phase2" / args.run_id
-    out_path = Path(args.out_path) if args.out_path else phase2_root / "discovery_quality_summary.json"
+    phase2_root = (
+        Path(args.phase2_root)
+        if args.phase2_root
+        else DATA_ROOT / "reports" / "phase2" / args.run_id
+    )
+    out_path = (
+        Path(args.out_path) if args.out_path else phase2_root / "discovery_quality_summary.json"
+    )
     funnel_out_path = (
         Path(args.funnel_out_path)
         if args.funnel_out_path
@@ -498,10 +551,22 @@ def main() -> int:
 
     funnel_payload = _build_funnel_payload(payload, top_fail_reasons=int(args.top_fail_reasons))
     funnel_out_path.parent.mkdir(parents=True, exist_ok=True)
-    funnel_out_path.write_text(json.dumps(funnel_payload, indent=2, sort_keys=True), encoding="utf-8")
+    funnel_out_path.write_text(
+        json.dumps(funnel_payload, indent=2, sort_keys=True), encoding="utf-8"
+    )
 
-    print(json.dumps({"run_id": args.run_id, "out_path": str(out_path), "funnel_out_path": str(funnel_out_path)}, sort_keys=True))
+    print(
+        json.dumps(
+            {
+                "run_id": args.run_id,
+                "out_path": str(out_path),
+                "funnel_out_path": str(funnel_out_path),
+            },
+            sort_keys=True,
+        )
+    )
     return 0
+
 
 if __name__ == "__main__":
     raise SystemExit(main())

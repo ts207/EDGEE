@@ -46,7 +46,10 @@ class TriggerSpec:
         t = self.trigger_type
 
         valid_states = list(registry.valid_state_ids)
-        if t in {TriggerType.STATE, TriggerType.TRANSITION, TriggerType.INTERACTION} and not valid_states:
+        if (
+            t in {TriggerType.STATE, TriggerType.TRANSITION, TriggerType.INTERACTION}
+            and not valid_states
+        ):
             raise ValueError("State registry is empty or missing")
 
         if t == TriggerType.EVENT:
@@ -80,7 +83,7 @@ class TriggerSpec:
             if self.max_gap is not None:
                 if len(self.max_gap) != len(self.events) - 1:
                     raise ValueError(
-                        f"Sequence max_gap length ({len(self.max_gap)}) must be len(events)-1 ({len(self.events)-1})"
+                        f"Sequence max_gap length ({len(self.max_gap)}) must be len(events)-1 ({len(self.events) - 1})"
                     )
                 if any(g < 0 for g in self.max_gap):
                     raise ValueError("Sequence max_gap values must be non-negative")
@@ -155,7 +158,9 @@ class TriggerSpec:
 
     @classmethod
     def state(cls, state_id: str, active: bool = True) -> "TriggerSpec":
-        return cls(trigger_type=TriggerType.STATE, state_id=state_id.upper().strip(), state_active=active)
+        return cls(
+            trigger_type=TriggerType.STATE, state_id=state_id.upper().strip(), state_active=active
+        )
 
     @classmethod
     def transition(cls, from_state: str, to_state: str) -> "TriggerSpec":
@@ -175,7 +180,9 @@ class TriggerSpec:
         )
 
     @classmethod
-    def sequence(cls, sequence_id: str, events: List[str], max_gap: Optional[List[int]] = None) -> "TriggerSpec":
+    def sequence(
+        cls, sequence_id: str, events: List[str], max_gap: Optional[List[int]] = None
+    ) -> "TriggerSpec":
         return cls(
             trigger_type=TriggerType.SEQUENCE,
             sequence_id=sequence_id.upper().strip(),
@@ -184,7 +191,9 @@ class TriggerSpec:
         )
 
     @classmethod
-    def interaction(cls, interaction_id: str, left: str, right: str, op: str, lag: int = 6) -> "TriggerSpec":
+    def interaction(
+        cls, interaction_id: str, left: str, right: str, op: str, lag: int = 6
+    ) -> "TriggerSpec":
         return cls(
             trigger_type=TriggerType.INTERACTION,
             interaction_id=interaction_id.upper().strip(),
@@ -262,7 +271,9 @@ class HypothesisSpec:
         if self.feature_condition:
             self.feature_condition.validate()
         payload = json.dumps(self.to_dict(), sort_keys=True, separators=(",", ":"))
-        object.__setattr__(self, "_hid", "hyp_" + hashlib.sha256(payload.encode("utf-8")).hexdigest()[:20])
+        object.__setattr__(
+            self, "_hid", "hyp_" + hashlib.sha256(payload.encode("utf-8")).hexdigest()[:20]
+        )
 
     def to_dict(self) -> Dict[str, Any]:
         d: Dict[str, Any] = {
@@ -281,7 +292,12 @@ class HypothesisSpec:
         return d
 
     def hypothesis_id(self) -> str:
-        return self._hid or ("hyp_" + hashlib.sha256(json.dumps(self.to_dict(), sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()[:20])
+        return self._hid or (
+            "hyp_"
+            + hashlib.sha256(
+                json.dumps(self.to_dict(), sort_keys=True, separators=(",", ":")).encode("utf-8")
+            ).hexdigest()[:20]
+        )
 
     def label(self) -> str:
         parts = [self.trigger.label(), self.direction, self.horizon, self.template_id]

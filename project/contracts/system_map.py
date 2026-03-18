@@ -55,6 +55,7 @@ def build_canonical_entrypoints() -> tuple[SystemSurface, ...]:
         ),
     )
 
+
 def build_compatibility_surfaces() -> tuple[SystemSurface, ...]:
     return ()
 
@@ -101,8 +102,12 @@ def build_system_map_payload() -> Dict[str, Any]:
 
     stage_families = [_json_ready(asdict(spec)) for spec in build_stage_specs()]
     artifact_contracts = [_json_ready(asdict(spec)) for spec in build_artifact_specs()]
-    canonical_entrypoints = [_json_ready(asdict(surface)) for surface in build_canonical_entrypoints()]
-    compatibility_surfaces = [_json_ready(asdict(surface)) for surface in build_compatibility_surfaces()]
+    canonical_entrypoints = [
+        _json_ready(asdict(surface)) for surface in build_canonical_entrypoints()
+    ]
+    compatibility_surfaces = [
+        _json_ready(asdict(surface)) for surface in build_compatibility_surfaces()
+    ]
     payload = {
         "schema_version": SYSTEM_MAP_SCHEMA_VERSION,
         "canonical_entrypoints": canonical_entrypoints,
@@ -129,7 +134,9 @@ def render_system_map_markdown(payload: Dict[str, Any]) -> str:
             f"| {item['name']} | {item['kind']} | `{item['module']}` | {item['status']} | {item['description']} |"
         )
 
-    lines.extend(["", "## Compatibility Surfaces", "", "Legacy wrapper surfaces have been removed.", ""])
+    lines.extend(
+        ["", "## Compatibility Surfaces", "", "Legacy wrapper surfaces have been removed.", ""]
+    )
 
     lines.extend(["", "## Stage Families", ""])
     for item in payload["stage_families"]:

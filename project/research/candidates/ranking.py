@@ -12,6 +12,7 @@ SOURCE_PRIORITY = {
     "alpha_bundle": 2,
 }
 
+
 def behavior_equivalence_key(row: Dict[str, object]) -> str:
     payload = {
         "base_strategy": str(row.get("base_strategy", "")),
@@ -24,6 +25,7 @@ def behavior_equivalence_key(row: Dict[str, object]) -> str:
     }
     return json.dumps(payload, sort_keys=True)
 
+
 def count_by_source(rows: List[Dict[str, object]]) -> Dict[str, int]:
     counts: Dict[str, int] = {}
     for row in rows:
@@ -31,9 +33,11 @@ def count_by_source(rows: List[Dict[str, object]]) -> Dict[str, int]:
         counts[source] = counts.get(source, 0) + 1
     return counts
 
+
 def _sort_metric_desc(value: object) -> float:
     v = safe_float(value, np.nan)
     return float("inf") if not pd.notna(v) else -float(v)
+
 
 def candidate_rank_key(row: Dict[str, object]) -> Tuple[float, float, float, int, str]:
     quality_score = safe_float(

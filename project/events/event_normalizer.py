@@ -15,9 +15,8 @@ from project.events.event_specs import (
     EventRegistrySpec,
 )
 
-def filter_phase1_rows_for_event_type(
-    events: pd.DataFrame, event_type: str
-) -> pd.DataFrame:
+
+def filter_phase1_rows_for_event_type(events: pd.DataFrame, event_type: str) -> pd.DataFrame:
     if events.empty or "event_type" not in events.columns:
         return events
     allowed = set(expected_event_types_for_spec(event_type))
@@ -25,16 +24,19 @@ def filter_phase1_rows_for_event_type(
         return events.iloc[0:0].copy()
     return events[events["event_type"].astype(str).isin(allowed)].copy()
 
+
 def _empty_registry_events() -> pd.DataFrame:
     out = pd.DataFrame(columns=REGISTRY_EVENT_COLUMNS)
     out["sign"] = pd.to_numeric(out["sign"], errors="coerce").astype("float64")
     return out
+
 
 def _first_existing_column(df: pd.DataFrame, names: Sequence[str]) -> str | None:
     for name in names:
         if name in df.columns:
             return name
     return None
+
 
 def _feature_payload(row: pd.Series) -> str:
     keys = [
@@ -69,8 +71,11 @@ def _feature_payload(row: pd.Series) -> str:
                     payload[key] = str(value)
     return json.dumps(payload, sort_keys=True)
 
+
 def normalize_phase1_events(
-    events: pd.DataFrame, spec: EventRegistrySpec, run_id: str,
+    events: pd.DataFrame,
+    spec: EventRegistrySpec,
+    run_id: str,
 ) -> pd.DataFrame:
     if events.empty:
         return _empty_registry_events()
@@ -88,7 +93,8 @@ def normalize_phase1_events(
     out["phenom_enter_ts"] = ts_ns_utc(out[phenom_col])
 
     entry_col = _first_existing_column(
-        out, ["enter_ts", "signal_ts", "trigger_ts", "timestamp", "anchor_ts", "event_ts", "start_ts"]
+        out,
+        ["enter_ts", "signal_ts", "trigger_ts", "timestamp", "anchor_ts", "event_ts", "start_ts"],
     )
     if entry_col is not None:
         out["enter_ts"] = ts_ns_utc(out[entry_col])
@@ -133,29 +139,21 @@ def normalize_phase1_events(
         out["eval_bar_ts"] = out["phenom_enter_ts"]
 
     out["timestamp"] = out["signal_ts"]
-    out = out.dropna(
-        subset=["timestamp", "enter_ts", "detected_ts", "signal_ts"]
-    ).copy()
+    out = out.dropna(subset=["timestamp", "enter_ts", "detected_ts", "signal_ts"]).copy()
     if out.empty:
         return _empty_registry_events()
     out["exit_ts"] = out["exit_ts"].where(out["exit_ts"].notna(), out["enter_ts"])
-    out["exit_ts"] = out["exit_ts"].where(
-        out["exit_ts"] >= out["enter_ts"], out["enter_ts"]
-    )
+    out["exit_ts"] = out["exit_ts"].where(out["exit_ts"] >= out["enter_ts"], out["enter_ts"])
 
     if "symbol" not in out.columns:
         out["symbol"] = "ALL"
-    out["symbol"] = (
-        out["symbol"].fillna("ALL").astype(str).str.upper().replace("", "ALL")
-    )
+    out["symbol"] = out["symbol"].fillna("ALL").astype(str).str.upper().replace("", "ALL")
 
     if "event_id" not in out.columns:
         if "parent_event_id" in out.columns:
             out["event_id"] = out["parent_event_id"].astype(str)
         else:
-            out["event_id"] = [
-                f"{spec.event_type}_{idx:08d}" for idx in range(len(out))
-            ]
+            out["event_id"] = [f"{spec.event_type}_{idx:08d}" for idx in range(len(out))]
     out["event_id"] = out["event_id"].fillna("").astype(str)
     missing_ids = out["event_id"].str.len() == 0
     if missing_ids.any():
@@ -168,13 +166,28 @@ def normalize_phase1_events(
             out[col] = _DIRECTION_DEFAULT if col == "direction" else np.nan
         if col == "direction":
             out[col] = out[col].fillna(_DIRECTION_DEFAULT).astype(str).str.lower().str.strip()
-            out[col] = out[col].replace({"1": "long", "1.0": "long", "-1": "short", "-1.0": "short", "0": "neutral", "0.0": "neutral", "nan": _DIRECTION_DEFAULT})
+            out[col] = out[col].replace(
+                {
+                    "1": "long",
+                    "1.0": "long",
+                    "-1": "short",
+                    "-1.0": "short",
+                    "0": "neutral",
+                    "0.0": "neutral",
+                    "up": "long",
+                    "down": "short",
+                    "nan": _DIRECTION_DEFAULT,
+                }
+            )
             invalid = ~out[col].isin(VALID_DIRECTIONS)
             if invalid.any():
                 bad_vals = out.loc[invalid, col].unique()[:5]
                 logging.getLogger(__name__).warning(
                     "Event %s has %d rows with invalid direction values: %s → defaulting to '%s'",
-                    spec.event_type, int(invalid.sum()), list(bad_vals), _DIRECTION_DEFAULT,
+                    spec.event_type,
+                    int(invalid.sum()),
+                    list(bad_vals),
+                    _DIRECTION_DEFAULT,
                 )
                 out.loc[invalid, col] = _DIRECTION_DEFAULT
         else:
@@ -204,6 +217,7 @@ def normalize_phase1_events(
     ).reset_index(drop=True)
     return result
 
+
 def normalize_registry_events_frame(events: pd.DataFrame) -> pd.DataFrame:
     if events is None or events.empty:
         return _empty_registry_events()
@@ -218,9 +232,13 @@ def normalize_registry_events_frame(events: pd.DataFrame) -> pd.DataFrame:
     out["signal_column"] = out["signal_column"].fillna("").astype(str)
 
     out["timestamp"] = ts_ns_utc(out["timestamp"])
-    out["phenom_enter_ts"] = ts_ns_utc(out.get("phenom_enter_ts"), allow_nat=True).fillna(out["timestamp"])
+    out["phenom_enter_ts"] = ts_ns_utc(out.get("phenom_enter_ts"), allow_nat=True).fillna(
+        out["timestamp"]
+    )
     out["eval_bar_ts"] = ts_ns_utc(out.get("eval_bar_ts"), allow_nat=True).fillna(out["timestamp"])
-    out["detected_ts"] = ts_ns_utc(out.get("detected_ts"), allow_nat=True).fillna(out["phenom_enter_ts"])
+    out["detected_ts"] = ts_ns_utc(out.get("detected_ts"), allow_nat=True).fillna(
+        out["phenom_enter_ts"]
+    )
     out["signal_ts"] = ts_ns_utc(out.get("signal_ts"), allow_nat=True).fillna(out["detected_ts"])
     out["enter_ts"] = ts_ns_utc(out.get("enter_ts"), allow_nat=True).fillna(out["signal_ts"])
     out["exit_ts"] = ts_ns_utc(out.get("exit_ts"), allow_nat=True).fillna(out["enter_ts"])
@@ -232,19 +250,13 @@ def normalize_registry_events_frame(events: pd.DataFrame) -> pd.DataFrame:
     out["exit_ts"] = out["exit_ts"].where(out["exit_ts"].notna(), out["enter_ts"])
     out["exit_ts"] = np.maximum(out["exit_ts"], out["enter_ts"])
     out = out.dropna(subset=["timestamp"]).copy()
-    out["symbol"] = (
-        out["symbol"].fillna("ALL").astype(str).str.upper().replace("", "ALL")
-    )
+    out["symbol"] = out["symbol"].fillna("ALL").astype(str).str.upper().replace("", "ALL")
     out["event_id"] = out["event_id"].fillna("").astype(str)
     out["features_at_event"] = out["features_at_event"].fillna("{}").astype(str)
     for col in ("direction",):
         out[col] = out[col].fillna(_DIRECTION_DEFAULT).astype(str)
     for col in ("sign",):
         out[col] = pd.to_numeric(out[col], errors="coerce").astype("float64")
-    out = out.drop_duplicates(
-        subset=["event_type", "timestamp", "symbol", "event_id"]
-    ).copy()
-    out = out.sort_values(
-        ["timestamp", "symbol", "event_type", "event_id"]
-    ).reset_index(drop=True)
+    out = out.drop_duplicates(subset=["event_type", "timestamp", "symbol", "event_id"]).copy()
+    out = out.sort_values(["timestamp", "symbol", "event_type", "event_id"]).reset_index(drop=True)
     return out[REGISTRY_EVENT_COLUMNS]

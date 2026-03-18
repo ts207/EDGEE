@@ -18,6 +18,7 @@ from project.artifacts import (
     run_manifest_path,
 )
 
+
 def collect_core_artifact_snapshot(*, data_root: Path, run_id: str) -> Dict[str, Any]:
     run_manifest = load_json_dict(run_manifest_path(run_id, data_root))
     promotion_summary = load_json_dict(promotion_summary_path(run_id, data_root))
@@ -45,15 +46,11 @@ def collect_core_artifact_snapshot(*, data_root: Path, run_id: str) -> Dict[str,
         "run_id": str(run_id),
         "run_manifest": {
             "status": str(run_manifest.get("status", "")),
-            "run_mode": str(
-                run_manifest.get("run_mode", run_manifest.get("mode", ""))
-            ),
+            "run_mode": str(run_manifest.get("run_mode", run_manifest.get("mode", ""))),
             "objective_name": str(run_manifest.get("objective_name", "")),
             "retail_profile_name": str(run_manifest.get("retail_profile_name", "")),
             "objective_spec_hash": str(run_manifest.get("objective_spec_hash", "")),
-            "retail_profile_spec_hash": str(
-                run_manifest.get("retail_profile_spec_hash", "")
-            ),
+            "retail_profile_spec_hash": str(run_manifest.get("retail_profile_spec_hash", "")),
         },
         "promotion_summary": {
             "candidates_promoted_final": safe_int(
@@ -68,21 +65,15 @@ def collect_core_artifact_snapshot(*, data_root: Path, run_id: str) -> Dict[str,
         },
         "blueprint_summary": {
             "blueprint_count": safe_int(blueprint_summary.get("blueprint_count"), 0),
-            "fallback_event_count": safe_int(
-                blueprint_summary.get("fallback_event_count"), 0
-            ),
-            "candidates_compiled": safe_int(
-                blueprint_summary.get("candidates_compiled"), 0
-            ),
+            "fallback_event_count": safe_int(blueprint_summary.get("fallback_event_count"), 0),
+            "candidates_compiled": safe_int(blueprint_summary.get("candidates_compiled"), 0),
         },
         "checklist": {
             "decision": str(checklist.get("decision", "")),
         },
         "release_signoff": {
             "decision": str(release_signoff.get("decision", "")),
-            "override_count": safe_int(
-                release_override.get("non_production_override_count"), 0
-            ),
+            "override_count": safe_int(release_override.get("non_production_override_count"), 0),
         },
         "kpi_scorecard": {
             "net_expectancy_bps": safe_float(
@@ -114,6 +105,7 @@ def collect_core_artifact_snapshot(*, data_root: Path, run_id: str) -> Dict[str,
     }
     return snapshot
 
+
 @dataclass(frozen=True)
 class GoldenToleranceConfig:
     default_numeric_abs_tolerance: float
@@ -123,6 +115,7 @@ class GoldenToleranceConfig:
         if key in self.per_metric_abs_tolerance:
             return float(self.per_metric_abs_tolerance[key])
         return float(self.default_numeric_abs_tolerance)
+
 
 def load_tolerance_config(path: Path) -> GoldenToleranceConfig:
     if not path.exists():
@@ -155,9 +148,8 @@ def load_tolerance_config(path: Path) -> GoldenToleranceConfig:
         per_metric_abs_tolerance=out,
     )
 
-def _flatten_snapshot(
-    payload: Dict[str, Any], prefix: str = ""
-) -> Dict[str, Any]:
+
+def _flatten_snapshot(payload: Dict[str, Any], prefix: str = "") -> Dict[str, Any]:
     out: Dict[str, Any] = {}
     for key, value in payload.items():
         path = f"{prefix}.{key}" if prefix else str(key)
@@ -166,6 +158,7 @@ def _flatten_snapshot(
         else:
             out[path] = value
     return out
+
 
 def compare_golden_snapshots(
     *,

@@ -7,7 +7,10 @@ from typing import Any, Callable, Mapping, Sequence
 import pandas as pd
 
 from project.pipelines.research.approval_registry_v2 import write_registry_status_artifacts
-from project.pipelines.research.approval_workflow_v2 import ApprovalDecision, evaluate_approval_workflow
+from project.pipelines.research.approval_workflow_v2 import (
+    ApprovalDecision,
+    evaluate_approval_workflow,
+)
 
 
 @dataclass(frozen=True)
@@ -17,7 +20,7 @@ class FamilyBatchSpec:
     analyze_callable: Callable[..., tuple[pd.DataFrame, dict[str, Any]]]
     args: Sequence[Any] = field(default_factory=tuple)
     kwargs: Mapping[str, Any] = field(default_factory=dict)
-    current_status: str = 'prototype'
+    current_status: str = "prototype"
     reference_events: pd.DataFrame | None = None
     overlap_threshold: float = 0.8
     min_events: int = 20
@@ -30,7 +33,6 @@ class FamilyBatchResult:
     events: pd.DataFrame
     analyzer_results: dict[str, Any]
     approval_decision: ApprovalDecision
-
 
 
 def run_family_approval_batch(

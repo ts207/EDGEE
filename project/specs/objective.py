@@ -59,6 +59,7 @@ LOW_CAPITAL_STRICT_ENUMS = {
     "active_range_semantics": "[start,end)",
 }
 
+
 @dataclass(frozen=True)
 class ObjectiveProfileContract:
     objective_name: str
@@ -120,6 +121,7 @@ class ObjectiveProfileContract:
             "low_capital_contract": dict(self.low_capital_contract),
         }
 
+
 def _sha256_text(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
@@ -130,6 +132,7 @@ def _safe_positive_float(value: Any) -> Optional[float]:
         return None
     return float(out)
 
+
 def _safe_positive_int(value: Any) -> Optional[int]:
     out = safe_float(value)
     if out is None:
@@ -139,12 +142,14 @@ def _safe_positive_int(value: Any) -> Optional[int]:
         return None
     return val
 
+
 def _is_missing_scalar(value: Any) -> bool:
     if value is None:
         return True
     if isinstance(value, str):
         return not value.strip()
     return False
+
 
 def _extract_low_capital_contract(profile_cfg: Dict[str, Any]) -> Dict[str, Any]:
     if not isinstance(profile_cfg, dict):
@@ -164,6 +169,7 @@ def _extract_low_capital_contract(profile_cfg: Dict[str, Any]) -> Dict[str, Any]
         if key in profile_cfg:
             out[key] = profile_cfg.get(key)
     return out
+
 
 def assert_low_capital_contract(
     contract: ObjectiveProfileContract,
@@ -212,6 +218,7 @@ def assert_low_capital_contract(
 
     return cfg
 
+
 def _load_run_manifest(data_root: Path, run_id: str) -> Dict[str, Any]:
     path = data_root / "runs" / str(run_id) / "run_manifest.json"
     if not path.exists():
@@ -221,6 +228,7 @@ def _load_run_manifest(data_root: Path, run_id: str) -> Dict[str, Any]:
     except Exception:
         return {}
     return payload if isinstance(payload, dict) else {}
+
 
 def _resolve_objective_name(*, explicit: str | None, run_manifest: Dict[str, Any]) -> str:
     name = str(explicit or "").strip()
@@ -232,6 +240,7 @@ def _resolve_objective_name(*, explicit: str | None, run_manifest: Dict[str, Any
     from_env = str(os.getenv(DEFAULT_OBJECTIVE_NAME_ENV_VAR, "")).strip()
     return from_env or "retail_profitability"
 
+
 def _resolve_retail_profile_name(*, explicit: str | None, run_manifest: Dict[str, Any]) -> str:
     name = str(explicit or "").strip()
     if name:
@@ -241,6 +250,7 @@ def _resolve_retail_profile_name(*, explicit: str | None, run_manifest: Dict[str
         return from_manifest
     from_env = str(os.getenv(DEFAULT_RETAIL_PROFILE_NAME_ENV_VAR, "")).strip()
     return from_env or "capital_constrained"
+
 
 def _resolve_objective_spec_path(
     *,
@@ -259,6 +269,7 @@ def _resolve_objective_spec_path(
         return str(Path(from_env).resolve())
     return str((project_root.parent / "spec" / "objectives" / f"{objective_name}.yaml").resolve())
 
+
 def _resolve_retail_profiles_spec_path(
     *,
     project_root: Path,
@@ -274,6 +285,7 @@ def _resolve_retail_profiles_spec_path(
     if from_env:
         return str(Path(from_env).resolve())
     return str((project_root / "configs" / "retail_profiles.yaml").resolve())
+
 
 def resolve_objective_profile_contract(
     *,
@@ -356,9 +368,7 @@ def resolve_objective_profile_contract(
         and max_initial_margin_pct is not None
         and max_leverage is not None
     ):
-        capital_budget_usd = float(
-            target_account_size_usd * max_initial_margin_pct * max_leverage
-        )
+        capital_budget_usd = float(target_account_size_usd * max_initial_margin_pct * max_leverage)
 
     effective_per_position_notional_cap_usd: Optional[float] = max_position_notional_usd
     if capital_budget_usd is not None and max_concurrent_positions:

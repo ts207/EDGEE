@@ -18,7 +18,11 @@ from project.engine.portfolio_aggregator import (
     build_symbol_contributions,
     combine_strategy_symbols,
 )
-from project.engine.reporting_summarizer import summarize_pnl, summarize_portfolio_ledger, entry_count
+from project.engine.reporting_summarizer import (
+    summarize_pnl,
+    summarize_portfolio_ledger,
+    entry_count,
+)
 from project.engine.schema import (
     PORTFOLIO_FRAME_SCHEMA_VERSION,
     STRATEGY_FRAME_SCHEMA_VERSION,
@@ -48,12 +52,25 @@ LOGGER = logging.getLogger(__name__)
 _DEFAULT_TIMEFRAME = "5m"
 
 
-def _load_symbol_data(data_root: Path, symbol: str, run_id: str, timeframe: str) -> Tuple[pd.DataFrame, pd.DataFrame]:
+def _load_symbol_data(
+    data_root: Path, symbol: str, run_id: str, timeframe: str
+) -> Tuple[pd.DataFrame, pd.DataFrame]:
     return load_symbol_raw_data(data_root, symbol, run_id, timeframe)
 
 
-def _strategy_returns(symbol: str, bars: pd.DataFrame, features: pd.DataFrame, strategy_name: str, strategy_params: dict, cost_bps: float, data_root: Path, **kwargs) -> StrategyResult:
-    return calculate_strategy_returns(symbol, bars, features, strategy_name, strategy_params, cost_bps, data_root, **kwargs)
+def _strategy_returns(
+    symbol: str,
+    bars: pd.DataFrame,
+    features: pd.DataFrame,
+    strategy_name: str,
+    strategy_params: dict,
+    cost_bps: float,
+    data_root: Path,
+    **kwargs,
+) -> StrategyResult:
+    return calculate_strategy_returns(
+        symbol, bars, features, strategy_name, strategy_params, cost_bps, data_root, **kwargs
+    )
 
 
 def _infer_bps_from_cost(turnover: pd.Series, cost: pd.Series) -> pd.Series:
@@ -93,24 +110,47 @@ def _rebuild_frame_after_allocation(
     allocation_scale: pd.Series,
     clip_reason: pd.Series,
 ) -> pd.DataFrame:
-    rebuilt = frame.copy().sort_values([col for col in ["timestamp", "symbol", "strategy"] if col in frame.columns]).reset_index(drop=True)
+    rebuilt = (
+        frame.copy()
+        .sort_values([col for col in ["timestamp", "symbol", "strategy"] if col in frame.columns])
+        .reset_index(drop=True)
+    )
     ts = pd.to_datetime(rebuilt["timestamp"], utc=True)
     scale_aligned = ts.map(allocation_scale).fillna(1.0).astype(float)
     clip_aligned = ts.map(clip_reason).fillna("").astype(str)
 
     idx = pd.DatetimeIndex(ts)
-    target_position = pd.to_numeric(rebuilt["target_position"], errors="coerce").fillna(0.0).astype(float) * scale_aligned.values
+    target_position = (
+        pd.to_numeric(rebuilt["target_position"], errors="coerce").fillna(0.0).astype(float)
+        * scale_aligned.values
+    )
     close = pd.to_numeric(rebuilt["close"], errors="coerce").set_axis(idx)
-    open_series = pd.to_numeric(rebuilt.get("open", pd.Series(np.nan, index=rebuilt.index)), errors="coerce").set_axis(idx)
+    open_series = pd.to_numeric(
+        rebuilt.get("open", pd.Series(np.nan, index=rebuilt.index)), errors="coerce"
+    ).set_axis(idx)
 
     fill_mode = str(rebuilt.get("fill_mode", pd.Series(["close"])).iloc[0]).strip().lower()
-    turnover = pd.to_numeric(rebuilt.get("turnover", pd.Series(0.0, index=rebuilt.index)), errors="coerce").set_axis(idx)
-    transaction_cost = pd.to_numeric(rebuilt.get("transaction_cost", pd.Series(0.0, index=rebuilt.index)), errors="coerce").set_axis(idx)
-    slippage_cost = pd.to_numeric(rebuilt.get("slippage_cost", pd.Series(0.0, index=rebuilt.index)), errors="coerce").set_axis(idx)
-    funding_pnl = pd.to_numeric(rebuilt.get("funding_pnl", pd.Series(0.0, index=rebuilt.index)), errors="coerce").set_axis(idx)
-    borrow_cost = pd.to_numeric(rebuilt.get("borrow_cost", pd.Series(0.0, index=rebuilt.index)), errors="coerce").set_axis(idx)
-    executed_position_old = pd.to_numeric(rebuilt.get("executed_position", pd.Series(0.0, index=rebuilt.index)), errors="coerce").set_axis(idx)
-    capital_base = pd.to_numeric(rebuilt.get("capital_base", pd.Series(1.0, index=rebuilt.index)), errors="coerce").set_axis(idx)
+    turnover = pd.to_numeric(
+        rebuilt.get("turnover", pd.Series(0.0, index=rebuilt.index)), errors="coerce"
+    ).set_axis(idx)
+    transaction_cost = pd.to_numeric(
+        rebuilt.get("transaction_cost", pd.Series(0.0, index=rebuilt.index)), errors="coerce"
+    ).set_axis(idx)
+    slippage_cost = pd.to_numeric(
+        rebuilt.get("slippage_cost", pd.Series(0.0, index=rebuilt.index)), errors="coerce"
+    ).set_axis(idx)
+    funding_pnl = pd.to_numeric(
+        rebuilt.get("funding_pnl", pd.Series(0.0, index=rebuilt.index)), errors="coerce"
+    ).set_axis(idx)
+    borrow_cost = pd.to_numeric(
+        rebuilt.get("borrow_cost", pd.Series(0.0, index=rebuilt.index)), errors="coerce"
+    ).set_axis(idx)
+    executed_position_old = pd.to_numeric(
+        rebuilt.get("executed_position", pd.Series(0.0, index=rebuilt.index)), errors="coerce"
+    ).set_axis(idx)
+    capital_base = pd.to_numeric(
+        rebuilt.get("capital_base", pd.Series(1.0, index=rebuilt.index)), errors="coerce"
+    ).set_axis(idx)
 
     cost_bps = _infer_bps_from_cost(turnover, transaction_cost)
     slippage_bps = _infer_bps_from_cost(turnover, slippage_cost)
@@ -211,7 +251,9 @@ def run_engine(
     universe_snapshots = load_universe_snapshots(data_root, run_id)
 
     for strategy_name in strategies:
-        strategy_params = (params_by_strategy.get(strategy_name, params) if params_by_strategy else params)
+        strategy_params = (
+            params_by_strategy.get(strategy_name, params) if params_by_strategy else params
+        )
         strategy_obj = get_strategy(strategy_name)
         required_features = getattr(strategy_obj, "required_features", []) or []
         feature_cols = sorted(
@@ -232,36 +274,53 @@ def run_engine(
                 blueprint_run_id = str(
                     strategy_params.get("dsl_blueprint", {}).get(
                         "run_id",
-                        strategy_params.get("executable_strategy_spec", {}).get(
-                            "metadata", {}
-                        ).get("run_id", run_id),
+                        strategy_params.get("executable_strategy_spec", {})
+                        .get("metadata", {})
+                        .get("run_id", run_id),
                     )
                 )
                 cache_key = (blueprint_run_id, str(symbol).upper())
                 if cache_key not in event_flags_cache:
-                    event_flags_cache[cache_key] = load_registry_flags(data_root=data_root, run_id=blueprint_run_id, symbol=symbol)
+                    event_flags_cache[cache_key] = load_registry_flags(
+                        data_root=data_root, run_id=blueprint_run_id, symbol=symbol
+                    )
                 event_flags = event_flags_cache[cache_key]
                 if cache_key not in event_features_cache:
-                    event_features_cache[cache_key] = build_event_feature_frame(data_root=data_root, run_id=blueprint_run_id, symbol=symbol)
+                    event_features_cache[cache_key] = build_event_feature_frame(
+                        data_root=data_root, run_id=blueprint_run_id, symbol=symbol
+                    )
                 event_features = event_features_cache[cache_key]
 
             bars, features_raw = load_symbol_raw_data(
-                data_root, symbol, run_id, timeframe,
+                data_root,
+                symbol,
+                run_id,
+                timeframe,
                 bars_columns=bars_cols,
                 feature_columns=feature_cols,
                 start_ts=start_ts,
                 end_ts=end_ts,
             )
             features = assemble_symbol_context(
-                bars, features_raw, data_root, symbol, run_id, timeframe,
-                start_ts, end_ts, event_flags, event_features,
+                bars,
+                features_raw,
+                data_root,
+                symbol,
+                run_id,
+                timeframe,
+                start_ts,
+                end_ts,
+                event_flags,
+                event_features,
                 event_feature_ffill_bars=int(strategy_params.get("event_feature_ffill_bars", 12)),
             )
 
             ts_index = pd.DatetimeIndex(pd.to_datetime(bars["timestamp"], utc=True))
             eligibility_mask = pd.Series(True, index=ts_index, dtype=bool)
             if not universe_snapshots.empty:
-                rows = universe_snapshots[universe_snapshots["symbol"].astype(str).str.upper() == str(symbol).upper()]
+                rows = universe_snapshots[
+                    universe_snapshots["symbol"].astype(str).str.upper() == str(symbol).upper()
+                ]
                 if rows.empty:
                     eligibility_mask[:] = False
                 else:
@@ -272,7 +331,13 @@ def run_engine(
                     eligibility_mask = pd.Series(mask, index=ts_index, dtype=bool)
 
             result = calculate_strategy_returns(
-                symbol, bars, features, strategy_name, strategy_params, cost_bps, data_root,
+                symbol,
+                bars,
+                features,
+                strategy_name,
+                strategy_params,
+                cost_bps,
+                data_root,
                 eligibility_mask=eligibility_mask,
                 calibration_dir=data_root / "reports" / "cost_calibration" / run_id,
             )
@@ -292,8 +357,12 @@ def run_engine(
     requested_scale_by_strategy = {}
     for name, frame in strategy_frames.items():
         validate_strategy_frame_schema(frame, frame_name=f"strategy frame [{name}]")
-        raw_positions_by_strategy[name] = frame.groupby("timestamp", sort=True)["signal_position"].sum()
-        requested_scale_by_strategy[name] = frame.groupby("timestamp", sort=True)["requested_position_scale"].mean()
+        raw_positions_by_strategy[name] = frame.groupby("timestamp", sort=True)[
+            "signal_position"
+        ].sum()
+        requested_scale_by_strategy[name] = frame.groupby("timestamp", sort=True)[
+            "requested_position_scale"
+        ].mean()
 
     allocation_diagnostics = pd.DataFrame()
     allocation_contract: AllocationContract | None = None
@@ -314,14 +383,22 @@ def run_engine(
         )
         allocation_contract = allocation.contract
         allocation_diagnostics = allocation.diagnostics.copy()
-        clip_reason_series = allocation_diagnostics.set_index("timestamp")["clip_reason"] if not allocation_diagnostics.empty else pd.Series(dtype=object)
+        clip_reason_series = (
+            allocation_diagnostics.set_index("timestamp")["clip_reason"]
+            if not allocation_diagnostics.empty
+            else pd.Series(dtype=object)
+        )
         for name, frame in list(strategy_frames.items()):
             strategy_frames[name] = _rebuild_frame_after_allocation(
                 frame,
-                allocation_scale=allocation.scale_by_strategy.get(name, pd.Series(1.0, index=raw_positions_by_strategy[name].index)),
+                allocation_scale=allocation.scale_by_strategy.get(
+                    name, pd.Series(1.0, index=raw_positions_by_strategy[name].index)
+                ),
                 clip_reason=clip_reason_series,
             )
-            validate_strategy_frame_schema(strategy_frames[name], frame_name=f"strategy frame [{name}] post-allocation")
+            validate_strategy_frame_schema(
+                strategy_frames[name], frame_name=f"strategy frame [{name}] post-allocation"
+            )
         metrics["allocation"] = allocation.summary
 
     for name, frame in strategy_frames.items():
@@ -335,7 +412,11 @@ def run_engine(
         validate_portfolio_frame_schema(portfolio)
     strategy_contributions = build_strategy_contributions(strategy_frames, portfolio)
     symbol_contributions = build_symbol_contributions(strategy_frames, portfolio)
-    metrics["portfolio"] = summarize_portfolio_ledger(portfolio) if not portfolio.empty else summarize_portfolio_ledger(pd.DataFrame())
+    metrics["portfolio"] = (
+        summarize_portfolio_ledger(portfolio)
+        if not portfolio.empty
+        else summarize_portfolio_ledger(pd.DataFrame())
+    )
 
     artifact_inventory = []
     for name, frame in strategy_frames.items():

@@ -25,12 +25,16 @@ def normalize_timestamp(value: str | pd.Timestamp) -> pd.Timestamp:
     return ts.tz_convert("UTC")
 
 
-def bars_to_timedelta(bars: int, *, bar_duration_minutes: int = DEFAULT_BAR_DURATION_MINUTES) -> pd.Timedelta:
+def bars_to_timedelta(
+    bars: int, *, bar_duration_minutes: int = DEFAULT_BAR_DURATION_MINUTES
+) -> pd.Timedelta:
     return pd.Timedelta(minutes=max(0, int(bars)) * max(1, int(bar_duration_minutes)))
 
 
 def resolve_split_scheme(split_scheme_id: str | None) -> tuple[str, float, float]:
-    raw = str(split_scheme_id or _DEFAULT_SPLIT_SCHEME_ID).strip().upper() or _DEFAULT_SPLIT_SCHEME_ID
+    raw = (
+        str(split_scheme_id or _DEFAULT_SPLIT_SCHEME_ID).strip().upper() or _DEFAULT_SPLIT_SCHEME_ID
+    )
     if raw in _SPLIT_SCHEME_ALIASES:
         train_frac, validation_frac = _SPLIT_SCHEME_ALIASES[raw]
         return raw, float(train_frac), float(validation_frac)
@@ -168,7 +172,9 @@ def assign_split_labels(
         out = out.loc[~excluded_mask].copy()
         labels = labels.loc[out.index]
     out[split_col] = labels.astype(str)
-    out["split_plan_id"] = f"TVT_{int(round(train_frac*100))}_{int(round(validation_frac*100))}_{100-int(round((train_frac+validation_frac)*100))}"
+    out["split_plan_id"] = (
+        f"TVT_{int(round(train_frac * 100))}_{int(round(validation_frac * 100))}_{100 - int(round((train_frac + validation_frac) * 100))}"
+    )
     out["purge_bars_used"] = int(purge_bars)
     out["embargo_bars_used"] = int(embargo_bars)
     out["bar_duration_minutes"] = int(bar_duration_minutes)

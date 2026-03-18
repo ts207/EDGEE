@@ -15,4 +15,3 @@ __all__ = [
     "compute_distance_matrix",
     "select_cluster_representatives",
 ]
-

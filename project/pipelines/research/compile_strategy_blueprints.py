@@ -16,7 +16,12 @@ import yaml
 import dataclasses
 
 from project import PROJECT_ROOT
-from project.artifacts import checklist_path, load_json_dict, phase2_candidates_path, run_manifest_path
+from project.artifacts import (
+    checklist_path,
+    load_json_dict,
+    phase2_candidates_path,
+    run_manifest_path,
+)
 from project.compilers import ExecutableStrategySpec
 from project.domain.compiled_registry import get_domain_registry
 
@@ -171,13 +176,22 @@ def _passes_quality_floor(
     tob_cov = coerce_numeric_nan(row.get("tob_coverage"))
     if min_tob_coverage > 0.0 and not finite_ge(tob_cov, min_tob_coverage):
         return False
-    net_exp = coerce_numeric_nan(row.get("bridge_validation_after_cost_bps", row.get("after_cost_expectancy_per_trade", 0.0) * 10_000.0))
+    net_exp = coerce_numeric_nan(
+        row.get(
+            "bridge_validation_after_cost_bps",
+            row.get("after_cost_expectancy_per_trade", 0.0) * 10_000.0,
+        )
+    )
     if min_net_expectancy_bps > 0.0 and not finite_ge(net_exp, min_net_expectancy_bps):
         return False
     if require_positive_expectancy and not finite_ge(net_exp, 1e-9):
         return False
     turnover = coerce_numeric_nan(row.get("turnover_proxy_mean"))
-    turnover_cap = float(max_daily_turnover_multiple) if max_daily_turnover_multiple is not None else float("inf")
+    turnover_cap = (
+        float(max_daily_turnover_multiple)
+        if max_daily_turnover_multiple is not None
+        else float("inf")
+    )
     if np.isfinite(turnover_cap) and not finite_le(turnover, turnover_cap):
         return False
     if expected_cost_digest is not None:
@@ -186,34 +200,43 @@ def _passes_quality_floor(
             return False
     if strict_cost_fields:
         cost = coerce_numeric_nan(row.get("bridge_effective_cost_bps_per_trade"))
-        cost_cap = float(max_fee_plus_slippage_bps) if max_fee_plus_slippage_bps is not None else float("inf")
+        cost_cap = (
+            float(max_fee_plus_slippage_bps)
+            if max_fee_plus_slippage_bps is not None
+            else float("inf")
+        )
         if np.isfinite(cost_cap) and not finite_le(cost, cost_cap):
             return False
     return True
 
 
-
 def _passes_fallback_gate(row: Dict[str, Any], gate_spec: Dict[str, Any]) -> bool:
     t_stat = coerce_numeric_nan(row.get("t_stat"))
     min_t = coerce_numeric_nan(gate_spec.get("min_t_stat"))
-    if not np.isfinite(min_t): min_t = 0.0
-    
+    if not np.isfinite(min_t):
+        min_t = 0.0
+
     if not finite_ge(t_stat, min_t):
         return False
-        
-    exp_bps = coerce_numeric_nan(row.get("after_cost_expectancy_per_trade", row.get("expectancy_bps", 0.0) / 10_000.0)) * 10_000.0
+
+    exp_bps = (
+        coerce_numeric_nan(
+            row.get("after_cost_expectancy_per_trade", row.get("expectancy_bps", 0.0) / 10_000.0)
+        )
+        * 10_000.0
+    )
     min_exp = coerce_numeric_nan(gate_spec.get("min_after_cost_expectancy_bps"))
-    if not np.isfinite(min_exp): min_exp = 0.0
-    
+    if not np.isfinite(min_exp):
+        min_exp = 0.0
+
     if not finite_ge(exp_bps, min_exp):
         return False
-        
+
     n = safe_int(row.get("n_events"), 0)
     min_n = safe_int(gate_spec.get("min_sample_size"), 0)
     if n < min_n:
         return False
     return True
-
 
 
 def _build_strategy_contract(
@@ -299,7 +322,9 @@ def _validate_strategy_contract(
 ) -> None:
     if strategy_spec.entry.order_type_assumption != "market":
         raise ValueError("unsupported order_type_assumption in executable strategy spec")
-    if strategy_spec.entry.delay_bars != strategy_spec.execution.policy_executor_config.get("entry_delay_bars"):
+    if strategy_spec.entry.delay_bars != strategy_spec.execution.policy_executor_config.get(
+        "entry_delay_bars"
+    ):
         raise ValueError("entry delay mismatch between entry and policy_executor_config")
     if require_low_capital_contract and not low_capital_contract:
         raise ValueError("low_capital_contract is required but empty")
@@ -360,11 +385,19 @@ def _write_strategy_contract_artifacts(
         except ValueError as exc:
             LOGGER.warning("Strategy contract validation failed for %s: %s", bp.id, exc)
         executable_path = executable_dir / f"{bp.id}.executable_strategy_spec.json"
-        executable_path.write_text(json.dumps(executable_spec.model_dump(), indent=2), encoding="utf-8")
-        executable_entries.append({"id": bp.id, "candidate_id": bp.candidate_id, "path": str(executable_path)})
+        executable_path.write_text(
+            json.dumps(executable_spec.model_dump(), indent=2), encoding="utf-8"
+        )
+        executable_entries.append(
+            {"id": bp.id, "candidate_id": bp.candidate_id, "path": str(executable_path)}
+        )
         allocation_path = allocation_dir / f"{bp.id}.allocation_spec.json"
-        allocation_path.write_text(json.dumps(allocation_spec.model_dump(), indent=2), encoding="utf-8")
-        allocation_entries.append({"id": bp.id, "candidate_id": bp.candidate_id, "path": str(allocation_path)})
+        allocation_path.write_text(
+            json.dumps(allocation_spec.model_dump(), indent=2), encoding="utf-8"
+        )
+        allocation_entries.append(
+            {"id": bp.id, "candidate_id": bp.candidate_id, "path": str(allocation_path)}
+        )
         executor_lines.append(json.dumps(executable_spec.execution.policy_executor_config))
 
     executable_index = {"count": len(executable_entries), "entries": executable_entries}
@@ -398,7 +431,6 @@ def _load_run_mode(run_id: str) -> str:
     return str(mode).strip().lower()
 
 
-
 def _enforce_deploy_mode_retail_viability(
     df: pd.DataFrame,
     *,
@@ -411,12 +443,15 @@ def _enforce_deploy_mode_retail_viability(
     if str(run_mode).strip().lower() not in deploy_modes:
         return
     if forbid_fallback_in_deploy_mode and "promotion_track" in df.columns:
-        fallback_rows = df[df["promotion_track"].astype(str).str.contains("fallback", case=False, na=False)]
+        fallback_rows = df[
+            df["promotion_track"].astype(str).str.contains("fallback", case=False, na=False)
+        ]
         if not fallback_rows.empty:
             raise ValueError(
                 f"fallback policy violated in deploy-mode compile"
                 f" (source={source_label}): {len(fallback_rows)} fallback-track row(s)"
             )
+
 
 def _build_blueprint(
     *,
@@ -451,27 +486,33 @@ def _build_blueprint(
         min_events=int(min_events),
     )
 
-def _event_stats(run_id: str, event_type: str, train_end_date: Optional[pd.Timestamp] = None) -> Dict[str, Any]:
+
+def _event_stats(
+    run_id: str, event_type: str, train_end_date: Optional[pd.Timestamp] = None
+) -> Dict[str, Any]:
     """Load simple event-level move statistics for compilation diagnostics."""
     df = _load_phase2_table(run_id, event_type)
     if df.empty:
         return {"adverse": [], "favorable": [], "count": 0}
-    
+
     if "timestamp" in df.columns:
         df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True)
         if train_end_date:
             df = df[df["timestamp"] <= train_end_date].copy()
-            
+
     return {
         "adverse": df["adverse_move"].tolist() if "adverse_move" in df.columns else [],
         "favorable": df["favorable_move"].tolist() if "favorable_move" in df.columns else [],
-        "count": len(df)
+        "count": len(df),
     }
+
 
 LOGGER = logging.getLogger(__name__)
 
+
 def _load_operator_registry() -> Dict[str, Dict[str, Any]]:
     return get_domain_registry().operator_rows()
+
 
 def _checklist_decision(run_id: str) -> str:
     payload = load_json_dict(checklist_path(run_id, DATA_ROOT))
@@ -518,6 +559,7 @@ def _annotate_blueprints_with_external_validation_evidence(
         "wf_evidence_source": source,
     }
 
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Compile strategy blueprints.")
     parser.add_argument("--run_id", required=True)
@@ -539,11 +581,15 @@ def main() -> int:
     parser.add_argument("--quality_floor_fallback", type=float, default=0.0)
     args = parser.parse_args()
 
-    out_dir = Path(args.out_dir) if args.out_dir else DATA_ROOT / "reports" / "strategy_blueprints" / args.run_id
+    out_dir = (
+        Path(args.out_dir)
+        if args.out_dir
+        else DATA_ROOT / "reports" / "strategy_blueprints" / args.run_id
+    )
     ensure_dir(out_dir)
 
     manifest = start_manifest("compile_strategy_blueprints", args.run_id, vars(args), [], [])
-    
+
     try:
         # 1. Setup and Loading
         contract = resolve_objective_profile_contract(
@@ -554,7 +600,7 @@ def main() -> int:
         )
         operator_registry = _load_operator_registry()
         ontology_hash = ontology_spec_hash(PROJECT_ROOT.parent)
-        
+
         # 2. Checklist Gate
         if not args.ignore_checklist:
             if _checklist_decision(args.run_id) != "PROMOTE":
@@ -566,13 +612,19 @@ def main() -> int:
         if args.candidates_file:
             promoted_path = Path(args.candidates_file)
         else:
-            promoted_path = DATA_ROOT / "reports" / "promotions" / args.run_id / "promoted_candidates.parquet"
+            promoted_path = (
+                DATA_ROOT / "reports" / "promotions" / args.run_id / "promoted_candidates.parquet"
+            )
             if not promoted_path.exists():
                 promoted_path = promoted_path.with_suffix(".csv")
         if not promoted_path.exists():
             raise FileNotFoundError(f"Missing promoted candidates: {promoted_path}")
 
-        edge_df = pd.read_parquet(promoted_path) if promoted_path.suffix == ".parquet" else pd.read_csv(promoted_path)
+        edge_df = (
+            pd.read_parquet(promoted_path)
+            if promoted_path.suffix == ".parquet"
+            else pd.read_csv(promoted_path)
+        )
         edge_df = ensure_candidate_schema(edge_df)
 
         # 3b. Deploy-mode retail viability gate
@@ -587,18 +639,18 @@ def main() -> int:
                     print(message, file=sys.stderr)
                     finalize_manifest(manifest, "failed", error="deploy-mode retail gate")
                     return 1
-        
+
         # 4. Compilation Loop
         blueprints: List[Blueprint] = []
         symbols = [s.strip().upper() for s in args.symbols.split(",") if s.strip()]
-        
+
         for row in edge_df.to_dict("records"):
             # Call Service
             bp, _ = compile_blueprint(
                 merged_row=row,
                 run_id=args.run_id,
                 run_symbols=symbols,
-                stats={}, # Placeholder for detailed stats if needed
+                stats={},  # Placeholder for detailed stats if needed
                 fees_bps=safe_float(args.fees_bps, 4.0),
                 slippage_bps=safe_float(args.slippage_bps, 2.0),
                 ontology_spec_hash_value=ontology_hash,
@@ -612,13 +664,14 @@ def main() -> int:
         with out_jsonl.open("w", encoding="utf-8") as f:
             for bp in blueprints:
                 f.write(json.dumps(bp.to_dict(), sort_keys=True) + "\n")
-        
+
         finalize_manifest(manifest, "success", stats={"blueprint_count": len(blueprints)})
         return 0
     except Exception as exc:
         logging.exception("Compilation failed")
         finalize_manifest(manifest, "failed", error=str(exc))
         return 1
+
 
 if __name__ == "__main__":
     sys.exit(main())

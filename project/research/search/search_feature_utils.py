@@ -49,8 +49,16 @@ def normalize_search_feature_columns(features: pd.DataFrame) -> pd.DataFrame:
     if "chop_state" not in out.columns and "chop_regime" in out.columns:
         out["chop_state"] = pd.to_numeric(out["chop_regime"], errors="coerce").fillna(0.0)
     if "trending_state" not in out.columns:
-        bull_source = out["bull_trend_regime"] if "bull_trend_regime" in out.columns else pd.Series(0.0, index=out.index)
-        bear_source = out["bear_trend_regime"] if "bear_trend_regime" in out.columns else pd.Series(0.0, index=out.index)
+        bull_source = (
+            out["bull_trend_regime"]
+            if "bull_trend_regime" in out.columns
+            else pd.Series(0.0, index=out.index)
+        )
+        bear_source = (
+            out["bear_trend_regime"]
+            if "bear_trend_regime" in out.columns
+            else pd.Series(0.0, index=out.index)
+        )
         bull = pd.to_numeric(bull_source, errors="coerce").fillna(0.0)
         bear = pd.to_numeric(bear_source, errors="coerce").fillna(0.0)
         out["trending_state"] = ((bull > 0) | (bear > 0)).astype(float)
@@ -66,7 +74,9 @@ def prepare_search_features_for_symbol(
     data_root: Path,
     load_features_fn=_load_features_wrapper,
 ) -> pd.DataFrame:
-    features = load_features_fn(run_id=run_id, symbol=symbol, timeframe=timeframe, data_root=data_root)
+    features = load_features_fn(
+        run_id=run_id, symbol=symbol, timeframe=timeframe, data_root=data_root
+    )
     if features.empty:
         return features
 

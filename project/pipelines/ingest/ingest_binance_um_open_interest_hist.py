@@ -26,11 +26,14 @@ DEFAULT_ARCHIVE_BASE = "https://data.binance.vision/data/futures/um"
 DEFAULT_ARCHIVE_LIST_BASE = "https://s3-ap-northeast-1.amazonaws.com/data.binance.vision"
 _ARCHIVE_KEY_DATE_RE = re.compile(r"-metrics-(\d{4}-\d{2}-\d{2})\.zip$")
 
+
 def _parse_date(value: str) -> datetime:
     return datetime.strptime(value, "%Y-%m-%d").replace(tzinfo=timezone.utc)
 
+
 def _month_start(ts: datetime) -> datetime:
     return ts.astimezone(timezone.utc).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
 
 def _next_month(ts: datetime) -> datetime:
     ts = ts.astimezone(timezone.utc)
@@ -42,6 +45,7 @@ def _next_month(ts: datetime) -> datetime:
         m += 1
     return ts.replace(year=y, month=m, day=1, hour=0, minute=0, second=0, microsecond=0)
 
+
 def _iter_months(start: datetime, end: datetime) -> List[datetime]:
     out: List[datetime] = []
     cur = _month_start(start)
@@ -50,12 +54,16 @@ def _iter_months(start: datetime, end: datetime) -> List[datetime]:
         cur = _next_month(cur)
     return out
 
+
 def _iter_days(start: datetime, end_exclusive: datetime) -> Iterable[datetime]:
     cursor = start.astimezone(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
-    end_exclusive = end_exclusive.astimezone(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    end_exclusive = end_exclusive.astimezone(timezone.utc).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    )
     while cursor < end_exclusive:
         yield cursor
         cursor += timedelta(days=1)
+
 
 def _read_csv_from_zip(path: Path) -> pd.DataFrame:
     with ZipFile(path) as zf:
@@ -63,7 +71,10 @@ def _read_csv_from_zip(path: Path) -> pd.DataFrame:
         with zf.open(csv_name) as f:
             return pd.read_csv(f)
 
-def _list_available_metric_day_set(symbol: str, list_base: str, session: requests.Session) -> set[str]:
+
+def _list_available_metric_day_set(
+    symbol: str, list_base: str, session: requests.Session
+) -> set[str]:
     prefix = f"data/futures/um/daily/metrics/{symbol}/{symbol}-metrics-"
     marker: str | None = None
     out: set[str] = set()
@@ -87,7 +98,9 @@ def _list_available_metric_day_set(symbol: str, list_base: str, session: request
             if m:
                 out.add(m.group(1))
 
-        is_truncated = (root.findtext("s3:IsTruncated", default="false", namespaces=ns) or "").lower() == "true"
+        is_truncated = (
+            root.findtext("s3:IsTruncated", default="false", namespaces=ns) or ""
+        ).lower() == "true"
         if not is_truncated:
             break
 
@@ -102,10 +115,18 @@ def _list_available_metric_day_set(symbol: str, list_base: str, session: request
 
     return out
 
+
 def _normalize_archive_metrics(df: pd.DataFrame, symbol: str) -> pd.DataFrame:
     if df.empty:
         return pd.DataFrame(
-            columns=["timestamp", "symbol", "sum_open_interest", "sum_open_interest_value", "cmc_circulating_supply", "source"]
+            columns=[
+                "timestamp",
+                "symbol",
+                "sum_open_interest",
+                "sum_open_interest_value",
+                "cmc_circulating_supply",
+                "source",
+            ]
         )
 
     ts_col = None
@@ -120,7 +141,9 @@ def _normalize_archive_metrics(df: pd.DataFrame, symbol: str) -> pd.DataFrame:
         {
             "timestamp": pd.to_datetime(df[ts_col], utc=True, errors="coerce"),
             "symbol": symbol,
-            "sum_open_interest": pd.to_numeric(df.get("sum_open_interest", df.get("sumOpenInterest")), errors="coerce"),
+            "sum_open_interest": pd.to_numeric(
+                df.get("sum_open_interest", df.get("sumOpenInterest")), errors="coerce"
+            ),
             "sum_open_interest_value": pd.to_numeric(
                 df.get("sum_open_interest_value", df.get("sumOpenInterestValue")), errors="coerce"
             ),
@@ -130,9 +153,15 @@ def _normalize_archive_metrics(df: pd.DataFrame, symbol: str) -> pd.DataFrame:
             "source": "archive_metrics_daily",
         }
     )
-    out = out.dropna(subset=["timestamp"]).sort_values("timestamp").drop_duplicates(subset=["timestamp"]).reset_index(drop=True)
+    out = (
+        out.dropna(subset=["timestamp"])
+        .sort_values("timestamp")
+        .drop_duplicates(subset=["timestamp"])
+        .reset_index(drop=True)
+    )
     ensure_utc_timestamp(out["timestamp"], "timestamp")
     return out
+
 
 def _fetch_open_interest_archive_metrics(
     session: requests.Session,
@@ -144,7 +173,9 @@ def _fetch_open_interest_archive_metrics(
     max_retries: int,
     retry_backoff_sec: float,
 ) -> Tuple[pd.DataFrame, Dict[str, int]]:
-    day_set = _list_available_metric_day_set(symbol=symbol, list_base=archive_list_base, session=session)
+    day_set = _list_available_metric_day_set(
+        symbol=symbol, list_base=archive_list_base, session=session
+    )
     frames: List[pd.DataFrame] = []
 
     stats = {
@@ -190,13 +221,25 @@ def _fetch_open_interest_archive_metrics(
         pd.concat(frames, ignore_index=True)
         if frames
         else pd.DataFrame(
-            columns=["timestamp", "symbol", "sum_open_interest", "sum_open_interest_value", "cmc_circulating_supply", "source"]
+            columns=[
+                "timestamp",
+                "symbol",
+                "sum_open_interest",
+                "sum_open_interest_value",
+                "cmc_circulating_supply",
+                "source",
+            ]
         )
     )
     if not out.empty:
         out = out[(out["timestamp"] >= start) & (out["timestamp"] < end_exclusive)].copy()
-        out = out.sort_values("timestamp").drop_duplicates(subset=["timestamp"]).reset_index(drop=True)
+        out = (
+            out.sort_values("timestamp")
+            .drop_duplicates(subset=["timestamp"])
+            .reset_index(drop=True)
+        )
     return out, stats
+
 
 def _fetch_open_interest_hist_api(
     session: requests.Session,
@@ -255,7 +298,9 @@ def _fetch_open_interest_hist_api(
             raise RuntimeError(f"Unexpected openInterestHist payload for {symbol}: {payload}")
 
         rows.extend(payload)
-        ts_values = [int(row.get("timestamp", 0) or 0) for row in payload if row.get("timestamp") is not None]
+        ts_values = [
+            int(row.get("timestamp", 0) or 0) for row in payload if row.get("timestamp") is not None
+        ]
         if not ts_values:
             break
         last_ts = max(ts_values)
@@ -266,22 +311,45 @@ def _fetch_open_interest_hist_api(
     if not rows:
         return (
             pd.DataFrame(
-                columns=["timestamp", "symbol", "sum_open_interest", "sum_open_interest_value", "cmc_circulating_supply", "source"]
+                columns=[
+                    "timestamp",
+                    "symbol",
+                    "sum_open_interest",
+                    "sum_open_interest_value",
+                    "cmc_circulating_supply",
+                    "source",
+                ]
             ),
             api_calls,
         )
 
     df = pd.DataFrame(rows)
-    df["timestamp"] = pd.to_datetime(pd.to_numeric(df.get("timestamp"), errors="coerce"), unit="ms", utc=True, errors="coerce")
+    df["timestamp"] = pd.to_datetime(
+        pd.to_numeric(df.get("timestamp"), errors="coerce"), unit="ms", utc=True, errors="coerce"
+    )
     df["symbol"] = symbol
     df["sum_open_interest"] = pd.to_numeric(df.get("sumOpenInterest"), errors="coerce")
     df["sum_open_interest_value"] = pd.to_numeric(df.get("sumOpenInterestValue"), errors="coerce")
     df["cmc_circulating_supply"] = pd.to_numeric(df.get("CMCCirculatingSupply"), errors="coerce")
     df["source"] = "api"
-    out = df[["timestamp", "symbol", "sum_open_interest", "sum_open_interest_value", "cmc_circulating_supply", "source"]].copy()
-    out = out.dropna(subset=["timestamp"]).sort_values("timestamp").drop_duplicates(subset=["timestamp"])
+    out = df[
+        [
+            "timestamp",
+            "symbol",
+            "sum_open_interest",
+            "sum_open_interest_value",
+            "cmc_circulating_supply",
+            "source",
+        ]
+    ].copy()
+    out = (
+        out.dropna(subset=["timestamp"])
+        .sort_values("timestamp")
+        .drop_duplicates(subset=["timestamp"])
+    )
     ensure_utc_timestamp(out["timestamp"], "timestamp")
     return out, api_calls
+
 
 def _fetch_open_interest_hist(
     session: requests.Session,
@@ -310,6 +378,7 @@ def _fetch_open_interest_hist(
         timeout_sec=30,
     )
 
+
 def _partition_has_rows(path: Path) -> bool:
     target = path
     if not target.exists():
@@ -323,6 +392,7 @@ def _partition_has_rows(path: Path) -> bool:
     except Exception:
         return False
     return int(len(df)) > 0
+
 
 def main() -> int:
     data_root = get_data_root()
@@ -353,7 +423,9 @@ def main() -> int:
     if args.log_path:
         ensure_dir(Path(args.log_path).parent)
         log_handlers.append(logging.FileHandler(args.log_path))
-    logging.basicConfig(level=logging.INFO, handlers=log_handlers, format="%(asctime)s %(levelname)s %(message)s")
+    logging.basicConfig(
+        level=logging.INFO, handlers=log_handlers, format="%(asctime)s %(levelname)s %(message)s"
+    )
 
     run_id = args.run_id
     symbols = [s.strip().upper() for s in args.symbols.split(",") if s.strip()]
@@ -383,7 +455,9 @@ def main() -> int:
     }
     inputs: List[Dict[str, object]] = []
     outputs: List[Dict[str, object]] = []
-    manifest = start_manifest("ingest_binance_um_open_interest_hist", run_id, params, inputs, outputs)
+    manifest = start_manifest(
+        "ingest_binance_um_open_interest_hist", run_id, params, inputs, outputs
+    )
 
     stats: Dict[str, object] = {
         "symbols": {},
@@ -400,7 +474,12 @@ def main() -> int:
         total_written_parts = 0
 
         for symbol in symbols:
-            logging.info("Open-interest ingest symbol=%s mode=%s period=%s", symbol, args.ingest_mode, args.period)
+            logging.info(
+                "Open-interest ingest symbol=%s mode=%s period=%s",
+                symbol,
+                args.ingest_mode,
+                args.period,
+            )
 
             source_frames: List[pd.DataFrame] = []
             symbol_stats: Dict[str, object] = {}
@@ -487,15 +566,23 @@ def main() -> int:
             )
             if not oi_df.empty:
                 # Keep API row on overlap if both archive+api provided.
-                oi_df = oi_df.drop_duplicates(subset=["timestamp"], keep="last").sort_values("timestamp").reset_index(drop=True)
-                oi_df = oi_df[(oi_df["timestamp"] >= start) & (oi_df["timestamp"] < end_exclusive)].copy()
+                oi_df = (
+                    oi_df.drop_duplicates(subset=["timestamp"], keep="last")
+                    .sort_values("timestamp")
+                    .reset_index(drop=True)
+                )
+                oi_df = oi_df[
+                    (oi_df["timestamp"] >= start) & (oi_df["timestamp"] < end_exclusive)
+                ].copy()
 
             written_parts = 0
             written_rows = 0
             for month_start in _iter_months(start, end):
                 month_end = _next_month(month_start)
                 part = (
-                    oi_df[(oi_df["timestamp"] >= month_start) & (oi_df["timestamp"] < month_end)].copy()
+                    oi_df[
+                        (oi_df["timestamp"] >= month_start) & (oi_df["timestamp"] < month_end)
+                    ].copy()
                     if not oi_df.empty
                     else pd.DataFrame(columns=oi_df.columns)
                 )
@@ -513,11 +600,16 @@ def main() -> int:
                     / f"year={month_start.year}"
                     / f"month={month_start.month:02d}"
                 )
-                out_path = out_dir / f"open_interest_{symbol}_{args.period}_{month_start.year}-{month_start.month:02d}.parquet"
+                out_path = (
+                    out_dir
+                    / f"open_interest_{symbol}_{args.period}_{month_start.year}-{month_start.month:02d}.parquet"
+                )
                 if not int(args.force) and _partition_has_rows(out_path):
                     continue
                 path_written, storage = write_parquet(part, out_path)
-                outputs.append({"path": str(path_written), "rows": int(len(part)), "storage": storage})
+                outputs.append(
+                    {"path": str(path_written), "rows": int(len(part)), "storage": storage}
+                )
                 written_parts += 1
                 written_rows += int(len(part))
 
@@ -550,6 +642,7 @@ def main() -> int:
         logging.exception("Open interest ingest failed")
         finalize_manifest(manifest, "failed", error=str(exc), stats=stats)
         return 1
+
 
 if __name__ == "__main__":
     raise SystemExit(main())

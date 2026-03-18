@@ -48,13 +48,19 @@ def build_benchmark_review(*, summary: Dict[str, Any]) -> Dict[str, Any]:
     slices = []
     status_counts: Dict[str, int] = {}
     for row in summary.get("slices", []):
-        generated_reports = dict(row.get("generated_reports", {})) if isinstance(row.get("generated_reports"), dict) else {}
+        generated_reports = (
+            dict(row.get("generated_reports", {}))
+            if isinstance(row.get("generated_reports"), dict)
+            else {}
+        )
         live = _load_json(generated_reports.get("live_foundation"))
         comparison = _load_json(generated_reports.get("context_mode_comparison"))
         benchmark_status = classify_benchmark_slice(generated_reports=generated_reports)
         status_counts[benchmark_status] = status_counts.get(benchmark_status, 0) + 1
         hard_selected = comparison.get("hard_label", {}).get("selected", {}) if comparison else {}
-        conf_selected = comparison.get("confidence_aware", {}).get("selected", {}) if comparison else {}
+        conf_selected = (
+            comparison.get("confidence_aware", {}).get("selected", {}) if comparison else {}
+        )
         slices.append(
             {
                 "benchmark_id": str(row.get("benchmark_id", "")).strip(),
@@ -67,14 +73,30 @@ def build_benchmark_review(*, summary: Dict[str, Any]) -> Dict[str, Any]:
                 "benchmark_status": benchmark_status,
                 "live_foundation_readiness": str(live.get("readiness", "")).strip(),
                 "context_comparison_present": bool(comparison),
-                "hard_evaluated_rows": int(comparison.get("hard_label", {}).get("evaluated_rows", 0) or 0) if comparison else 0,
-                "confidence_evaluated_rows": int(comparison.get("confidence_aware", {}).get("evaluated_rows", 0) or 0) if comparison else 0,
-                "selection_changed": bool(comparison.get("selection_changed")) if comparison else False,
-                "selection_outcome_changed": bool(comparison.get("selection_outcome_changed")) if comparison else False,
+                "hard_evaluated_rows": int(
+                    comparison.get("hard_label", {}).get("evaluated_rows", 0) or 0
+                )
+                if comparison
+                else 0,
+                "confidence_evaluated_rows": int(
+                    comparison.get("confidence_aware", {}).get("evaluated_rows", 0) or 0
+                )
+                if comparison
+                else 0,
+                "selection_changed": bool(comparison.get("selection_changed"))
+                if comparison
+                else False,
+                "selection_outcome_changed": bool(comparison.get("selection_outcome_changed"))
+                if comparison
+                else False,
                 "selected_hypothesis_hard": _selected_hypothesis_key(hard_selected),
                 "selected_hypothesis_confidence_aware": _selected_hypothesis_key(conf_selected),
-                "selected_valid_hard": bool(hard_selected.get("valid")) if isinstance(hard_selected, dict) else False,
-                "selected_valid_confidence_aware": bool(conf_selected.get("valid")) if isinstance(conf_selected, dict) else False,
+                "selected_valid_hard": bool(hard_selected.get("valid"))
+                if isinstance(hard_selected, dict)
+                else False,
+                "selected_valid_confidence_aware": bool(conf_selected.get("valid"))
+                if isinstance(conf_selected, dict)
+                else False,
                 "generated_reports": generated_reports,
             }
         )

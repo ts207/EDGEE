@@ -35,7 +35,10 @@ from project.pipelines.pipeline_planning import (
     compute_stage_instance_ids,
 )
 from project.pipelines.run_all_bootstrap import build_run_bootstrap_state
-from project.pipelines.effective_config import build_effective_config_payload, write_effective_config
+from project.pipelines.effective_config import (
+    build_effective_config_payload,
+    write_effective_config,
+)
 from project.pipelines.pipeline_execution import (
     execute_pipeline_stages,
     seed_run_manifest,
@@ -85,6 +88,7 @@ _run_runtime_postflight_audit = run_runtime_postflight_audit
 _validate_phase2_event_chain = validate_phase2_event_chain
 _data_fingerprint = compute_data_fingerprint
 
+
 def _run_all_impl(raw_argv: List[str] | None = None) -> int:
     # Synchronize environment with current DATA_ROOT for downstream helpers
     os.environ["BACKTEST_DATA_ROOT"] = str(DATA_ROOT)
@@ -98,10 +102,10 @@ def _run_all_impl(raw_argv: List[str] | None = None) -> int:
         return 2
 
     parser = build_parser()
-    
+
     def write_run_manifest_internal(run_id: str, manifest: Dict[str, Any]) -> None:
         _write_run_manifest(run_id, manifest)
-    
+
     args, resolved_config, experiment_id, experiment_results_dir = resolve_experiment_context(
         parser,
         raw_argv,
@@ -130,7 +134,7 @@ def _run_all_impl(raw_argv: List[str] | None = None) -> int:
     stages = preflight["stages"]
     planned_stage_instances = compute_stage_instance_ids(stages)
     runtime_invariants_mode = str(preflight["runtime_invariants_mode"])
-    
+
     if bool(args.plan_only):
         print(f"Plan for run {run_id}:")
         for s in planned_stage_instances:
@@ -141,7 +145,7 @@ def _run_all_impl(raw_argv: List[str] | None = None) -> int:
     stage_timings: List[Tuple[str, float]] = []
     stage_instance_timings: List[Tuple[str, float]] = []
     pipeline_session_id = hashlib.sha256(f"{run_id}:{time.time_ns()}".encode()).hexdigest()
-    
+
     try:
         bootstrap = build_run_bootstrap_state(
             args=args,
@@ -250,7 +254,7 @@ def _run_all_impl(raw_argv: List[str] | None = None) -> int:
         current_pipeline_session_id=pipeline_session_id,
         run_stage_fn=_run_stage,
     )
-    
+
     if str(stage_execution.get("status")) != "ok":
         if str(stage_execution.get("reason")) == "terminal_manifest_guard":
             print("Terminal run manifest detected; aborting remaining stages", file=sys.stderr)
@@ -306,8 +310,9 @@ def _run_all_impl(raw_argv: List[str] | None = None) -> int:
     )
 
 
-
 def main(argv: List[str] | None = None) -> int:
     return _run_all_impl(list(argv if argv is not None else sys.argv[1:]))
+
+
 if __name__ == "__main__":
     sys.exit(main())

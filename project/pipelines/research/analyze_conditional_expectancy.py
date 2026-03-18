@@ -15,7 +15,9 @@ from project.specs.manifest import finalize_manifest, start_manifest
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     data_root = get_data_root()
-    parser = argparse.ArgumentParser(description="Analyze conditional expectancy from edge registry history.")
+    parser = argparse.ArgumentParser(
+        description="Analyze conditional expectancy from edge registry history."
+    )
     parser.add_argument("--run_id", required=True)
     parser.add_argument("--symbols", default="")
     parser.add_argument("--retail_profile", default="capital_constrained")
@@ -42,7 +44,14 @@ def _safe_numeric(frame: pd.DataFrame, column: str) -> pd.Series:
     return pd.to_numeric(frame[column], errors="coerce")
 
 
-def _build_payload(run_id: str, registry_df: pd.DataFrame, registry_path: Path, symbols: list[str], retail_profile: str, top_k: int) -> tuple[Dict[str, Any], pd.DataFrame]:
+def _build_payload(
+    run_id: str,
+    registry_df: pd.DataFrame,
+    registry_path: Path,
+    symbols: list[str],
+    retail_profile: str,
+    top_k: int,
+) -> tuple[Dict[str, Any], pd.DataFrame]:
     if registry_df.empty:
         payload = {
             "run_id": run_id,
@@ -108,8 +117,12 @@ def _build_payload(run_id: str, registry_df: pd.DataFrame, registry_path: Path, 
         "summary": {
             "tested_edges": int(len(work)),
             "promoted_edges": int((_safe_numeric(work, "times_promoted") > 0).sum()),
-            "avg_median_effect": float(work["median_effect"].dropna().mean()) if work["median_effect"].notna().any() else 0.0,
-            "avg_stability_median": float(work["stability_median"].dropna().mean()) if work["stability_median"].notna().any() else 0.0,
+            "avg_median_effect": float(work["median_effect"].dropna().mean())
+            if work["median_effect"].notna().any()
+            else 0.0,
+            "avg_stability_median": float(work["stability_median"].dropna().mean())
+            if work["stability_median"].notna().any()
+            else 0.0,
             "avg_times_tested": float(work["times_tested"].mean()) if not work.empty else 0.0,
         },
         "expectancy_evidence": evidence.to_dict(orient="records"),
@@ -139,7 +152,12 @@ def main(argv: list[str] | None = None) -> int:
         args.run_id,
         vars(args),
         [{"path": str(registry_path), "artifact": "history.candidate.edge_registry"}],
-        [{"path": str(out_dir / "conditional_expectancy.json"), "artifact": "research.expectancy_analysis"}],
+        [
+            {
+                "path": str(out_dir / "conditional_expectancy.json"),
+                "artifact": "research.expectancy_analysis",
+            }
+        ],
     )
 
     try:
@@ -167,7 +185,12 @@ def main(argv: list[str] | None = None) -> int:
                 "evidence_count": int(len(payload["expectancy_evidence"])),
             },
         )
-        print(json.dumps({"expectancy_exists": payload["expectancy_exists"], "out_dir": str(out_dir)}, indent=2))
+        print(
+            json.dumps(
+                {"expectancy_exists": payload["expectancy_exists"], "out_dir": str(out_dir)},
+                indent=2,
+            )
+        )
         return 0
     except Exception as exc:
         finalize_manifest(manifest, "failed", error=str(exc))

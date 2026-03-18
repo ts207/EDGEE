@@ -118,25 +118,35 @@ def check_hypothesis_feasibility(
         if not registry.has_state(t.to_state or ""):
             reasons.append("unknown_to_state")
         if available_columns is not None:
-            from_col = _existing_column(ColumnRegistry.state_cols(t.from_state or ""), available_columns)
-            to_col = _existing_column(ColumnRegistry.state_cols(t.to_state or ""), available_columns)
+            from_col = _existing_column(
+                ColumnRegistry.state_cols(t.from_state or ""), available_columns
+            )
+            to_col = _existing_column(
+                ColumnRegistry.state_cols(t.to_state or ""), available_columns
+            )
             if from_col is None or to_col is None:
                 reasons.append("missing_transition_state_column")
     elif ttype == TriggerType.FEATURE_PREDICATE:
         if available_columns is not None:
-            column = _existing_column(ColumnRegistry.feature_cols(t.feature or ""), available_columns)
+            column = _existing_column(
+                ColumnRegistry.feature_cols(t.feature or ""), available_columns
+            )
             if column is None:
                 reasons.append("missing_feature_column")
                 details["feature"] = t.feature or ""
     elif ttype == TriggerType.SEQUENCE:
         if available_columns is not None:
-            column = _existing_column(ColumnRegistry.sequence_cols(t.sequence_id or ""), available_columns)
+            column = _existing_column(
+                ColumnRegistry.sequence_cols(t.sequence_id or ""), available_columns
+            )
             if column is None:
                 reasons.append("missing_sequence_column")
                 details["sequence_id"] = t.sequence_id or ""
     elif ttype == TriggerType.INTERACTION:
         if available_columns is not None:
-            column = _existing_column(ColumnRegistry.interaction_cols(t.interaction_id or ""), available_columns)
+            column = _existing_column(
+                ColumnRegistry.interaction_cols(t.interaction_id or ""), available_columns
+            )
             if column is None:
                 reasons.append("missing_interaction_column")
                 details["interaction_id"] = t.interaction_id or ""
