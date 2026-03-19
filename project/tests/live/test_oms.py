@@ -18,7 +18,7 @@ from project.live.oms import (
     OrderSubmissionBlocked,
     build_live_order_from_strategy_result,
 )
-from project.live import LiveStateStore
+from project.live.state import LiveStateStore
 from project.engine.strategy_executor import calculate_strategy_returns
 from project.engine.exchange_constraints import SymbolConstraints
 

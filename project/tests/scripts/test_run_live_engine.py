@@ -4,7 +4,7 @@ import asyncio
 import json
 from pathlib import Path
 
-import project.live as live_runner  # patched via project.live package root
+import project.live.runner as live_runner
 from project.scripts import run_live_engine
 
 

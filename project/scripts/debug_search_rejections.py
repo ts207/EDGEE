@@ -33,8 +33,8 @@ def debug_rejections():
         pass
 
     # Alternative: just iterate through events and templates and validate
-    from project.spec_validation import load_search_spec
-    from project.spec_validation import expand_triggers
+    from project.spec_validation.loaders import load_search_spec
+    from project.spec_validation.search import expand_triggers
     from project.domain.hypotheses import TriggerSpec, TriggerType
     from itertools import product
 

@@ -3,9 +3,9 @@ import pandas as pd
 import dataclasses
 from project.core.feature_schema import feature_dataset_dir_name
 
-from project.compilers import ExecutableStrategySpec
+from project.compilers.executable_strategy_spec import ExecutableStrategySpec
 from project.engine.runner import run_engine
-from project.portfolio import AllocationSpec
+from project.portfolio.allocation_spec import AllocationSpec
 
 
 @pytest.fixture

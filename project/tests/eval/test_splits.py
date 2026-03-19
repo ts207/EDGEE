@@ -1,11 +1,11 @@
 import pytest
 import pandas as pd
-from project.eval import (
+from project.eval.splits import (
     build_time_splits,
     build_time_splits_with_purge,
     SplitWindow,
+    _normalize_ts,
 )
-from project.eval.splits import _normalize_ts  # private internal, not part of public API
 
 
 def test_normalize_ts():
@@ -154,7 +154,7 @@ def test_default_embargo_is_nonzero():
     If this test fails, zero-embargo was re-introduced as the default.
     """
     import inspect
-    from project.eval import build_time_splits
+    from project.eval.splits import build_time_splits
 
     sig = inspect.signature(build_time_splits)
     default_embargo = sig.parameters["embargo_days"].default

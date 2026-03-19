@@ -7,8 +7,9 @@ import json
 import uuid
 from pathlib import Path
 
-from project import PROJECT_ROOT
-_REPO_ROOT = str(PROJECT_ROOT.parent)
+from project.tests.conftest import REPO_ROOT
+
+_REPO_ROOT = str(REPO_ROOT)
 
 
 def _env_with_pythonpath() -> dict:

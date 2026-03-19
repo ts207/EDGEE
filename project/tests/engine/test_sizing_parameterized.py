@@ -1,6 +1,6 @@
 """Tests that sizing limits are not hardcoded and can be overridden."""
 
-from project.portfolio import calculate_target_notional
+from project.portfolio.sizing import calculate_target_notional
 
 
 def test_concentration_cap_is_overridable():

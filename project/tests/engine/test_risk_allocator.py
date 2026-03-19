@@ -23,7 +23,7 @@ from project.engine.risk_allocator import (
     allocate_position_scales,
     build_allocation_contract,
 )
-from project.portfolio import AllocationSpec
+from project.portfolio.allocation_spec import AllocationSpec
 
 
 def _ts(n: int) -> pd.DatetimeIndex:

@@ -3,7 +3,7 @@ import numpy as np
 import pytest
 
 from project.engine.execution_model import get_comprehensive_execution_estimate
-from project.portfolio import (
+from project.portfolio.sizing import (
     calculate_execution_aware_target_notional,
     calculate_target_notional,
 )

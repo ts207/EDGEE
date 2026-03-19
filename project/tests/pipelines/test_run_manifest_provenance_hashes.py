@@ -3,7 +3,6 @@ from __future__ import annotations
 import hashlib
 import json
 
-import project.specs.manifest as _specs_manifest
 from project.apps.pipeline import manifest as run_manifest
 
 
@@ -36,7 +35,7 @@ def test_finalize_manifest_hashes_input_parquets(monkeypatch, tmp_path):
 
     out_manifest = tmp_path / "unit_stage.json"
     monkeypatch.setattr(
-        _specs_manifest, "_manifest_path", lambda run_id, stage, stage_instance_id=None: out_manifest
+        run_manifest, "_manifest_path", lambda run_id, stage, stage_instance_id=None: out_manifest
     )
 
     manifest = run_manifest.start_manifest(
@@ -63,10 +62,7 @@ def test_finalize_manifest_uses_manifest_stage_instance_id(monkeypatch, tmp_path
     def _manifest_path(run_id, stage, stage_instance_id=None):
         return manifest_dir / f"{stage_instance_id or stage}.json"
 
-    # Patch the canonical module where finalize_manifest actually resolves _manifest_path.
-    # Patching the compat wrapper (run_manifest) has no effect because star-imports
-    # create a copy of the name, not a shared reference.
-    monkeypatch.setattr(_specs_manifest, "_manifest_path", _manifest_path)
+    monkeypatch.setattr(run_manifest, "_manifest_path", _manifest_path)
 
     manifest = run_manifest.start_manifest(
         stage_name="unit_stage",

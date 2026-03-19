@@ -5,7 +5,7 @@ import json
 import sys
 from pathlib import Path
 
-from project import PROJECT_ROOT
+from project.tests.conftest import PROJECT_ROOT
 
 
 def _load_runner_module():

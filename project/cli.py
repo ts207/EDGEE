@@ -4,7 +4,6 @@ import argparse
 import sys
 
 from project.pipelines import run_all
-from project.pipelines.ingest import ingest_binance_um_ohlcv as _ingest_ohlcv
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -59,6 +58,8 @@ def main() -> int:
         return int(run_all.main())
 
     if args.command == "ingest":
+        from project.pipelines.ingest import ingest_binance_um_ohlcv as _ingest_ohlcv
+
         # Construct argv for the ingestion script.  We preserve unknown arguments
         # so that any extra flags supported by the ingestion implementation
         # remain functional.

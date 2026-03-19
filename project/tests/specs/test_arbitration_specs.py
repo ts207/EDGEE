@@ -1,10 +1,9 @@
 import pytest
 import yaml
-from pathlib import Path
 
-from project import PROJECT_ROOT
+from project.tests.conftest import SPEC_ROOT
 
-SPEC_DIR = PROJECT_ROOT.parent / "spec" / "events"
+SPEC_DIR = SPEC_ROOT / "events"
 COMPAT_FILE = SPEC_DIR / "compatibility.yaml"
 PREC_FILE = SPEC_DIR / "precedence.yaml"
 

@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import importlib.util
 import sys
-from pathlib import Path
 
 import pytest
 
-from project import PROJECT_ROOT
+from project.tests.conftest import PROJECT_ROOT
+
 CLI_PATH = PROJECT_ROOT / "cli.py"
 
 

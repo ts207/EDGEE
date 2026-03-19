@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-from pathlib import Path
 import pandas as pd
 
-from project import PROJECT_ROOT
+from project.tests.conftest import PROJECT_ROOT
 
 from project.pipelines.pipeline_audit import run_runtime_postflight_audit
 

@@ -1,5 +1,5 @@
 import pytest
-from project.spec_validation import (
+from project.spec_validation.ontology import (
     load_ontology_events,
     load_ontology_states,
     get_event_ids_for_family,

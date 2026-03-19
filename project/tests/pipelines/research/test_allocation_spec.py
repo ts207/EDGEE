@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 
 from project.pipelines.research import compile_strategy_blueprints as compiler
-from project.portfolio import AllocationSpec
+from project.portfolio.allocation_spec import AllocationSpec
 from project.strategy.dsl.schema import (
     Blueprint,
     EntrySpec,

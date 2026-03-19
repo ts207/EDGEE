@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from project import PROJECT_ROOT
+from project.tests.conftest import PROJECT_ROOT
 
 from project.pipelines.pipeline_audit import apply_runtime_postflight_to_manifest
 from project.pipelines.pipeline_audit import run_runtime_postflight_audit

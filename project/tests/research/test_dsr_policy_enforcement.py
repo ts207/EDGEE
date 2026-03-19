@@ -12,8 +12,9 @@ from pathlib import Path
 
 import pytest
 
-from project import PROJECT_ROOT
-_REPO_ROOT = PROJECT_ROOT.parent
+from project.tests.conftest import REPO_ROOT
+
+_REPO_ROOT = REPO_ROOT
 # Add any new promotion CLI entrypoints here to keep the policy guard comprehensive.
 _PROMOTION_CLI_PATHS = [
     "project/pipelines/research/cli/promotion_cli.py",

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from project.artifacts import (
+from project.artifacts.catalog import (
     blueprint_summary_path,
     checklist_path,
     kpi_scorecard_path,

@@ -9,7 +9,7 @@ from project.research.walkforward import (
 )
 from project.research.stability import evaluate_regime_stability
 from project.live.drift import calculate_feature_drift
-from project.live import check_kill_switch_triggers
+from project.live.health_checks import check_kill_switch_triggers
 
 
 def test_walkforward_windows():

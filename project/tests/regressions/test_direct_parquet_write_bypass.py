@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from project.tests.conftest import REPO_ROOT
+
 
 ALLOWED = {
     Path("project/io/utils.py"),
@@ -10,14 +12,9 @@ ALLOWED = {
 
 
 def test_project_code_uses_shared_storage_abstraction_for_artifact_writes() -> None:
-    from project import PROJECT_ROOT
-    repo_root = PROJECT_ROOT.parent
     offenders: list[str] = []
-    for path in (repo_root / "project").rglob("*.py"):
-        rel = path.relative_to(repo_root)
-        # Test files may write parquet directly in fixtures/helpers — only enforce on production code
-        if "tests/" in str(rel) or str(rel).startswith("project/tests/"):
-            continue
+    for path in (REPO_ROOT / "project").rglob("*.py"):
+        rel = path.relative_to(REPO_ROOT)
         if rel in ALLOWED:
             continue
         text = path.read_text(encoding="utf-8")

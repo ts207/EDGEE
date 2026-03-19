@@ -11,7 +11,7 @@ from project.engine.strategy_executor import StrategyResult, calculate_strategy_
 from project.live.execution_attribution import build_execution_attribution_record
 from project.live.kill_switch import KillSwitchReason
 from project.live.oms import OrderManager, OrderType
-from project.live import LiveEngineRunner
+from project.live.runner import LiveEngineRunner
 
 
 class _DummyDataManager:

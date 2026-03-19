@@ -285,9 +285,8 @@ def test_rolling_center_not_used_in_feature_modules():
     none use rolling(center=True).
     """
     import re
-    from pathlib import Path
+    from project.tests.conftest import PROJECT_ROOT
 
-    from project import PROJECT_ROOT
     features_dir = PROJECT_ROOT / "features"
     assert features_dir.is_dir(), f"Features directory not found: {features_dir}"
 

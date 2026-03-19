@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-from pathlib import Path
-
-from project import PROJECT_ROOT
+from project.tests.conftest import PROJECT_ROOT
 
 from project.runtime.hashing import compute_run_hash, load_hashing_spec
 from project.runtime.replay import determinism_replay_check

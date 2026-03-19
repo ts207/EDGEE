@@ -10,9 +10,7 @@ import pandas as pd
 import numpy as np
 import pytest
 from project.core.feature_schema import feature_dataset_dir_name
-
-# Add project to path
-from project import PROJECT_ROOT
+from project.tests.conftest import PROJECT_ROOT
 
 from project.io.utils import HAS_PYARROW, write_parquet
 

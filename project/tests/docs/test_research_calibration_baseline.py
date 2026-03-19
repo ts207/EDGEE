@@ -1,10 +1,6 @@
 from __future__ import annotations
 
-from pathlib import Path
-
-
-from project import PROJECT_ROOT
-REPO_ROOT = PROJECT_ROOT.parent
+from project.tests.conftest import REPO_ROOT
 
 
 def test_research_calibration_baseline_doc_exists_and_mentions_current_defaults():

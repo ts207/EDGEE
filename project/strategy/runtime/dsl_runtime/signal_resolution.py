@@ -56,9 +56,8 @@ def signal_mask(signal: str, frame: pd.DataFrame, blueprint: Blueprint) -> pd.Se
     if signal == "event_detected":
         if "event_detected" in frame.columns:
             return frame["event_detected"].fillna(False).astype(bool)
-        # Column absent means no events were merged into this frame → no triggers fire.
-        # Return False rather than raising — event_detected is a valid registered signal
-        # that legitimately produces an all-False mask when the event table is empty.
+        # A missing event column means no event rows were joined into the frame.
+        # Treat that as "no triggers fired", not as an unconditional pass.
         return pd.Series(False, index=frame.index, dtype=bool)
 
     raise ValueError(

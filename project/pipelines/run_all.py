@@ -110,6 +110,7 @@ def _data_fingerprint(symbols, run_id, **kwargs):
     return digest, lineage
 
 
+
 def _run_all_impl(raw_argv: List[str] | None = None) -> int:
     # Synchronize environment with current DATA_ROOT for downstream helpers
     os.environ["BACKTEST_DATA_ROOT"] = str(DATA_ROOT)

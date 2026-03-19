@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import pytest
 from project.live.kill_switch import KillSwitchManager, KillSwitchReason, KillSwitchStatus
-from project.live import LiveStateStore, PositionState
+from project.live.state import LiveStateStore, PositionState
 
 
 def test_drawdown_trigger():

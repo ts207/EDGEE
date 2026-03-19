@@ -8,7 +8,7 @@ AccountState/PositionState.
 from __future__ import annotations
 
 import pytest
-from project.live import LiveStateStore, PositionState
+from project.live.state import LiveStateStore, PositionState
 
 
 def test_initial_state_empty():
