@@ -11,7 +11,9 @@ from project.research.analyzers.base import AnalyzerResult, BaseEventAnalyzer
 class StabilityAnalyzer(BaseEventAnalyzer):
     name = "stability"
 
-    def analyze(self, events: pd.DataFrame, *, market: pd.DataFrame | None = None, **kwargs: Any) -> AnalyzerResult:
+    def analyze(
+        self, events: pd.DataFrame, *, market: pd.DataFrame | None = None, **kwargs: Any
+    ) -> AnalyzerResult:
         frame = self.validate_events(events)
         if frame.empty:
             return AnalyzerResult(name=self.name, summary={"n_events": 0}, tables={})
@@ -23,7 +25,11 @@ class StabilityAnalyzer(BaseEventAnalyzer):
                     return_col = candidate
                     break
         if return_col is None:
-            return AnalyzerResult(name=self.name, summary={"n_events": int(len(frame)), "return_col": None}, tables={"stability_events": frame})
+            return AnalyzerResult(
+                name=self.name,
+                summary={"n_events": int(len(frame)), "return_col": None},
+                tables={"stability_events": frame},
+            )
 
         returns = pd.to_numeric(frame[return_col], errors="coerce")
         summary: dict[str, Any] = {
@@ -41,11 +47,18 @@ class StabilityAnalyzer(BaseEventAnalyzer):
                 .agg(["count", "mean", "median", "std"])
                 .reset_index()
             )
-            asset_table["sign_positive_rate"] = frame.assign(_ret=returns).groupby("asset", dropna=False)["_ret"].apply(lambda s: float((s > 0).mean())) .values
+            asset_table["sign_positive_rate"] = (
+                frame.assign(_ret=returns)
+                .groupby("asset", dropna=False)["_ret"]
+                .apply(lambda s: float((s > 0).mean()))
+                .values
+            )
             tables["stability_by_asset"] = asset_table
             if not asset_table.empty:
                 means = pd.to_numeric(asset_table["mean"], errors="coerce")
-                summary["asset_mean_dispersion"] = float(means.std()) if means.notna().sum() > 1 else 0.0
+                summary["asset_mean_dispersion"] = (
+                    float(means.std()) if means.notna().sum() > 1 else 0.0
+                )
 
         if "regime" in frame.columns:
             regime_table = (
@@ -57,7 +70,9 @@ class StabilityAnalyzer(BaseEventAnalyzer):
             tables["stability_by_regime"] = regime_table
             if not regime_table.empty:
                 means = pd.to_numeric(regime_table["mean"], errors="coerce")
-                summary["regime_mean_dispersion"] = float(means.std()) if means.notna().sum() > 1 else 0.0
+                summary["regime_mean_dispersion"] = (
+                    float(means.std()) if means.notna().sum() > 1 else 0.0
+                )
 
         if "split" in frame.columns:
             split_table = (
@@ -69,6 +84,8 @@ class StabilityAnalyzer(BaseEventAnalyzer):
             tables["stability_by_split"] = split_table
             if not split_table.empty:
                 means = pd.to_numeric(split_table["mean"], errors="coerce")
-                summary["split_mean_dispersion"] = float(means.std()) if means.notna().sum() > 1 else 0.0
+                summary["split_mean_dispersion"] = (
+                    float(means.std()) if means.notna().sum() > 1 else 0.0
+                )
 
         return AnalyzerResult(name=self.name, summary=summary, tables=tables)

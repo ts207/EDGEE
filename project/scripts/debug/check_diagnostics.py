@@ -6,12 +6,14 @@ from pathlib import Path
 
 import pandas as pd
 
+
 def _make_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Ad-hoc diagnostics for a single run_id.")
     parser.add_argument("--run-id", required=True)
     parser.add_argument("--event-type", default="liquidation_cascade")
     parser.add_argument("--reports-dir", default="data/reports")
     return parser
+
 
 def main() -> int:
     args = _make_parser().parse_args()
@@ -98,6 +100,7 @@ def main() -> int:
         print(f"Phase 2 file not found: {phase2_file}")
 
     return 0
+
 
 if __name__ == "__main__":
     raise SystemExit(main())

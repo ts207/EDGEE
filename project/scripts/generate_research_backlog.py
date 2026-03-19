@@ -95,28 +95,69 @@ TOOL_REF_PATTERNS = [
     r"https?://",
     r"github\.com/",
     r"\[[\w\s]+\]\(https?://",  # markdown links
-    r"^\s*-\s*\[",               # markdown list item with link
+    r"^\s*-\s*\[",  # markdown list item with link
 ]
 
 TOOL_REF_RE = re.compile("|".join(TOOL_REF_PATTERNS))
 
 # Words that suggest operationalizability
 OPERATIONAL_KEYWORDS = {
-    "threshold", "percentile", "z-score", "window", "lookback", "cooldown",
-    "trigger", "signal", "condition", "regime", "spread", "depth", "imbalance",
-    "funding", "basis", "vpin", "amihud", "roll", "oi", "liquidat", "volatil",
-    "compression", "breakout", "reversion", "momentum", "carry", "basis",
-    "forward return", "fwd_ret", "horizon", "5m", "15m", "1h", "4h", "24h",
-    "event study", "slice", "fdr", "bh ", "multiplicity", "cost sweep",
-    "slippage", "impact", "participation", "capacity",
+    "threshold",
+    "percentile",
+    "z-score",
+    "window",
+    "lookback",
+    "cooldown",
+    "trigger",
+    "signal",
+    "condition",
+    "regime",
+    "spread",
+    "depth",
+    "imbalance",
+    "funding",
+    "basis",
+    "vpin",
+    "amihud",
+    "roll",
+    "oi",
+    "liquidat",
+    "volatil",
+    "compression",
+    "breakout",
+    "reversion",
+    "momentum",
+    "carry",
+    "basis",
+    "forward return",
+    "fwd_ret",
+    "horizon",
+    "5m",
+    "15m",
+    "1h",
+    "4h",
+    "24h",
+    "event study",
+    "slice",
+    "fdr",
+    "bh ",
+    "multiplicity",
+    "cost sweep",
+    "slippage",
+    "impact",
+    "participation",
+    "capacity",
 }
+
 
 def is_tool_reference(statement: str) -> bool:
     return bool(TOOL_REF_RE.search(statement))
 
+
 def has_operational_content(statement: str) -> bool:
     s = statement.lower()
     return any(kw in s for kw in OPERATIONAL_KEYWORDS)
+
 
 def infer_candidate_type(claim: dict) -> str:
     concept_id = claim.get("concept_id", "")
@@ -132,6 +173,7 @@ def infer_candidate_type(claim: dict) -> str:
     if any(w in statement for w in ("cost", "slippage", "fill", "execution", "latency")):
         return "execution"
     return "evaluation"
+
 
 def compute_operationalizable(claim: dict) -> tuple[str, list[str]]:
     """Returns (operationalizable, missing_items).
@@ -188,6 +230,7 @@ def compute_operationalizable(claim: dict) -> tuple[str, list[str]]:
         return "N", missing
     return "PARTIAL", missing
 
+
 def compute_priority(claim: dict, candidate_type: str) -> int:
     concept_id = claim.get("concept_id", "")
     claim_type = claim.get("claim_type", "empirical")
@@ -217,8 +260,10 @@ def compute_priority(claim: dict, candidate_type: str) -> int:
 
     return impact + feasibility + novelty  # 3–15 range
 
+
 def next_artifact(candidate_type: str) -> str:
     return ARTIFACT_MAP.get(candidate_type, "spec/tests/test_spec.yaml")
+
 
 def evidence_locator(claim: dict) -> str:
     evidence = claim.get("evidence", [])
@@ -227,11 +272,13 @@ def evidence_locator(claim: dict) -> str:
         return e.get("locator", "")
     return ""
 
+
 def source_id(claim: dict) -> str:
     evidence = claim.get("evidence", [])
     if evidence:
         return evidence[0].get("source_id", "")
     return ""
+
 
 FIELDNAMES = [
     "claim_id",
@@ -254,8 +301,10 @@ FIELDNAMES = [
     "statement_summary",
 ]
 
+
 def truncate(s: str, n: int = 200) -> str:
     return s[:n].replace("\n", " ").strip() if s else ""
+
 
 def main():
     rows = []
@@ -295,26 +344,28 @@ def main():
             op = claim.get("operationalization", {})
             scope = claim.get("scope", {})
 
-            rows.append({
-                "claim_id": claim.get("claim_id", ""),
-                "source_id": src,
-                "concept_id": concept_id,
-                "candidate_type": ctype,
-                "claim_type": claim.get("claim_type", ""),
-                "operationalizable": op_flag,
-                "missing": "|".join(missing),
-                "priority_score": priority,
-                "target_gate": gate,
-                "next_artifact": artifact,
-                "evidence_locator": locator,
-                "assets": "|".join(scope.get("assets", ["*"])),
-                "horizon": scope.get("horizon", "*"),
-                "stage": scope.get("stage", ""),
-                "features": "|".join(op.get("features", [])),
-                "label": op.get("label", ""),
-                "status": claim.get("status", "unverified"),
-                "statement_summary": truncate(statement, 200),
-            })
+            rows.append(
+                {
+                    "claim_id": claim.get("claim_id", ""),
+                    "source_id": src,
+                    "concept_id": concept_id,
+                    "candidate_type": ctype,
+                    "claim_type": claim.get("claim_type", ""),
+                    "operationalizable": op_flag,
+                    "missing": "|".join(missing),
+                    "priority_score": priority,
+                    "target_gate": gate,
+                    "next_artifact": artifact,
+                    "evidence_locator": locator,
+                    "assets": "|".join(scope.get("assets", ["*"])),
+                    "horizon": scope.get("horizon", "*"),
+                    "stage": scope.get("stage", ""),
+                    "features": "|".join(op.get("features", [])),
+                    "label": op.get("label", ""),
+                    "status": claim.get("status", "unverified"),
+                    "statement_summary": truncate(statement, 200),
+                }
+            )
     else:
         print(f"Atlas not found at {ATLAS_PATH}; generating backlog from template registry.")
         registry = get_domain_registry()
@@ -377,6 +428,7 @@ def main():
     for t, cnt in sorted(by_type.items(), key=lambda x: -x[1]):
         print(f"    {t:15s}: {cnt}")
     print(f"\n  Output: {OUTPUT_PATH}")
+
 
 if __name__ == "__main__":
     sys.exit(main())

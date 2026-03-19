@@ -23,8 +23,10 @@ KNOWN_ENTRY_SIGNALS = {
     "breakout_confirmation",
 }
 
+
 def _active_signal_column(signal: str) -> str:
     return f"{signal.removesuffix('_event')}_active"
+
 
 REGISTRY_SIGNAL_COLUMNS = set()
 for signal in REGISTRY_BACKED_SIGNALS:
@@ -47,6 +49,7 @@ CONTRARIAN_BIAS_EVENTS = {
     "oi_flush",
     "liquidation_cascade",
 }
+
 
 def event_direction_bias(event_type: str) -> int:
     """Returns 1 for momentum, -1 for contrarian events."""

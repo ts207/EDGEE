@@ -50,7 +50,9 @@ class FeasibilityGuard:
             "ohlcv_perp_15m": "perp_ohlcv_15m",
             "ohlcv_spot_15m": "spot_ohlcv_15m",
         }
-        resolved_id = alias_map.get(str(dataset_id).strip().lower(), str(dataset_id).strip().lower())
+        resolved_id = alias_map.get(
+            str(dataset_id).strip().lower(), str(dataset_id).strip().lower()
+        )
         try:
             candidates = dataset_path_candidates(
                 data_root=self.data_root,
@@ -59,6 +61,10 @@ class FeasibilityGuard:
                 dataset_id=resolved_id,
             )
         except Exception:
-            self.log.warning("Unknown dataset mapping in feasibility guard: dataset_id=%s symbol=%s", dataset_id, symbol)
+            self.log.warning(
+                "Unknown dataset mapping in feasibility guard: dataset_id=%s symbol=%s",
+                dataset_id,
+                symbol,
+            )
             return False
         return any(path.exists() for path in candidates)

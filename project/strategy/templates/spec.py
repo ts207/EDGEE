@@ -3,6 +3,7 @@ import json
 from dataclasses import asdict, dataclass, field
 from typing import Dict, List, Optional
 
+
 @dataclass
 class StrategySpec:
     event_family: str
@@ -15,11 +16,11 @@ class StrategySpec:
     stop_loss_atr_multipliers: Optional[float] = None
     take_profit_atr_multipliers: Optional[float] = None
     params: Dict[str, float] = field(default_factory=dict)
-    
+
     @property
     def strategy_id(self) -> str:
         return hashlib.sha256(json.dumps(self.normalize(), sort_keys=True).encode()).hexdigest()
-        
+
     def normalize(self) -> Dict[str, object]:
         return {
             "event_family": str(self.event_family).strip().upper(),
@@ -28,8 +29,14 @@ class StrategySpec:
             "position_cap": float(self.position_cap),
             "cooldown_bars": int(self.cooldown_bars),
             "stop_loss_bps": float(self.stop_loss_bps) if self.stop_loss_bps is not None else None,
-            "take_profit_bps": float(self.take_profit_bps) if self.take_profit_bps is not None else None,
-            "stop_loss_atr_multipliers": float(self.stop_loss_atr_multipliers) if self.stop_loss_atr_multipliers is not None else None,
-            "take_profit_atr_multipliers": float(self.take_profit_atr_multipliers) if self.take_profit_atr_multipliers is not None else None,
-            "params": {str(k): float(v) for k, v in sorted((self.params or {}).items())}
+            "take_profit_bps": float(self.take_profit_bps)
+            if self.take_profit_bps is not None
+            else None,
+            "stop_loss_atr_multipliers": float(self.stop_loss_atr_multipliers)
+            if self.stop_loss_atr_multipliers is not None
+            else None,
+            "take_profit_atr_multipliers": float(self.take_profit_atr_multipliers)
+            if self.take_profit_atr_multipliers is not None
+            else None,
+            "params": {str(k): float(v) for k, v in sorted((self.params or {}).items())},
         }

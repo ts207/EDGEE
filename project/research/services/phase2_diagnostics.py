@@ -33,13 +33,7 @@ def _jsonify_mapping(payload: Mapping[str, Any]) -> Dict[str, Any]:
 def split_counts(df: pd.DataFrame, split_col: str = "split_label") -> Dict[str, int]:
     if df.empty or split_col not in df.columns:
         return {"train": 0, "validation": 0, "test": 0}
-    counts = (
-        df[split_col]
-        .astype(str)
-        .str.lower()
-        .value_counts(dropna=False)
-        .to_dict()
-    )
+    counts = df[split_col].astype(str).str.lower().value_counts(dropna=False).to_dict()
     return {
         "train": int(counts.get("train", 0)),
         "validation": int(counts.get("validation", 0)),

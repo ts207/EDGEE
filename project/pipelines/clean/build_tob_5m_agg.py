@@ -20,6 +20,7 @@ from project.io.utils import (
 )
 from project.specs.manifest import finalize_manifest, start_manifest
 
+
 def main() -> int:
     data_root = get_data_root()
     parser = argparse.ArgumentParser(description="Build 5m ToB aggregates from 1s snapshots")
@@ -34,7 +35,9 @@ def main() -> int:
     if args.log_path:
         ensure_dir(Path(args.log_path).parent)
         log_handlers.append(logging.FileHandler(args.log_path))
-    logging.basicConfig(level=logging.INFO, handlers=log_handlers, format="%(asctime)s %(levelname)s %(message)s")
+    logging.basicConfig(
+        level=logging.INFO, handlers=log_handlers, format="%(asctime)s %(levelname)s %(message)s"
+    )
 
     params = {
         "symbols": symbols,
@@ -59,33 +62,39 @@ def main() -> int:
                 if data.empty:
                     continue
 
-                inputs.append({
-                    "path": str(file_path),
-                    "rows": int(len(data)),
-                })
+                inputs.append(
+                    {
+                        "path": str(file_path),
+                        "rows": int(len(data)),
+                    }
+                )
 
                 data["timestamp"] = pd.to_datetime(data["timestamp"], utc=True)
-                
+
                 data["mid_price"] = (data["bid_price"] + data["ask_price"]) / 2
-                data["spread_bps"] = (data["ask_price"] - data["bid_price"]) / data["mid_price"] * 10000
+                data["spread_bps"] = (
+                    (data["ask_price"] - data["bid_price"]) / data["mid_price"] * 10000
+                )
                 data["bid_depth_usd"] = data["bid_price"] * data["bid_qty"]
                 data["ask_depth_usd"] = data["ask_price"] * data["ask_qty"]
                 data["imbalance"] = data["bid_qty"] / (data["bid_qty"] + data["ask_qty"])
                 data["valid_snapshot"] = data["mid_price"].notna().astype(float)
 
                 resampler = data.resample("5min", on="timestamp")
-                agg = resampler.agg({
-                    "spread_bps": ["mean", "max", "std"],
-                    "bid_depth_usd": "mean",
-                    "ask_depth_usd": "mean",
-                    "imbalance": "mean",
-                    "mid_price": "last",
-                    "valid_snapshot": "mean"
-                })
-                
+                agg = resampler.agg(
+                    {
+                        "spread_bps": ["mean", "max", "std"],
+                        "bid_depth_usd": "mean",
+                        "ask_depth_usd": "mean",
+                        "imbalance": "mean",
+                        "mid_price": "last",
+                        "valid_snapshot": "mean",
+                    }
+                )
+
                 # Flatten MultiIndex columns
                 agg.columns = [
-                    f"{col[0]}_{col[1]}" if isinstance(col, tuple) and col[1] else col[0] 
+                    f"{col[0]}_{col[1]}" if isinstance(col, tuple) and col[1] else col[0]
                     for col in agg.columns
                 ]
                 if "valid_snapshot_mean" in agg.columns:
@@ -95,29 +104,31 @@ def main() -> int:
 
                 first_ts = data["timestamp"].min()
                 month_key = f"{first_ts.year}-{first_ts.month:02d}"
-                
+
                 out_dir = (
-                    data_root 
-                    / "lake" 
-                    / "cleaned" 
-                    / "perp" 
-                    / symbol 
-                    / "tob_5m_agg" 
-                    / f"year={first_ts.year}" 
+                    data_root
+                    / "lake"
+                    / "cleaned"
+                    / "perp"
+                    / symbol
+                    / "tob_5m_agg"
+                    / f"year={first_ts.year}"
                     / f"month={first_ts.month:02d}"
                 )
                 out_path = out_dir / f"tob_agg_{symbol}_5m_{month_key}.parquet"
-                
+
                 ensure_dir(out_dir)
                 written, storage = write_parquet(agg, out_path)
-                outputs.append({
-                    "path": str(written),
-                    "rows": int(len(agg)),
-                    "start_ts": agg["timestamp"].min().isoformat(),
-                    "end_ts": agg["timestamp"].max().isoformat(),
-                    "storage": storage,
-                })
-                
+                outputs.append(
+                    {
+                        "path": str(written),
+                        "rows": int(len(agg)),
+                        "start_ts": agg["timestamp"].min().isoformat(),
+                        "end_ts": agg["timestamp"].max().isoformat(),
+                        "storage": storage,
+                    }
+                )
+
                 stats["symbols"].setdefault(symbol, {})[month_key] = {
                     "agg_rows": int(len(agg)),
                 }
@@ -128,6 +139,7 @@ def main() -> int:
         logging.exception("ToB aggregation failed")
         finalize_manifest(manifest, "failed", error=str(exc), stats=stats)
         return 1
+
 
 if __name__ == "__main__":
     sys.exit(main())

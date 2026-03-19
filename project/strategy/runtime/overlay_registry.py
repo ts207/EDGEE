@@ -5,6 +5,7 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Any, Dict
 from project import PROJECT_ROOT
+
 EDGES_DIR = PROJECT_ROOT / "edges"
 PINNED_SPEC_VERSION = "v1"
 REQUIRED_FIELDS = {
@@ -102,6 +103,7 @@ DEFAULT_OVERLAY_SPECS: Dict[str, Dict[str, Any]] = {
     },
 }
 
+
 def _validate_evidence_entries(spec: Dict[str, Any], source_path: Path) -> None:
     entries = spec.get("run_ids_evidence")
     if not isinstance(entries, list) or not entries:
@@ -109,20 +111,29 @@ def _validate_evidence_entries(spec: Dict[str, Any], source_path: Path) -> None:
 
     for idx, item in enumerate(entries):
         if not isinstance(item, dict):
-            raise ValueError(f"APPROVED overlay evidence entry {idx} must be an object: {source_path}")
+            raise ValueError(
+                f"APPROVED overlay evidence entry {idx} must be an object: {source_path}"
+            )
         missing = sorted(REQUIRED_EVIDENCE_FIELDS.difference(item.keys()))
         if missing:
-            raise ValueError(f"APPROVED overlay evidence entry {idx} missing fields {missing}: {source_path}")
+            raise ValueError(
+                f"APPROVED overlay evidence entry {idx} missing fields {missing}: {source_path}"
+            )
         for key in REQUIRED_EVIDENCE_FIELDS:
             if not str(item.get(key, "")).strip():
-                raise ValueError(f"APPROVED overlay evidence entry {idx} has empty {key}: {source_path}")
+                raise ValueError(
+                    f"APPROVED overlay evidence entry {idx} has empty {key}: {source_path}"
+                )
+
 
 def _validate_approved_overlay_requirements(spec: Dict[str, Any], source_path: Path) -> None:
     _validate_evidence_entries(spec, source_path)
 
     cost_bps = spec.get("cost_bps_validated")
     if not isinstance(cost_bps, (int, float)) or float(cost_bps) < 0:
-        raise ValueError(f"APPROVED overlay requires non-negative numeric cost_bps_validated: {source_path}")
+        raise ValueError(
+            f"APPROVED overlay requires non-negative numeric cost_bps_validated: {source_path}"
+        )
 
     objective = spec.get("objective")
     target_metric = objective.get("target_metric") if isinstance(objective, dict) else None
@@ -142,21 +153,32 @@ def _validate_approved_overlay_requirements(spec: Dict[str, Any], source_path: P
     stability = spec.get("stability")
     if not isinstance(stability, dict):
         raise ValueError(f"APPROVED overlay requires stability object: {source_path}")
-    required_stability_thresholds = ("sign_consistency_min", "effect_ci_excludes_0", "max_regime_flip_count")
+    required_stability_thresholds = (
+        "sign_consistency_min",
+        "effect_ci_excludes_0",
+        "max_regime_flip_count",
+    )
     for key in required_stability_thresholds:
         if key not in stability:
             raise ValueError(f"APPROVED overlay missing stability.{key}: {source_path}")
 
     sign_consistency = stability.get("sign_consistency_min")
     if not isinstance(sign_consistency, (int, float)) or not (0 <= float(sign_consistency) <= 1):
-        raise ValueError(f"APPROVED overlay stability.sign_consistency_min must be in [0,1]: {source_path}")
+        raise ValueError(
+            f"APPROVED overlay stability.sign_consistency_min must be in [0,1]: {source_path}"
+        )
 
     if not isinstance(stability.get("effect_ci_excludes_0"), bool):
-        raise ValueError(f"APPROVED overlay stability.effect_ci_excludes_0 must be boolean: {source_path}")
+        raise ValueError(
+            f"APPROVED overlay stability.effect_ci_excludes_0 must be boolean: {source_path}"
+        )
 
     max_flips = stability.get("max_regime_flip_count")
     if not isinstance(max_flips, int) or max_flips < 0:
-        raise ValueError(f"APPROVED overlay stability.max_regime_flip_count must be a non-negative integer: {source_path}")
+        raise ValueError(
+            f"APPROVED overlay stability.max_regime_flip_count must be a non-negative integer: {source_path}"
+        )
+
 
 def _validate_spec(spec: Dict[str, Any], source_path: Path) -> None:
     missing = sorted(REQUIRED_FIELDS.difference(spec.keys()))
@@ -173,6 +195,7 @@ def _validate_spec(spec: Dict[str, Any], source_path: Path) -> None:
     if status == "APPROVED":
         _validate_approved_overlay_requirements(spec, source_path)
 
+
 def _load_overlay_specs(edges_dir: Path = EDGES_DIR) -> Dict[str, Dict[str, Any]]:
     registry: Dict[str, Dict[str, Any]] = deepcopy(DEFAULT_OVERLAY_SPECS)
     spec_paths = sorted(edges_dir.glob("*.json"))
@@ -188,11 +211,16 @@ def _load_overlay_specs(edges_dir: Path = EDGES_DIR) -> Dict[str, Dict[str, Any]
         registry[name] = spec
     return registry
 
+
 def list_overlays() -> list[str]:
     return sorted(_load_overlay_specs().keys())
 
+
 def list_applicable_overlays() -> list[str]:
-    return sorted([name for name, spec in _load_overlay_specs().items() if spec.get("status") == "APPROVED"])
+    return sorted(
+        [name for name, spec in _load_overlay_specs().items() if spec.get("status") == "APPROVED"]
+    )
+
 
 def get_overlay(name: str) -> Dict[str, Any]:
     key = name.strip()
@@ -201,6 +229,7 @@ def get_overlay(name: str) -> Dict[str, Any]:
         available = ", ".join(sorted(registry.keys()))
         raise ValueError(f"Unknown overlay '{name}'. Available overlays: {available}")
     return deepcopy(registry[key])
+
 
 def apply_overlay(name: str, params: Dict[str, Any] | None = None) -> Dict[str, Any]:
     """Return params augmented with a named overlay configuration."""

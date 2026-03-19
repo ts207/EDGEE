@@ -3,6 +3,7 @@ Live Order Management System (OMS) state machine.
 
 Tracks the lifecycle of an order from submission to terminal state (FILLED, CANCELLED, REJECTED).
 """
+
 from __future__ import annotations
 
 import logging
@@ -57,7 +58,7 @@ class LiveOrder:
     quantity: float
     price: Optional[float] = None
     stop_price: Optional[float] = None
-    
+
     # State
     status: OrderStatus = OrderStatus.PENDING_NEW
     filled_quantity: float = 0.0
@@ -65,7 +66,7 @@ class LiveOrder:
     avg_fill_price: float = 0.0
     exchange_order_id: Optional[str] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
-    
+
     # Timestamps
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
@@ -86,10 +87,10 @@ class LiveOrder:
         self.avg_fill_price = (
             (self.avg_fill_price * self.filled_quantity) + (fill_price * fill_qty)
         ) / total_filled
-        
+
         self.filled_quantity = total_filled
         self.remaining_quantity = max(0.0, self.quantity - self.filled_quantity)
-        
+
         if self.remaining_quantity <= 1e-10:
             self.update_status(OrderStatus.FILLED)
         else:
@@ -158,7 +159,9 @@ class OrderManager:
             LOGGER.warning("No exchange client configured; skipping cancel_all_orders.")
             return
 
-        symbols_to_cancel = [symbol] if symbol else list(set(o.symbol for o in self.active_orders.values()))
+        symbols_to_cancel = (
+            [symbol] if symbol else list(set(o.symbol for o in self.active_orders.values()))
+        )
         for sym in symbols_to_cancel:
             try:
                 await self.exchange_client.cancel_all_open_orders(sym)
@@ -183,10 +186,7 @@ class OrderManager:
             side = "SELL" if pos.side == "LONG" else "BUY"
             try:
                 await self.exchange_client.create_market_order(
-                    symbol=sym,
-                    side=side,
-                    quantity=pos.quantity,
-                    reduce_only=True
+                    symbol=sym, side=side, quantity=pos.quantity, reduce_only=True
                 )
                 LOGGER.info(f"Submitted flattening order for {sym}: {side} {pos.quantity}")
             except Exception as e:
@@ -199,8 +199,13 @@ class OrderManager:
             return
 
         order.update_status(status, exchange_id=kwargs.get("exchange_order_id"))
-        
-        if status in (OrderStatus.FILLED, OrderStatus.CANCELLED, OrderStatus.REJECTED, OrderStatus.EXPIRED):
+
+        if status in (
+            OrderStatus.FILLED,
+            OrderStatus.CANCELLED,
+            OrderStatus.REJECTED,
+            OrderStatus.EXPIRED,
+        ):
             self.order_history.append(order)
             del self.active_orders[client_order_id]
 
@@ -211,7 +216,7 @@ class OrderManager:
             return
 
         order.apply_fill(fill_qty, fill_price)
-        
+
         if order.status == OrderStatus.FILLED:
             self._record_execution_attribution(order)
             self.order_history.append(order)

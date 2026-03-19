@@ -26,7 +26,13 @@ def compute_event_windows(
         horizons = pd.to_numeric(out[horizon_col], errors="coerce").fillna(0).astype(int)
     else:
         horizons = pd.Series(int(horizon_bars or 0), index=out.index, dtype=int)
-    end_ts = start_ts + lag_delta + horizons.apply(lambda v: bars_to_timedelta(int(v), bar_duration_minutes=bar_duration_minutes))
+    end_ts = (
+        start_ts
+        + lag_delta
+        + horizons.apply(
+            lambda v: bars_to_timedelta(int(v), bar_duration_minutes=bar_duration_minutes)
+        )
+    )
     out["event_window_start"] = start_ts
     out["event_window_end"] = end_ts
     return out
@@ -64,6 +70,8 @@ def apply_embargo(
     out = events.copy()
     ts = pd.to_datetime(out[time_col], utc=True, errors="coerce")
     anchor_end_ts = pd.Timestamp(anchor_end)
-    embargo_end = anchor_end_ts + bars_to_timedelta(embargo_bars, bar_duration_minutes=bar_duration_minutes)
+    embargo_end = anchor_end_ts + bars_to_timedelta(
+        embargo_bars, bar_duration_minutes=bar_duration_minutes
+    )
     mask = (ts > anchor_end_ts) & (ts < embargo_end)
     return out.loc[~mask].copy()

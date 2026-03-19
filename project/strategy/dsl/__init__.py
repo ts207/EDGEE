@@ -14,7 +14,12 @@ from project.strategy.dsl.contract_v1 import (
     validate_feature_references,
 )
 from project.strategy.dsl.normalize import build_blueprint
-from project.strategy.dsl.policies import DEFAULT_POLICY, EVENT_POLICIES, event_policy, overlay_defaults
+from project.strategy.dsl.policies import (
+    DEFAULT_POLICY,
+    EVENT_POLICIES,
+    event_policy,
+    overlay_defaults,
+)
 from project.strategy.dsl.references import REGISTRY_SIGNAL_COLUMNS, event_direction_bias
 from project.strategy.dsl.schema import (
     Blueprint,

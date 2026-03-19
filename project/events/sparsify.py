@@ -7,14 +7,13 @@ import pandas as pd
 def sparsify_mask(mask: pd.Series, *, min_spacing: int = 1) -> list[int]:
     idxs = np.flatnonzero(mask.fillna(False).to_numpy())
     selected: list[int] = []
-    last = -10**9
+    last = -(10**9)
     for idx in idxs:
         i = int(idx)
         if i - last >= int(min_spacing):
             selected.append(i)
             last = i
     return selected
-
 
 
 def cluster_mask(mask: pd.Series, *, max_gap: int = 0) -> list[tuple[int, int]]:
@@ -32,7 +31,6 @@ def cluster_mask(mask: pd.Series, *, max_gap: int = 0) -> list[tuple[int, int]]:
         start = end = i
     clusters.append((start, end))
     return clusters
-
 
 
 def select_cluster_representatives(

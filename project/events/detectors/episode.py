@@ -23,10 +23,16 @@ class EpisodeDetector(ThresholdDetector):
         features = self.prepare_features(work, **params)
         mask = self.compute_raw_mask(work, features=features, **params)
         intensity = self.compute_intensity(work, features=features, **params)
-        episodes = build_episodes(mask, score=intensity, max_gap=int(params.get("max_gap", self.max_gap)))
+        episodes = build_episodes(
+            mask, score=intensity, max_gap=int(params.get("max_gap", self.max_gap))
+        )
         rows = []
         for sub_idx, episode in enumerate(episodes):
-            idx = int(episode.peak_idx if str(params.get("anchor_rule", self.anchor_rule)).lower() == "peak" else episode.start_idx)
+            idx = int(
+                episode.peak_idx
+                if str(params.get("anchor_rule", self.anchor_rule)).lower() == "peak"
+                else episode.start_idx
+            )
             ts = work.at[idx, "timestamp"]
             if pd.isna(ts):
                 continue

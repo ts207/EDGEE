@@ -16,24 +16,39 @@ class ApprovalDecision:
     metrics: dict[str, Any]
 
 
-
 def evaluate_approval_workflow(
     analyzer_results: dict[str, Any],
     *,
-    current_status: str = 'prototype',
+    current_status: str = "prototype",
     events=None,
     reference_events=None,
     overlap_threshold: float = 0.8,
     min_events: int = 20,
 ) -> ApprovalDecision:
     promotion = evaluate_family_promotion(analyzer_results, min_events=min_events)
-    overlap_metrics = redundancy_report(events, reference_events, overlap_threshold=overlap_threshold)
+    overlap_metrics = redundancy_report(
+        events, reference_events, overlap_threshold=overlap_threshold
+    )
     reasons = list(promotion.reasons)
     metrics = dict(promotion.metrics)
     metrics.update(overlap_metrics)
-    recommended = 'approved' if promotion.passed else 'validated' if metrics.get('pit_ok', False) and metrics.get('n_events', 0) >= max(5, min_events // 2) else 'prototype'
-    if overlap_metrics.get('redundant'):
-        recommended = 'deprecated'
-        reasons.append(f"redundant with reference family: jaccard {float(overlap_metrics['jaccard_overlap']):.3f} >= {float(overlap_threshold):.3f}")
-    approved = recommended == 'approved'
-    return ApprovalDecision(current_status=str(current_status), recommended_status=recommended, approved=approved, reasons=reasons, metrics=metrics)
+    recommended = (
+        "approved"
+        if promotion.passed
+        else "validated"
+        if metrics.get("pit_ok", False) and metrics.get("n_events", 0) >= max(5, min_events // 2)
+        else "prototype"
+    )
+    if overlap_metrics.get("redundant"):
+        recommended = "deprecated"
+        reasons.append(
+            f"redundant with reference family: jaccard {float(overlap_metrics['jaccard_overlap']):.3f} >= {float(overlap_threshold):.3f}"
+        )
+    approved = recommended == "approved"
+    return ApprovalDecision(
+        current_status=str(current_status),
+        recommended_status=recommended,
+        approved=approved,
+        reasons=reasons,
+        metrics=metrics,
+    )

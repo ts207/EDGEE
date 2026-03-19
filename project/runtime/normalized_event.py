@@ -14,6 +14,7 @@ _DEFAULT_ROLE = "alpha"
 _DEFAULT_PROVENANCE = "market"
 _MAX_ISSUE_EXAMPLES = 20
 
+
 @dataclass(frozen=True)
 class NormalizedEvent:
     event_id: str
@@ -28,6 +29,7 @@ class NormalizedEvent:
     role: str
     provenance: str
     order_id: str = ""
+
 
 def to_us(value: Any) -> Optional[int]:
     if value is None:
@@ -126,11 +128,16 @@ def normalize_event_rows(
         event_id = str(row.get("event_id", "")).strip() or f"{event_type}_{symbol}_{idx:08d}"
         venue_id = str(row.get("venue_id", "")).strip() or _DEFAULT_VENUE_ID
         role = str(row.get("role", "")).strip().lower() or _DEFAULT_ROLE
-        provenance = str(
-            row.get("provenance", "")
-            or row.get("feature_provenance", "")
-            or row.get("source_provenance", "")
-        ).strip().lower() or _DEFAULT_PROVENANCE
+        provenance = (
+            str(
+                row.get("provenance", "")
+                or row.get("feature_provenance", "")
+                or row.get("source_provenance", "")
+            )
+            .strip()
+            .lower()
+            or _DEFAULT_PROVENANCE
+        )
 
         events.append(
             NormalizedEvent(
@@ -160,8 +167,10 @@ def normalize_event_rows(
     )
     return events, issues
 
+
 def event_to_record(event: NormalizedEvent) -> Dict[str, Any]:
     return dict(asdict(event))
+
 
 def events_to_records(events: Iterable[NormalizedEvent]) -> List[Dict[str, Any]]:
     return [event_to_record(event) for event in events]

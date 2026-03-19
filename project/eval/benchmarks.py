@@ -6,6 +6,7 @@ from typing import Dict
 
 BARS_PER_YEAR = BARS_PER_YEAR_BY_TIMEFRAME["5m"]  # 5m bars
 
+
 def compute_buy_hold_sharpe(close: pd.Series) -> Dict[str, float]:
     ret = close.pct_change().dropna()
     if ret.empty:
@@ -15,6 +16,7 @@ def compute_buy_hold_sharpe(close: pd.Series) -> Dict[str, float]:
     sharpe = ann_ret / ann_vol if ann_vol > 0 else 0.0
     return {"sharpe_annualized": sharpe, "annualized_return": ann_ret, "annualized_vol": ann_vol}
 
+
 def compute_btc_beta(strategy_returns: pd.Series, btc_returns: pd.Series) -> Dict[str, float]:
     aligned = pd.DataFrame({"strat": strategy_returns, "btc": btc_returns}).dropna()
     if len(aligned) < 10:
@@ -23,7 +25,8 @@ def compute_btc_beta(strategy_returns: pd.Series, btc_returns: pd.Series) -> Dic
     var_btc = float(aligned["btc"].var())
     beta = cov / var_btc if var_btc > 0 else float("nan")
     corr = float(aligned["strat"].corr(aligned["btc"]))
-    return {"beta": beta, "r_squared": corr ** 2}
+    return {"beta": beta, "r_squared": corr**2}
+
 
 def compute_exposure_summary(positions: pd.Series) -> Dict[str, float]:
     gross = positions.abs()

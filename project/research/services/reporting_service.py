@@ -34,7 +34,7 @@ def write_dataframe_report(
 
 def write_json_report(payload: Mapping[str, Any], output_path: Path) -> Path:
     ensure_dir(output_path.parent)
-    output_path.write_text(json.dumps(dict(payload), indent=2, sort_keys=True), encoding='utf-8')
+    output_path.write_text(json.dumps(dict(payload), indent=2, sort_keys=True), encoding="utf-8")
     return output_path
 
 
@@ -46,28 +46,28 @@ def write_candidate_reports(
     diagnostics: Optional[Mapping[str, Any]] = None,
 ) -> ReportBundleResult:
     result = ReportBundleResult()
-    combined_out = out_dir / 'phase2_candidates.parquet'
+    combined_out = out_dir / "phase2_candidates.parquet"
     combined_frame, combined_actual = write_dataframe_report(
         combined_candidates,
         combined_out,
-        schema_name='phase2_candidates',
+        schema_name="phase2_candidates",
         allow_empty=True,
     )
-    result.written_frames['combined_candidates'] = combined_frame
-    result.written_paths['combined_candidates'] = combined_actual
+    result.written_frames["combined_candidates"] = combined_frame
+    result.written_paths["combined_candidates"] = combined_actual
     for symbol, frame in symbol_candidates.items():
-        sym_out = out_dir / str(symbol) / 'phase2_candidates.parquet'
+        sym_out = out_dir / str(symbol) / "phase2_candidates.parquet"
         sym_frame, sym_actual = write_dataframe_report(
             frame,
             sym_out,
-            schema_name='phase2_candidates',
+            schema_name="phase2_candidates",
             allow_empty=True,
         )
-        result.written_frames[f'symbol::{symbol}'] = sym_frame
-        result.written_paths[f'symbol::{symbol}'] = sym_actual
+        result.written_frames[f"symbol::{symbol}"] = sym_frame
+        result.written_paths[f"symbol::{symbol}"] = sym_actual
     if diagnostics is not None:
-        diag_out = out_dir / 'phase2_diagnostics.json'
-        result.written_paths['diagnostics'] = write_json_report(diagnostics, diag_out)
+        diag_out = out_dir / "phase2_diagnostics.json"
+        result.written_paths["diagnostics"] = write_json_report(diagnostics, diag_out)
     return result
 
 
@@ -83,17 +83,37 @@ def write_promotion_reports(
 ) -> ReportBundleResult:
     result = ReportBundleResult()
     outputs = {
-        'promotion_audit': (audit_df, out_dir / 'promotion_statistical_audit.parquet', 'promotion_audit'),
-        'promoted_candidates': (promoted_df, out_dir / 'promoted_candidates.parquet', 'promoted_candidates'),
-        'evidence_bundle_summary': (evidence_bundle_summary, out_dir / 'evidence_bundle_summary.parquet', 'evidence_bundle_summary'),
-        'promotion_decisions': (promotion_decisions, out_dir / 'promotion_decisions.parquet', 'promotion_decisions'),
+        "promotion_audit": (
+            audit_df,
+            out_dir / "promotion_statistical_audit.parquet",
+            "promotion_audit",
+        ),
+        "promoted_candidates": (
+            promoted_df,
+            out_dir / "promoted_candidates.parquet",
+            "promoted_candidates",
+        ),
+        "evidence_bundle_summary": (
+            evidence_bundle_summary,
+            out_dir / "evidence_bundle_summary.parquet",
+            "evidence_bundle_summary",
+        ),
+        "promotion_decisions": (
+            promotion_decisions,
+            out_dir / "promotion_decisions.parquet",
+            "promotion_decisions",
+        ),
     }
     for key, (frame, path, schema) in outputs.items():
-        written_frame, actual_path = write_dataframe_report(frame, path, schema_name=schema, allow_empty=True)
+        written_frame, actual_path = write_dataframe_report(
+            frame, path, schema_name=schema, allow_empty=True
+        )
         result.written_frames[key] = written_frame
         result.written_paths[key] = actual_path
     ensure_dir(out_dir)
-    promotion_summary.to_csv(out_dir / 'promotion_summary.csv', index=False)
-    result.written_paths['promotion_summary'] = out_dir / 'promotion_summary.csv'
-    result.written_paths['promotion_diagnostics'] = write_json_report(diagnostics, out_dir / 'promotion_diagnostics.json')
+    promotion_summary.to_csv(out_dir / "promotion_summary.csv", index=False)
+    result.written_paths["promotion_summary"] = out_dir / "promotion_summary.csv"
+    result.written_paths["promotion_diagnostics"] = write_json_report(
+        diagnostics, out_dir / "promotion_diagnostics.json"
+    )
     return result

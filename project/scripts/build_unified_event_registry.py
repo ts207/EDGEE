@@ -17,11 +17,13 @@ META_KEYS = {
     "version",
 }
 
+
 def _load_yaml(path: Path) -> Dict[str, Any]:
     if not path.exists():
         return {}
     payload = yaml.safe_load(path.read_text(encoding="utf-8"))
     return payload if isinstance(payload, dict) else {}
+
 
 def build_unified_registry(repo_root: Path) -> Dict[str, Any]:
     spec_root = repo_root / "spec"
@@ -39,9 +41,7 @@ def build_unified_registry(repo_root: Path) -> Dict[str, Any]:
 
     event_defaults = _load_yaml(events_root / "_defaults.yaml")
     event_family_defaults = _load_yaml(events_root / "_families.yaml")
-    template_registry = _load_yaml(
-        spec_root / "templates" / "event_template_registry.yaml"
-    )
+    template_registry = _load_yaml(spec_root / "templates" / "event_template_registry.yaml")
 
     # Build event rows from per-event specs first.
     event_rows: Dict[str, Dict[str, Any]] = {}
@@ -70,9 +70,7 @@ def build_unified_registry(repo_root: Path) -> Dict[str, Any]:
             params = {}
 
         legacy_top_level = {
-            str(k): v
-            for k, v in payload.items()
-            if k not in CORE_KEYS and k not in META_KEYS
+            str(k): v for k, v in payload.items() if k not in CORE_KEYS and k not in META_KEYS
         }
         merged_event_params = dict(legacy_top_level)
         merged_event_params.update(params)
@@ -135,8 +133,7 @@ def build_unified_registry(repo_root: Path) -> Dict[str, Any]:
     all_families.update(str(k).strip().upper() for k in legacy_family_rows.keys())
     all_families.update(str(k).strip().upper() for k in template_families.keys())
     all_families.update(
-        str(row.get("canonical_family", "")).strip().upper()
-        for row in event_rows.values()
+        str(row.get("canonical_family", "")).strip().upper() for row in event_rows.values()
     )
     all_families.discard("")
 
@@ -195,6 +192,7 @@ def build_unified_registry(repo_root: Path) -> Dict[str, Any]:
         "events": {k: event_rows[k] for k in sorted(event_rows)},
     }
 
+
 def main() -> int:
     repo_root = PROJECT_ROOT.parent
     unified = build_unified_registry(repo_root)
@@ -203,6 +201,6 @@ def main() -> int:
     print(f"Wrote {out_path} with {len(unified.get('events', {}))} events")
     return 0
 
+
 if __name__ == "__main__":
     raise SystemExit(main())
-

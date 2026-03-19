@@ -1,18 +1,22 @@
 __all__ = [
-    'CandidateDiscoveryConfig',
-    'CandidateDiscoveryResult',
-    'execute_candidate_discovery',
-    'PromotionConfig',
-    'PromotionServiceResult',
-    'execute_promotion',
-    'ReportBundleResult',
-    'write_candidate_reports',
-    'write_promotion_reports',
+    "CandidateDiscoveryConfig",
+    "CandidateDiscoveryResult",
+    "execute_candidate_discovery",
+    "PromotionConfig",
+    "PromotionServiceResult",
+    "execute_promotion",
+    "ReportBundleResult",
+    "write_candidate_reports",
+    "write_promotion_reports",
 ]
 
 
 def __getattr__(name: str):
-    if name in {"CandidateDiscoveryConfig", "CandidateDiscoveryResult", "execute_candidate_discovery"}:
+    if name in {
+        "CandidateDiscoveryConfig",
+        "CandidateDiscoveryResult",
+        "execute_candidate_discovery",
+    }:
         from project.research.services.candidate_discovery_service import (
             CandidateDiscoveryConfig,
             CandidateDiscoveryResult,

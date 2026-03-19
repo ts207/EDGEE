@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any, Dict, List, Literal, Optional
 from pydantic import BaseModel, ConfigDict, Field
 
+
 class DataRequirements(BaseModel):
     model_config = ConfigDict(frozen=True)
     bars: List[str] = Field(default_factory=lambda: ["1m"])
@@ -11,11 +12,13 @@ class DataRequirements(BaseModel):
     latency_class: Literal["low", "medium", "high"] = "medium"
     depth_fidelity: Literal["tob", "top_5", "full"] = "tob"
 
+
 class EntryCondition(BaseModel):
     model_config = ConfigDict(frozen=True)
     feature: str
     operator: Literal["==", "!=", ">", "<", ">=", "<="]
     value: float
+
 
 class EntrySpec(BaseModel):
     model_config = ConfigDict(frozen=True)
@@ -23,16 +26,19 @@ class EntrySpec(BaseModel):
     conditions: List[EntryCondition]
     direction: Literal["LONG", "SHORT", "FLAT"]
 
+
 class ExitSpec(BaseModel):
     model_config = ConfigDict(frozen=True)
     time_stop_bars: Optional[int] = None
     take_profit_bps: Optional[float] = None
     stop_loss_bps: Optional[float] = None
 
+
 class RiskSpec(BaseModel):
     model_config = ConfigDict(frozen=True)
     max_position_notional_usd: float
     max_concurrent_positions: int = 1
+
 
 class ExecutionSpec(BaseModel):
     model_config = ConfigDict(frozen=True)
@@ -40,6 +46,7 @@ class ExecutionSpec(BaseModel):
     post_only_preference: bool = False
     slippage_assumption_bps: float = 1.0
     cost_assumption_bps: float = 1.0
+
 
 class StrategySpec(BaseModel):
     model_config = ConfigDict(frozen=True)

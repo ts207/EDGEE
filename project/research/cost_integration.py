@@ -5,6 +5,7 @@ from typing import Dict, Any
 
 from project.core.execution_costs import resolve_execution_costs
 
+
 def integrate_execution_costs(
     candidates: pd.DataFrame,
     symbol: str,

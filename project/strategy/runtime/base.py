@@ -4,6 +4,7 @@ from typing import List, Protocol
 
 import pandas as pd
 
+
 class Strategy(Protocol):
     name: str
     required_features: List[str]

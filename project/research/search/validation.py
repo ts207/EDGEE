@@ -1,6 +1,7 @@
 """
 Validation for HypothesisSpec and TriggerSpec objects.
 """
+
 from __future__ import annotations
 
 from typing import List
@@ -22,7 +23,9 @@ def validate_hypothesis_spec(spec: HypothesisSpec) -> List[str]:
     errors: List[str] = []
 
     if spec.direction not in VALID_DIRECTIONS:
-        errors.append(f"Invalid direction {spec.direction!r}. Must be one of {sorted(VALID_DIRECTIONS)}")
+        errors.append(
+            f"Invalid direction {spec.direction!r}. Must be one of {sorted(VALID_DIRECTIONS)}"
+        )
 
     if spec.horizon not in VALID_HORIZONS:
         errors.append(f"Invalid horizon {spec.horizon!r}. Must be one of {sorted(VALID_HORIZONS)}")
@@ -67,9 +70,13 @@ def validate_hypothesis_spec(spec: HypothesisSpec) -> List[str]:
             for family, label in spec.context.items():
                 labels = set(registry.context_labels_for_family(family))
                 if not labels:
-                    errors.append(f"Context family {family!r} not found in compiled domain registry")
+                    errors.append(
+                        f"Context family {family!r} not found in compiled domain registry"
+                    )
                 elif label not in labels:
-                    errors.append(f"Context label {label!r} not found for family {family!r} in compiled domain registry")
+                    errors.append(
+                        f"Context label {label!r} not found for family {family!r} in compiled domain registry"
+                    )
         except Exception as e:
             errors.append(f"Failed to load compiled domain registry for context validation: {e}")
 

@@ -22,21 +22,22 @@ from project.events.event_normalizer import (
     _empty_registry_events,
 )
 
+
 def _registry_root(data_root: Path, run_id: str) -> Path:
     return Path(data_root) / "events" / str(run_id)
+
 
 def _registry_file(root: Path, stem: str) -> Path:
     return root / f"{stem}.parquet"
 
-def _read_phase1_events(
-    data_root: Path, run_id: str, spec: EventRegistrySpec
-) -> pd.DataFrame:
+
+def _read_phase1_events(data_root: Path, run_id: str, spec: EventRegistrySpec) -> pd.DataFrame:
     # Check both data_root/reports and data_root/data/reports
     primary_candidates = [
         Path(data_root) / "reports" / spec.reports_dir / str(run_id) / spec.events_file,
         Path(data_root) / "data" / "reports" / spec.reports_dir / str(run_id) / spec.events_file,
     ]
-    
+
     candidates: List[Path] = []
     for p in primary_candidates:
         print(f"DEBUG: checking candidate path: {p}")
@@ -62,14 +63,11 @@ def _read_phase1_events(
 
     return pd.DataFrame()
 
+
 def collect_registry_events(
     data_root: Path, run_id: str, event_types: Iterable[str] | None = None
 ) -> pd.DataFrame:
-    selected = (
-        list(event_types)
-        if event_types is not None
-        else sorted(EVENT_REGISTRY_SPECS.keys())
-    )
+    selected = list(event_types) if event_types is not None else sorted(EVENT_REGISTRY_SPECS.keys())
     rows: List[pd.DataFrame] = []
     for event_type in selected:
         spec = EVENT_REGISTRY_SPECS.get(str(event_type))
@@ -83,10 +81,9 @@ def collect_registry_events(
     if not rows:
         return _empty_registry_events()
     out = pd.concat(rows, ignore_index=True)
-    out = out.sort_values(
-        ["timestamp", "symbol", "event_type", "event_id"]
-    ).reset_index(drop=True)
+    out = out.sort_values(["timestamp", "symbol", "event_type", "event_id"]).reset_index(drop=True)
     return out[REGISTRY_EVENT_COLUMNS]
+
 
 def merge_registry_events(
     *,
@@ -102,12 +99,8 @@ def merge_registry_events(
     existing_norm = normalize_registry_events_frame(existing)
     incoming_norm = normalize_registry_events_frame(incoming)
     if selected:
-        existing_kept = existing_norm[
-            ~existing_norm["event_type"].isin(selected)
-        ].copy()
-        incoming_replacement = incoming_norm[
-            incoming_norm["event_type"].isin(selected)
-        ].copy()
+        existing_kept = existing_norm[~existing_norm["event_type"].isin(selected)].copy()
+        incoming_replacement = incoming_norm[incoming_norm["event_type"].isin(selected)].copy()
     else:
         existing_kept = _empty_registry_events()
         incoming_replacement = incoming_norm
@@ -118,6 +111,7 @@ def merge_registry_events(
     else:
         merged = pd.concat([existing_kept, incoming_replacement], ignore_index=True)
     return normalize_registry_events_frame(merged)
+
 
 def write_event_registry_artifacts(
     data_root: Path, run_id: str, events: pd.DataFrame, event_flags: pd.DataFrame
@@ -133,6 +127,7 @@ def write_event_registry_artifacts(
         "registry_root": str(root),
     }
 
+
 def _read_registry_stem(data_root: Path, run_id: str, stem: str) -> pd.DataFrame:
     root = _registry_root(data_root=data_root, run_id=run_id)
     parquet_path = root / f"{stem}.parquet"
@@ -144,6 +139,7 @@ def _read_registry_stem(data_root: Path, run_id: str, stem: str) -> pd.DataFrame
         return pd.read_csv(csv_path)
     return pd.DataFrame()
 
+
 def load_registry_events(
     *,
     data_root: Path,
@@ -152,13 +148,20 @@ def load_registry_events(
     symbols: Sequence[str] | None = None,
 ) -> pd.DataFrame:
     from project.core.validation import coerce_to_ns_int
+
     events = _read_registry_stem(data_root=data_root, run_id=run_id, stem="events")
     if not events.empty:
-        events["enter_ts"] = pd.to_datetime(coerce_to_ns_int(events["enter_ts"]), utc=True, errors="coerce")
-        events["exit_ts"] = pd.to_datetime(coerce_to_ns_int(events["exit_ts"]), utc=True, errors="coerce")
+        events["enter_ts"] = pd.to_datetime(
+            coerce_to_ns_int(events["enter_ts"]), utc=True, errors="coerce"
+        )
+        events["exit_ts"] = pd.to_datetime(
+            coerce_to_ns_int(events["exit_ts"]), utc=True, errors="coerce"
+        )
         for col in ("phenom_enter_ts", "eval_bar_ts", "detected_ts", "signal_ts", "timestamp"):
             if col in events.columns:
-                events[col] = pd.to_datetime(coerce_to_ns_int(events[col]), utc=True, errors="coerce")
+                events[col] = pd.to_datetime(
+                    coerce_to_ns_int(events[col]), utc=True, errors="coerce"
+                )
     events = normalize_registry_events_frame(events)
     if events.empty:
         return _empty_registry_events()
@@ -167,18 +170,18 @@ def load_registry_events(
     if symbols is not None:
         symbol_set = {str(s).strip().upper() for s in symbols if str(s).strip()}
         if symbol_set:
-            events = events[
-                events["symbol"].astype(str).str.upper().isin(symbol_set)
-            ].copy()
-    return events.sort_values(
-        ["timestamp", "symbol", "event_type", "event_id"]
-    ).reset_index(drop=True)
+            events = events[events["symbol"].astype(str).str.upper().isin(symbol_set)].copy()
+    return events.sort_values(["timestamp", "symbol", "event_type", "event_id"]).reset_index(
+        drop=True
+    )
+
 
 def write_registry_file(data_root: Path, run_id: str, name: str, df: pd.DataFrame) -> str:
     root = _registry_root(data_root=data_root, run_id=run_id)
     ensure_dir(root)
     path, _ = write_parquet(df, _registry_file(root, name))
     return str(path)
+
 
 def load_registry_episode_anchors(
     *,
@@ -188,6 +191,7 @@ def load_registry_episode_anchors(
     symbols: Sequence[str] | None = None,
 ) -> pd.DataFrame:
     from project.core.validation import coerce_to_ns_int
+
     root = _registry_root(data_root=data_root, run_id=run_id)
     ep_path = _registry_file(root, "episode_anchors")
     if not Path(ep_path).exists():
@@ -197,7 +201,14 @@ def load_registry_episode_anchors(
 
     events = read_parquet(ep_path)
     if not events.empty:
-        for col in ("enter_ts", "exit_ts", "phenom_enter_ts", "eval_bar_ts", "detected_ts", "signal_ts"):
+        for col in (
+            "enter_ts",
+            "exit_ts",
+            "phenom_enter_ts",
+            "eval_bar_ts",
+            "detected_ts",
+            "signal_ts",
+        ):
             if col in events.columns and not pd.api.types.is_datetime64_any_dtype(events[col]):
                 events[col] = pd.to_datetime(
                     coerce_to_ns_int(events[col]), utc=True, errors="coerce"
@@ -213,10 +224,8 @@ def load_registry_episode_anchors(
     if symbols is not None:
         symbol_set = {str(s).strip().upper() for s in symbols if str(s).strip()}
         if symbol_set:
-            events = events[
-                events["symbol"].astype(str).str.upper().isin(symbol_set)
-            ].copy()
+            events = events[events["symbol"].astype(str).str.upper().isin(symbol_set)].copy()
 
-    return events.sort_values(
-        ["timestamp", "symbol", "event_type", "event_id"]
-    ).reset_index(drop=True)
+    return events.sort_values(["timestamp", "symbol", "event_type", "event_id"]).reset_index(
+        drop=True
+    )

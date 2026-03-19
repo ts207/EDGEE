@@ -54,7 +54,9 @@ def _load_runtime_event_rows() -> Dict[str, Dict[str, Any]]:
     return out
 
 
-def _merge_event_rows(unified: Dict[str, Any], runtime_rows: Dict[str, Dict[str, Any]]) -> Dict[str, EventDefinition]:
+def _merge_event_rows(
+    unified: Dict[str, Any], runtime_rows: Dict[str, Dict[str, Any]]
+) -> Dict[str, EventDefinition]:
     defaults = unified.get("defaults", {})
     families = unified.get("families", {})
     unified_events = unified.get("events", {})
@@ -70,10 +72,16 @@ def _merge_event_rows(unified: Dict[str, Any], runtime_rows: Dict[str, Dict[str,
         row: Dict[str, Any] = {}
         if isinstance(defaults, dict):
             row.update(defaults)
-        family_name = str(
-            unified_row.get("canonical_family") or runtime_row.get("canonical_family") or ""
-        ).strip().upper()
-        if family_name and isinstance(families, dict) and isinstance(families.get(family_name), dict):
+        family_name = (
+            str(unified_row.get("canonical_family") or runtime_row.get("canonical_family") or "")
+            .strip()
+            .upper()
+        )
+        if (
+            family_name
+            and isinstance(families, dict)
+            and isinstance(families.get(family_name), dict)
+        ):
             row.update(families[family_name])
         if isinstance(unified_row, dict):
             row.update(unified_row)
@@ -86,7 +94,11 @@ def _merge_event_rows(unified: Dict[str, Any], runtime_rows: Dict[str, Dict[str,
         parameters = {}
         default_params = defaults.get("parameters", {}) if isinstance(defaults, dict) else {}
         family_params = {}
-        if family_name and isinstance(families, dict) and isinstance(families.get(family_name), dict):
+        if (
+            family_name
+            and isinstance(families, dict)
+            and isinstance(families.get(family_name), dict)
+        ):
             family_params = families[family_name].get("parameters", {})
         if isinstance(default_params, dict):
             parameters.update(default_params)
@@ -107,7 +119,9 @@ def _merge_event_rows(unified: Dict[str, Any], runtime_rows: Dict[str, Dict[str,
             parameters=dict(parameters),
             raw=dict(row),
             spec_path=spec_path,
-            source_kind="runtime_event_spec" if event_type in runtime_rows and event_type not in (unified_events or {}) else "unified_registry",
+            source_kind="runtime_event_spec"
+            if event_type in runtime_rows and event_type not in (unified_events or {})
+            else "unified_registry",
         )
     return out
 
@@ -150,7 +164,8 @@ def _load_states() -> Dict[str, StateDefinition]:
             out[state_id] = StateDefinition(
                 state_id=state_id,
                 family=existing.family or str(row.get("family", "")).strip().upper(),
-                source_event_type=existing.source_event_type or str(row.get("source_event_type", "")).strip().upper(),
+                source_event_type=existing.source_event_type
+                or str(row.get("source_event_type", "")).strip().upper(),
                 raw=merged_raw,
             )
             continue
@@ -195,7 +210,11 @@ def _load_state_aliases() -> tuple[str, ...]:
     if isinstance(state_map, dict):
         for labels in state_map.values():
             if isinstance(labels, dict):
-                out.update(str(state_id).strip().upper() for state_id in labels.values() if str(state_id).strip())
+                out.update(
+                    str(state_id).strip().upper()
+                    for state_id in labels.values()
+                    if str(state_id).strip()
+                )
     return tuple(sorted(out))
 
 
@@ -243,11 +262,7 @@ def _load_kill_switch_candidate_features() -> tuple[str, ...]:
     rows = payload.get("candidates", []) if isinstance(payload, dict) else []
     if not isinstance(rows, list):
         return ()
-    return tuple(
-        str(value).strip()
-        for value in rows
-        if str(value).strip()
-    )
+    return tuple(str(value).strip() for value in rows if str(value).strip())
 
 
 def _load_sequence_definitions() -> tuple[Dict[str, Any], ...]:
@@ -297,7 +312,9 @@ def _load_operators(unified: Dict[str, Any]) -> Dict[str, TemplateOperatorDefini
             continue
         out[str(template_id).strip()] = TemplateOperatorDefinition(
             template_id=str(template_id).strip(),
-            compatible_families=tuple(str(x).strip().upper() for x in row.get("compatible_families", []) or []),
+            compatible_families=tuple(
+                str(x).strip().upper() for x in row.get("compatible_families", []) or []
+            ),
             raw=dict(row),
         )
     return out
@@ -326,9 +343,17 @@ def compile_domain_registry() -> DomainRegistry:
         state_definitions=state_definitions,
         template_operator_definitions=template_operator_definitions,
         gates_spec=dict(load_gates_spec()),
-        unified_registry_path=str(resolve_relative_spec_path("spec/events/event_registry_unified.yaml", repo_root=PROJECT_ROOT.parent)),
-        template_registry_payload=dict(template_registry_payload) if isinstance(template_registry_payload, dict) else {},
-        family_registry_payload=dict(family_registry_payload) if isinstance(family_registry_payload, dict) else {},
+        unified_registry_path=str(
+            resolve_relative_spec_path(
+                "spec/events/event_registry_unified.yaml", repo_root=PROJECT_ROOT.parent
+            )
+        ),
+        template_registry_payload=dict(template_registry_payload)
+        if isinstance(template_registry_payload, dict)
+        else {},
+        family_registry_payload=dict(family_registry_payload)
+        if isinstance(family_registry_payload, dict)
+        else {},
         context_state_map=context_state_map,
         searchable_event_families=searchable_event_families,
         searchable_state_families=searchable_state_families,

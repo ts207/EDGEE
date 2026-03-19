@@ -9,6 +9,7 @@ from typing import Dict, Tuple, Optional
 import numpy as np
 import pandas as pd
 from project import PROJECT_ROOT
+
 REPO_ROOT = PROJECT_ROOT.parent
 
 from project.events.registry import (
@@ -23,13 +24,13 @@ from project.core.validation import ts_ns_utc
 from project.core.validation import assert_monotonic_utc_timestamp
 
 
-
 @dataclass(frozen=True)
 class EpisodeConfig:
     timeframe_ns: int
     merge_gap_ns: int
     cooldown_ns: int
     anchor_rule: str  # "max_intensity" | "first" | "last"
+
 
 def _first_existing(df: pd.DataFrame, cols) -> Optional[str]:
     DATA_ROOT = get_data_root()
@@ -38,16 +39,21 @@ def _first_existing(df: pd.DataFrame, cols) -> Optional[str]:
             return c
     return None
 
+
 def _canonicalize_group(g: pd.DataFrame, cfg: EpisodeConfig) -> Tuple[pd.DataFrame, pd.DataFrame]:
     # g is sorted by enter_ts
     if g.empty:
         return g, g
 
-    intensity_col = _first_existing(g, ["evt_signal_intensity", "event_score", "intensity", "signal_intensity"])
+    intensity_col = _first_existing(
+        g, ["evt_signal_intensity", "event_score", "intensity", "signal_intensity"]
+    )
     if intensity_col is None:
         intensity = np.ones(len(g), dtype="float64")
     else:
-        intensity = pd.to_numeric(g[intensity_col], errors="coerce").fillna(0.0).to_numpy(dtype="float64")
+        intensity = (
+            pd.to_numeric(g[intensity_col], errors="coerce").fillna(0.0).to_numpy(dtype="float64")
+        )
 
     enter_ts = g["enter_ts"].to_numpy(dtype="int64")
     exit_ts = g["exit_ts"].to_numpy(dtype="int64")
@@ -69,7 +75,7 @@ def _canonicalize_group(g: pd.DataFrame, cfg: EpisodeConfig) -> Tuple[pd.DataFra
         # Ensure we use numpy arrays for faster min/max calculation over small lists
         ep_start = enter_ts[rows_idx].min()
         ep_end = exit_ts[rows_idx].max()
-        
+
         # Advance cooldown window past this episode
         cooldown_end_ns = ep_end + cfg.cooldown_ns
         # Anchor selection
@@ -85,7 +91,9 @@ def _canonicalize_group(g: pd.DataFrame, cfg: EpisodeConfig) -> Tuple[pd.DataFra
                 idx = int(np.nanargmax(np.abs(intensity[rows_idx])))
                 anchor_row = sub.iloc[idx]
 
-        anchor_ts = int(anchor_row.get("signal_ts", anchor_row.get("detected_ts", anchor_row["enter_ts"])))
+        anchor_ts = int(
+            anchor_row.get("signal_ts", anchor_row.get("detected_ts", anchor_row["enter_ts"]))
+        )
         # Bound anchor inside episode
         anchor_ts = max(ep_start, min(anchor_ts, ep_end))
 
@@ -107,7 +115,9 @@ def _canonicalize_group(g: pd.DataFrame, cfg: EpisodeConfig) -> Tuple[pd.DataFra
             if c in sub.columns:
                 ep[c] = sub[c].iloc[0]
         if intensity_col is not None:
-            ep["episode_anchor_intensity"] = float(pd.to_numeric(anchor_row[intensity_col], errors="coerce") or 0.0)
+            ep["episode_anchor_intensity"] = float(
+                pd.to_numeric(anchor_row[intensity_col], errors="coerce") or 0.0
+            )
 
         episodes.append(ep)
 
@@ -148,7 +158,10 @@ def _canonicalize_group(g: pd.DataFrame, cfg: EpisodeConfig) -> Tuple[pd.DataFra
     anchor_df = pd.DataFrame(anchors)
     return ep_df, anchor_df
 
-def canonicalize_event_episodes(events: pd.DataFrame, cfg: EpisodeConfig) -> Tuple[pd.DataFrame, pd.DataFrame]:
+
+def canonicalize_event_episodes(
+    events: pd.DataFrame, cfg: EpisodeConfig
+) -> Tuple[pd.DataFrame, pd.DataFrame]:
     if events.empty:
         return events.copy(), events.copy()
 
@@ -174,7 +187,9 @@ def canonicalize_event_episodes(events: pd.DataFrame, cfg: EpisodeConfig) -> Tup
         events["signal_ts"] = events["enter_ts"].astype("int64")
 
     # Sanity: monotonic within symbol? not globally; enforce sorting
-    events = events.sort_values(["symbol", "event_id", "enter_ts", "exit_ts"]).reset_index(drop=True)
+    events = events.sort_values(["symbol", "event_id", "enter_ts", "exit_ts"]).reset_index(
+        drop=True
+    )
 
     ep_parts = []
     anchor_parts = []
@@ -194,16 +209,43 @@ def canonicalize_event_episodes(events: pd.DataFrame, cfg: EpisodeConfig) -> Tup
 
     return episodes, anchors
 
+
 def main() -> int:
     DATA_ROOT = get_data_root()
-    ap = argparse.ArgumentParser(description="Canonicalize Phase1 event triggers into non-overlapping episodes and anchor events.")
+    ap = argparse.ArgumentParser(
+        description="Canonicalize Phase1 event triggers into non-overlapping episodes and anchor events."
+    )
     ap.add_argument("--run_id", required=True)
     ap.add_argument("--timeframe", default="5m")
-    ap.add_argument("--merge_gap_bars", type=int, default=None, help="Merge events if gap <= this many bars. Overrides spec default.")
-    ap.add_argument("--cooldown_bars", type=int, default=None, help="Cooldown bars between episodes. Overrides spec default.")
-    ap.add_argument("--anchor_rule", default=None, choices=["max_intensity", "first", "last"], help="Anchor selection rule. Overrides spec default.")
-    ap.add_argument("--min_occurrences", type=int, default=None, help="Minimum event count to keep an event_type. Overrides spec default.")
-    ap.add_argument("--event_type", default="all", help="Optional: restrict to one event_type if the registry was built per type.")
+    ap.add_argument(
+        "--merge_gap_bars",
+        type=int,
+        default=None,
+        help="Merge events if gap <= this many bars. Overrides spec default.",
+    )
+    ap.add_argument(
+        "--cooldown_bars",
+        type=int,
+        default=None,
+        help="Cooldown bars between episodes. Overrides spec default.",
+    )
+    ap.add_argument(
+        "--anchor_rule",
+        default=None,
+        choices=["max_intensity", "first", "last"],
+        help="Anchor selection rule. Overrides spec default.",
+    )
+    ap.add_argument(
+        "--min_occurrences",
+        type=int,
+        default=None,
+        help="Minimum event count to keep an event_type. Overrides spec default.",
+    )
+    ap.add_argument(
+        "--event_type",
+        default="all",
+        help="Optional: restrict to one event_type if the registry was built per type.",
+    )
     args = ap.parse_args()
 
     timeframe_ns = TIMEFRAME_TO_NS.get(str(args.timeframe).lower())
@@ -212,10 +254,26 @@ def main() -> int:
 
     # Resolve per-event spec defaults (CLI overrides take precedence)
     spec = EVENT_REGISTRY_SPECS.get(args.event_type) if args.event_type != "all" else None
-    merge_gap_bars = args.merge_gap_bars if args.merge_gap_bars is not None else (spec.merge_gap_bars if spec else 1)
-    cooldown_bars = args.cooldown_bars if args.cooldown_bars is not None else (spec.cooldown_bars if spec else 0)
-    anchor_rule = args.anchor_rule if args.anchor_rule is not None else (spec.anchor_rule if spec else "max_intensity")
-    min_occurrences = args.min_occurrences if args.min_occurrences is not None else (spec.min_occurrences if spec else 0)
+    merge_gap_bars = (
+        args.merge_gap_bars
+        if args.merge_gap_bars is not None
+        else (spec.merge_gap_bars if spec else 1)
+    )
+    cooldown_bars = (
+        args.cooldown_bars
+        if args.cooldown_bars is not None
+        else (spec.cooldown_bars if spec else 0)
+    )
+    anchor_rule = (
+        args.anchor_rule
+        if args.anchor_rule is not None
+        else (spec.anchor_rule if spec else "max_intensity")
+    )
+    min_occurrences = (
+        args.min_occurrences
+        if args.min_occurrences is not None
+        else (spec.min_occurrences if spec else 0)
+    )
 
     cfg = EpisodeConfig(
         timeframe_ns=timeframe_ns,
@@ -263,11 +321,14 @@ def main() -> int:
     # Write under registry root
     out_paths = {}
     out_paths["episodes_path"] = write_registry_file(DATA_ROOT, args.run_id, "episodes", episodes)
-    out_paths["episode_anchors_path"] = write_registry_file(DATA_ROOT, args.run_id, "episode_anchors", anchor_events)
+    out_paths["episode_anchors_path"] = write_registry_file(
+        DATA_ROOT, args.run_id, "episode_anchors", anchor_events
+    )
 
     manifest["outputs"] = [{"path": str(p)} for p in out_paths.values()]
     finalize_manifest(manifest, status="success")
     return 0
+
 
 if __name__ == "__main__":
     raise SystemExit(main())

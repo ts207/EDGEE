@@ -7,7 +7,10 @@ import numpy as np
 import pandas as pd
 
 from project.core.execution_costs import estimate_transaction_cost_bps
-from project.portfolio.risk_budget import calculate_portfolio_risk_multiplier, get_asset_correlation_adjustment
+from project.portfolio.risk_budget import (
+    calculate_portfolio_risk_multiplier,
+    get_asset_correlation_adjustment,
+)
 
 _LOG = logging.getLogger(__name__)
 
@@ -68,21 +71,21 @@ def calculate_target_notional(
     expected_adverse = abs(_to_decimal_return(expected_adverse_bps))
     risk_variance = max(1e-8, expected_adverse**2)
     edge = float(event_score) * net_expected_return
-    
+
     # Kelly-like multiplier
     confidence_multiplier = np.clip(edge / risk_variance, 0.0, max_kelly_multiplier)
-    
+
     # Base position size (e.g. 0.1% of portfolio per unit of confidence)
     portfolio_value = portfolio_state.get("portfolio_value", 1000000.0)
     base_notional = portfolio_value * 0.001 * confidence_multiplier
-    
+
     # 2. Constraints
     # Liquidity cap (max 1% of available liquidity)
     liquidity_cap = liquidity_usd * 0.01
-    
+
     # Concentration cap (max 5% of portfolio)
     concentration_cap = portfolio_value * concentration_cap_pct
-    
+
     # Portfolio Risk Adjustment
     risk_mult = calculate_portfolio_risk_multiplier(
         gross_exposure=portfolio_state.get("gross_exposure", 0.0),
@@ -90,7 +93,7 @@ def calculate_target_notional(
         target_vol=portfolio_state.get("target_vol", 0.1),
         current_vol=portfolio_state.get("current_vol", 0.1),
     )
-    
+
     # Correlation adjustment
     corr_adj = get_asset_correlation_adjustment(
         asset_bucket=asset_bucket,
@@ -98,14 +101,14 @@ def calculate_target_notional(
     )
 
     vol_adj = _resolve_volatility_adjustment(vol_regime, portfolio_state)
-    
+
     # Final target
     target_notional = min(
         base_notional * risk_mult * corr_adj * vol_adj,
         liquidity_cap,
         concentration_cap,
     )
-    
+
     return {
         "target_notional": float(target_notional),
         "confidence_multiplier": float(confidence_multiplier),
@@ -159,8 +162,16 @@ def calculate_execution_aware_target_notional(
             "spread_bps": [float(market_data.get("spread_bps", 0.0))],
             "atr_14": [market_data.get("atr_14")],
             "close": [float(market_data.get("close", market_data.get("base_price", 1.0)) or 1.0)],
-            "high": [market_data.get("high", market_data.get("close", market_data.get("base_price", 1.0)) or 1.0)],
-            "low": [market_data.get("low", market_data.get("close", market_data.get("base_price", 1.0)) or 1.0)],
+            "high": [
+                market_data.get(
+                    "high", market_data.get("close", market_data.get("base_price", 1.0)) or 1.0
+                )
+            ],
+            "low": [
+                market_data.get(
+                    "low", market_data.get("close", market_data.get("base_price", 1.0)) or 1.0
+                )
+            ],
             "quote_volume": [market_data.get("quote_volume", liquidity_usd)],
             "depth_usd": [market_data.get("depth_usd", liquidity_usd)],
             "tob_coverage": [market_data.get("tob_coverage", 1.0)],

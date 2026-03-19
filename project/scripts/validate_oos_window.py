@@ -11,24 +11,31 @@ Usage:
         --eval_end   2025-07-01 \\
         [--allow_oos_overlap 0]
 """
+
 from __future__ import annotations
 from project.core.config import get_data_root
 
 import argparse
 import json
 import sys
+
 DATA_ROOT = get_data_root()
+
 
 def _load_manifest(run_id: str) -> dict:
     path = DATA_ROOT / "runs" / run_id / "run_manifest.json"
     if not path.exists():
-        print(f"[oos_guard] Warning: run_manifest.json not found for run_id={run_id}. Skipping OOS check.", file=sys.stderr)
+        print(
+            f"[oos_guard] Warning: run_manifest.json not found for run_id={run_id}. Skipping OOS check.",
+            file=sys.stderr,
+        )
         return {}
     try:
         return json.loads(path.read_text(encoding="utf-8"))
     except Exception as exc:
         print(f"[oos_guard] Warning: could not parse manifest: {exc}", file=sys.stderr)
         return {}
+
 
 def validate_oos_window(
     run_id: str,
@@ -49,7 +56,10 @@ def validate_oos_window(
     discovery_end = str(manifest.get("end") or manifest.get("end_date") or "").strip()
 
     if not discovery_end:
-        print("[oos_guard] No discovery end date found in manifest. Skipping OOS overlap check.", file=sys.stderr)
+        print(
+            "[oos_guard] No discovery end date found in manifest. Skipping OOS overlap check.",
+            file=sys.stderr,
+        )
         return True
 
     # Compare date strings — ISO format comparison is safe for YYYY-MM-DD
@@ -71,12 +81,22 @@ def validate_oos_window(
     )
     return True
 
+
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Validate OOS evaluation window against discovery window.")
+    parser = argparse.ArgumentParser(
+        description="Validate OOS evaluation window against discovery window."
+    )
     parser.add_argument("--run_id", required=True)
-    parser.add_argument("--eval_start", required=True, help="Start of evaluation window (YYYY-MM-DD)")
+    parser.add_argument(
+        "--eval_start", required=True, help="Start of evaluation window (YYYY-MM-DD)"
+    )
     parser.add_argument("--eval_end", required=True, help="End of evaluation window (YYYY-MM-DD)")
-    parser.add_argument("--allow_oos_overlap", type=int, default=0, help="If 1, log warning instead of failing on overlap.")
+    parser.add_argument(
+        "--allow_oos_overlap",
+        type=int,
+        default=0,
+        help="If 1, log warning instead of failing on overlap.",
+    )
     args = parser.parse_args()
 
     ok = validate_oos_window(
@@ -86,6 +106,7 @@ def main() -> int:
         allow_overlap=bool(int(args.allow_oos_overlap)),
     )
     return 0 if ok else 2
+
 
 if __name__ == "__main__":
     sys.exit(main())

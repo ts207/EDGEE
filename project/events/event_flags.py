@@ -18,17 +18,20 @@ from project.events.event_specs import (
     REGISTRY_BACKED_SIGNALS,
 )
 
+
 def _active_signal_column(signal_column: str) -> str:
     signal = str(signal_column).strip()
     if signal.endswith("_event"):
         return f"{signal[:-6]}_active"
     return f"{signal}_active"
 
+
 def _signal_ts_column(signal_column: str) -> str:
     signal = str(signal_column).strip()
     if signal.endswith("_event"):
         return f"{signal[:-6]}_signal"
     return f"{signal}_signal"
+
 
 def _load_symbol_timestamps(
     data_root: Path, run_id: str, symbol: str, timeframe: str = "5m"
@@ -38,13 +41,7 @@ def _load_symbol_timestamps(
         run_scoped_lake_path(
             data_root, run_id, "features", "perp", symbol, timeframe, feature_dataset
         ),
-        Path(data_root)
-        / "lake"
-        / "features"
-        / "perp"
-        / symbol
-        / timeframe
-        / feature_dataset,
+        Path(data_root) / "lake" / "features" / "perp" / symbol / timeframe / feature_dataset,
     ]
     src = choose_partition_dir(candidates)
     files = list_parquet_files(src) if src else []
@@ -57,6 +54,7 @@ def _load_symbol_timestamps(
     if ts.empty:
         return pd.Series(dtype="datetime64[ns, UTC]")
     return pd.Series(sorted(pd.DatetimeIndex(ts).unique()))
+
 
 def build_event_flags(
     *,
@@ -78,24 +76,18 @@ def build_event_flags(
 
     grids = []
     for symbol in symbols_clean:
-        ts = _ts_loader(
-            data_root=data_root, run_id=run_id, symbol=symbol, timeframe=timeframe
-        )
+        ts = _ts_loader(data_root=data_root, run_id=run_id, symbol=symbol, timeframe=timeframe)
         if ts.empty:
             event_ts = pd.Series(dtype="datetime64[ns, UTC]")
             if not events.empty:
-                local = events[
-                    (events["symbol"] == symbol) | (events["symbol"] == "ALL")
-                ]
+                local = events[(events["symbol"] == symbol) | (events["symbol"] == "ALL")]
                 event_ts = pd.to_datetime(
                     local.get("timestamp", pd.Series(dtype=object)),
                     utc=True,
                     errors="coerce",
                 ).dropna()
             ts = (
-                pd.Series(sorted(pd.DatetimeIndex(event_ts).unique()))
-                if not event_ts.empty
-                else ts
+                pd.Series(sorted(pd.DatetimeIndex(event_ts).unique())) if not event_ts.empty else ts
             )
 
         if not ts.empty:
@@ -172,14 +164,14 @@ def build_event_flags(
         # We use side="right" to find the open time of the bar AFTER detection.
         # This ensures earliest tradable bar is t+1.
         idx_tradable = np.searchsorted(grid_ts_naive, sig_ts_naive, side="right")
-        
+
         # 3. Active window end
         exit_ts_naive = sym_events["exit_ts"].dt.tz_localize(None).values
         idx_exit = np.searchsorted(grid_ts_naive, exit_ts_naive, side="right") - 1
 
         for sig_col in np.unique(sym_events["signal_column"]):
             sig_mask = sym_events["signal_column"] == sig_col
-            
+
             # Set Tradable Signal (_signal column)
             tradable_col = _signal_ts_column(sig_col)
             valid_sig = idx_tradable[sig_mask] < len(grid_ts_naive)
@@ -195,9 +187,7 @@ def build_event_flags(
             starts = idx_tradable[sig_mask]
             exits = idx_exit[sig_mask]
 
-            valid_ranges = (
-                (starts < len(grid_ts_naive)) & (exits >= 0) & (starts <= exits)
-            )
+            valid_ranges = (starts < len(grid_ts_naive)) & (exits >= 0) & (starts <= exits)
             if valid_ranges.any():
                 starts_v = np.maximum(0, starts[valid_ranges])
                 exits_v = np.minimum(len(grid_ts_naive) - 1, exits[valid_ranges])
@@ -208,22 +198,18 @@ def build_event_flags(
 
     return full_grid.sort_values(["timestamp", "symbol"]).reset_index(drop=True)
 
-def load_registry_flags(
-    data_root: Path, run_id: str, symbol: str | None = None
-) -> pd.DataFrame:
+
+def load_registry_flags(data_root: Path, run_id: str, symbol: str | None = None) -> pd.DataFrame:
     from project.events.event_repository import _read_registry_stem
+
     flags = _read_registry_stem(data_root=data_root, run_id=run_id, stem="event_flags")
     if flags.empty:
         cols = ["timestamp", "symbol"]
         for signal in sorted(REGISTRY_BACKED_SIGNALS):
-            cols.extend(
-                [signal, _active_signal_column(signal), _signal_ts_column(signal)]
-            )
+            cols.extend([signal, _active_signal_column(signal), _signal_ts_column(signal)])
         return pd.DataFrame(columns=cols)
 
-    flags["timestamp"] = pd.to_datetime(
-        flags.get("timestamp"), utc=True, errors="coerce"
-    )
+    flags["timestamp"] = pd.to_datetime(flags.get("timestamp"), utc=True, errors="coerce")
     flags = flags.dropna(subset=["timestamp"]).copy()
     if symbol is not None:
         symbol_norm = str(symbol).strip().upper()
@@ -248,6 +234,7 @@ def load_registry_flags(
 
     return flags.sort_values(["timestamp", "symbol"]).reset_index(drop=True)
 
+
 def merge_event_flags_for_selected_event_types(
     *,
     existing_flags: pd.DataFrame,
@@ -255,9 +242,7 @@ def merge_event_flags_for_selected_event_types(
     selected_event_types: Sequence[str],
 ) -> pd.DataFrame:
     selected = [
-        str(event_type).strip()
-        for event_type in selected_event_types
-        if str(event_type).strip()
+        str(event_type).strip() for event_type in selected_event_types if str(event_type).strip()
     ]
     selected_signal_cols: List[str] = []
     for event_type in selected:
@@ -270,23 +255,13 @@ def merge_event_flags_for_selected_event_types(
     selected_signal_cols = list(dict.fromkeys(selected_signal_cols))
 
     keys = ["timestamp", "symbol"]
-    left = (
-        existing_flags.copy()
-        if existing_flags is not None
-        else pd.DataFrame(columns=keys)
-    )
-    right = (
-        recomputed_flags.copy()
-        if recomputed_flags is not None
-        else pd.DataFrame(columns=keys)
-    )
+    left = existing_flags.copy() if existing_flags is not None else pd.DataFrame(columns=keys)
+    right = recomputed_flags.copy() if recomputed_flags is not None else pd.DataFrame(columns=keys)
 
     if "timestamp" in left.columns:
         left["timestamp"] = pd.to_datetime(left["timestamp"], utc=True, errors="coerce")
     if "timestamp" in right.columns:
-        right["timestamp"] = pd.to_datetime(
-            right["timestamp"], utc=True, errors="coerce"
-        )
+        right["timestamp"] = pd.to_datetime(right["timestamp"], utc=True, errors="coerce")
     left = (
         left.dropna(subset=["timestamp"])
         if "timestamp" in left.columns
@@ -304,9 +279,7 @@ def merge_event_flags_for_selected_event_types(
         if right.empty:
             merged = left.copy()
         else:
-            keep_right_cols = [
-                c for c in [*keys, *selected_signal_cols] if c in right.columns
-            ]
+            keep_right_cols = [c for c in [*keys, *selected_signal_cols] if c in right.columns]
             merged = left.merge(
                 right[keep_right_cols],
                 on=keys,
@@ -326,9 +299,7 @@ def merge_event_flags_for_selected_event_types(
 
     out_cols = ["timestamp", "symbol"]
     for signal in sorted(REGISTRY_BACKED_SIGNALS):
-        out_cols.extend(
-            [signal, _active_signal_column(signal), _signal_ts_column(signal)]
-        )
+        out_cols.extend([signal, _active_signal_column(signal), _signal_ts_column(signal)])
 
     missing = [c for c in out_cols if c not in merged.columns]
     if missing:
@@ -339,7 +310,9 @@ def merge_event_flags_for_selected_event_types(
     for signal in sorted(REGISTRY_BACKED_SIGNALS):
         merged[signal] = merged[signal].where(merged[signal].notna(), False).astype(bool)
         active_col = _active_signal_column(signal)
-        merged[active_col] = merged[active_col].where(merged[active_col].notna(), False).astype(bool)
+        merged[active_col] = (
+            merged[active_col].where(merged[active_col].notna(), False).astype(bool)
+        )
         ts_col = _signal_ts_column(signal)
         merged[ts_col] = merged[ts_col].where(merged[ts_col].notna(), False).astype(bool)
 

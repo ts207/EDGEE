@@ -4,6 +4,7 @@ Hypothesis generator.
 Refactored to support phased search specs, family-based expansion,
 sequences, and interactions.
 """
+
 from __future__ import annotations
 
 import logging
@@ -31,6 +32,7 @@ log = logging.getLogger(__name__)
 def _candidate_row(spec: HypothesisSpec, *, search_spec_name: str) -> Dict[str, Any]:
     return CandidateHypothesis(spec=spec, search_spec_name=search_spec_name).to_record()
 
+
 def _context_combinations(contexts: Dict[str, Any]) -> List[Optional[Dict[str, str]]]:
     """
     Expand contexts dict into a list of conditioning dicts.
@@ -52,13 +54,16 @@ def _context_combinations(contexts: Dict[str, Any]) -> List[Optional[Dict[str, s
                 active_keys.append(k)
                 values.append(list(labels))
             else:
-                log.warning("Family %r not found in compiled domain registry context labels. Skipping wildcard expansion for this family.", k)
+                log.warning(
+                    "Family %r not found in compiled domain registry context labels. Skipping wildcard expansion for this family.",
+                    k,
+                )
                 # Ensure we don't invent "unknown" labels. Just skip this family from combinations.
                 continue
         else:
             active_keys.append(k)
             values.append(v if isinstance(v, list) else [v])
-            
+
     if not values:
         return [None]
 
@@ -86,15 +91,13 @@ def _build_hypotheses(
             trigger = TriggerSpec.transition(from_state=item["from"], to_state=item["to"])
         elif trigger_type == TriggerType.FEATURE_PREDICATE:
             trigger = TriggerSpec.feature_predicate(
-                feature=item["feature"],
-                operator=item["operator"],
-                threshold=item["threshold"]
+                feature=item["feature"], operator=item["operator"], threshold=item["threshold"]
             )
         elif trigger_type == TriggerType.SEQUENCE:
             trigger = TriggerSpec.sequence(
                 sequence_id=item["name"],
                 events=item["events"],
-                max_gap=item.get("max_gap", [6] * (len(item["events"]) - 1))
+                max_gap=item.get("max_gap", [6] * (len(item["events"]) - 1)),
             )
         elif trigger_type == TriggerType.INTERACTION:
             trigger = TriggerSpec.interaction(
@@ -102,7 +105,7 @@ def _build_hypotheses(
                 left=item["left"],
                 right=item["right"],
                 op=item["op"],
-                lag=item.get("lag", 6)
+                lag=item.get("lag", 6),
             )
         else:
             log.warning("Unsupported trigger_type in _build_hypotheses: %s", trigger_type)
@@ -124,6 +127,7 @@ def _build_hypotheses(
 def load_sequence_registry() -> List[Dict[str, Any]]:
     return get_domain_registry().sequence_rows()
 
+
 def load_interaction_registry() -> List[Dict[str, Any]]:
     return get_domain_registry().interaction_rows()
 
@@ -141,10 +145,11 @@ def generate_hypotheses_with_audit(
     """
     if search_space_path:
         from project.spec_registry import load_yaml_path
+
         doc = load_yaml_path(Path(search_space_path))
     else:
         doc = loaders.load_search_spec(search_spec_name)
-    
+
     # Expand triggers from families and explicit lists
     expanded = expand_triggers(doc)
     events = expanded.get("events", [])
@@ -152,7 +157,7 @@ def generate_hypotheses_with_audit(
     transitions = expanded.get("transitions", [])
     feature_predicates = expanded.get("feature_predicates", [])
     event_family_map: Dict[str, str] = expanded.get("event_family_map", {})
-    
+
     # Resolve wildcards
     horizons = [str(h) for h in doc.get("horizons", ["15m"])]
     directions = [str(d) for d in doc.get("directions", ["long", "short"])]
@@ -169,7 +174,7 @@ def generate_hypotheses_with_audit(
     # Budgets and Quotas
     quotas = doc.get("quotas", {})
     template_budgets = doc.get("template_budgets", {})
-    
+
     type_counts: Dict[str, int] = {}
     template_counts: Dict[str, int] = {}
 
@@ -286,7 +291,13 @@ def generate_hypotheses_with_audit(
 
     # Build feature predicates
     for spec in _build_hypotheses(
-        TriggerType.FEATURE_PREDICATE, feature_predicates, horizons, directions, entry_lags, contexts, templates
+        TriggerType.FEATURE_PREDICATE,
+        feature_predicates,
+        horizons,
+        directions,
+        entry_lags,
+        contexts,
+        templates,
     ):
         _add(spec)
 
@@ -302,7 +313,13 @@ def generate_hypotheses_with_audit(
     if doc.get("include_interactions", False) or search_spec_name == "full":
         interactions = load_interaction_registry()
         for spec in _build_hypotheses(
-            TriggerType.INTERACTION, interactions, horizons, directions, entry_lags, contexts, templates
+            TriggerType.INTERACTION,
+            interactions,
+            horizons,
+            directions,
+            entry_lags,
+            contexts,
+            templates,
         ):
             _add(spec)
 
@@ -323,24 +340,24 @@ def generate_hypotheses_with_audit(
                 operator=ft["operator"],
                 threshold=ft["threshold"],
             )
-            for horizon, direction, lag, ctx in product(
-                horizons, directions, entry_lags, contexts
-            ):
-                _add(HypothesisSpec(
-                    trigger=trigger,
-                    direction=direction,
-                    horizon=horizon,
-                    template_id=ft["name"],
-                    context=ctx,
-                    entry_lag=lag,
-                    feature_condition=fc,
-                ))
+            for horizon, direction, lag, ctx in product(horizons, directions, entry_lags, contexts):
+                _add(
+                    HypothesisSpec(
+                        trigger=trigger,
+                        direction=direction,
+                        horizon=horizon,
+                        template_id=ft["name"],
+                        context=ctx,
+                        entry_lag=lag,
+                        feature_condition=fc,
+                    )
+                )
 
     if skipped_invalid:
         log.warning("Skipped %d invalid HypothesisSpec objects during generation", skipped_invalid)
     if rejection_reason_counts:
         log.warning("Generation rejections by reason: %s", rejection_reason_counts)
-    
+
     log.info(
         "Generated %d hypotheses from search spec '%s' (events=%d states=%d transitions=%d features=%d). "
         "Audit: skipped_cap=%d, skipped_quota=%d, skipped_budget=%d, skipped_dup=%d, skipped_invalid=%d",

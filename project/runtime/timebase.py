@@ -8,11 +8,13 @@ from typing import Dict, Iterable, Mapping
 NEG_INF_US = -(2**62)
 DEFAULT_LANE_ID = "alpha_5s"
 
+
 @dataclass(frozen=True)
 class WatermarkCfg:
     max_lateness_us: int
     idle_source_policy: str
     idle_timeout_us: int
+
 
 @dataclass
 class _SourceState:
@@ -51,7 +53,10 @@ class WatermarkTracker:
                 if idle_policy == "stall":
                     return NEG_INF_US
                 continue
-            is_idle = idle_timeout > 0 and (int(decision_time_us) - int(state.last_recv_time_seen)) > idle_timeout
+            is_idle = (
+                idle_timeout > 0
+                and (int(decision_time_us) - int(state.last_recv_time_seen)) > idle_timeout
+            )
             if is_idle:
                 if idle_policy == "stall":
                     return NEG_INF_US
@@ -63,6 +68,7 @@ class WatermarkTracker:
             return min(wms)
         all_seen = [int(state.max_event_time_seen) - max_late for state in self._sources.values()]
         return min(all_seen) if all_seen else NEG_INF_US
+
 
 def lane_cfg_map(lanes_spec: Mapping[str, object]) -> Dict[str, WatermarkCfg]:
     out: Dict[str, WatermarkCfg] = {}

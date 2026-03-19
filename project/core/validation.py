@@ -148,7 +148,11 @@ def assert_funding_event_grid(
     assert_monotonic_utc_timestamp(df, col)
     series = df[col]
 
-    if series.dt.minute.ne(0).any() or series.dt.second.ne(0).any() or series.dt.microsecond.ne(0).any():
+    if (
+        series.dt.minute.ne(0).any()
+        or series.dt.second.ne(0).any()
+        or series.dt.microsecond.ne(0).any()
+    ):
         raise ValueError("Funding timestamps must be on the hour")
     if (series.dt.hour % expected_hours != 0).any():
         raise ValueError(f"Funding timestamps must align to {expected_hours}h grid")
@@ -211,28 +215,28 @@ def ts_ns_utc(series: pd.Series, *, allow_nat: bool = False) -> pd.Series:
 
 def coerce_to_ns_int(series: pd.Series) -> pd.Series:
     """
-    Heuristically convert arbitrary timestamps (ms ints, ns ints, strings, datetimes) 
+    Heuristically convert arbitrary timestamps (ms ints, ns ints, strings, datetimes)
     to int64 epoch nanoseconds.
     """
     if series.empty:
         return pd.Series(dtype="int64")
-        
+
     if pd.api.types.is_datetime64_any_dtype(series):
         return series.astype("int64")
-        
+
     s_num = pd.to_numeric(series, errors="coerce")
-    
+
     if s_num.isna().all():
         # Fallback to string parsing
         ts = pd.to_datetime(series, utc=True, errors="coerce")
         # Replace NaT (-9223372036854775808) with 0 or drop, but astype("int64") does NaT -> MIN_INT
         return ts.astype("int64")
-        
+
     med = s_num.median()
     if pd.isna(med):
         return s_num.fillna(0).astype("int64")
-        
-    # Heuristic: 1e12 is ~2001 in ms. 1e15 is ~1970 days in micro. 
+
+    # Heuristic: 1e12 is ~2001 in ms. 1e15 is ~1970 days in micro.
     # Current time in ms is ~1.7e12. In ns is ~1.7e18.
     if med < 1e14:
         # Treat as ms
@@ -241,7 +245,7 @@ def coerce_to_ns_int(series: pd.Series) -> pd.Series:
         # Treat as ns
         # If it's already ns ints, passing to pd.to_datetime with unit="ns" is safe
         ts = pd.to_datetime(s_num, unit="ns", utc=True, errors="coerce")
-        
+
     return ts.astype("int64")
 
 
@@ -308,7 +312,9 @@ def validate_strategy_family_params(config: Dict[str, Any]) -> Dict[str, Dict[st
                 curve = str(norm["sizing_curve"]).strip().lower()
                 if curve not in _ALLOWED_SIZING_CURVES:
                     allowed = ", ".join(sorted(_ALLOWED_SIZING_CURVES))
-                    raise ValueError(f"strategy_family_params.Carry.sizing_curve must be one of: {allowed}")
+                    raise ValueError(
+                        f"strategy_family_params.Carry.sizing_curve must be one of: {allowed}"
+                    )
                 norm["sizing_curve"] = curve
             out[family] = norm
 
@@ -324,7 +330,9 @@ def validate_strategy_family_params(config: Dict[str, Any]) -> Dict[str, Dict[st
             if "stop_zscore_abs" in norm and norm["stop_zscore_abs"] is not None:
                 stop_z = float(norm["stop_zscore_abs"])
                 if stop_z <= 0.0:
-                    raise ValueError("strategy_family_params.MeanReversion.stop_zscore_abs must be > 0 when set")
+                    raise ValueError(
+                        "strategy_family_params.MeanReversion.stop_zscore_abs must be > 0 when set"
+                    )
                 norm["stop_zscore_abs"] = stop_z
             out[family] = norm
 
@@ -333,12 +341,16 @@ def validate_strategy_family_params(config: Dict[str, Any]) -> Dict[str, Dict[st
                 if key in norm:
                     value = float(norm[key])
                     if key == "spread_zscore_entry_abs" and value <= 0.0:
-                        raise ValueError("strategy_family_params.Spread.spread_zscore_entry_abs must be > 0")
+                        raise ValueError(
+                            "strategy_family_params.Spread.spread_zscore_entry_abs must be > 0"
+                        )
                     norm[key] = value
             if "dislocation_threshold_bps" in norm:
                 dislocation = float(norm["dislocation_threshold_bps"])
                 if dislocation < 0.0:
-                    raise ValueError("strategy_family_params.Spread.dislocation_threshold_bps must be >= 0")
+                    raise ValueError(
+                        "strategy_family_params.Spread.dislocation_threshold_bps must be >= 0"
+                    )
                 norm["dislocation_threshold_bps"] = dislocation
             if "max_hold_bars" in norm:
                 hold = int(norm["max_hold_bars"])

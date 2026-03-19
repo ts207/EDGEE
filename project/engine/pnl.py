@@ -154,7 +154,9 @@ def build_execution_state(
             "fill_mode": exec_mode,
             "fill_price": fill_price,
             "close": close_aligned,
-            "open": open_aligned if open_aligned is not None else pd.Series(np.nan, index=idx, dtype=float),
+            "open": open_aligned
+            if open_aligned is not None
+            else pd.Series(np.nan, index=idx, dtype=float),
             "bar_return_close_to_close": bar_ret_cc,
             "entry_return_next_open": gap_ret,
             "intrabar_return": intrabar_ret,
@@ -185,10 +187,12 @@ def compute_bar_gross_pnl(execution_state: pd.DataFrame) -> pd.Series:
     prior_executed = pd.to_numeric(
         execution_state["prior_executed_position"], errors="coerce"
     ).fillna(0.0)
-    bar_ret_cc = pd.to_numeric(
-        execution_state["bar_return_close_to_close"], errors="coerce"
+    bar_ret_cc = pd.to_numeric(execution_state["bar_return_close_to_close"], errors="coerce")
+    exec_mode = (
+        str(execution_state["fill_mode"].iloc[0]).strip().lower()
+        if not execution_state.empty
+        else "close"
     )
-    exec_mode = str(execution_state["fill_mode"].iloc[0]).strip().lower() if not execution_state.empty else "close"
 
     if exec_mode == "close":
         gross = executed * bar_ret_cc
@@ -215,7 +219,9 @@ def compute_transaction_cost(turnover: pd.Series, cost_bps: float | pd.Series) -
     return turnover_aligned * (cost_bps_aligned / 10000.0)
 
 
-def compute_slippage_cost(turnover: pd.Series, slippage_bps: float | pd.Series | None = None) -> pd.Series:
+def compute_slippage_cost(
+    turnover: pd.Series, slippage_bps: float | pd.Series | None = None
+) -> pd.Series:
     turnover_aligned = pd.to_numeric(turnover, errors="coerce").fillna(0.0).abs().astype(float)
     slippage_bps_aligned = _as_series(slippage_bps, turnover_aligned.index).clip(lower=0.0)
     return turnover_aligned * (slippage_bps_aligned / 10000.0)
@@ -274,9 +280,9 @@ def compute_pnl_ledger(
     ledger["gross_exposure"] = ledger["executed_position"].abs()
     ledger["net_exposure"] = ledger["executed_position"]
     ledger["capital_base"] = capital_base_aligned.ffill().fillna(1.0)
-    ledger["equity_return"] = (
-        ledger["net_pnl"] / capital_base_aligned
-    ).replace([np.inf, -np.inf], np.nan)
+    ledger["equity_return"] = (ledger["net_pnl"] / capital_base_aligned).replace(
+        [np.inf, -np.inf], np.nan
+    )
 
     numeric_zero_on_nan = [
         "gross_pnl",
@@ -289,7 +295,9 @@ def compute_pnl_ledger(
     ]
     nan_mask = ledger["bar_return_close_to_close"].isna()
     if execution_mode == "next_open":
-        nan_mask = nan_mask & ledger["entry_return_next_open"].isna() & ledger["intrabar_return"].isna()
+        nan_mask = (
+            nan_mask & ledger["entry_return_next_open"].isna() & ledger["intrabar_return"].isna()
+        )
     if nan_mask.any():
         for col in numeric_zero_on_nan:
             ledger.loc[nan_mask, col] = 0.0

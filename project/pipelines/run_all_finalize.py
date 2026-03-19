@@ -48,9 +48,10 @@ def handle_runtime_postflight(
         run_manifest=run_manifest,
         runtime_postflight=runtime_postflight,
     )
-    if runtime_postflight_status != "pass" or int(
-        run_manifest.get("runtime_watermark_violation_count", 0) or 0
-    ) > 0:
+    if (
+        runtime_postflight_status != "pass"
+        or int(run_manifest.get("runtime_watermark_violation_count", 0) or 0) > 0
+    ):
         run_manifest["runtime_invariants_status"] = "violations"
     if (
         int(run_manifest.get("runtime_firewall_violation_count", 0) or 0) > 0
@@ -66,13 +67,10 @@ def handle_runtime_postflight(
         determinism_replay_checks_requested=preflight["determinism_replay_checks_requested"],
         oms_replay_checks_requested=preflight["oms_replay_checks_requested"],
     )
-    if (
-        runtime_invariants_mode == "enforce"
-        and (
-            int(run_manifest.get("runtime_firewall_violation_count", 0) or 0) > 0
-            or str(run_manifest.get("determinism_status", "")).strip().lower() == "failed"
-            or str(run_manifest.get("oms_replay_status", "")).strip().lower() == "failed"
-        )
+    if runtime_invariants_mode == "enforce" and (
+        int(run_manifest.get("runtime_firewall_violation_count", 0) or 0) > 0
+        or str(run_manifest.get("determinism_status", "")).strip().lower() == "failed"
+        or str(run_manifest.get("oms_replay_status", "")).strip().lower() == "failed"
     ):
         should_fail = True
         if "Runtime lineage validation failed" not in postflight_messages:
@@ -157,9 +155,15 @@ def finalize_successful_run(
             run_manifest["research_comparison_status"] = "written"
             run_manifest["research_comparison_baseline_run_id"] = baseline_run_id
             run_manifest["research_comparison_report_path"] = str(comparison_path)
-            run_manifest["research_comparison_summary_path"] = str(comparison_path.with_name("research_run_comparison_summary.md"))
-            run_manifest["research_comparison_assessment_status"] = str(assessment.get("status", "unknown"))
-            run_manifest["research_comparison_violation_count"] = int(assessment.get("violation_count", 0) or 0)
+            run_manifest["research_comparison_summary_path"] = str(
+                comparison_path.with_name("research_run_comparison_summary.md")
+            )
+            run_manifest["research_comparison_assessment_status"] = str(
+                assessment.get("status", "unknown")
+            )
+            run_manifest["research_comparison_violation_count"] = int(
+                assessment.get("violation_count", 0) or 0
+            )
             run_manifest["research_comparison_violations"] = list(assessment.get("violations", []))
             if str(assessment.get("status", "")).strip().lower() == "fail":
                 finalize_run_manifest(
@@ -170,14 +174,18 @@ def finalize_successful_run(
                     checklist_decision=stage_execution.get("checklist_decision"),
                     auto_continue_applied=bool(stage_execution.get("auto_continue_applied")),
                     auto_continue_reason=str(stage_execution.get("auto_continue_reason")),
-                    non_production_overrides=list(stage_execution.get("non_production_overrides", [])),
+                    non_production_overrides=list(
+                        stage_execution.get("non_production_overrides", [])
+                    ),
                     failed_stage="research_comparison",
                     failed_stage_instance="research_comparison",
                 )
                 maybe_emit_run_hash(run_manifest)
                 write_run_manifest(run_id, run_manifest)
                 write_run_kpi_scorecard(run_id, run_manifest)
-                emit_message = f"Research comparison drift exceeded thresholds for baseline {baseline_run_id}"
+                emit_message = (
+                    f"Research comparison drift exceeded thresholds for baseline {baseline_run_id}"
+                )
                 print(emit_message, file=sys.stderr)
                 return 1
         except Exception as exc:

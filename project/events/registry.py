@@ -63,12 +63,14 @@ def _load_symbol_timestamps(
 ) -> pd.Series:
     from project.io.utils import read_parquet
     from project import PROJECT_ROOT
+
     DATA_ROOT = get_data_root()
     path = DATA_ROOT / "lake" / "bars" / symbol / f"{timeframe}.parquet"
     if path.exists():
         df = read_parquet(path)
         return df["timestamp"]
     return pd.Series(dtype="datetime64[ns, UTC]")
+
 
 from project.events.event_prerequisites import (
     check_event_prerequisites,

@@ -8,6 +8,7 @@ Returns ArbitrationResult:
   events    -- surviving events, potentially with adjusted tradeability scores
   suppressed -- hard-blocked events with suppression reason attached
 """
+
 from __future__ import annotations
 
 import warnings
@@ -36,9 +37,7 @@ class ArbitrationResult:
     composite_events: pd.DataFrame = field(default_factory=pd.DataFrame)
 
 
-def _events_overlap(
-    df: pd.DataFrame, active_type: str, target_type: str, symbol: str
-) -> bool:
+def _events_overlap(df: pd.DataFrame, active_type: str, target_type: str, symbol: str) -> bool:
     """True if any active_type event temporally overlaps any target_type event."""
     active = df[(df["event_type"] == active_type) & (df["symbol"] == symbol)]
     target = df[(df["event_type"] == target_type) & (df["symbol"] == symbol)]
@@ -120,10 +119,10 @@ def arbitrate_events(
                     ).clip(0.0, 1.0)
 
     # Build priority lookup from precedence spec
-    fam_prio = {e["family"]: e["priority"]
-                for e in prec_spec.get("family_precedence", [])}
-    evt_prio = {e["event_type"]: e["override_priority"]
-                for e in prec_spec.get("event_overrides", [])}
+    fam_prio = {e["family"]: e["priority"] for e in prec_spec.get("family_precedence", [])}
+    evt_prio = {
+        e["event_type"]: e["override_priority"] for e in prec_spec.get("event_overrides", [])
+    }
 
     def _priority(row) -> int:
         et = str(row.get("event_type", ""))
@@ -132,12 +131,11 @@ def arbitrate_events(
 
     if not out.empty:
         out["_arb_prio"] = out.apply(_priority, axis=1)
-        out = out.sort_values(
-            ["symbol", "timestamp", "_arb_prio"], ignore_index=True
-        ).drop(columns=["_arb_prio"])
+        out = out.sort_values(["symbol", "timestamp", "_arb_prio"], ignore_index=True).drop(
+            columns=["_arb_prio"]
+        )
 
     suppressed_df = (
-        pd.concat(suppressed_rows, ignore_index=True)
-        if suppressed_rows else pd.DataFrame()
+        pd.concat(suppressed_rows, ignore_index=True) if suppressed_rows else pd.DataFrame()
     )
     return ArbitrationResult(events=out, suppressed=suppressed_df)

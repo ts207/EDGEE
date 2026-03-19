@@ -4,7 +4,12 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from project.core.exceptions import ContractViolationError
-from project.core.timeframes import bars_dataset_name, funding_dataset_name, normalize_timeframe, ohlcv_dataset_name
+from project.core.timeframes import (
+    bars_dataset_name,
+    funding_dataset_name,
+    normalize_timeframe,
+    ohlcv_dataset_name,
+)
 from project.io.utils import run_scoped_lake_path
 
 
@@ -64,16 +69,28 @@ def resolve_dataset_id(dataset_id: str) -> DatasetResolution:
     raise ContractViolationError(f"Unsupported dataset identifier: '{dataset_id}'")
 
 
-def dataset_path_candidates(*, data_root: Path, run_id: str, symbol: str, dataset_id: str) -> list[Path]:
+def dataset_path_candidates(
+    *, data_root: Path, run_id: str, symbol: str, dataset_id: str
+) -> list[Path]:
     resolved = resolve_dataset_id(dataset_id)
     if resolved.kind == "ohlcv":
         return [
-            run_scoped_lake_path(data_root, run_id, "cleaned", resolved.market, symbol, resolved.dataset_name),
+            run_scoped_lake_path(
+                data_root, run_id, "cleaned", resolved.market, symbol, resolved.dataset_name
+            ),
             data_root / "lake" / "cleaned" / resolved.market / symbol / resolved.dataset_name,
         ]
     if resolved.kind == "funding":
         return [
-            run_scoped_lake_path(data_root, run_id, "raw", "binance", resolved.market, symbol, resolved.dataset_name),
-            data_root / "lake" / "raw" / "binance" / resolved.market / symbol / resolved.dataset_name,
+            run_scoped_lake_path(
+                data_root, run_id, "raw", "binance", resolved.market, symbol, resolved.dataset_name
+            ),
+            data_root
+            / "lake"
+            / "raw"
+            / "binance"
+            / resolved.market
+            / symbol
+            / resolved.dataset_name,
         ]
     raise ContractViolationError(f"No path mapping for dataset identifier: '{dataset_id}'")

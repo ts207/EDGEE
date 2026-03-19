@@ -31,11 +31,13 @@ OutputMode = Literal[
     "label",
 ]
 
+
 @dataclass(frozen=True)
 class TemporalContract:
     """
     Defines the temporal assumptions and PIT constraints for a module.
     """
+
     name: str
     output_mode: OutputMode
     observation_clock: ObservationClock

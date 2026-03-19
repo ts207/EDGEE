@@ -12,8 +12,10 @@ from project.pipelines.pipeline_defaults import (
     utc_now_iso,
 )
 
+
 def _data_root() -> Path:
     return Path(os.getenv("BACKTEST_DATA_ROOT", str(DATA_ROOT)))
+
 
 def load_kpi_source_frame(run_id: str) -> Tuple[Optional[Any], Optional[str], Optional[Path]]:
     """Searches for a KPI source frame in data/reports."""
@@ -36,19 +38,20 @@ def load_kpi_source_frame(run_id: str) -> Tuple[Optional[Any], Optional[str], Op
         df = read_table_auto(path)
         if df is not None and not df.empty:
             return df, name, path
-                
+
     return None, None, None
+
 
 def numeric_metric(df: Any, columns: List[str], *, aggregation: str) -> Dict[str, Any]:
     """Calculates a numeric metric from a DataFrame using specified columns and aggregation."""
     col = next((c for c in columns if c in df.columns), None)
     if col is None:
         return {"value": None, "column": "", "aggregation": aggregation, "sample_size": 0}
-    
+
     series = df[col].dropna()
     if series.empty:
         return {"value": None, "column": col, "aggregation": aggregation, "sample_size": 0}
-        
+
     try:
         if aggregation == "mean":
             val = series.mean()
@@ -62,36 +65,48 @@ def numeric_metric(df: Any, columns: List[str], *, aggregation: str) -> Dict[str
             val = series.max()
         else:
             val = None
-            
+
         return {
             "value": float(val) if val is not None else None,
             "column": col,
             "aggregation": aggregation,
-            "sample_size": len(series)
+            "sample_size": len(series),
         }
     except (ValueError, TypeError, AttributeError):
-        return {"value": None, "column": col, "aggregation": aggregation, "sample_size": len(series)}
+        return {
+            "value": None,
+            "column": col,
+            "aggregation": aggregation,
+            "sample_size": len(series),
+        }
+
 
 def bool_rate_metric(df: Any, columns: List[str]) -> Dict[str, Any]:
     """Calculates the mean rate of a boolean column."""
     col = next((c for c in columns if c in df.columns), None)
     if col is None:
         return {"value": None, "column": "", "aggregation": "mean_bool_rate", "sample_size": 0}
-        
+
     series = df[col].dropna()
     if series.empty:
         return {"value": None, "column": col, "aggregation": "mean_bool_rate", "sample_size": 0}
-        
+
     try:
         val = series.astype(bool).mean()
         return {
             "value": float(val),
             "column": col,
             "aggregation": "mean_bool_rate",
-            "sample_size": len(series)
+            "sample_size": len(series),
         }
     except (ValueError, TypeError, AttributeError):
-        return {"value": None, "column": col, "aggregation": "mean_bool_rate", "sample_size": len(series)}
+        return {
+            "value": None,
+            "column": col,
+            "aggregation": "mean_bool_rate",
+            "sample_size": len(series),
+        }
+
 
 def write_run_kpi_scorecard(run_id: str, run_manifest: Dict[str, Any] | None = None) -> None:
     """Calculates and writes the KPI scorecard for a given run."""
@@ -107,7 +122,12 @@ def write_run_kpi_scorecard(run_id: str, run_manifest: Dict[str, Any] | None = N
         "metrics": {
             "net_expectancy_bps": numeric_metric(
                 df,
-                ["bridge_validation_stressed_after_cost_bps", "net_expectancy_bps", "net_expectancy", "expectancy"],
+                [
+                    "bridge_validation_stressed_after_cost_bps",
+                    "net_expectancy_bps",
+                    "net_expectancy",
+                    "expectancy",
+                ],
                 aggregation="mean",
             ),
             "oos_sign_consistency": numeric_metric(
@@ -120,7 +140,9 @@ def write_run_kpi_scorecard(run_id: str, run_manifest: Dict[str, Any] | None = N
                 ["turnover_proxy_mean"],
                 aggregation="mean",
             ),
-            "trade_count": numeric_metric(df, ["n_events", "trade_count", "n_trades"], aggregation="sum"),
+            "trade_count": numeric_metric(
+                df, ["n_events", "trade_count", "n_trades"], aggregation="sum"
+            ),
             "max_drawdown_pct": numeric_metric(
                 df,
                 ["naive_max_drawdown", "max_drawdown_pct"],
@@ -129,18 +151,19 @@ def write_run_kpi_scorecard(run_id: str, run_manifest: Dict[str, Any] | None = N
             "win_rate": bool_rate_metric(df, ["is_win", "win"]),
             "edge_score": numeric_metric(df, ["edge_score", "score"], aggregation="mean"),
         },
-        "generated_at": utc_now_iso()
+        "generated_at": utc_now_iso(),
     }
-    
+
     if run_manifest is not None:
         run_manifest["kpi_scorecard"] = scorecard
-        
+
     out_path = _data_root() / "runs" / run_id / "kpi_scorecard.json"
     try:
         out_path.parent.mkdir(parents=True, exist_ok=True)
         out_path.write_text(json.dumps(scorecard, indent=2), encoding="utf-8")
     except OSError:
         pass
+
 
 def print_artifact_summary(run_id: str) -> None:
     """Prints a summary of the found and missing artifacts for a given run."""

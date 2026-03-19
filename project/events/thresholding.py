@@ -17,12 +17,12 @@ TEMPORAL_CONTRACT = TemporalContract(
     output_mode="point_feature",
     observation_clock="bar_close",
     decision_lag_bars=1,
-    lookback_bars=None, # Variable per caller
+    lookback_bars=None,  # Variable per caller
     uses_current_observation=False,
     calibration_mode="rolling",
     fit_scope="streaming",
     approved_primitives=("trailing_quantile", "trailing_mean", "trailing_std", "trailing_median"),
-    notes="Official PIT-safe primitive library. Default lag is 1."
+    notes="Official PIT-safe primitive library. Default lag is 1.",
 )
 
 
@@ -47,7 +47,6 @@ def rolling_mean_std_zscore(
     return (s - mean) / std
 
 
-
 def rolling_robust_zscore(
     series: pd.Series,
     *,
@@ -61,11 +60,11 @@ def rolling_robust_zscore(
     """
     s = _series(series)
     median = trailing_median(s, window=window, lag=shift, min_periods=min_periods)
-    
+
     # MAD also needs to be computed on the shifted baseline
     baseline = s.shift(int(shift)) if shift else s
     rolling = baseline.rolling(window=window, min_periods=min_periods or window)
-    
+
     def _mad(values: np.ndarray) -> float:
         valid = values[np.isfinite(values)]
         if len(valid) == 0:
@@ -78,7 +77,6 @@ def rolling_robust_zscore(
     denom = (1.4826 * mad).where(mad > 0.0, std)
     denom = denom.where(denom > 0.0, 1e-12)
     return (s - median) / denom
-
 
 
 def rolling_quantile_threshold(
@@ -95,7 +93,6 @@ def rolling_quantile_threshold(
     return trailing_quantile(series, window=window, q=quantile, lag=shift, min_periods=min_periods)
 
 
-
 def ewma_zscore(
     series: pd.Series,
     *,
@@ -109,7 +106,6 @@ def ewma_zscore(
     var = baseline.ewm(span=span, adjust=False, min_periods=min_periods or 1).var()
     std = np.sqrt(var).replace(0.0, np.nan)
     return (s - mean) / std
-
 
 
 def percentile_rank(
@@ -140,7 +136,6 @@ def percentile_rank(
     return out
 
 
-
 def rolling_percentile_rank(
     series: pd.Series,
     *,
@@ -152,8 +147,9 @@ def rolling_percentile_rank(
     """
     Compute rolling percentile rank. PIT-safe by default (shift=1).
     """
-    return trailing_percentile_rank(series, window=window, lag=shift, min_periods=min_periods) * scale
-
+    return (
+        trailing_percentile_rank(series, window=window, lag=shift, min_periods=min_periods) * scale
+    )
 
 
 def percentile_rank_historical(
@@ -164,7 +160,6 @@ def percentile_rank_historical(
     scale: float = 100.0,
 ) -> pd.Series:
     return percentile_rank(series, window=window, min_periods=min_periods, shift=1, scale=scale)
-
 
 
 def state_conditioned_threshold(
@@ -210,10 +205,12 @@ def dynamic_quantile_floor(
     shift: int = 1,
 ) -> pd.Series:
     """Computes a rolling quantile threshold with a hard floor."""
-    q_th = rolling_quantile_threshold(series, window=window, quantile=quantile, min_periods=min_periods, shift=shift)
-    
+    q_th = rolling_quantile_threshold(
+        series, window=window, quantile=quantile, min_periods=min_periods, shift=shift
+    )
+
     if isinstance(floor, pd.Series):
         floor_series = floor.reindex(q_th.index).astype(float)
         return q_th.where(q_th >= floor_series, floor_series)
-    
+
     return q_th.where(q_th >= float(floor), float(floor))

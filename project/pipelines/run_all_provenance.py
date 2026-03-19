@@ -5,8 +5,20 @@ from project import PROJECT_ROOT
 from project.pipelines.pipeline_defaults import DATA_ROOT
 from project.pipelines.pipeline_provenance import data_fingerprint
 
-def validate_phase2_event_chain(phase2_event_chain, event_registry_specs) -> List[str]:
+
+def validate_phase2_event_chain(
+    phase2_event_chain=None,
+    event_registry_specs=None,
+) -> List[str]:
     import project.events.detectors.registry as _det_reg
+    from project.events.phase2 import PHASE2_EVENT_CHAIN
+    from project.events.event_specs import EVENT_REGISTRY_SPECS
+
+    if phase2_event_chain is None:
+        phase2_event_chain = PHASE2_EVENT_CHAIN
+    if event_registry_specs is None:
+        event_registry_specs = EVENT_REGISTRY_SPECS
+
     _det_reg.load_all_detectors()
     issues = []
     for etype, script, _ in phase2_event_chain:
@@ -18,6 +30,7 @@ def validate_phase2_event_chain(phase2_event_chain, event_registry_specs) -> Lis
         if _det_reg.get_detector(etype) is None:
             issues.append(f"No registered detector for {etype}")
     return issues
+
 
 def compute_data_fingerprint(
     symbols: List[str],

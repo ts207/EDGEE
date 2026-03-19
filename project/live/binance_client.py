@@ -10,10 +10,12 @@ from urllib.parse import urlencode
 
 _LOG = logging.getLogger(__name__)
 
+
 class BinanceFuturesClient:
     """
     Binance USD-M Futures REST Client using aiohttp.
     """
+
     BASE_URL = "https://fapi.binance.com"
 
     def __init__(self, api_key: str, api_secret: str):
@@ -23,12 +25,12 @@ class BinanceFuturesClient:
     def _sign(self, params: Dict[str, Any]) -> str:
         query_string = urlencode(params)
         return hmac.new(
-            self.api_secret.encode("utf-8"),
-            query_string.encode("utf-8"),
-            hashlib.sha256
+            self.api_secret.encode("utf-8"), query_string.encode("utf-8"), hashlib.sha256
         ).hexdigest()
 
-    async def _request(self, method: str, path: str, params: Dict[str, Any] = None, signed: bool = False) -> Any:
+    async def _request(
+        self, method: str, path: str, params: Dict[str, Any] = None, signed: bool = False
+    ) -> Any:
         params = params or {}
         if signed:
             params["timestamp"] = int(time.time() * 1000)
@@ -51,15 +53,19 @@ class BinanceFuturesClient:
 
     async def cancel_all_open_orders(self, symbol: str) -> Any:
         """DELETE /fapi/v1/allOpenOrders"""
-        return await self._request("DELETE", "/fapi/v1/allOpenOrders", params={"symbol": symbol.upper()}, signed=True)
+        return await self._request(
+            "DELETE", "/fapi/v1/allOpenOrders", params={"symbol": symbol.upper()}, signed=True
+        )
 
-    async def create_market_order(self, symbol: str, side: str, quantity: float, reduce_only: bool = False) -> Any:
+    async def create_market_order(
+        self, symbol: str, side: str, quantity: float, reduce_only: bool = False
+    ) -> Any:
         """POST /fapi/v1/order"""
         params = {
             "symbol": symbol.upper(),
             "side": side.upper(),
             "type": "MARKET",
             "quantity": quantity,
-            "reduceOnly": "true" if reduce_only else "false"
+            "reduceOnly": "true" if reduce_only else "false",
         }
         return await self._request("POST", "/fapi/v1/order", params=params, signed=True)

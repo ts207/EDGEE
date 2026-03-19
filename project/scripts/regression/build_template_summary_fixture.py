@@ -7,10 +7,12 @@ import json
 import sys
 from pathlib import Path
 from project import PROJECT_ROOT
+
 REPO_ROOT = PROJECT_ROOT.parent
 DATA_ROOT = get_data_root()
 
 from project.pipelines.research.template_regression import build_run_summary  # noqa: E402
+
 
 def main() -> int:
     parser = argparse.ArgumentParser(
@@ -35,6 +37,7 @@ def main() -> int:
     out_path.write_text(json.dumps(summary, indent=2, sort_keys=True), encoding="utf-8")
     print(str(out_path))
     return 0
+
 
 if __name__ == "__main__":
     raise SystemExit(main())

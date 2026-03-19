@@ -35,8 +35,15 @@ def _build_rollup(symbol: str, tob: pd.DataFrame) -> pd.DataFrame:
     """Aggregate 1s top-of-book data into 5m microstructure metrics."""
     if tob.empty:
         return pd.DataFrame(
-            columns=["timestamp", "symbol", "micro_spread_stress", "micro_depth_depletion",
-                     "micro_sweep_pressure", "micro_imbalance", "micro_feature_coverage"]
+            columns=[
+                "timestamp",
+                "symbol",
+                "micro_spread_stress",
+                "micro_depth_depletion",
+                "micro_sweep_pressure",
+                "micro_imbalance",
+                "micro_feature_coverage",
+            ]
         )
 
     tob = tob.copy()
@@ -80,20 +87,29 @@ def _build_rollup(symbol: str, tob: pd.DataFrame) -> pd.DataFrame:
 
         micro_feature_coverage = float(n) / 300.0  # 300 = 5*60 1s bars
 
-        rows.append({
-            "timestamp": bar_ts,
-            "symbol": symbol,
-            "micro_spread_stress": micro_spread_stress,
-            "micro_depth_depletion": micro_depth_depletion,
-            "micro_sweep_pressure": micro_sweep_pressure,
-            "micro_imbalance": micro_imbalance,
-            "micro_feature_coverage": micro_feature_coverage,
-        })
+        rows.append(
+            {
+                "timestamp": bar_ts,
+                "symbol": symbol,
+                "micro_spread_stress": micro_spread_stress,
+                "micro_depth_depletion": micro_depth_depletion,
+                "micro_sweep_pressure": micro_sweep_pressure,
+                "micro_imbalance": micro_imbalance,
+                "micro_feature_coverage": micro_feature_coverage,
+            }
+        )
 
     if not rows:
         return pd.DataFrame(
-            columns=["timestamp", "symbol", "micro_spread_stress", "micro_depth_depletion",
-                     "micro_sweep_pressure", "micro_imbalance", "micro_feature_coverage"]
+            columns=[
+                "timestamp",
+                "symbol",
+                "micro_spread_stress",
+                "micro_depth_depletion",
+                "micro_sweep_pressure",
+                "micro_imbalance",
+                "micro_feature_coverage",
+            ]
         )
 
     out = pd.DataFrame(rows)
@@ -111,7 +127,11 @@ def main(argv=None) -> int:
     parser.add_argument("--out_dir", default=None)
     args = parser.parse_args(argv if argv is not None else sys.argv[1:])
 
-    out_dir = Path(args.out_dir) if args.out_dir else data_root / "reports" / "microstructure" / args.run_id
+    out_dir = (
+        Path(args.out_dir)
+        if args.out_dir
+        else data_root / "reports" / "microstructure" / args.run_id
+    )
     ensure_dir(out_dir)
 
     manifest = start_manifest("build_microstructure_rollup", args.run_id, vars(args), [], [])
@@ -129,7 +149,11 @@ def main(argv=None) -> int:
                     start_ts = pd.Timestamp(args.start, tz="UTC")
                     tob = tob[tob["timestamp"] >= start_ts]
                 if args.end:
-                    end_ts = pd.Timestamp(args.end, tz="UTC") + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
+                    end_ts = (
+                        pd.Timestamp(args.end, tz="UTC")
+                        + pd.Timedelta(days=1)
+                        - pd.Timedelta(seconds=1)
+                    )
                     tob = tob[tob["timestamp"] <= end_ts]
             rolled = _build_rollup(symbol, tob)
             all_frames.append(rolled)
@@ -138,8 +162,15 @@ def main(argv=None) -> int:
             result = pd.concat(all_frames, ignore_index=True)
         else:
             result = pd.DataFrame(
-                columns=["timestamp", "symbol", "micro_spread_stress", "micro_depth_depletion",
-                         "micro_sweep_pressure", "micro_imbalance", "micro_feature_coverage"]
+                columns=[
+                    "timestamp",
+                    "symbol",
+                    "micro_spread_stress",
+                    "micro_depth_depletion",
+                    "micro_sweep_pressure",
+                    "micro_imbalance",
+                    "micro_feature_coverage",
+                ]
             )
 
         write_parquet(result, out_dir / "microstructure_rollup.parquet")

@@ -3,6 +3,7 @@ from pathlib import Path
 from dataclasses import dataclass, field, asdict
 from typing import Dict, List, Any
 
+
 @dataclass
 class SearchCoverageReport:
     search_spec_name: str
@@ -12,6 +13,7 @@ class SearchCoverageReport:
     num_states: int = 0
     num_hypotheses: int = 0
     context_cardinalities: Dict[str, int] = field(default_factory=dict)
+
 
 class CoverageReporter:
     def __init__(self, output_dir: Path):

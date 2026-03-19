@@ -14,6 +14,7 @@ from project.portfolio import AllocationSpec
 ALLOCATION_CONTRACT_SCHEMA_VERSION = "allocation_contract_v1"
 ALLOCATION_DIAGNOSTICS_SCHEMA_VERSION = "allocation_diagnostics_v1"
 
+
 # Provide an optimised implementation for the per-bar clamping loop used
 # when enforcing ``max_new_exposure_per_bar``.  If Numba is installed the
 # helper will be JIT‑compiled for performance; otherwise a pure Python
@@ -35,11 +36,14 @@ def _clamp_positions_py(raw: np.ndarray, max_new: float) -> np.ndarray:
         prior = out[i]
     return out
 
+
 try:
     from numba import njit  # type: ignore
+
     _clamp_positions = njit(cache=True)(_clamp_positions_py)
 except Exception:
     _clamp_positions = _clamp_positions_py
+
 
 @dataclass(frozen=True)
 class RiskLimits:
@@ -61,9 +65,9 @@ class RiskLimits:
     enable_correlation_allocation: bool = False
 
     # Vol estimator configuration
-    vol_estimator_mode: str = "rolling"      # "rolling" | "ewma"
-    vol_window_bars: int = 5760             # rolling window (bars); only used when mode="rolling"
-    vol_ewma_halflife_bars: int = 1440      # EWMA halflife (bars); only used when mode="ewma"
+    vol_estimator_mode: str = "rolling"  # "rolling" | "ewma"
+    vol_window_bars: int = 5760  # rolling window (bars); only used when mode="rolling"
+    vol_ewma_halflife_bars: int = 1440  # EWMA halflife (bars); only used when mode="ewma"
     bars_per_year: float = float(BARS_PER_YEAR_BY_TIMEFRAME["5m"])
 
     def __post_init__(self) -> None:
@@ -176,11 +180,7 @@ def _coerce_string_mapping(raw: object) -> Dict[str, str]:
         parsed = json.loads(text)
     if not isinstance(parsed, Mapping):
         raise ValueError("string mappings must be a mapping or JSON object string")
-    return {
-        str(key): str(value).strip()
-        for key, value in parsed.items()
-        if str(value).strip()
-    }
+    return {str(key): str(value).strip() for key, value in parsed.items() if str(value).strip()}
 
 
 def _optional_float(raw: object) -> float | None:
@@ -197,7 +197,10 @@ def build_allocation_contract(params: Mapping[str, object]) -> AllocationContrac
             if isinstance(raw_allocation_spec, AllocationSpec)
             else AllocationSpec.model_validate(dict(raw_allocation_spec))
         )
-        params = {**allocation_spec.to_allocator_params(), **{k: v for k, v in params.items() if k != "allocation_spec"}}
+        params = {
+            **allocation_spec.to_allocator_params(),
+            **{k: v for k, v in params.items() if k != "allocation_spec"},
+        }
     limits = RiskLimits(
         portfolio_max_exposure=float(params.get("portfolio_max_exposure", 10.0)),
         max_portfolio_gross=float(params.get("max_portfolio_gross", 10.0)),
@@ -209,9 +212,7 @@ def build_allocation_contract(params: Mapping[str, object]) -> AllocationContrac
         max_drawdown_limit=_optional_float(params.get("drawdown_limit")),
         portfolio_max_drawdown=_optional_float(params.get("portfolio_max_drawdown")),
         symbol_max_exposure=_optional_float(params.get("max_symbol_exposure")),
-        enable_correlation_allocation=bool(
-            params.get("enable_correlation_allocation", False)
-        ),
+        enable_correlation_allocation=bool(params.get("enable_correlation_allocation", False)),
     )
     policy = AllocationPolicy(
         mode=str(params.get("allocator_mode", "heuristic")).strip().lower(),
@@ -250,9 +251,7 @@ def _resolve_policy_weights(
 
     requested_frame = pd.DataFrame(requested).fillna(0.0)
     gross_by_strategy = requested_frame.abs().sum(axis=0).reindex(ordered).fillna(0.0)
-    turnover_by_strategy = (
-        requested_frame.diff().abs().sum(axis=0).reindex(ordered).fillna(0.0)
-    )
+    turnover_by_strategy = requested_frame.diff().abs().sum(axis=0).reindex(ordered).fillna(0.0)
     scores = pd.Series(index=ordered, dtype=float)
     for key in ordered:
         budget = float(contract.policy.strategy_risk_budgets.get(key, 1.0))
@@ -282,11 +281,17 @@ def _apply_family_budget_caps(
         budget = contract.policy.family_risk_budgets.get(family)
         if budget is None:
             continue
-        family_frame = pd.DataFrame({member: allocated[member] for member in members}, index=aligned_index)
+        family_frame = pd.DataFrame(
+            {member: allocated[member] for member in members}, index=aligned_index
+        )
         family_gross = family_frame.abs().sum(axis=1)
         safe_family_gross = family_gross.replace(0.0, np.nan)
-        family_ratio = (float(max(0.0, budget)) / safe_family_gross).where(family_gross > float(budget), 1.0)
-        family_ratio = family_ratio.replace([np.inf, -np.inf], np.nan).fillna(1.0).clip(lower=0.0, upper=1.0)
+        family_ratio = (float(max(0.0, budget)) / safe_family_gross).where(
+            family_gross > float(budget), 1.0
+        )
+        family_ratio = (
+            family_ratio.replace([np.inf, -np.inf], np.nan).fillna(1.0).clip(lower=0.0, upper=1.0)
+        )
         family_mask = family_ratio < 0.999999
         if bool(family_mask.any()):
             family_budget_hits[family] = int(family_mask.sum())
@@ -332,13 +337,15 @@ def allocate_position_details(
 ) -> AllocationDetails:
     resolved_contract = contract or AllocationContract(limits=limits)
     if not raw_positions_by_strategy:
-        empty_diag = pd.DataFrame(columns=[
-            "requested_gross",
-            "allocated_gross",
-            "clip_fraction",
-            "clip_reason",
-            "allocator_mode",
-        ])
+        empty_diag = pd.DataFrame(
+            columns=[
+                "requested_gross",
+                "allocated_gross",
+                "clip_fraction",
+                "clip_reason",
+                "allocator_mode",
+            ]
+        )
         return AllocationDetails(
             {},
             {},
@@ -364,9 +371,13 @@ def allocate_position_details(
     requested: Dict[str, pd.Series] = {}
     for key in ordered:
         pos = _as_float_series(raw_positions_by_strategy[key]).reindex(aligned_index).fillna(0.0)
-        scale = _as_float_series(
-            requested_scale_by_strategy.get(key, pd.Series(1.0, index=aligned_index))
-        ).reindex(aligned_index).fillna(1.0)
+        scale = (
+            _as_float_series(
+                requested_scale_by_strategy.get(key, pd.Series(1.0, index=aligned_index))
+            )
+            .reindex(aligned_index)
+            .fillna(1.0)
+        )
         requested[key] = (pos * scale.clip(lower=0.0)).astype(float)
     policy_weights = _resolve_policy_weights(requested, ordered, resolved_contract)
     if resolved_contract.policy.mode == "deterministic_optimizer" and policy_weights:
@@ -374,7 +385,11 @@ def allocate_position_details(
             requested[key] = requested[key] * float(policy_weights.get(key, 0.0))
 
     scale_by_strategy: Dict[str, pd.Series] = {}
-    requested_gross = pd.DataFrame(requested).abs().sum(axis=1) if requested else pd.Series(0.0, index=aligned_index)
+    requested_gross = (
+        pd.DataFrame(requested).abs().sum(axis=1)
+        if requested
+        else pd.Series(0.0, index=aligned_index)
+    )
 
     # ----- Original allocator logic (preserved) -----
     if limits.enable_correlation_allocation and len(requested) > 1:
@@ -384,14 +399,16 @@ def allocate_position_details(
             cov = diff.cov()
             if (cov.isnull().any().any()) or len(cov) != len(requested):
                 raise ValueError("invalid covariance for allocation")
-            
+
             # Audit 3.2: Add regularization (Shrinkage) to ensure numerical stability
             # Simple constant shrinkage towards identity to prevent singular matrix
             cov_vals = cov.values
             n_assets = len(cov_vals)
             shrinkage = 0.1
-            shrunk_cov = (1 - shrinkage) * cov_vals + shrinkage * np.eye(n_assets) * np.trace(cov_vals) / n_assets
-            
+            shrunk_cov = (1 - shrinkage) * cov_vals + shrinkage * np.eye(n_assets) * np.trace(
+                cov_vals
+            ) / n_assets
+
             inv_cov = np.linalg.inv(shrunk_cov)
             ones = np.ones(len(inv_cov))
             weights = inv_cov @ ones
@@ -401,29 +418,44 @@ def allocate_position_details(
             for key, w in zip(ordered, weights):
                 requested[key] = requested[key] * float(w)
         except Exception:
-            _LOG.warning("Correlation allocation failed, falling back to equal-weight", exc_info=True)
+            _LOG.warning(
+                "Correlation allocation failed, falling back to equal-weight", exc_info=True
+            )
 
     allocated = {key: s.copy() for key, s in requested.items()}
 
     reason_flags: dict[str, pd.Series] = {}
+
     def _flag(name: str, mask: pd.Series) -> None:
         nonlocal reason_flags
-        reason_flags[name] = reason_flags.get(name, pd.Series(False, index=aligned_index)) | mask.reindex(aligned_index).fillna(False)
+        reason_flags[name] = reason_flags.get(
+            name, pd.Series(False, index=aligned_index)
+        ) | mask.reindex(aligned_index).fillna(False)
 
     for key in ordered:
         max_s = float(max(0.0, limits.max_strategy_gross))
         gross = allocated[key].abs()
         safe_gross = gross.replace(0.0, np.nan)
         ratio_series = (max_s / safe_gross).where(gross > max_s, 1.0)
-        ratio_series = ratio_series.replace([np.inf, -np.inf], np.nan).fillna(1.0).clip(lower=0.0, upper=1.0)
+        ratio_series = (
+            ratio_series.replace([np.inf, -np.inf], np.nan).fillna(1.0).clip(lower=0.0, upper=1.0)
+        )
         _flag("max_strategy_gross", ratio_series < 0.999999)
         allocated[key] = allocated[key] * ratio_series
 
     symbol_cap = float(max(0.0, limits.max_symbol_gross))
-    symbol_gross = pd.DataFrame(allocated).abs().sum(axis=1) if allocated else pd.Series(0.0, index=aligned_index)
+    symbol_gross = (
+        pd.DataFrame(allocated).abs().sum(axis=1)
+        if allocated
+        else pd.Series(0.0, index=aligned_index)
+    )
     safe_symbol_gross = symbol_gross.replace(0.0, np.nan)
     symbol_ratio_series = (symbol_cap / safe_symbol_gross).where(symbol_gross > symbol_cap, 1.0)
-    symbol_ratio_series = symbol_ratio_series.replace([np.inf, -np.inf], np.nan).fillna(1.0).clip(lower=0.0, upper=1.0)
+    symbol_ratio_series = (
+        symbol_ratio_series.replace([np.inf, -np.inf], np.nan)
+        .fillna(1.0)
+        .clip(lower=0.0, upper=1.0)
+    )
     _flag("max_symbol_gross", symbol_ratio_series < 0.999999)
     for key in ordered:
         allocated[key] = allocated[key] * symbol_ratio_series
@@ -439,13 +471,23 @@ def allocate_position_details(
     if limits.max_correlated_gross is not None:
         corr_cap = float(max(0.0, limits.max_correlated_gross))
         df_alloc = pd.DataFrame(allocated) if allocated else pd.DataFrame(index=aligned_index)
-        net_direction = df_alloc.sum(axis=1) if not df_alloc.empty else pd.Series(0.0, index=aligned_index)
-        same_dir_gross = df_alloc.abs().sum(axis=1) if not df_alloc.empty else pd.Series(0.0, index=aligned_index)
+        net_direction = (
+            df_alloc.sum(axis=1) if not df_alloc.empty else pd.Series(0.0, index=aligned_index)
+        )
+        same_dir_gross = (
+            df_alloc.abs().sum(axis=1)
+            if not df_alloc.empty
+            else pd.Series(0.0, index=aligned_index)
+        )
         fully_concordant = (net_direction.abs() - same_dir_gross).abs() < 1e-9
         needs_clip = fully_concordant & (same_dir_gross > corr_cap)
         safe_gross = same_dir_gross.replace(0.0, np.nan)
         corr_ratio_series = (corr_cap / safe_gross).where(needs_clip, 1.0)
-        corr_ratio_series = corr_ratio_series.replace([np.inf, -np.inf], np.nan).fillna(1.0).clip(lower=0.0, upper=1.0)
+        corr_ratio_series = (
+            corr_ratio_series.replace([np.inf, -np.inf], np.nan)
+            .fillna(1.0)
+            .clip(lower=0.0, upper=1.0)
+        )
         _flag("max_correlated_gross", corr_ratio_series < 0.999999)
         for key in ordered:
             allocated[key] = allocated[key] * corr_ratio_series
@@ -470,19 +512,32 @@ def allocate_position_details(
                 normal_limit = float(limits.max_pairwise_correlation)
                 if is_stressed.any() and max_corr > stressed_limit:
                     scale_factor = min(1.0, stressed_limit / max_corr)
-                    _flag("stressed_pairwise_correlation", pd.Series(is_stressed & (max_corr > stressed_limit), index=aligned_index))
+                    _flag(
+                        "stressed_pairwise_correlation",
+                        pd.Series(is_stressed & (max_corr > stressed_limit), index=aligned_index),
+                    )
                     for key in ordered:
-                        allocated[key] = allocated[key].where(~is_stressed, allocated[key] * scale_factor)
+                        allocated[key] = allocated[key].where(
+                            ~is_stressed, allocated[key] * scale_factor
+                        )
                 # On calm bars, apply the normal limit
                 if (not is_stressed).any() and max_corr > normal_limit:
                     scale_factor_calm = min(1.0, normal_limit / max_corr)
-                    _flag("max_pairwise_correlation", pd.Series((~is_stressed) & (max_corr > normal_limit), index=aligned_index))
+                    _flag(
+                        "max_pairwise_correlation",
+                        pd.Series((~is_stressed) & (max_corr > normal_limit), index=aligned_index),
+                    )
                     for key in ordered:
-                        allocated[key] = allocated[key].where(is_stressed, allocated[key] * scale_factor_calm)
+                        allocated[key] = allocated[key].where(
+                            is_stressed, allocated[key] * scale_factor_calm
+                        )
             else:
                 if max_corr > limits.max_pairwise_correlation > 0:
                     scale_factor = min(1.0, limits.max_pairwise_correlation / max_corr)
-                    _flag("max_pairwise_correlation", pd.Series(scale_factor < 0.999999, index=aligned_index))
+                    _flag(
+                        "max_pairwise_correlation",
+                        pd.Series(scale_factor < 0.999999, index=aligned_index),
+                    )
                     for key in ordered:
                         allocated[key] = allocated[key] * scale_factor
         except Exception:
@@ -490,7 +545,9 @@ def allocate_position_details(
 
     if regime_series is not None and regime_scale_map:
         regime_aligned = regime_series.reindex(aligned_index).astype(str)
-        regime_scale_vals = regime_aligned.map(regime_scale_map).fillna(1.0).clip(lower=0.0, upper=1.0)
+        regime_scale_vals = (
+            regime_aligned.map(regime_scale_map).fillna(1.0).clip(lower=0.0, upper=1.0)
+        )
         _flag("regime_scale", regime_scale_vals < 0.999999)
         for key in ordered:
             allocated[key] = allocated[key] * regime_scale_vals
@@ -506,7 +563,11 @@ def allocate_position_details(
                 min_periods=min(288, limits.vol_window_bars),
             ).std()
         ann_vol = roll_std * np.sqrt(float(max(1.0, limits.bars_per_year)))
-        vol_scale = (limits.target_annual_vol / ann_vol.replace(0.0, np.nan)).replace([np.inf, -np.inf], np.nan).fillna(1.0)
+        vol_scale = (
+            (limits.target_annual_vol / ann_vol.replace(0.0, np.nan))
+            .replace([np.inf, -np.inf], np.nan)
+            .fillna(1.0)
+        )
         vol_scale_series = vol_scale.clip(lower=0.0, upper=2.0)
         _flag("target_annual_vol", vol_scale_series < 0.999999)
 
@@ -536,7 +597,11 @@ def allocate_position_details(
 
     if limits.symbol_max_exposure is not None:
         symbol_cap_exp = float(max(0.0, limits.symbol_max_exposure))
-        symbol_gross = pd.DataFrame(allocated).abs().sum(axis=1) if allocated else pd.Series(0.0, index=aligned_index)
+        symbol_gross = (
+            pd.DataFrame(allocated).abs().sum(axis=1)
+            if allocated
+            else pd.Series(0.0, index=aligned_index)
+        )
         reject_mask = symbol_gross > symbol_cap_exp
         _flag("symbol_max_exposure", reject_mask)
         for key in ordered:
@@ -544,17 +609,31 @@ def allocate_position_details(
 
     if limits.portfolio_max_exposure is not None:
         portfolio_cap_exp = float(max(0.0, limits.portfolio_max_exposure))
-        portfolio_gross_exp = pd.DataFrame(allocated).abs().sum(axis=1) if allocated else pd.Series(0.0, index=aligned_index)
+        portfolio_gross_exp = (
+            pd.DataFrame(allocated).abs().sum(axis=1)
+            if allocated
+            else pd.Series(0.0, index=aligned_index)
+        )
         reject_mask = portfolio_gross_exp > portfolio_cap_exp
         _flag("portfolio_max_exposure", reject_mask)
         for key in ordered:
             allocated[key] = allocated[key].mask(reject_mask, 0.0)
 
     portfolio_cap = float(max(0.0, limits.max_portfolio_gross))
-    portfolio_gross = pd.DataFrame(allocated).abs().sum(axis=1) if allocated else pd.Series(0.0, index=aligned_index)
+    portfolio_gross = (
+        pd.DataFrame(allocated).abs().sum(axis=1)
+        if allocated
+        else pd.Series(0.0, index=aligned_index)
+    )
     safe_portfolio_gross = portfolio_gross.replace(0.0, np.nan)
-    portfolio_ratio_series = (portfolio_cap / safe_portfolio_gross).where(portfolio_gross > portfolio_cap, 1.0)
-    portfolio_ratio_series = portfolio_ratio_series.replace([np.inf, -np.inf], np.nan).fillna(1.0).clip(lower=0.0, upper=1.0)
+    portfolio_ratio_series = (portfolio_cap / safe_portfolio_gross).where(
+        portfolio_gross > portfolio_cap, 1.0
+    )
+    portfolio_ratio_series = (
+        portfolio_ratio_series.replace([np.inf, -np.inf], np.nan)
+        .fillna(1.0)
+        .clip(lower=0.0, upper=1.0)
+    )
     _flag("max_portfolio_gross", portfolio_ratio_series < 0.999999)
     for key in ordered:
         allocated[key] = allocated[key] * portfolio_ratio_series
@@ -567,10 +646,16 @@ def allocate_position_details(
         _flag("max_new_exposure_per_bar", (clamped_series - allocated[key]).abs() > 1e-12)
         allocated[key] = clamped_series
 
-    allocated_gross = pd.DataFrame(allocated).abs().sum(axis=1) if allocated else pd.Series(0.0, index=aligned_index)
+    allocated_gross = (
+        pd.DataFrame(allocated).abs().sum(axis=1)
+        if allocated
+        else pd.Series(0.0, index=aligned_index)
+    )
     req_total = float(requested_gross.sum())
     alloc_total = float(allocated_gross.sum())
-    clipped_fraction = 0.0 if req_total <= 0 else float(max(0.0, (req_total - alloc_total) / req_total))
+    clipped_fraction = (
+        0.0 if req_total <= 0 else float(max(0.0, (req_total - alloc_total) / req_total))
+    )
 
     for key in ordered:
         pos = _as_float_series(raw_positions_by_strategy[key]).reindex(aligned_index).fillna(0.0)
@@ -583,7 +668,8 @@ def allocate_position_details(
     diagnostics["allocated_gross"] = allocated_gross.astype(float)
     diagnostics["clip_fraction"] = np.where(
         diagnostics["requested_gross"] > 0,
-        (diagnostics["requested_gross"] - diagnostics["allocated_gross"]).clip(lower=0.0) / diagnostics["requested_gross"],
+        (diagnostics["requested_gross"] - diagnostics["allocated_gross"]).clip(lower=0.0)
+        / diagnostics["requested_gross"],
         0.0,
     )
     for reason_name, mask in reason_flags.items():

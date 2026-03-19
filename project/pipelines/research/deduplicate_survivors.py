@@ -16,6 +16,7 @@ from project.specs.utils import get_spec_hashes
 from project.pipelines.research.evaluate_naive_entry import _condition_mask, _load_phase1_events
 from project.research.utils.decision_safety import fail_closed_bool
 
+
 def _calculate_jaccard(set_a: set, set_b: set) -> float:
     DATA_ROOT = get_data_root()
     if not set_a and not set_b:
@@ -24,9 +25,12 @@ def _calculate_jaccard(set_a: set, set_b: set) -> float:
     union = len(set_a.union(set_b))
     return float(intersection / union) if union > 0 else 0.0
 
+
 def main() -> int:
     DATA_ROOT = get_data_root()
-    parser = argparse.ArgumentParser(description="Deduplicate survivors and initialize promotion ledger")
+    parser = argparse.ArgumentParser(
+        description="Deduplicate survivors and initialize promotion ledger"
+    )
     parser.add_argument("--run_id", required=True)
     parser.add_argument("--verbose", action="store_true", help="Emit per-candidate debug output")
     args = parser.parse_args()
@@ -42,19 +46,19 @@ def main() -> int:
 
     try:
         df = pd.read_parquet(bridge_queue_path)
-        
+
         # Add duplicate_of column
         df["duplicate_of"] = None
         deduped_rows = []
-        cluster_records = [] # List of {cluster_id, members, representative}
-        
+        cluster_records = []  # List of {cluster_id, members, representative}
+
         # Group by (event_type, rule_template, horizon, sign)
         # To identify cross-symbol redundancy or parameter-neighborhood variations
         group_cols = ["event_type", "rule_template", "horizon", "sign"]
         grouped = df.groupby(group_cols)
-        
+
         cluster_id_counter = 0
-        
+
         # Cache events to avoid reloading
         events_cache = {}
 
@@ -64,17 +68,22 @@ def main() -> int:
             # Map string gate to a sortable rank
             def _gate_rank(val) -> int:
                 val = str(val).strip().lower()
-                if val in ("pass", "true", "1", "1.0"): return 2
-                if val in ("fail", "false", "0", "0.0"): return 1
+                if val in ("pass", "true", "1", "1.0"):
+                    return 2
+                if val in ("fail", "false", "0", "0.0"):
+                    return 1
                 return 0
 
             candidates = group.to_dict("records")
-            candidates.sort(key=lambda x: (
-                _gate_rank(x.get("gate_bridge_tradable", "missing_evidence")),
-                x.get("after_cost_expectancy_per_trade", 0.0),
-                x.get("robustness_score", 0.0)
-            ), reverse=True)
-            
+            candidates.sort(
+                key=lambda x: (
+                    _gate_rank(x.get("gate_bridge_tradable", "missing_evidence")),
+                    x.get("after_cost_expectancy_per_trade", 0.0),
+                    x.get("robustness_score", 0.0),
+                ),
+                reverse=True,
+            )
+
             event_type = name[0]
             if event_type not in events_cache:
                 try:
@@ -83,9 +92,9 @@ def main() -> int:
                     print(f"Warning: Could not load events for {event_type}: {e}")
                     deduped_rows.extend(candidates)
                     continue
-            
+
             base_events = events_cache[event_type]
-            
+
             # Compute event sets for each candidate
             candidate_sets = []
             for cand in candidates:
@@ -99,53 +108,57 @@ def main() -> int:
                 if args.verbose:
                     print(f"Candidate {cand['candidate_id']} has {len(ids)} events.")
                 candidate_sets.append(ids)
-            
+
             # Greedy deduplication
             kept = []
             kept_sets = []
-            
+
             for i, cand in enumerate(candidates):
                 is_dup = False
                 my_set = candidate_sets[i]
-                
+
                 for j, kept_cand in enumerate(kept):
                     kept_set = kept_sets[j]
                     overlap = _calculate_jaccard(my_set, kept_set)
                     if overlap > 0.8:
                         cand["duplicate_of"] = kept_cand["candidate_id"]
                         is_dup = True
-                        
+
                         # Record cluster member
-                        cluster_records.append({
-                            "cluster_id": f"cluster_{cluster_id_counter}",
-                            "candidate_id": cand["candidate_id"],
-                            "is_representative": False,
-                            "duplicate_of": kept_cand["candidate_id"],
-                            "overlap_score": overlap
-                        })
+                        cluster_records.append(
+                            {
+                                "cluster_id": f"cluster_{cluster_id_counter}",
+                                "candidate_id": cand["candidate_id"],
+                                "is_representative": False,
+                                "duplicate_of": kept_cand["candidate_id"],
+                                "overlap_score": overlap,
+                            }
+                        )
                         break
-                
+
                 if not is_dup:
                     kept.append(cand)
                     kept_sets.append(my_set)
                     deduped_rows.append(cand)
-                    
+
                     # New cluster
                     cluster_id_counter += 1
-                    cluster_records.append({
-                        "cluster_id": f"cluster_{cluster_id_counter}",
-                        "candidate_id": cand["candidate_id"],
-                        "is_representative": True,
-                        "duplicate_of": None,
-                        "overlap_score": 1.0
-                    })
-            
+                    cluster_records.append(
+                        {
+                            "cluster_id": f"cluster_{cluster_id_counter}",
+                            "candidate_id": cand["candidate_id"],
+                            "is_representative": True,
+                            "duplicate_of": None,
+                            "overlap_score": 1.0,
+                        }
+                    )
+
         deduped = pd.DataFrame(deduped_rows)
 
         # Output survivors
         out_path = run_dir / "survivors_deduped.parquet"
         write_parquet(deduped, out_path)
-        
+
         # Output cluster diagnostic
         if cluster_records:
             clusters_df = pd.DataFrame(cluster_records)
@@ -175,23 +188,26 @@ def main() -> int:
         # Hash the spec directory that is the source of truth for this run.
         spec_hashes = get_spec_hashes(PROJECT_ROOT)
         ledger["spec_version"] = str(spec_hashes)
-        
+
         ledger_path = run_dir / "promotion_ledger.parquet"
         write_parquet(ledger, ledger_path)
 
-        finalize_manifest(manifest, "success", stats={
-            "input_candidates": len(df),
-            "deduped_candidates": len(deduped)
-        })
+        finalize_manifest(
+            manifest,
+            "success",
+            stats={"input_candidates": len(df), "deduped_candidates": len(deduped)},
+        )
         print(f"Deduped survivors: {len(deduped)} (from {len(df)})")
         return 0
-        
+
     except Exception as exc:
         print(f"Deduplication failed with error: {exc}", file=sys.stderr)
         import traceback
+
         traceback.print_exc()
         finalize_manifest(manifest, "failed", error=str(exc), stats={})
         return 1
+
 
 if __name__ == "__main__":
     sys.exit(main())

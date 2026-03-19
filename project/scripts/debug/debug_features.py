@@ -5,10 +5,12 @@ from pathlib import Path
 
 import pandas as pd
 
+
 def _make_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Inspect a features parquet file.")
     parser.add_argument("--path", required=True, help="Path to features parquet.")
     return parser
+
 
 def main() -> int:
     args = _make_parser().parse_args()
@@ -36,6 +38,7 @@ def main() -> int:
         print("oi_delta_1h stats:")
         print(pd.to_numeric(df["oi_delta_1h"], errors="coerce").describe())
     return 0
+
 
 if __name__ == "__main__":
     raise SystemExit(main())

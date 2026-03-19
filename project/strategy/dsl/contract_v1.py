@@ -5,11 +5,14 @@ from typing import Iterable, List, Optional, Tuple
 
 from project.strategy.dsl.schema import ConditionNodeSpec, OverlaySpec
 
+
 class NonExecutableConditionError(ValueError):
     pass
 
+
 class NonExecutableActionError(ValueError):
     pass
+
 
 def derive_action_delay(action: str, robustness: float, time_stop_bars: int) -> int:
     """Derives entry delay bars from action name and robustness."""
@@ -29,6 +32,7 @@ def derive_action_delay(action: str, robustness: float, time_stop_bars: int) -> 
         return 4
     return 0
 
+
 def action_to_overlays(action: str) -> List[OverlaySpec]:
     """Maps action name to a list of OverlaySpec objects."""
     normalized = str(action or "").strip().lower()
@@ -42,6 +46,7 @@ def action_to_overlays(action: str) -> List[OverlaySpec]:
         scale = max(0.0, min(1.0, scale))
         return [OverlaySpec(name="risk_throttle", params={"size_scale": scale})]
     return []
+
 
 # Canonical, executable condition names supported by the Strategy DSL compiler.
 # NOTE: "research-only" condition names (e.g., age buckets, half-life buckets)
@@ -140,18 +145,23 @@ _ALLOWED_ACTIONS = {
     "risk_throttle_0",
 }
 
+
 def is_executable_action(action: str) -> bool:
     return str(action or "").strip() in _ALLOWED_ACTIONS
+
 
 def validate_action(action: str, *, event_type: str, candidate_id: str) -> str:
     value = str(action or "").strip()
     if not value:
-        raise NonExecutableActionError(f"Empty action for event={event_type}, candidate_id={candidate_id}")
+        raise NonExecutableActionError(
+            f"Empty action for event={event_type}, candidate_id={candidate_id}"
+        )
     if value not in _ALLOWED_ACTIONS:
         raise NonExecutableActionError(
             f"Non-executable action for event={event_type}, candidate_id={candidate_id}: `{value}`"
         )
     return value
+
 
 def normalize_entry_condition(
     condition: object,
@@ -168,11 +178,16 @@ def normalize_entry_condition(
     if lowered.startswith("all__"):
         raise NonExecutableConditionError(f"legacy all__ prefix is forbidden: {raw}")
 
-    if lowered in {"", "all"} or lowered.startswith("severity_bucket_") or lowered.startswith("quantile_"):
+    if (
+        lowered in {"", "all"}
+        or lowered.startswith("severity_bucket_")
+        or lowered.startswith("quantile_")
+    ):
         return "all", [], None
 
     # Try registry first
     from project.strategy.dsl.conditions import ConditionRegistry
+
     nodes = ConditionRegistry.resolve(lowered)
     if nodes is not None:
         return lowered, nodes, None
@@ -180,7 +195,11 @@ def normalize_entry_condition(
     # Carry State (Special case or move to registry)
     if lowered in CARRY_STATE_CONDITION_MAP:
         code = float(CARRY_STATE_CONDITION_MAP[lowered])
-        return lowered, [ConditionNodeSpec(feature="carry_state_code", operator="==", value=code)], None
+        return (
+            lowered,
+            [ConditionNodeSpec(feature="carry_state_code", operator="==", value=code)],
+            None,
+        )
 
     # MS state conditions
     _MS_MAPS = [
@@ -201,13 +220,18 @@ def normalize_entry_condition(
     if match:
         feature, operator, value = match.groups()
         value_f = float(value)
-        return f"{feature}{operator}{value_f:g}", [ConditionNodeSpec(feature=feature, operator=operator, value=value_f)], None
+        return (
+            f"{feature}{operator}{value_f:g}",
+            [ConditionNodeSpec(feature=feature, operator=operator, value=value_f)],
+            None,
+        )
 
     if lowered.startswith("symbol_"):
         symbol = lowered[len("symbol_") :].strip().upper()
         return f"symbol_{symbol}", [], symbol
 
     raise NonExecutableConditionError(f"Non-executable condition: {raw}")
+
 
 def is_executable_condition(
     condition: object,
@@ -217,22 +241,54 @@ def is_executable_condition(
     lowered = str(condition if condition is not None else "").strip().lower()
     # Research-only buckets are allowed to route to "all", but they are not
     # executable condition names themselves.
-    if lowered.startswith("severity_bucket_") or lowered.startswith("quantile_") or lowered.startswith("all__"):
+    if (
+        lowered.startswith("severity_bucket_")
+        or lowered.startswith("quantile_")
+        or lowered.startswith("all__")
+    ):
         return False
 
     try:
-        normalize_entry_condition(condition, event_type="_", candidate_id="_", run_symbols=run_symbols)
+        normalize_entry_condition(
+            condition, event_type="_", candidate_id="_", run_symbols=run_symbols
+        )
         return True
     except NonExecutableConditionError:
         return False
+
 
 # ---- Feature allowlist/denylist (runtime safety) ----
 # The DSL must never reference research-only or future-looking columns.
 # Enforcement is intentionally conservative: unknown feature names are rejected.
 ALLOWED_FEATURE_PREFIXES = (
-    "vol_", "range_", "ret_", "rvol_", "atr_", "basis_", "spread_", "quote_vol_", "volume_", "oi_", "liq_",
-    "liquidity_", "funding_", "carry_", "basis_", "sentiment_", "onchain_", "flow_",
-    "fp_", "mc_", "ms_", "session_", "regime_", "bb_", "z_", "event_", "flag_", "symbol_"
+    "vol_",
+    "range_",
+    "ret_",
+    "rvol_",
+    "atr_",
+    "basis_",
+    "spread_",
+    "quote_vol_",
+    "volume_",
+    "oi_",
+    "liq_",
+    "liquidity_",
+    "funding_",
+    "carry_",
+    "basis_",
+    "sentiment_",
+    "onchain_",
+    "flow_",
+    "fp_",
+    "mc_",
+    "ms_",
+    "session_",
+    "regime_",
+    "bb_",
+    "z_",
+    "event_",
+    "flag_",
+    "symbol_",
 )
 
 # Explicitly disallow common forward return/outcome tokens and training labels.
@@ -244,9 +300,11 @@ DISALLOWED_FEATURE_PATTERNS = (
     r"(^|_)target(_|$)",
     r"(^|_)y(_|$)",
     r"(^|_)outcome(_|$)",
-    r"return_after_costs",   # research metric
-    r"mfe", r"mae",          # research-only unless explicitly surfaced
+    r"return_after_costs",  # research metric
+    r"mfe",
+    r"mae",  # research-only unless explicitly surfaced
 )
+
 
 def _is_allowed_feature_name(name: str) -> bool:
     if not isinstance(name, str) or not name:
@@ -257,6 +315,7 @@ def _is_allowed_feature_name(name: str) -> bool:
             return False
     # allowlist prefixes
     return name.startswith(ALLOWED_FEATURE_PREFIXES)
+
 
 def validate_feature_references(blueprint: dict) -> None:
     """
@@ -286,6 +345,7 @@ def validate_feature_references(blueprint: dict) -> None:
             if not _is_allowed_feature_name(feat):
                 raise ValueError(f"Disallowed feature reference in condition string: {feat}")
 
+
 def resolve_trigger_column(trigger: str, available_columns: list[str]) -> str | None:
     """Resolve a trigger name to an actual boolean column in the runtime frame.
 
@@ -310,7 +370,7 @@ def resolve_trigger_column(trigger: str, available_columns: list[str]) -> str | 
     # strip known prefixes
     for pref in ("event_", "flag_"):
         if base.startswith(pref):
-            base = base[len(pref):]
+            base = base[len(pref) :]
 
     # build deterministic candidate list
     variants = [
@@ -328,10 +388,11 @@ def resolve_trigger_column(trigger: str, available_columns: list[str]) -> str | 
     else:
         variants.append(trig + "_flag")
 
-    seen=set()
+    seen = set()
     for v in variants:
         if v and v not in seen:
-            candidates.append(v); seen.add(v)
+            candidates.append(v)
+            seen.add(v)
 
     for v in candidates:
         if v in cols:

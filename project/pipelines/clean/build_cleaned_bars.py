@@ -38,19 +38,28 @@ from project.core.validation import (
 )
 from project.core.validation import validate_columns
 from project.core.data_quality import summarize_frame_quality
-from project.core.timeframes import bars_dataset_name, normalize_timeframe, ohlcv_dataset_name, timeframe_to_minutes, timeframe_to_pandas_freq
+from project.core.timeframes import (
+    bars_dataset_name,
+    normalize_timeframe,
+    ohlcv_dataset_name,
+    timeframe_to_minutes,
+    timeframe_to_pandas_freq,
+)
 from project.schemas.data_contracts import Cleaned5mBarsSchema
 
 FUNDING_EVENT_HOURS = 8
 FUNDING_MAX_STALENESS = pd.Timedelta(hours=8)
 
+
 def _month_start(ts: datetime) -> datetime:
     return ts.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
 
 def _next_month(ts: datetime) -> datetime:
     year = ts.year + (ts.month // 12)
     month = 1 if ts.month == 12 else ts.month + 1
     return ts.replace(year=year, month=month, day=1, hour=0, minute=0, second=0, microsecond=0)
+
 
 def _iter_months(start: datetime, end: datetime) -> List[datetime]:
     months: List[datetime] = []
@@ -60,10 +69,12 @@ def _iter_months(start: datetime, end: datetime) -> List[datetime]:
         cursor = _next_month(cursor)
     return months
 
+
 def _gap_lengths(is_gap: pd.Series) -> pd.Series:
     gap_group = (is_gap != is_gap.shift()).cumsum()
     lengths = is_gap.groupby(gap_group).transform("sum")
     return lengths.where(is_gap, 0).astype(int)
+
 
 def _parse_optional_utc(ts_raw: str | None) -> pd.Timestamp | None:
     raw = str(ts_raw or "").strip()
@@ -74,7 +85,10 @@ def _parse_optional_utc(ts_raw: str | None) -> pd.Timestamp | None:
         return ts.tz_localize(timezone.utc)
     return ts.tz_convert(timezone.utc)
 
-def _resolve_requested_window(start_raw: str | None, end_raw: str | None) -> tuple[pd.Timestamp | None, pd.Timestamp | None]:
+
+def _resolve_requested_window(
+    start_raw: str | None, end_raw: str | None
+) -> tuple[pd.Timestamp | None, pd.Timestamp | None]:
     start_ts = _parse_optional_utc(start_raw)
     end_ts = _parse_optional_utc(end_raw)
     end_exclusive: pd.Timestamp | None = None
@@ -88,6 +102,7 @@ def _resolve_requested_window(start_raw: str | None, end_raw: str | None) -> tup
         raise ValueError("--end must be after --start")
     return start_ts, end_exclusive
 
+
 def _align_funding(bars: pd.DataFrame, funding: pd.DataFrame) -> Tuple[pd.DataFrame, float]:
     if funding.empty:
         aligned = bars[["timestamp"]].copy()
@@ -98,12 +113,17 @@ def _align_funding(bars: pd.DataFrame, funding: pd.DataFrame) -> Tuple[pd.DataFr
         return aligned, 1.0
 
     funding_sorted = funding.copy()
-    funding_sorted["timestamp"] = pd.to_datetime(funding_sorted["timestamp"], utc=True, errors="coerce")
+    funding_sorted["timestamp"] = pd.to_datetime(
+        funding_sorted["timestamp"], utc=True, errors="coerce"
+    )
     funding_sorted = funding_sorted.dropna(subset=["timestamp"]).reset_index(drop=True)
     # Round sub-hour offsets to nearest hour (Binance archive CSVs have ms-level jitter)
     funding_sorted, coerced_count = coerce_timestamps_to_hour(funding_sorted, "timestamp")
     if coerced_count > 0:
-        logging.info("Coerced %s funding timestamps to nearest hour (sub-hour offsets in raw CSV data)", coerced_count)
+        logging.info(
+            "Coerced %s funding timestamps to nearest hour (sub-hour offsets in raw CSV data)",
+            coerced_count,
+        )
     funding_sorted = (
         funding_sorted.sort_values("timestamp")
         .drop_duplicates(subset=["timestamp"], keep="last")
@@ -127,14 +147,22 @@ def _align_funding(bars: pd.DataFrame, funding: pd.DataFrame) -> Tuple[pd.DataFr
     if "funding_rate_scaled" in merged.columns:
         # Keep the full rate as the "feature"
         merged["funding_rate_feature"] = merged["funding_rate_scaled"]
-        
+
         # Realized cashflow applies ONLY exactly on the funding timestamp
         is_exact = merged["timestamp"] == merged["funding_event_ts"]
         merged["funding_rate_realized"] = np.where(is_exact, merged["funding_rate_scaled"], 0.0)
-    
+
     merged["funding_missing"] = merged["funding_rate_feature"].isna()
     missing_pct = float(merged["funding_missing"].mean()) if len(merged) else 0.0
-    return merged[["timestamp", "funding_event_ts", "funding_rate_feature", "funding_rate_realized", "funding_missing"]], missing_pct
+    return merged[
+        [
+            "timestamp",
+            "funding_event_ts",
+            "funding_rate_feature",
+            "funding_rate_realized",
+            "funding_missing",
+        ]
+    ], missing_pct
 
 
 def _coerce_numeric_columns(frame: pd.DataFrame, columns: list[str]) -> int:
@@ -174,6 +202,7 @@ def _write_data_quality_report(path: Path, payload: dict[str, object]) -> None:
     ensure_dir(path.parent)
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
+
 def main() -> int:
     data_root = get_data_root()
     parser = argparse.ArgumentParser(description="Build cleaned bars for the requested timeframe")
@@ -184,7 +213,9 @@ def main() -> int:
     parser.add_argument("--end", required=False)
     parser.add_argument("--force", type=int, default=0)
     parser.add_argument("--timeframe", default="5m")
-    parser.add_argument("--funding_scale", choices=["auto", "decimal", "percent", "bps"], default="auto")
+    parser.add_argument(
+        "--funding_scale", choices=["auto", "decimal", "percent", "bps"], default="auto"
+    )
     parser.add_argument("--config", action="append", default=[])
     parser.add_argument("--log_path", default=None)
     args = parser.parse_args()
@@ -203,7 +234,9 @@ def main() -> int:
     if args.log_path:
         ensure_dir(Path(args.log_path).parent)
         log_handlers.append(logging.FileHandler(args.log_path))
-    logging.basicConfig(level=logging.INFO, handlers=log_handlers, format="%(asctime)s %(levelname)s %(message)s")
+    logging.basicConfig(
+        level=logging.INFO, handlers=log_handlers, format="%(asctime)s %(levelname)s %(message)s"
+    )
 
     params = {
         "symbols": symbols,
@@ -216,14 +249,18 @@ def main() -> int:
     }
     inputs: List[Dict[str, object]] = []
     outputs: List[Dict[str, object]] = []
-    stage_name = f"build_cleaned_{timeframe}" if market == "perp" else f"build_cleaned_{timeframe}_spot"
+    stage_name = (
+        f"build_cleaned_{timeframe}" if market == "perp" else f"build_cleaned_{timeframe}_spot"
+    )
     manifest = start_manifest(stage_name, run_id, params, inputs, outputs)
     stats: Dict[str, object] = {"symbols": {}}
 
     try:
         for symbol in symbols:
             raw_dir_candidates = [
-                run_scoped_lake_path(data_root, run_id, "raw", "binance", market, symbol, ohlcv_dataset),
+                run_scoped_lake_path(
+                    data_root, run_id, "raw", "binance", market, symbol, ohlcv_dataset
+                ),
                 data_root / "lake" / "raw" / "binance" / market / symbol / ohlcv_dataset,
             ]
             raw_dir = choose_partition_dir(raw_dir_candidates)
@@ -236,7 +273,9 @@ def main() -> int:
                 for _subdir in ("funding", "fundingRate"):
                     _candidate = choose_partition_dir(
                         [
-                            run_scoped_lake_path(data_root, run_id, "raw", "binance", market, symbol, _subdir),
+                            run_scoped_lake_path(
+                                data_root, run_id, "raw", "binance", market, symbol, _subdir
+                            ),
                             data_root / "lake" / "raw" / "binance" / market / symbol / _subdir,
                         ]
                     )
@@ -247,7 +286,11 @@ def main() -> int:
                         break
 
             raw = read_parquet(raw_files)
-            funding = read_parquet(funding_files) if market == "perp" and funding_files else pd.DataFrame()
+            funding = (
+                read_parquet(funding_files)
+                if market == "perp" and funding_files
+                else pd.DataFrame()
+            )
 
             if raw.empty:
                 logging.warning("No raw OHLCV %s data for %s", timeframe, symbol)
@@ -255,7 +298,11 @@ def main() -> int:
             assert_ohlcv_schema(raw)
 
             raw["timestamp"] = pd.to_datetime(raw["timestamp"], utc=True)
-            raw = raw.sort_values("timestamp").drop_duplicates(subset=["timestamp"]).reset_index(drop=True)
+            raw = (
+                raw.sort_values("timestamp")
+                .drop_duplicates(subset=["timestamp"])
+                .reset_index(drop=True)
+            )
             if requested_start is not None:
                 raw = raw[raw["timestamp"] >= requested_start].copy()
             if requested_end_exclusive is not None:
@@ -290,21 +337,31 @@ def main() -> int:
             end_ts = raw["timestamp"].max()
             end_exclusive = end_ts + timedelta(minutes=tf_minutes)
 
-            full_index = pd.date_range(start=start_ts, end=end_exclusive - timedelta(minutes=tf_minutes), freq=tf_freq, tz=timezone.utc)
-            bars = raw.set_index("timestamp").reindex(full_index).reset_index().rename(columns={"index": "timestamp"})
-            
+            full_index = pd.date_range(
+                start=start_ts,
+                end=end_exclusive - timedelta(minutes=tf_minutes),
+                freq=tf_freq,
+                tz=timezone.utc,
+            )
+            bars = (
+                raw.set_index("timestamp")
+                .reindex(full_index)
+                .reset_index()
+                .rename(columns={"index": "timestamp"})
+            )
+
             gap_cols = ["open", "high", "low", "close", "volume"]
             for opt_col in ["quote_volume", "taker_base_volume"]:
                 if opt_col in bars.columns:
                     gap_cols.append(opt_col)
-            
+
             bars["is_gap"] = bars[gap_cols].isna().any(axis=1)
             bars["gap_len"] = _gap_lengths(bars["is_gap"])
             bars["symbol"] = symbol
-            
+
             # Do NOT forward fill prices for gaps to prevent optimistic stability bias
             price_cols = ["open", "high", "low", "close"]
-            
+
             # Zero fill volume for gaps
             vol_cols = [c for c in gap_cols if c not in price_cols]
             bars[vol_cols] = bars[vol_cols].fillna(0.0)
@@ -321,9 +378,13 @@ def main() -> int:
             )
 
             if market == "perp" and not funding.empty:
-                funding["timestamp"] = pd.to_datetime(funding["timestamp"], utc=True, format="ISO8601")
-                funding = funding.dropna(subset=["timestamp"]).sort_values("timestamp").drop_duplicates(
-                    subset=["timestamp"], keep="last"
+                funding["timestamp"] = pd.to_datetime(
+                    funding["timestamp"], utc=True, format="ISO8601"
+                )
+                funding = (
+                    funding.dropna(subset=["timestamp"])
+                    .sort_values("timestamp")
+                    .drop_duplicates(subset=["timestamp"], keep="last")
                 )
                 funding_raw_start = funding["timestamp"].min()
                 funding_raw_end = funding["timestamp"].max()
@@ -339,21 +400,31 @@ def main() -> int:
                         funding_raw_start.isoformat() if pd.notna(funding_raw_start) else "unknown",
                         funding_raw_end.isoformat() if pd.notna(funding_raw_end) else "unknown",
                         funding_window_start.isoformat(),
-                        requested_end_exclusive.isoformat() if requested_end_exclusive is not None else end_exclusive.isoformat(),
+                        requested_end_exclusive.isoformat()
+                        if requested_end_exclusive is not None
+                        else end_exclusive.isoformat(),
                     )
                 inputs.append(
                     {
                         "path": str(funding_dir),
                         "rows": int(len(funding)),
-                        "start_ts": funding["timestamp"].min().isoformat() if not funding.empty else funding_raw_start.isoformat(),
-                        "end_ts": funding["timestamp"].max().isoformat() if not funding.empty else funding_raw_end.isoformat(),
+                        "start_ts": funding["timestamp"].min().isoformat()
+                        if not funding.empty
+                        else funding_raw_start.isoformat(),
+                        "end_ts": funding["timestamp"].max().isoformat()
+                        if not funding.empty
+                        else funding_raw_end.isoformat(),
                         "provenance": {
                             "vendor": "binance",
                             "exchange": "binance",
                             "schema_version": "raw_funding_v1",
                             "schema_hash": schema_hash_from_columns(funding.columns.tolist()),
-                            "extraction_start": funding["timestamp"].min().isoformat() if not funding.empty else funding_raw_start.isoformat(),
-                            "extraction_end": funding["timestamp"].max().isoformat() if not funding.empty else funding_raw_end.isoformat(),
+                            "extraction_start": funding["timestamp"].min().isoformat()
+                            if not funding.empty
+                            else funding_raw_start.isoformat(),
+                            "extraction_end": funding["timestamp"].max().isoformat()
+                            if not funding.empty
+                            else funding_raw_end.isoformat(),
                         },
                     }
                 )
@@ -368,9 +439,14 @@ def main() -> int:
 
                 explicit_scale = None
                 if str(args.funding_scale).strip().lower() != "auto":
-                    explicit_scale = float(FUNDING_SCALE_NAME_TO_MULTIPLIER[str(args.funding_scale).strip().lower()])
-                
-                if funding.empty or pd.to_numeric(funding["funding_rate"], errors="coerce").dropna().empty:
+                    explicit_scale = float(
+                        FUNDING_SCALE_NAME_TO_MULTIPLIER[str(args.funding_scale).strip().lower()]
+                    )
+
+                if (
+                    funding.empty
+                    or pd.to_numeric(funding["funding_rate"], errors="coerce").dropna().empty
+                ):
                     funding["funding_rate_scaled"] = np.nan
                     inferred_scale, scale_confidence = 1.0, 1.0
                 else:
@@ -379,7 +455,7 @@ def main() -> int:
                         "funding_rate",
                         explicit_scale=explicit_scale,
                     )
-                    
+
                     # ENFORCEABLE GATE: Range sanity check for scale errors (100x/10000x)
                     max_abs_funding = funding["funding_rate_scaled"].abs().max()
                     if max_abs_funding > 0.15:  # 15% per 8h is insane (normally < 0.3% decimal)
@@ -394,7 +470,10 @@ def main() -> int:
                     inferred_scale,
                     scale_confidence,
                 )
-                if str(args.funding_scale).strip().lower() == "auto" and float(scale_confidence) < 0.99:
+                if (
+                    str(args.funding_scale).strip().lower() == "auto"
+                    and float(scale_confidence) < 0.99
+                ):
                     raise ValueError(
                         f"Low confidence funding scale inference for {symbol}: "
                         f"confidence={scale_confidence:.4f} (<0.99). "
@@ -402,7 +481,15 @@ def main() -> int:
                     )
                 aligned_funding, _ = _align_funding(bars, funding)
                 bars = bars.merge(
-                    aligned_funding[["timestamp", "funding_event_ts", "funding_rate_feature", "funding_rate_realized", "funding_missing"]],
+                    aligned_funding[
+                        [
+                            "timestamp",
+                            "funding_event_ts",
+                            "funding_rate_feature",
+                            "funding_rate_realized",
+                            "funding_missing",
+                        ]
+                    ],
                     on="timestamp",
                     how="left",
                 )
@@ -432,16 +519,20 @@ def main() -> int:
             monthly_quality: dict[str, dict[str, object]] = {}
 
             cleaned_dir = data_root / "lake" / "cleaned" / market / symbol / bars_dataset
-            run_cleaned_dir = run_scoped_lake_path(data_root, run_id, "cleaned", market, symbol, bars_dataset)
+            run_cleaned_dir = run_scoped_lake_path(
+                data_root, run_id, "cleaned", market, symbol, bars_dataset
+            )
 
             for month_start in _iter_months(start_ts, end_ts):
                 month_end = _next_month(month_start)
                 range_start = max(start_ts, month_start)
                 range_end_exclusive = min(end_exclusive, month_end)
 
-                bars_month = bars[(bars["timestamp"] >= range_start) & (bars["timestamp"] < range_end_exclusive)]
+                bars_month = bars[
+                    (bars["timestamp"] >= range_start) & (bars["timestamp"] < range_end_exclusive)
+                ]
                 filename_symbol = f"{symbol}_spot" if market == "spot" else symbol
-                
+
                 out_path = (
                     run_cleaned_dir
                     / f"year={month_start.year}"
@@ -465,14 +556,16 @@ def main() -> int:
                 logging.info("Writing cleaned data to out_path: %s", out_path)
                 ensure_dir(out_path.parent)
                 written, storage = write_parquet(bars_month.reset_index(drop=True), out_path)
-                
-                outputs.append({
-                    "path": str(written),
-                    "rows": int(len(bars_month)),
-                    "start_ts": bars_month["timestamp"].min().isoformat(),
-                    "end_ts": bars_month["timestamp"].max().isoformat(),
-                    "storage": storage,
-                })
+
+                outputs.append(
+                    {
+                        "path": str(written),
+                        "rows": int(len(bars_month)),
+                        "start_ts": bars_month["timestamp"].min().isoformat(),
+                        "end_ts": bars_month["timestamp"].max().isoformat(),
+                        "storage": storage,
+                    }
+                )
                 month_key = f"{month_start.year}-{month_start.month:02d}"
                 monthly_quality[month_key] = summarize_frame_quality(
                     bars_month,
@@ -505,9 +598,13 @@ def main() -> int:
                     "market": market,
                     "symbol": symbol,
                     "timeframe": timeframe,
-                    "requested_start": requested_start.isoformat() if requested_start is not None else None,
+                    "requested_start": requested_start.isoformat()
+                    if requested_start is not None
+                    else None,
                     "requested_end_exclusive": (
-                        requested_end_exclusive.isoformat() if requested_end_exclusive is not None else None
+                        requested_end_exclusive.isoformat()
+                        if requested_end_exclusive is not None
+                        else None
                     ),
                     "overall": overall_quality.to_dict(),
                     "by_month": monthly_quality,
@@ -519,11 +616,17 @@ def main() -> int:
                 "end": end_ts.isoformat(),
                 "rows": int(len(bars)),
                 "funding_scale_mode": str(args.funding_scale),
-                "requested_start": requested_start.isoformat() if requested_start is not None else None,
+                "requested_start": requested_start.isoformat()
+                if requested_start is not None
+                else None,
                 "requested_end_exclusive": (
-                    requested_end_exclusive.isoformat() if requested_end_exclusive is not None else None
+                    requested_end_exclusive.isoformat()
+                    if requested_end_exclusive is not None
+                    else None
                 ),
-                "funding_missing_pct": float(pd.to_numeric(bars["funding_missing"], errors="coerce").mean()),
+                "funding_missing_pct": float(
+                    pd.to_numeric(bars["funding_missing"], errors="coerce").mean()
+                ),
                 "data_quality": overall_quality.to_dict(),
                 "data_quality_report_path": str(report_path),
             }
@@ -535,6 +638,7 @@ def main() -> int:
         logging.exception("Cleaning failed")
         finalize_manifest(manifest, "failed", error=str(exc), stats=stats)
         return 1
+
 
 if __name__ == "__main__":
     sys.exit(main())

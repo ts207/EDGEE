@@ -6,6 +6,7 @@ from typing import Dict, List
 
 DATA_ROOT = get_data_root()
 
+
 def create_schema(conn: sqlite3.Connection) -> None:
     conn.execute("""
         CREATE TABLE IF NOT EXISTS runs (
@@ -28,19 +29,24 @@ def create_schema(conn: sqlite3.Connection) -> None:
         )
     """)
 
+
 def upsert_run(conn: sqlite3.Connection, row: Dict) -> None:
-    conn.execute("""
+    conn.execute(
+        """
         INSERT OR REPLACE INTO runs (run_id, stage, status, survivors_count, tested_count, timestamp)
         VALUES (:run_id, :stage, :status, :survivors_count, :tested_count, :timestamp)
-    """, row)
+    """,
+        row,
+    )
+
 
 def query_top_promoted(conn: sqlite3.Connection, limit: int = 10) -> List[Dict]:
     cur = conn.execute(
-        "SELECT * FROM runs WHERE status='success' ORDER BY survivors_count DESC LIMIT ?",
-        (limit,)
+        "SELECT * FROM runs WHERE status='success' ORDER BY survivors_count DESC LIMIT ?", (limit,)
     )
     cols = [d[0] for d in cur.description]
     return [dict(zip(cols, row)) for row in cur.fetchall()]
+
 
 def main() -> int:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
@@ -62,18 +68,22 @@ def main() -> int:
             logging.warning("Skipping malformed manifest %s: %s", manifest_path, exc)
             continue
         run_id = manifest.get("run_id", manifest_path.parent.name)
-        upsert_run(conn, {
-            "run_id": run_id,
-            "stage": manifest.get("stage", ""),
-            "status": manifest.get("status", ""),
-            "survivors_count": int(manifest.get("stats", {}).get("survivors_count", 0) or 0),
-            "tested_count": int(manifest.get("stats", {}).get("tested_count", 0) or 0),
-            "timestamp": manifest.get("started_at", ""),
-        })
+        upsert_run(
+            conn,
+            {
+                "run_id": run_id,
+                "stage": manifest.get("stage", ""),
+                "status": manifest.get("status", ""),
+                "survivors_count": int(manifest.get("stats", {}).get("survivors_count", 0) or 0),
+                "tested_count": int(manifest.get("stats", {}).get("tested_count", 0) or 0),
+                "timestamp": manifest.get("started_at", ""),
+            },
+        )
     conn.commit()
     conn.close()
     print(f"Registry updated: {db_path}")
     return 0
+
 
 if __name__ == "__main__":
     sys.exit(main())

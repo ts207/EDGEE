@@ -7,6 +7,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+
 def _refresh_phase2_metrics_after_shrinkage(
     df: pd.DataFrame,
     *,
@@ -40,27 +41,20 @@ def _refresh_phase2_metrics_after_shrinkage(
         direction = out["direction_rule"].fillna("both").str.lower()
         direction_multiplier = np.where(direction == "short", -1.0, 1.0)
         if "effect_shrunk_state" in out.columns:
-            out["effect_shrunk_state"] = (
-                out["effect_shrunk_state"] * direction_multiplier
-            )
+            out["effect_shrunk_state"] = out["effect_shrunk_state"] * direction_multiplier
         if "effect_shrunk_event" in out.columns:
-            out["effect_shrunk_event"] = (
-                out["effect_shrunk_event"] * direction_multiplier
-            )
+            out["effect_shrunk_event"] = out["effect_shrunk_event"] * direction_multiplier
         if "effect_shrunk_family" in out.columns:
-            out["effect_shrunk_family"] = (
-                out["effect_shrunk_family"] * direction_multiplier
-            )
+            out["effect_shrunk_family"] = out["effect_shrunk_family"] * direction_multiplier
         if "effect_raw" in out.columns:
             out["effect_raw"] = out["effect_raw"] * direction_multiplier
 
-    out["expectancy"] = pd.to_numeric(
-        out["effect_shrunk_state"], errors="coerce"
-    ).fillna(pd.to_numeric(out.get("expectancy", 0.0), errors="coerce").fillna(0.0))
+    out["expectancy"] = pd.to_numeric(out["effect_shrunk_state"], errors="coerce").fillna(
+        pd.to_numeric(out.get("expectancy", 0.0), errors="coerce").fillna(0.0)
+    )
 
     resolved_cost = (
-        pd.to_numeric(out.get("cost_bps_resolved", 0.0), errors="coerce").fillna(0.0)
-        / 10000.0
+        pd.to_numeric(out.get("cost_bps_resolved", 0.0), errors="coerce").fillna(0.0) / 10000.0
     )
     out["after_cost_expectancy"] = out["expectancy"] - resolved_cost
     out["after_cost_expectancy_per_trade"] = out["after_cost_expectancy"]
@@ -69,9 +63,7 @@ def _refresh_phase2_metrics_after_shrinkage(
     )
 
     out["p_value"] = (
-        pd.to_numeric(
-            out.get("p_value_shrunk", out.get("p_value", 1.0)), errors="coerce"
-        )
+        pd.to_numeric(out.get("p_value_shrunk", out.get("p_value", 1.0)), errors="coerce")
         .fillna(1.0)
         .clip(0.0, 1.0)
     )
@@ -82,9 +74,9 @@ def _refresh_phase2_metrics_after_shrinkage(
     )
 
     out["gate_economic"] = out["after_cost_expectancy"] >= float(min_after_cost)
-    out["gate_economic_conservative"] = out[
-        "stressed_after_cost_expectancy_per_trade"
-    ] >= float(min_after_cost)
+    out["gate_economic_conservative"] = out["stressed_after_cost_expectancy_per_trade"] >= float(
+        min_after_cost
+    )
     out["gate_after_cost_positive"] = out["gate_economic"]
     out["gate_after_cost_stressed_positive"] = out["gate_economic_conservative"]
     if "gate_stability" in out.columns:
@@ -97,21 +89,15 @@ def _refresh_phase2_metrics_after_shrinkage(
         .fillna(0)
         .astype(int)
     )
-    out["n_events"] = (
-        pd.to_numeric(out.get("n_events", 0), errors="coerce").fillna(0).astype(int)
-    )
+    out["n_events"] = pd.to_numeric(out.get("n_events", 0), errors="coerce").fillna(0).astype(int)
     out["validation_samples"] = (
-        pd.to_numeric(out.get("validation_samples", 0), errors="coerce")
-        .fillna(0)
-        .astype(int)
+        pd.to_numeric(out.get("validation_samples", 0), errors="coerce").fillna(0).astype(int)
     )
     out["test_samples"] = (
         pd.to_numeric(out.get("test_samples", 0), errors="coerce").fillna(0).astype(int)
     )
 
-    validation_return = pd.to_numeric(
-        out.get("mean_validation_return", np.nan), errors="coerce"
-    )
+    validation_return = pd.to_numeric(out.get("mean_validation_return", np.nan), errors="coerce")
     test_return = pd.to_numeric(out.get("mean_test_return", np.nan), errors="coerce")
     expectancy_sign = np.sign(pd.to_numeric(out["expectancy"], errors="coerce").fillna(0.0))
     validation_sign = np.sign(validation_return.fillna(0.0))
@@ -147,17 +133,13 @@ def _refresh_phase2_metrics_after_shrinkage(
         state_weight_col = out["shrinkage_weight_state"]
     else:
         state_weight_col = pd.Series(1.0, index=out.index)
-    out["gate_state_information"] = (
-        state_id_col.fillna("").astype(str).str.strip() == ""
-    ) | (
+    out["gate_state_information"] = (state_id_col.fillna("").astype(str).str.strip() == "") | (
         pd.to_numeric(state_weight_col, errors="coerce").fillna(0.0)
         >= float(min_information_weight_state)
     )
 
     stability_ok = (
-        out["gate_stability"]
-        if require_sign_stability
-        else pd.Series(True, index=out.index)
+        out["gate_stability"] if require_sign_stability else pd.Series(True, index=out.index)
     )
     out["gate_phase2_research"] = (
         out["gate_economic_conservative"]
@@ -193,9 +175,7 @@ def _refresh_phase2_metrics_after_shrinkage(
 
     # Vectorized fail_reasons: strip managed gate tokens, then OR-in new failures.
     # Strip known managed prefixes from any pre-existing fail_reasons strings.
-    _prior = (
-        out.get("fail_reasons", pd.Series("", index=out.index)).fillna("").astype(str)
-    )
+    _prior = out.get("fail_reasons", pd.Series("", index=out.index)).fillna("").astype(str)
 
     def _strip_managed(s: str) -> str:
         kept = [
@@ -233,7 +213,5 @@ def _refresh_phase2_metrics_after_shrinkage(
         .str.strip(",")
         .str.replace(r",+", ",", regex=True)
     )
-    out["promotion_track"] = np.where(
-        out["gate_phase2_final"], "standard", "fallback_only"
-    )
+    out["promotion_track"] = np.where(out["gate_phase2_final"], "standard", "fallback_only")
     return out

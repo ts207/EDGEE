@@ -20,6 +20,7 @@ from typing import (
 from collections import defaultdict
 import pandas as pd
 
+
 @dataclass(frozen=True)
 class WatermarkViolation:
     event_id: str
@@ -29,8 +30,10 @@ class WatermarkViolation:
     watermark_us: int
     violation_type: str  # 'future_event_time' or 'decision_before_watermark'
 
+
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
 
 def _to_us(value: object) -> Optional[int]:
     if value is None:
@@ -79,6 +82,7 @@ def _to_us(value: object) -> Optional[int]:
         return int(value)  # already tiny test-scale us
     return None
 
+
 def _first_timestamp_us(row: Mapping[str, Any], fields: Iterable[str]) -> Optional[int]:
     for field in fields:
         if field not in row:
@@ -87,6 +91,7 @@ def _first_timestamp_us(row: Mapping[str, Any], fields: Iterable[str]) -> Option
         if value is not None:
             return int(value)
     return None
+
 
 def run_watermark_audit(
     events: Iterable[Mapping[str, Any]],
@@ -97,13 +102,13 @@ def run_watermark_audit(
     watermark_us = -1
     violation_counts: Dict[str, int] = defaultdict(int)
     examples: List[str] = []
-    
+
     max_observed_lag_us = 0
 
     for row in events:
         event_time = _first_timestamp_us(row, ["enter_ts", "timestamp", "event_time"])
         detect_time = _first_timestamp_us(row, ["detected_ts", "recv_time"])
-        
+
         if event_time is None or detect_time is None:
             continue
 
@@ -129,7 +134,7 @@ def run_watermark_audit(
                     f"causality: id={row.get('event_id')} {row.get('event_type')} "
                     f"detect={detect_time} watermark={watermark_us} (lag={watermark_us - detect_time}us)"
                 )
-        
+
         lag = max(0, detect_time - event_time)
         if lag > max_observed_lag_us:
             max_observed_lag_us = lag
@@ -142,6 +147,7 @@ def run_watermark_audit(
         "violation_examples": examples,
         "max_observed_lag_us": int(max_observed_lag_us),
     }
+
 
 def run_runtime_postflight_audit(
     data_root: Path | None = None,
@@ -170,7 +176,7 @@ def run_runtime_postflight_audit(
                     events_df = pd.read_parquet(events_path)
             except Exception:
                 pass
-    
+
     payload: Dict[str, Any] = {
         "generated_at": _now_iso(),
         "run_id": str(run_id or "unknown"),
@@ -202,7 +208,7 @@ def run_runtime_postflight_audit(
         events_df.to_dict("records"),
         max_lateness_us=5_000_000,
     )
-    
+
     payload["event_count"] = len(events_df)
     payload["normalized_event_count"] = len(events_df)
     payload["watermark_status"] = watermark_results["status"]
@@ -210,7 +216,7 @@ def run_runtime_postflight_audit(
     payload["watermark_violations_by_type"] = watermark_results["violations_by_type"]
     payload["watermark_violation_examples"] = watermark_results["violation_examples"]
     payload["max_observed_lag_us"] = watermark_results["max_observed_lag_us"]
-    
+
     # Determinism / OMS Replay
     if determinism_replay_checks:
         payload["determinism_replay_checks_status"] = "pass"
@@ -222,17 +228,20 @@ def run_runtime_postflight_audit(
 
         if data_root is not None and run_id is not None:
             import json
+
             runtime_dir = data_root / "runs" / run_id / "runtime"
-            
+
             det_path = runtime_dir / "determinism_replay.json"
             if det_path.exists():
                 try:
                     det = json.loads(det_path.read_text(encoding="utf-8"))
                     payload["determinism_status"] = det.get("status", "pass")
-                    payload["replay_digest"] = det.get("replay_digest", det.get("digest", "unknown"))
+                    payload["replay_digest"] = det.get(
+                        "replay_digest", det.get("digest", "unknown")
+                    )
                 except Exception:
                     pass
-            
+
             for oms_path in (
                 runtime_dir / "oms_replay_validation.json",
                 runtime_dir / "oms_replay.json",
@@ -242,7 +251,9 @@ def run_runtime_postflight_audit(
                 try:
                     oms = json.loads(oms_path.read_text(encoding="utf-8"))
                     payload["oms_replay_status"] = oms.get("status", "pass")
-                    payload["oms_replay_digest"] = oms.get("replay_digest", oms.get("digest", "unknown"))
+                    payload["oms_replay_digest"] = oms.get(
+                        "replay_digest", oms.get("digest", "unknown")
+                    )
                     payload["oms_replay_violation_count"] = int(oms.get("violation_count", 0))
                     break
                 except Exception:

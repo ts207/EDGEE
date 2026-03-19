@@ -2,8 +2,10 @@
 Centralized column naming registry for the Edge framework.
 Ensures consistency across data ingestion, feature engineering, and evaluation.
 """
+
 from __future__ import annotations
 from typing import List, Optional
+
 
 class ColumnRegistry:
     @staticmethod

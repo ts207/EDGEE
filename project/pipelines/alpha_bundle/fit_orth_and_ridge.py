@@ -16,6 +16,7 @@ from project.io.utils import ensure_dir, list_parquet_files, read_parquet, write
 from project.specs.manifest import finalize_manifest, start_manifest
 from project.core.validation import ensure_utc_timestamp
 
+
 def sequential_residualize(Xz: np.ndarray) -> tuple[np.ndarray, list[list[float] | None]]:
     """Sequentially residualize columns of Xz.
 
@@ -38,6 +39,7 @@ def sequential_residualize(Xz: np.ndarray) -> tuple[np.ndarray, list[list[float]
         betas.append(b.astype(float).tolist())
     return Xo, betas
 
+
 def time_block_splits(n: int, k_blocks: int) -> list[tuple[np.ndarray, np.ndarray]]:
     """Deterministic forward-chaining splits for walk-forward CV.
 
@@ -55,6 +57,7 @@ def time_block_splits(n: int, k_blocks: int) -> list[tuple[np.ndarray, np.ndarra
         splits.append((tr, va))
     return splits
 
+
 def ridge_fit(X: np.ndarray, y: np.ndarray, lam: float) -> tuple[np.ndarray, float]:
     """Fit ridge regression with intercept on centered y."""
     XtX = X.T @ X
@@ -62,6 +65,7 @@ def ridge_fit(X: np.ndarray, y: np.ndarray, lam: float) -> tuple[np.ndarray, flo
     beta = np.linalg.solve(XtX + float(lam) * np.eye(XtX.shape[0]), Xty)
     intercept = float(y.mean() - (X @ beta).mean())
     return beta, intercept
+
 
 def corr_ic(a: np.ndarray, b: np.ndarray) -> float:
     a = np.asarray(a, dtype=np.float64)
@@ -75,16 +79,36 @@ def corr_ic(a: np.ndarray, b: np.ndarray) -> float:
         return 0.0
     return float(np.corrcoef(aa, bb)[0, 1])
 
+
 def main() -> int:
     p = argparse.ArgumentParser(description="Fit OrthSpec + Ridge (offline)")
     p.add_argument("--run_id", required=True)
-    p.add_argument("--signals_path", required=True, help="Parquet with ts_event, symbol, and signal columns")
-    p.add_argument("--label_path", required=True, help="Parquet with ts_event, symbol, and y column")
-    p.add_argument("--signal_cols", required=True, help="Comma-separated signal column names in deterministic order")
+    p.add_argument(
+        "--signals_path", required=True, help="Parquet with ts_event, symbol, and signal columns"
+    )
+    p.add_argument(
+        "--label_path", required=True, help="Parquet with ts_event, symbol, and y column"
+    )
+    p.add_argument(
+        "--signal_cols",
+        required=True,
+        help="Comma-separated signal column names in deterministic order",
+    )
     p.add_argument("--label_col", default="y")
-    p.add_argument("--orth_method", default="residualization", choices=["residualization", "standardize_only"], help="Orthogonalization method")
-    p.add_argument("--lambda_", type=float, default=1e-3, help="Used if --lambda_grid is not provided")
-    p.add_argument("--lambda_grid", default=None, help="Optional comma-separated lambda grid for walk-forward CV")
+    p.add_argument(
+        "--orth_method",
+        default="residualization",
+        choices=["residualization", "standardize_only"],
+        help="Orthogonalization method",
+    )
+    p.add_argument(
+        "--lambda_", type=float, default=1e-3, help="Used if --lambda_grid is not provided"
+    )
+    p.add_argument(
+        "--lambda_grid",
+        default=None,
+        help="Optional comma-separated lambda grid for walk-forward CV",
+    )
     p.add_argument("--cv_blocks", type=int, default=6)
     p.add_argument("--out_dir", default=None)
     args = p.parse_args()
@@ -120,7 +144,9 @@ def main() -> int:
 
     # Multi-universe: merge by (ts_event, symbol)
     if "symbol" not in sig.columns or "symbol" not in lab.columns:
-        raise ValueError("signals_path and label_path must include a 'symbol' column for multi-universe fitting")
+        raise ValueError(
+            "signals_path and label_path must include a 'symbol' column for multi-universe fitting"
+        )
     df = pd.merge(sig, lab[[tcol, "symbol", args.label_col]], on=[tcol, "symbol"], how="inner")
     cols = [c.strip() for c in args.signal_cols.split(",") if c.strip()]
     required_cols = [tcol, "symbol", args.label_col, *cols]
@@ -147,7 +173,12 @@ def main() -> int:
         }
         X_used = Xo
     else:
-        orth_spec = {"signal_cols": cols, "mean": mean.tolist(), "std": std.tolist(), "method": "standardize_only_v1"}
+        orth_spec = {
+            "signal_cols": cols,
+            "mean": mean.tolist(),
+            "std": std.tolist(),
+            "method": "standardize_only_v1",
+        }
         X_used = Xz
 
     # Choose lambda
@@ -224,6 +255,7 @@ def main() -> int:
     }
 
     import hashlib
+
     blob = json.dumps(model, sort_keys=True).encode("utf-8")
     model["artifact_hash"] = hashlib.sha256(blob).hexdigest()
 
@@ -231,8 +263,11 @@ def main() -> int:
     with out_path.open("w", encoding="utf-8") as f:
         json.dump(model, f, indent=2, sort_keys=True)
 
-    finalize_manifest(manifest, status="success", stats={"rows": int(len(df)), "out": str(out_path)})
+    finalize_manifest(
+        manifest, status="success", stats={"rows": int(len(df)), "out": str(out_path)}
+    )
     return 0
+
 
 if __name__ == "__main__":
     raise SystemExit(main())

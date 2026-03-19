@@ -8,6 +8,7 @@ a metrics DataFrame. Reuses the existing project.research infrastructure
 The evaluator is trigger-type-agnostic: event, state, transition, and
 feature_predicate triggers all resolve to a boolean mask over the feature table.
 """
+
 from __future__ import annotations
 
 import logging
@@ -25,13 +26,21 @@ from project.events.event_specs import EVENT_REGISTRY_SPECS
 # Robustness framework imports
 from project.research.robustness.regime_evaluator import evaluate_by_regime
 from project.research.robustness.robustness_scorer import compute_robustness_score
-from project.research.robustness.stress_test import evaluate_stress_scenarios, STRESS_SCENARIOS, _apply_stress_mask
+from project.research.robustness.stress_test import (
+    evaluate_stress_scenarios,
+    STRESS_SCENARIOS,
+    _apply_stress_mask,
+)
 from project.research.robustness.kill_switch import detect_kill_switches
 from project.research.robustness.regime_labeler import label_regimes
 
 # Shared utilities
 from project.research.search.feasibility import FeasibilityResult, check_hypothesis_feasibility
-from project.research.search.stage_models import CandidateHypothesis, EvaluatedHypothesis, FeasibilityCheckedHypothesis
+from project.research.search.stage_models import (
+    CandidateHypothesis,
+    EvaluatedHypothesis,
+    FeasibilityCheckedHypothesis,
+)
 from project.research.search.evaluator_utils import (
     horizon_bars as _horizon_bars_func,
     forward_log_returns as _forward_log_returns,
@@ -141,12 +150,20 @@ def evaluate_hypothesis_batch(
         # Default to 5m if unknown
         try:
             from project.core.timeframes import normalize_timeframe
+
             # Assuming the index has freq or we can infer it
             pandas_freq = features.index.inferred_freq
             if pandas_freq:
                 # Map pandas freq to our timeframe
                 # Simplified mapping for common ones
-                mapping = {"5min": "5m", "1min": "1m", "15min": "15m", "1H": "1h", "4H": "4h", "1D": "1d"}
+                mapping = {
+                    "5min": "5m",
+                    "1min": "1m",
+                    "15min": "15m",
+                    "1H": "1h",
+                    "4H": "4h",
+                    "1D": "1d",
+                }
                 tf = mapping.get(pandas_freq, "5m")
                 ann = float(bars_per_year(tf))
             else:
@@ -155,21 +172,21 @@ def evaluate_hypothesis_batch(
             ann = float(bars_per_year("5m"))
     else:
         ann = annualisation_factor
-    
+
     # Compute population volatility across full forward distribution to avoid selection bias
     # Use 15m default if hbars not yet resolved, but better to calculate inside loop per horizon.
     # However, to avoid redundant computation, we can cache fwd series.
     fwd_cache: Dict[int, pd.Series] = {}
-    
+
     # Pre-calculate time decay weights if timestamp is available
     weights = pd.Series(1.0, index=features.index)
     if "timestamp" in features.columns and time_decay_tau_days:
         ref_ts = pd.to_datetime(features["timestamp"].max(), utc=True)
         weights = _time_decay_weights(
-            features["timestamp"], 
-            ref_ts=ref_ts, 
-            tau_seconds=time_decay_tau_days * 86400.0, 
-            floor_weight=0.05
+            features["timestamp"],
+            ref_ts=ref_ts,
+            tau_seconds=time_decay_tau_days * 86400.0,
+            floor_weight=0.05,
         )
 
     # Pre-calculate shared masks for robustness evaluation
@@ -185,7 +202,9 @@ def evaluate_hypothesis_batch(
             continue
 
         hbars = _horizon_bars_func(spec.horizon)
-        direction_sign = 1.0 if spec.direction == "long" else -1.0 if spec.direction == "short" else 1.0
+        direction_sign = (
+            1.0 if spec.direction == "long" else -1.0 if spec.direction == "short" else 1.0
+        )
 
         # Resolve trigger mask
         mask_raw = _trigger_mask(spec, features)
@@ -227,7 +246,7 @@ def evaluate_hypothesis_batch(
         # Compute forward returns and extracts
         if hbars not in fwd_cache:
             fwd_cache[hbars] = _forward_log_returns(features["close"], hbars)
-        
+
         fwd = fwd_cache[hbars]
         event_returns = fwd[mask].dropna()
         n = len(event_returns)
@@ -251,55 +270,55 @@ def evaluate_hypothesis_batch(
             continue
 
         event_weights = weights[mask].loc[event_returns.index]
-        
+
         # ── Refined Statistical Estimators ──
         # Effective Sample Size from time-decay weights
         # n_eff_w = (sum w)^2 / (sum w^2)
         n_eff_w = float(_effective_sample_size(event_weights))
         # NOTE: Overlap correction is handled entirely by the Newey-West
         # variance estimator below — no separate n_eff deflation is needed.
-        
+
         signed = event_returns * direction_sign
-        
+
         # 2. Weighted Mean
         w_sum = event_weights.sum()
         weighted_mean = float((signed * event_weights).sum() / w_sum)
-        
+
         # SF-003: Newey-West robust variance (handling overlap serial correlation).
         # We manually calculate an approximated AR(hbars) overlapping variance for t-stats,
         # integrating the reliability weights.
         v1 = w_sum
         v2 = (event_weights**2).sum()
         denom = v1 - (v2 / v1)
-        
+
         if denom > 0:
             # Base sample weighted variance
-            weighted_var = ((event_weights * (signed - weighted_mean)**2).sum()) / denom
-            
+            weighted_var = ((event_weights * (signed - weighted_mean) ** 2).sum()) / denom
+
             # Newey-West overlap correction
             # Lags up to (hbars - 1)
             nw_var = weighted_var
             n_samples = len(signed)
-            
+
             if hbars > 1 and n_samples > hbars:
                 signed_demeaned = (signed - weighted_mean).values
                 w_arr = event_weights.values
-                
+
                 # Approximate sum of autocorrelations out to hbars - 1 lag
                 cov_sum = 0.0
                 for lag in range(1, hbars):
                     # Bartlett kernel weight: 1 - lag / hbars
                     kernel = 1.0 - (lag / hbars)
-                    
+
                     # Weighted auto-covariance at this lag
                     w_lag = w_arr[lag:] * w_arr[:-lag]
                     x_lag = signed_demeaned[lag:] * signed_demeaned[:-lag]
                     cov_lag = (w_lag * x_lag).sum() / denom
-                    
+
                     cov_sum += 2.0 * kernel * cov_lag
-                
+
                 nw_var += cov_sum
-                
+
             weighted_std = np.sqrt(max(0.0, float(nw_var)))
         else:
             weighted_std = 0.0
@@ -308,16 +327,20 @@ def evaluate_hypothesis_batch(
         if weighted_std < 1e-10:
             rows.append(_null_row(spec, n, "low_variance"))
             continue
-            
+
         # ── Enhanced Robustness Framework ──
         # 1. Per-Regime Evaluation
-        regime_evals = evaluate_by_regime(spec, features, horizon_bars=hbars, min_n_per_regime=5, regime_labels=regime_labels)
-        
+        regime_evals = evaluate_by_regime(
+            spec, features, horizon_bars=hbars, min_n_per_regime=5, regime_labels=regime_labels
+        )
+
         # 2. Composite Robustness Score
         robustness = compute_robustness_score(regime_evals, overall_direction=direction_sign)
-        
+
         # 3. Stress Test Score
-        stress_evals = evaluate_stress_scenarios(spec, features, horizon_bars=hbars, min_n=5, stress_masks=stress_masks)
+        stress_evals = evaluate_stress_scenarios(
+            spec, features, horizon_bars=hbars, min_n=5, stress_masks=stress_masks
+        )
         if not stress_evals.empty and stress_evals["valid"].any():
             valid_stress = stress_evals[stress_evals["valid"]]
             # Stress score is fraction of survived scenarios (t_stat > 1.0, a meaningful threshold)
@@ -325,11 +348,11 @@ def evaluate_hypothesis_batch(
             stress_score = float(stress_survived / len(valid_stress))
         else:
             stress_score = 0.0
-            
+
         # 4. Kill-Switch Detection
         ks_df = detect_kill_switches(spec, features, horizon_bars=hbars, min_n=10)
         ks_count = len(ks_df) if not ks_df.empty else 0
-            
+
         # Excursions
         maes, mfes = _excursion_stats(features["close"], mask, hbars, direction_sign)
         mae_mean = float(maes.mean())
@@ -340,14 +363,16 @@ def evaluate_hypothesis_batch(
         if "volume" in features.columns:
             capacity = float(features["volume"][mask].median())
 
-        # T-stat using Newey-West weighted standard error. 
-        # Overlap density adjustment is already captured structurally by NW variance above, 
+        # T-stat using Newey-West weighted standard error.
+        # Overlap density adjustment is already captured structurally by NW variance above,
         # so we use raw sqrt(n_eff_w) for the denominator to prevent double-penalizing.
         t_stat = weighted_mean / (weighted_std / np.sqrt(max(1.0, n_eff_w)))
-        
+
         # Strategy Sharpe (Scaling by realized trades per year)
         trades_per_year = n * (ann / len(features))
-        trades_per_year = min(trades_per_year, ann)  # Cap at theoretical max to avoid sparse-trigger Sharpe inflation
+        trades_per_year = min(
+            trades_per_year, ann
+        )  # Cap at theoretical max to avoid sparse-trigger Sharpe inflation
         sharpe = (weighted_mean / weighted_std) * np.sqrt(trades_per_year)
         hit_rate = float((signed > 0).mean())
         mean_bps = weighted_mean * 10_000.0

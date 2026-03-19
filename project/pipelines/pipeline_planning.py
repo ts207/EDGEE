@@ -39,7 +39,11 @@ def build_parser() -> argparse.ArgumentParser:
     # Core Pipeline Flags
     parser.add_argument("--run_id", help="Unique ID for this pipeline run.")
     parser.add_argument("--experiment_config", help="Path to an experiment YAML config.")
-    parser.add_argument("--registry_root", default="project/configs/registries", help="Path to platform-owned registries.")
+    parser.add_argument(
+        "--registry_root",
+        default="project/configs/registries",
+        help="Path to platform-owned registries.",
+    )
     parser.add_argument("--override", action="append", default=[], help="Override config keys.")
     parser.add_argument(
         "--symbols", default="dynamic", help="Comma-separated symbols or 'dynamic'."
@@ -56,7 +60,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--skip_ingest_ohlcv", type=int, default=0)
     parser.add_argument("--skip_ingest_funding", type=int, default=0)
     parser.add_argument("--skip_ingest_spot_ohlcv", type=int, default=0)
-    parser.add_argument("--funding_scale", choices=["auto", "decimal", "percent", "bps"], default="auto")
+    parser.add_argument(
+        "--funding_scale", choices=["auto", "decimal", "percent", "bps"], default="auto"
+    )
     parser.add_argument("--enable_cross_venue_spot_pipeline", type=int, default=1)
     parser.add_argument("--allow_missing_funding", type=int, default=0)
     parser.add_argument("--allow_constant_funding", type=int, default=0)
@@ -86,11 +92,21 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--run_phase2_conditional", type=int, default=0)
     parser.add_argument("--phase2_event_type", default="VOL_SHOCK")
     parser.add_argument("--events", nargs="+", help="Explicit subset of event IDs to run.")
-    parser.add_argument("--templates", nargs="+", help="Explicit subset of strategy templates to run.")
-    parser.add_argument("--horizons", nargs="+", help="Explicit subset of horizons (e.g., 5m, 15m) to run.")
-    parser.add_argument("--directions", nargs="+", help="Explicit subset of directions (e.g., long, short) to run.")
-    parser.add_argument("--contexts", nargs="+", help="Explicit subset of contexts (e.g., session=open) to run.")
-    parser.add_argument("--entry_lags", nargs="+", type=int, help="Explicit subset of entry lags (bars) to run.")
+    parser.add_argument(
+        "--templates", nargs="+", help="Explicit subset of strategy templates to run."
+    )
+    parser.add_argument(
+        "--horizons", nargs="+", help="Explicit subset of horizons (e.g., 5m, 15m) to run."
+    )
+    parser.add_argument(
+        "--directions", nargs="+", help="Explicit subset of directions (e.g., long, short) to run."
+    )
+    parser.add_argument(
+        "--contexts", nargs="+", help="Explicit subset of contexts (e.g., session=open) to run."
+    )
+    parser.add_argument(
+        "--entry_lags", nargs="+", type=int, help="Explicit subset of entry lags (bars) to run."
+    )
     parser.add_argument("--sequence_max_gap", type=int, help="Max gap for event sequences.")
     parser.add_argument("--program_id", help="Program ID for experiment campaign tracking.")
     parser.add_argument("--search_budget", type=int, help="Limit total candidate expansions.")
@@ -113,15 +129,30 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--phase2_cost_min_tob_coverage", type=float, default=0.60)
     parser.add_argument("--phase2_cost_tob_tolerance_minutes", type=int, default=10)
     parser.add_argument(
-        "--phase2_gate_profile", choices=["auto", "discovery", "promotion", "synthetic"], default="auto"
+        "--phase2_gate_profile",
+        choices=["auto", "discovery", "promotion", "synthetic"],
+        default="auto",
     )
-    parser.add_argument("--discovery_profile", choices=["standard", "synthetic"], default="standard")
     parser.add_argument(
-        "--discovery-mode", choices=["search"], default="search",
-        help="Canonical discovery path. Only the search-backed discovery engine is supported."
+        "--discovery_profile", choices=["standard", "synthetic"], default="standard"
     )
-    parser.add_argument("--search_spec", default="spec/search_space.yaml", help="Search spec name or path (default: spec/search_space.yaml).")
-    parser.add_argument("--search_min_n", type=int, default=30, help="Min sample size for new search engine discovery.")
+    parser.add_argument(
+        "--discovery-mode",
+        choices=["search"],
+        default="search",
+        help="Canonical discovery path. Only the search-backed discovery engine is supported.",
+    )
+    parser.add_argument(
+        "--search_spec",
+        default="spec/search_space.yaml",
+        help="Search spec name or path (default: spec/search_space.yaml).",
+    )
+    parser.add_argument(
+        "--search_min_n",
+        type=int,
+        default=30,
+        help="Min sample size for new search engine discovery.",
+    )
 
     # Bridge / Eval Flags
     parser.add_argument("--run_bridge_eval_phase2", type=int, default=1)
@@ -149,7 +180,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--performance_mode", type=int, default=0)
     parser.add_argument("--enable_event_stage_cache", type=int, default=1)
     parser.add_argument("--resume_from_failed_stage", type=int, default=0)
-    parser.add_argument("--feature_schema_version", default="", help="Leave empty for canonical default.")
+    parser.add_argument(
+        "--feature_schema_version", default="", help="Leave empty for canonical default."
+    )
 
     # Strategy / Promotion Flags
     parser.add_argument("--run_candidate_promotion", type=int, default=1)
@@ -226,18 +259,42 @@ def build_parser() -> argparse.ArgumentParser:
         default="warn",
         help="How to treat research comparison drift when a baseline run is configured.",
     )
-    parser.add_argument("--research_compare_max_phase2_candidate_count_delta_abs", type=float, default=10.0)
-    parser.add_argument("--research_compare_max_phase2_survivor_count_delta_abs", type=float, default=2.0)
-    parser.add_argument("--research_compare_max_phase2_zero_eval_rows_increase", type=float, default=0.0)
-    parser.add_argument("--research_compare_max_phase2_survivor_q_value_increase", type=float, default=0.05)
-    parser.add_argument("--research_compare_max_phase2_survivor_estimate_bps_drop", type=float, default=3.0)
-    parser.add_argument("--research_compare_max_promotion_promoted_count_delta_abs", type=float, default=2.0)
+    parser.add_argument(
+        "--research_compare_max_phase2_candidate_count_delta_abs", type=float, default=10.0
+    )
+    parser.add_argument(
+        "--research_compare_max_phase2_survivor_count_delta_abs", type=float, default=2.0
+    )
+    parser.add_argument(
+        "--research_compare_max_phase2_zero_eval_rows_increase", type=float, default=0.0
+    )
+    parser.add_argument(
+        "--research_compare_max_phase2_survivor_q_value_increase", type=float, default=0.05
+    )
+    parser.add_argument(
+        "--research_compare_max_phase2_survivor_estimate_bps_drop", type=float, default=3.0
+    )
+    parser.add_argument(
+        "--research_compare_max_promotion_promoted_count_delta_abs", type=float, default=2.0
+    )
     parser.add_argument("--research_compare_max_reject_reason_shift_abs", type=float, default=3.0)
-    parser.add_argument("--research_compare_max_edge_tradable_count_delta_abs", type=float, default=2.0)
-    parser.add_argument("--research_compare_max_edge_candidate_count_delta_abs", type=float, default=2.0)
-    parser.add_argument("--research_compare_max_edge_after_cost_positive_validation_count_delta_abs", type=float, default=2.0)
-    parser.add_argument("--research_compare_max_edge_median_resolved_cost_bps_delta_abs", type=float, default=0.25)
-    parser.add_argument("--research_compare_max_edge_median_expectancy_bps_delta_abs", type=float, default=0.25)
+    parser.add_argument(
+        "--research_compare_max_edge_tradable_count_delta_abs", type=float, default=2.0
+    )
+    parser.add_argument(
+        "--research_compare_max_edge_candidate_count_delta_abs", type=float, default=2.0
+    )
+    parser.add_argument(
+        "--research_compare_max_edge_after_cost_positive_validation_count_delta_abs",
+        type=float,
+        default=2.0,
+    )
+    parser.add_argument(
+        "--research_compare_max_edge_median_resolved_cost_bps_delta_abs", type=float, default=0.25
+    )
+    parser.add_argument(
+        "--research_compare_max_edge_median_expectancy_bps_delta_abs", type=float, default=0.25
+    )
     parser.add_argument("--phase2_min_validation_n_obs", type=int, default=None)
     parser.add_argument("--phase2_min_test_n_obs", type=int, default=None)
     parser.add_argument("--phase2_min_total_n_obs", type=int, default=None)
@@ -256,9 +313,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def resolve_experiment_context(
-    parser: argparse.ArgumentParser,
-    raw_argv: List[str],
-    **kwargs
+    parser: argparse.ArgumentParser, raw_argv: List[str], **kwargs
 ) -> Tuple[argparse.Namespace, Dict, str, Path]:
     """Resolves effective configuration and experiment context."""
     experiment_id = "default"
@@ -441,7 +496,9 @@ def prepare_run_preflight(
         # silently narrows the run and breaks calibration parity with event-level reruns.
         args.phase2_event_type = "all"
 
-    expectancy_script = project_root / "pipelines" / "research" / "analyze_conditional_expectancy.py"
+    expectancy_script = (
+        project_root / "pipelines" / "research" / "analyze_conditional_expectancy.py"
+    )
     expectancy_tail_requested = any(
         int(getattr(args, attr, 0) or 0)
         for attr in (
@@ -533,20 +590,50 @@ def prepare_run_preflight(
         "research_compare_baseline_run_id": str(
             getattr(args, "research_compare_baseline_run_id", "") or ""
         ).strip(),
-        "research_compare_drift_mode": str(getattr(args, "research_compare_drift_mode", "warn") or "warn").strip(),
+        "research_compare_drift_mode": str(
+            getattr(args, "research_compare_drift_mode", "warn") or "warn"
+        ).strip(),
         "research_compare_thresholds": {
-            "max_phase2_candidate_count_delta_abs": float(getattr(args, "research_compare_max_phase2_candidate_count_delta_abs", 10.0)),
-            "max_phase2_survivor_count_delta_abs": float(getattr(args, "research_compare_max_phase2_survivor_count_delta_abs", 2.0)),
-            "max_phase2_zero_eval_rows_increase": float(getattr(args, "research_compare_max_phase2_zero_eval_rows_increase", 0.0)),
-            "max_phase2_survivor_q_value_increase": float(getattr(args, "research_compare_max_phase2_survivor_q_value_increase", 0.05)),
-            "max_phase2_survivor_estimate_bps_drop": float(getattr(args, "research_compare_max_phase2_survivor_estimate_bps_drop", 3.0)),
-            "max_promotion_promoted_count_delta_abs": float(getattr(args, "research_compare_max_promotion_promoted_count_delta_abs", 2.0)),
-            "max_reject_reason_shift_abs": float(getattr(args, "research_compare_max_reject_reason_shift_abs", 3.0)),
-            "max_edge_tradable_count_delta_abs": float(getattr(args, "research_compare_max_edge_tradable_count_delta_abs", 2.0)),
-            "max_edge_candidate_count_delta_abs": float(getattr(args, "research_compare_max_edge_candidate_count_delta_abs", 2.0)),
-            "max_edge_after_cost_positive_validation_count_delta_abs": float(getattr(args, "research_compare_max_edge_after_cost_positive_validation_count_delta_abs", 2.0)),
-            "max_edge_median_resolved_cost_bps_delta_abs": float(getattr(args, "research_compare_max_edge_median_resolved_cost_bps_delta_abs", 0.25)),
-            "max_edge_median_expectancy_bps_delta_abs": float(getattr(args, "research_compare_max_edge_median_expectancy_bps_delta_abs", 0.25)),
+            "max_phase2_candidate_count_delta_abs": float(
+                getattr(args, "research_compare_max_phase2_candidate_count_delta_abs", 10.0)
+            ),
+            "max_phase2_survivor_count_delta_abs": float(
+                getattr(args, "research_compare_max_phase2_survivor_count_delta_abs", 2.0)
+            ),
+            "max_phase2_zero_eval_rows_increase": float(
+                getattr(args, "research_compare_max_phase2_zero_eval_rows_increase", 0.0)
+            ),
+            "max_phase2_survivor_q_value_increase": float(
+                getattr(args, "research_compare_max_phase2_survivor_q_value_increase", 0.05)
+            ),
+            "max_phase2_survivor_estimate_bps_drop": float(
+                getattr(args, "research_compare_max_phase2_survivor_estimate_bps_drop", 3.0)
+            ),
+            "max_promotion_promoted_count_delta_abs": float(
+                getattr(args, "research_compare_max_promotion_promoted_count_delta_abs", 2.0)
+            ),
+            "max_reject_reason_shift_abs": float(
+                getattr(args, "research_compare_max_reject_reason_shift_abs", 3.0)
+            ),
+            "max_edge_tradable_count_delta_abs": float(
+                getattr(args, "research_compare_max_edge_tradable_count_delta_abs", 2.0)
+            ),
+            "max_edge_candidate_count_delta_abs": float(
+                getattr(args, "research_compare_max_edge_candidate_count_delta_abs", 2.0)
+            ),
+            "max_edge_after_cost_positive_validation_count_delta_abs": float(
+                getattr(
+                    args,
+                    "research_compare_max_edge_after_cost_positive_validation_count_delta_abs",
+                    2.0,
+                )
+            ),
+            "max_edge_median_resolved_cost_bps_delta_abs": float(
+                getattr(args, "research_compare_max_edge_median_resolved_cost_bps_delta_abs", 0.25)
+            ),
+            "max_edge_median_expectancy_bps_delta_abs": float(
+                getattr(args, "research_compare_max_edge_median_expectancy_bps_delta_abs", 0.25)
+            ),
         },
         "normalized_timeframes_csv": args.timeframes,
         "start": args.start,

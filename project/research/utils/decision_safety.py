@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 from typing import Any
 
+
 def is_finite_scalar(x: Any) -> bool:
     """Returns True only if x is a finite number."""
     try:
@@ -11,6 +12,7 @@ def is_finite_scalar(x: Any) -> bool:
         return np.isfinite(f)
     except (TypeError, ValueError):
         return False
+
 
 def finite_ge(x: Any, threshold: float) -> bool:
     """Returns True only if x is finite and >= threshold."""
@@ -22,6 +24,7 @@ def finite_ge(x: Any, threshold: float) -> bool:
     except (TypeError, ValueError):
         return False
 
+
 def finite_le(x: Any, threshold: float) -> bool:
     """Returns True only if x is finite and <= threshold."""
     try:
@@ -31,6 +34,7 @@ def finite_le(x: Any, threshold: float) -> bool:
         return f <= float(threshold)
     except (TypeError, ValueError):
         return False
+
 
 def fail_closed_bool(x: Any) -> bool:
     """Returns False if x is missing, NaN, or not truthy."""
@@ -49,6 +53,7 @@ def fail_closed_bool(x: Any) -> bool:
     s = str(x).strip().lower()
     return s in {"1", "true", "t", "yes", "y", "on", "pass"}
 
+
 def nanmedian_or_nan(series: pd.Series | list) -> float:
     """Returns NaN if the series is empty or all NaN, otherwise returns median."""
     if isinstance(series, list):
@@ -57,6 +62,7 @@ def nanmedian_or_nan(series: pd.Series | list) -> float:
         return np.nan
     res = series.median()
     return float(res) if pd.notna(res) else np.nan
+
 
 def nanmax_or_nan(series: pd.Series | list) -> float:
     """Returns NaN if the series is empty or all NaN, otherwise returns max."""
@@ -67,11 +73,13 @@ def nanmax_or_nan(series: pd.Series | list) -> float:
     res = series.max()
     return float(res) if pd.notna(res) else np.nan
 
+
 def required_columns(df: pd.DataFrame, cols: list[str], stage_name: str) -> None:
     """Raises ValueError if any required column is missing from the DataFrame."""
     missing = [c for c in cols if c not in df.columns]
     if missing:
         raise ValueError(f"[{stage_name}] missing required columns: {missing}")
+
 
 def coerce_numeric_nan(val: Any) -> float:
     """Coerces to float, returns NaN if not finite or invalid."""
@@ -80,6 +88,7 @@ def coerce_numeric_nan(val: Any) -> float:
         return f if np.isfinite(f) else np.nan
     except (TypeError, ValueError):
         return np.nan
+
 
 def bool_gate(value: Any) -> bool:
     """Alias for fail_closed_bool, returning False on missing/invalid."""

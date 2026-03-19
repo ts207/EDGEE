@@ -24,4 +24,3 @@ __all__ = [
     "evaluate_pretrade_microstructure_gate",
     "validate_market_microstructure",
 ]
-

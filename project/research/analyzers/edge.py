@@ -18,7 +18,9 @@ from project.research.analyzers.base import (
 class EdgeAnalyzer(BaseEventAnalyzer):
     name = "edge"
 
-    def analyze(self, events: pd.DataFrame, *, market: pd.DataFrame | None = None, **kwargs: Any) -> AnalyzerResult:
+    def analyze(
+        self, events: pd.DataFrame, *, market: pd.DataFrame | None = None, **kwargs: Any
+    ) -> AnalyzerResult:
         frame = self.validate_events(events)
         market = self.validate_market(market)
         if frame.empty or market is None or market.empty:
@@ -34,7 +36,11 @@ class EdgeAnalyzer(BaseEventAnalyzer):
         frame[time_col] = ensure_timestamp(frame[time_col])
         market = market.copy()
         market[market_time_col] = ensure_timestamp(market[market_time_col])
-        market = market.dropna(subset=[market_time_col, price_col]).sort_values(market_time_col).reset_index(drop=True)
+        market = (
+            market.dropna(subset=[market_time_col, price_col])
+            .sort_values(market_time_col)
+            .reset_index(drop=True)
+        )
         market = market.rename(columns={market_time_col: "_ts", price_col: "_px"})
         market["_idx"] = np.arange(len(market), dtype=int)
 
@@ -55,7 +61,9 @@ class EdgeAnalyzer(BaseEventAnalyzer):
                     continue
                 idx = int(idx)
                 if idx + horizon < len(px):
-                    joined.at[i, col] = (float(px.iloc[idx + horizon]) / float(px.iloc[idx]) - 1.0) * 10000.0
+                    joined.at[i, col] = (
+                        float(px.iloc[idx + horizon]) / float(px.iloc[idx]) - 1.0
+                    ) * 10000.0
             joined[f"net_{int(horizon)}_bps"] = joined[col] - cost_bps
 
         rows = []
@@ -70,7 +78,11 @@ class EdgeAnalyzer(BaseEventAnalyzer):
                     "n_obs": int(gross.notna().sum()),
                     "mean_bps": float(gross.mean()) if gross.notna().any() else None,
                     "median_bps": float(gross.median()) if gross.notna().any() else None,
-                    "trimmed_mean_bps": float(gross.clip(lower=gross.quantile(0.1), upper=gross.quantile(0.9)).mean()) if gross.notna().any() else None,
+                    "trimmed_mean_bps": float(
+                        gross.clip(lower=gross.quantile(0.1), upper=gross.quantile(0.9)).mean()
+                    )
+                    if gross.notna().any()
+                    else None,
                     "win_rate": float((gross > 0).mean()) if gross.notna().any() else None,
                     "net_mean_bps": float(net.mean()) if net.notna().any() else None,
                     "net_win_rate": float((net > 0).mean()) if net.notna().any() else None,
@@ -80,7 +92,17 @@ class EdgeAnalyzer(BaseEventAnalyzer):
         summary = {
             "n_events": int(len(joined)),
             "cost_bps": cost_bps,
-            "best_horizon_bars": int(horizon_table.sort_values("net_mean_bps", ascending=False).iloc[0]["horizon_bars"]) if not horizon_table.empty else None,
-            "best_net_mean_bps": float(horizon_table["net_mean_bps"].max()) if not horizon_table.empty else None,
+            "best_horizon_bars": int(
+                horizon_table.sort_values("net_mean_bps", ascending=False).iloc[0]["horizon_bars"]
+            )
+            if not horizon_table.empty
+            else None,
+            "best_net_mean_bps": float(horizon_table["net_mean_bps"].max())
+            if not horizon_table.empty
+            else None,
         }
-        return AnalyzerResult(name=self.name, summary=summary, tables={"edge_horizons": horizon_table, "edge_events": joined})
+        return AnalyzerResult(
+            name=self.name,
+            summary=summary,
+            tables={"edge_horizons": horizon_table, "edge_events": joined},
+        )

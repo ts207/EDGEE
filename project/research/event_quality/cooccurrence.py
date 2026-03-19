@@ -8,6 +8,7 @@ For each ordered pair (A, B), computes:
 High co-occurrence (> redundancy_threshold) suggests A and B are measuring
 the same underlying microstructure state and one is redundant.
 """
+
 from __future__ import annotations
 
 import re
@@ -80,7 +81,7 @@ def compute_cooccurrence(
             # For each bar i, sum of B in [i-window, i+window]
             left = np.maximum(0, np.arange(n_bars) - window_bars)
             right = np.minimum(n_bars - 1, np.arange(n_bars) + window_bars)
-            
+
             # Use np.where to handle the boundary at index 0
             windowed_b_count = b_cumsum[right] - np.where(left > 0, b_cumsum[left - 1], 0)
             b_in_window = windowed_b_count > 0
@@ -88,20 +89,18 @@ def compute_cooccurrence(
             n_co = int(b_in_window[a_indices].sum())
             p_b_given_a = n_co / n_a if n_a > 0 else 0.0
 
-            rows.append({
-                "event_a": eid_a,
-                "event_b": eid_b,
-                "n_a_fires": n_a,
-                "n_co_fires": n_co,
-                "p_b_given_a": round(p_b_given_a, 4),
-                "redundancy_candidate": p_b_given_a >= redundancy_threshold,
-            })
+            rows.append(
+                {
+                    "event_a": eid_a,
+                    "event_b": eid_b,
+                    "n_a_fires": n_a,
+                    "n_co_fires": n_co,
+                    "p_b_given_a": round(p_b_given_a, 4),
+                    "redundancy_candidate": p_b_given_a >= redundancy_threshold,
+                }
+            )
 
     if not rows:
         return pd.DataFrame()
 
-    return (
-        pd.DataFrame(rows)
-        .sort_values("p_b_given_a", ascending=False)
-        .reset_index(drop=True)
-    )
+    return pd.DataFrame(rows).sort_values("p_b_given_a", ascending=False).reset_index(drop=True)

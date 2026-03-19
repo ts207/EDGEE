@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Any
 import yaml
 
+
 def dump_yaml(path: Path | str, data: Any) -> None:
     """A simple wrapper for yaml.dump."""
     with open(path, "w") as f:

@@ -8,7 +8,9 @@ from project.events.registries.trend import TREND_DETECTORS, ensure_trend_detect
 from project.research.analyzers import run_analyzer_suite
 
 
-def detect_trend_family(df: pd.DataFrame, symbol: str, event_type: str, **params: Any) -> pd.DataFrame:
+def detect_trend_family(
+    df: pd.DataFrame, symbol: str, event_type: str, **params: Any
+) -> pd.DataFrame:
     ensure_trend_detectors_registered()
     detector_cls = TREND_DETECTORS.get(event_type)
     if detector_cls is None:
@@ -16,7 +18,9 @@ def detect_trend_family(df: pd.DataFrame, symbol: str, event_type: str, **params
     return detector_cls().detect(df, symbol=symbol, **params)
 
 
-def analyze_trend_family(df: pd.DataFrame, symbol: str, event_type: str, **params: Any) -> tuple[pd.DataFrame, dict[str, Any]]:
+def analyze_trend_family(
+    df: pd.DataFrame, symbol: str, event_type: str, **params: Any
+) -> tuple[pd.DataFrame, dict[str, Any]]:
     events = detect_trend_family(df, symbol, event_type, **params)
     market = df[["timestamp", "close"]].copy() if not df.empty and "close" in df.columns else None
     results = run_analyzer_suite(events, market=market) if not events.empty else {}

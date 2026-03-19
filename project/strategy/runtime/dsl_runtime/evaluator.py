@@ -11,13 +11,17 @@ from project.strategy.dsl.schema import Blueprint, ConditionNodeSpec, EntrySpec
 
 LOGGER = logging.getLogger(__name__)
 
+
 def condition_mask_node(merged: pd.DataFrame, node: ConditionNodeSpec) -> pd.Series:
     """Evaluates a structured condition node or dynamic expression."""
     if getattr(node, "expression", None):
         import re
+
         expr = str(node.expression).strip()
         # Strictly allow only column names, math operators, numbers, and basic boolean operators
-        if not re.match(r'^[\w\s\.\+\-\*/<>=&\|~()]+$', expr) or re.search(r'\b(import|eval|exec|open|__)\b', expr):
+        if not re.match(r"^[\w\s\.\+\-\*/<>=&\|~()]+$", expr) or re.search(
+            r"\b(import|eval|exec|open|__)\b", expr
+        ):
             LOGGER.error(f"Blocked unsafe or complex expression: '{expr}'")
             return pd.Series(False, index=merged.index)
         try:
@@ -34,11 +38,16 @@ def condition_mask_node(merged: pd.DataFrame, node: ConditionNodeSpec) -> pd.Ser
 
     op = node.operator
     val = float(node.value)
-    if op == ">": return (series > val).fillna(False)
-    if op == ">=": return (series >= val).fillna(False)
-    if op == "<": return (series < val).fillna(False)
-    if op == "<=": return (series <= val).fillna(False)
-    if op == "==": return (series == val).fillna(False)
+    if op == ">":
+        return (series > val).fillna(False)
+    if op == ">=":
+        return (series >= val).fillna(False)
+    if op == "<":
+        return (series < val).fillna(False)
+    if op == "<=":
+        return (series <= val).fillna(False)
+    if op == "==":
+        return (series == val).fillna(False)
     if op == "crosses_above":
         prior = series.shift(1)
         return ((prior <= val) & (series > val)).fillna(False)
@@ -54,9 +63,11 @@ def condition_mask_node(merged: pd.DataFrame, node: ConditionNodeSpec) -> pd.Ser
         raw_std = series.rolling(window, min_periods=window).std()
         std = raw_std.replace(0.0, np.nan)
         z = (series - mean) / std
-        if op == "zscore_gt": return (z > val).fillna(False)
+        if op == "zscore_gt":
+            return (z > val).fillna(False)
         return (z < val).fillna(False)
     raise ValueError(f"Unsupported condition operator: {op}")
+
 
 def combined_entry_mask(merged: pd.DataFrame, entry: EntrySpec) -> pd.Series:
     masks: List[pd.Series] = []
@@ -65,10 +76,13 @@ def combined_entry_mask(merged: pd.DataFrame, entry: EntrySpec) -> pd.Series:
         return pd.Series(True, index=merged.index, dtype=bool)
     out = masks[0]
     if entry.condition_logic == "any":
-        for mask in masks[1:]: out = out | mask
+        for mask in masks[1:]:
+            out = out | mask
     else:
-        for mask in masks[1:]: out = out & mask
+        for mask in masks[1:]:
+            out = out & mask
     return out.fillna(False)
+
 
 def entry_eligibility_mask(
     frame: pd.DataFrame, entry: EntrySpec, blueprint: Blueprint

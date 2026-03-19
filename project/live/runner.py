@@ -7,12 +7,18 @@ from pathlib import Path
 from typing import Any, Awaitable, Callable, Dict, List
 
 from project.live.kill_switch import KillSwitchManager, KillSwitchReason
-from project.live.oms import OrderManager, OrderType, OrderStatus, build_live_order_from_strategy_result
+from project.live.oms import (
+    OrderManager,
+    OrderType,
+    OrderStatus,
+    build_live_order_from_strategy_result,
+)
 from project.live.state import LiveStateStore
 from project.live.execution_attribution import summarize_execution_attribution_by
 from project.live.health_checks import DataHealthMonitor
 
 _LOG = logging.getLogger(__name__)
+
 
 class LiveEngineRunner:
     def __init__(
@@ -51,7 +57,9 @@ class LiveEngineRunner:
         self.data_manager = data_manager
         self.order_manager = order_manager or OrderManager()
         self.execution_quality_report_path = (
-            Path(execution_quality_report_path) if execution_quality_report_path is not None else None
+            Path(execution_quality_report_path)
+            if execution_quality_report_path is not None
+            else None
         )
         self.account_sync_interval_seconds = max(1.0, float(account_sync_interval_seconds))
         self.account_sync_failure_threshold = max(1, int(account_sync_failure_threshold))
@@ -74,7 +82,9 @@ class LiveEngineRunner:
         return {
             "symbols": list(self.symbols),
             "live_state_snapshot_path": (
-                str(self.state_store._snapshot_path) if self.state_store._snapshot_path is not None else ""
+                str(self.state_store._snapshot_path)
+                if self.state_store._snapshot_path is not None
+                else ""
             ),
             "live_state_auto_persist_enabled": bool(self.state_store._snapshot_path is not None),
             "kill_switch_recovery_streak": int(self.kill_switch.microstructure_recovery_streak),
@@ -82,10 +92,16 @@ class LiveEngineRunner:
             "account_sync_failure_threshold": int(self.account_sync_failure_threshold),
             "execution_degradation_min_samples": int(self.execution_degradation_min_samples),
             "execution_degradation_warn_edge_bps": float(self.execution_degradation_warn_edge_bps),
-            "execution_degradation_block_edge_bps": float(self.execution_degradation_block_edge_bps),
-            "execution_degradation_throttle_scale": float(self.execution_degradation_throttle_scale),
+            "execution_degradation_block_edge_bps": float(
+                self.execution_degradation_block_edge_bps
+            ),
+            "execution_degradation_throttle_scale": float(
+                self.execution_degradation_throttle_scale
+            ),
             "execution_quality_report_path": (
-                str(self.execution_quality_report_path) if self.execution_quality_report_path is not None else ""
+                str(self.execution_quality_report_path)
+                if self.execution_quality_report_path is not None
+                else ""
             ),
         }
 
@@ -101,9 +117,15 @@ class LiveEngineRunner:
         ]
         sample_count = len(bucket_records)
         if sample_count < self.execution_degradation_min_samples:
-            return {"action": "allow", "sample_count": float(sample_count), "avg_realized_net_edge_bps": 0.0}
+            return {
+                "action": "allow",
+                "sample_count": float(sample_count),
+                "avg_realized_net_edge_bps": 0.0,
+            }
 
-        avg_realized_net_edge_bps = sum(float(item.realized_net_edge_bps) for item in bucket_records) / float(sample_count)
+        avg_realized_net_edge_bps = sum(
+            float(item.realized_net_edge_bps) for item in bucket_records
+        ) / float(sample_count)
         if avg_realized_net_edge_bps <= self.execution_degradation_block_edge_bps:
             return {
                 "action": "block",
@@ -164,7 +186,9 @@ class LiveEngineRunner:
             order.quantity = original_quantity * self.execution_degradation_throttle_scale
             order.remaining_quantity = order.quantity
             order.metadata["execution_degradation_original_quantity"] = original_quantity
-            order.metadata["execution_degradation_applied_scale"] = float(self.execution_degradation_throttle_scale)
+            order.metadata["execution_degradation_applied_scale"] = float(
+                self.execution_degradation_throttle_scale
+            )
         return self.order_manager.submit_order(
             order,
             kill_switch_manager=self.kill_switch,
@@ -188,8 +212,12 @@ class LiveEngineRunner:
         target.parent.mkdir(parents=True, exist_ok=True)
         payload = {
             "summary": self.execution_quality_summary(),
-            "by_symbol": summarize_execution_attribution_by(self.order_manager.execution_attribution, "symbol"),
-            "by_strategy": summarize_execution_attribution_by(self.order_manager.execution_attribution, "strategy"),
+            "by_symbol": summarize_execution_attribution_by(
+                self.order_manager.execution_attribution, "symbol"
+            ),
+            "by_strategy": summarize_execution_attribution_by(
+                self.order_manager.execution_attribution, "strategy"
+            ),
             "by_volatility_regime": summarize_execution_attribution_by(
                 self.order_manager.execution_attribution, "volatility_regime"
             ),
@@ -221,7 +249,7 @@ class LiveEngineRunner:
         _LOG.info("Starting Live Engine for %s", self.symbols)
         if self.state_store._snapshot_path is not None:
             _LOG.info("Live state auto-persist enabled at %s", self.state_store._snapshot_path)
-            
+
         if self.reconcile_at_startup and self.account_snapshot_fetcher is not None:
             _LOG.info("Performing strict startup reconciliation...")
             exchange_snapshot = await self.account_snapshot_fetcher()
@@ -236,17 +264,17 @@ class LiveEngineRunner:
             _LOG.info("Reconciliation successful.")
 
         self._running = True
-        
+
         # Start the data ingestion manager
         await self.data_manager.start()
-        
+
         # Start consumers
         self._tasks.append(asyncio.create_task(self._consume_klines()))
         self._tasks.append(asyncio.create_task(self._consume_tickers()))
         self._tasks.append(asyncio.create_task(self._monitor_data_health()))
         if self.account_snapshot_fetcher is not None:
             self._tasks.append(asyncio.create_task(self._sync_account_state()))
-        
+
         # Keep running
         while self._running:
             await asyncio.sleep(1)
@@ -267,7 +295,9 @@ class LiveEngineRunner:
             try:
                 event = await self.data_manager.kline_queue.get()
                 # Here we would update the live engine's feature state
-                _LOG.debug(f"Consumed kline: {event.symbol} {event.timeframe} close={event.close} final={event.is_final}")
+                _LOG.debug(
+                    f"Consumed kline: {event.symbol} {event.timeframe} close={event.close} final={event.is_final}"
+                )
                 self.health_monitor.on_event(event.symbol, f"kline:{event.timeframe}")
                 self.data_manager.kline_queue.task_done()
             except asyncio.CancelledError:
@@ -280,7 +310,9 @@ class LiveEngineRunner:
             try:
                 event = await self.data_manager.ticker_queue.get()
                 # Here we would update order execution state, bid/ask spread, etc.
-                _LOG.debug(f"Consumed ticker: {event.symbol} bid={event.best_bid_price} ask={event.best_ask_price}")
+                _LOG.debug(
+                    f"Consumed ticker: {event.symbol} bid={event.best_bid_price} ask={event.best_ask_price}"
+                )
                 self.health_monitor.on_event(event.symbol, "ticker")
                 self.data_manager.ticker_queue.task_done()
             except asyncio.CancelledError:
@@ -330,25 +362,30 @@ class LiveEngineRunner:
 
     def _on_ws_reconnect_exhausted(self) -> None:
         """Callback invoked when the WebSocket client exhausts all reconnect attempts."""
-        _LOG.error("WebSocket reconnect retries exhausted; triggering EXCHANGE_DISCONNECT kill-switch.")
+        _LOG.error(
+            "WebSocket reconnect retries exhausted; triggering EXCHANGE_DISCONNECT kill-switch."
+        )
         self.kill_switch.trigger(
             KillSwitchReason.EXCHANGE_DISCONNECT,
             "WebSocket connection lost and all reconnect attempts exhausted",
         )
 
+
 async def main(snapshot_path: str | Path | None = None):
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
     runner = LiveEngineRunner(["btcusdt", "ethusdt"], snapshot_path=snapshot_path)
-    
+
     loop = asyncio.get_running_loop()
     import signal
+
     for sig in (signal.SIGINT, signal.SIGTERM):
         try:
             loop.add_signal_handler(sig, lambda: asyncio.create_task(runner.stop()))
         except NotImplementedError:
             pass
-            
+
     await runner.start()
+
 
 if __name__ == "__main__":
     try:

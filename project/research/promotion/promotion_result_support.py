@@ -73,6 +73,7 @@ def _assemble_promotion_result(
     is_trade_trigger: bool,
     max_q_value: float,
     promotion_profile: str,
+    is_reduced_evidence: bool = False,
     benchmark_pass: bool = True,
 ) -> Dict[str, Any]:
     promoted = bool(
@@ -123,9 +124,12 @@ def _assemble_promotion_result(
         "promotion_score": float(promotion_score),
         "reject_reason": reasons.unique_reject_reason_str(),
         "promotion_fail_gate_primary": primary_promo_fail,
-        "promotion_fail_reason_primary": f"failed_{primary_promo_fail}" if primary_promo_fail else "",
+        "promotion_fail_reason_primary": f"failed_{primary_promo_fail}"
+        if primary_promo_fail
+        else "",
         "run_mode_normalized": run_mode_normalized,
         "is_deploy_mode": bool(is_deploy_mode),
+        "is_reduced_evidence": bool(is_reduced_evidence),
         "deploy_only_reject_reason": reasons.unique_deploy_only_reject_reason_str(),
         "reject_reason_categories_json": reasons.categorized_reject_json(),
         "promotion_fail_reason_categories_json": reasons.categorized_promo_fail_json(),
@@ -142,8 +146,12 @@ def _assemble_promotion_result(
         "control_rate_source": control_rate_source,
         "tob_coverage": float(tob_coverage),
         "net_expectancy_bps": float(net_expectancy_bps),
-        "effective_cost_bps": None if not np.isfinite(effective_cost_bps) else float(effective_cost_bps),
-        "turnover_proxy_mean": None if not np.isfinite(turnover_proxy_mean) else float(turnover_proxy_mean),
+        "effective_cost_bps": None
+        if not np.isfinite(effective_cost_bps)
+        else float(effective_cost_bps),
+        "turnover_proxy_mean": None
+        if not np.isfinite(turnover_proxy_mean)
+        else float(turnover_proxy_mean),
         "audit_statuses": audit_statuses,
         "gate_promo_statistical": "pass" if statistical_pass else "fail",
         "gate_promo_multiplicity_diagnostics": "pass" if multiplicity_diag_pass else "fail",
@@ -182,7 +190,9 @@ def _assemble_promotion_result(
         "gate_structural_break": "pass" if structural_break_pass else "fail",
         "gate_promo_baseline_beats_complexity": bool(beats_baseline),
         "gate_promo_placebo_controls": bool(placebo_pass),
-        "gate_promo_event_discipline": "pass" if (not is_descriptive and is_trade_trigger) else "fail",
+        "gate_promo_event_discipline": "pass"
+        if (not is_descriptive and is_trade_trigger)
+        else "fail",
         "gate_promo_stressed_cost_survival": "pass" if stressed_cost_pass else "fail",
         "gate_promo_delayed_entry_stress": "pass" if delayed_entry_pass else "fail",
         "gate_promo_timeframe_consensus": "pass" if timeframe_consensus_pass else "fail",

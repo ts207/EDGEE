@@ -26,9 +26,18 @@ DEFAULT_DRIFT_THRESHOLDS: Dict[str, float] = {
 
 def research_diagnostics_paths(*, data_root: Path, run_id: str) -> Dict[str, Path]:
     return {
-        "phase2": data_root / "reports" / "phase2" / run_id / "search_engine" / "phase2_diagnostics.json",
+        "phase2": data_root
+        / "reports"
+        / "phase2"
+        / run_id
+        / "search_engine"
+        / "phase2_diagnostics.json",
         "promotion": data_root / "reports" / "promotions" / run_id / "promotion_diagnostics.json",
-        "edge_candidates": data_root / "reports" / "edge_candidates" / run_id / "edge_candidates_normalized.parquet",
+        "edge_candidates": data_root
+        / "reports"
+        / "edge_candidates"
+        / run_id
+        / "edge_candidates_normalized.parquet",
     }
 
 
@@ -93,16 +102,27 @@ def summarize_phase2_distribution(diagnostics: Mapping[str, Any]) -> Dict[str, A
         "candidate_count": _as_int(
             global_diag.get(
                 "candidates_total",
-                diagnostics.get("combined_candidate_rows", diagnostics.get("bridge_candidates_rows", 0)),
+                diagnostics.get(
+                    "combined_candidate_rows", diagnostics.get("bridge_candidates_rows", 0)
+                ),
             )
         ),
-        "survivor_count": _as_int(global_diag.get("survivors_total", diagnostics.get("multiplicity_discoveries", 0))),
-        "symbol_count": _as_int(global_diag.get("symbols_total", len(diagnostics.get("symbols_with_candidates", []) or symbol_diagnostics))),
+        "survivor_count": _as_int(
+            global_diag.get("survivors_total", diagnostics.get("multiplicity_discoveries", 0))
+        ),
+        "symbol_count": _as_int(
+            global_diag.get(
+                "symbols_total",
+                len(diagnostics.get("symbols_with_candidates", []) or symbol_diagnostics),
+            )
+        ),
         "family_count": _as_int(global_diag.get("families_total", 0)),
         "discovery_profile": str(diagnostics.get("discovery_profile", "") or ""),
         "search_spec": str(diagnostics.get("search_spec", "") or ""),
         "zero_eval_rows": _as_int(sample_quality.get("zero_eval_rows", 0)),
-        "sample_quality_gate_rejections": _as_int(sample_quality_gate.get("rejected_by_sample_quality_gate", 0)),
+        "sample_quality_gate_rejections": _as_int(
+            sample_quality_gate.get("rejected_by_sample_quality_gate", 0)
+        ),
         "median_validation_n_obs": _as_float(sample_quality.get("median_validation_n_obs", 0.0)),
         "median_test_n_obs": _as_float(sample_quality.get("median_test_n_obs", 0.0)),
         "median_survivor_q_value": _as_float(survivor_quality.get("median_q_value", 1.0), 1.0),
@@ -116,9 +136,13 @@ def summarize_promotion_distribution(diagnostics: Mapping[str, Any]) -> Dict[str
         "candidate_count": _as_int(decision_summary.get("candidates_total", 0)),
         "promoted_count": _as_int(decision_summary.get("promoted_count", 0)),
         "rejected_count": _as_int(decision_summary.get("rejected_count", 0)),
-        "mean_failed_gate_count_rejected": _as_float(decision_summary.get("mean_failed_gate_count_rejected", 0.0)),
+        "mean_failed_gate_count_rejected": _as_float(
+            decision_summary.get("mean_failed_gate_count_rejected", 0.0)
+        ),
         "primary_fail_gate_counts": dict(decision_summary.get("primary_fail_gate_counts", {})),
-        "primary_reject_reason_counts": dict(decision_summary.get("primary_reject_reason_counts", {})),
+        "primary_reject_reason_counts": dict(
+            decision_summary.get("primary_reject_reason_counts", {})
+        ),
     }
 
 
@@ -126,11 +150,15 @@ def summarize_edge_candidate_distribution(frame: pd.DataFrame) -> Dict[str, Any]
     return {
         "candidate_count": int(len(frame)),
         "tradable_count": _count_pass_like(frame, "gate_bridge_tradable"),
-        "after_cost_positive_validation_count": _count_pass_like(frame, "gate_bridge_after_cost_positive_validation"),
+        "after_cost_positive_validation_count": _count_pass_like(
+            frame, "gate_bridge_after_cost_positive_validation"
+        ),
         "median_resolved_cost_bps": _series_median(frame, "resolved_cost_bps", 0.0),
         "median_expectancy_bps": _series_median(frame, "expectancy_bps", 0.0),
         "median_avg_dynamic_cost_bps": _series_median(frame, "avg_dynamic_cost_bps", 0.0),
-        "median_bridge_validation_after_cost_bps": _series_median(frame, "bridge_validation_after_cost_bps", 0.0),
+        "median_bridge_validation_after_cost_bps": _series_median(
+            frame, "bridge_validation_after_cost_bps", 0.0
+        ),
     }
 
 
@@ -147,11 +175,15 @@ def compare_phase2_run_diagnostics(
             "candidate_count": cand["candidate_count"] - base["candidate_count"],
             "survivor_count": cand["survivor_count"] - base["survivor_count"],
             "zero_eval_rows": cand["zero_eval_rows"] - base["zero_eval_rows"],
-            "sample_quality_gate_rejections": cand["sample_quality_gate_rejections"] - base["sample_quality_gate_rejections"],
-            "median_validation_n_obs": cand["median_validation_n_obs"] - base["median_validation_n_obs"],
+            "sample_quality_gate_rejections": cand["sample_quality_gate_rejections"]
+            - base["sample_quality_gate_rejections"],
+            "median_validation_n_obs": cand["median_validation_n_obs"]
+            - base["median_validation_n_obs"],
             "median_test_n_obs": cand["median_test_n_obs"] - base["median_test_n_obs"],
-            "median_survivor_q_value": cand["median_survivor_q_value"] - base["median_survivor_q_value"],
-            "median_survivor_estimate_bps": cand["median_survivor_estimate_bps"] - base["median_survivor_estimate_bps"],
+            "median_survivor_q_value": cand["median_survivor_q_value"]
+            - base["median_survivor_q_value"],
+            "median_survivor_estimate_bps": cand["median_survivor_estimate_bps"]
+            - base["median_survivor_estimate_bps"],
         },
     }
 
@@ -169,15 +201,23 @@ def compare_promotion_run_diagnostics(
             "candidate_count": cand["candidate_count"] - base["candidate_count"],
             "promoted_count": cand["promoted_count"] - base["promoted_count"],
             "rejected_count": cand["rejected_count"] - base["rejected_count"],
-            "mean_failed_gate_count_rejected": cand["mean_failed_gate_count_rejected"] - base["mean_failed_gate_count_rejected"],
+            "mean_failed_gate_count_rejected": cand["mean_failed_gate_count_rejected"]
+            - base["mean_failed_gate_count_rejected"],
         },
         "fail_gate_shift": {
-            key: _as_int(cand["primary_fail_gate_counts"].get(key, 0)) - _as_int(base["primary_fail_gate_counts"].get(key, 0))
-            for key in sorted(set(base["primary_fail_gate_counts"]) | set(cand["primary_fail_gate_counts"]))
+            key: _as_int(cand["primary_fail_gate_counts"].get(key, 0))
+            - _as_int(base["primary_fail_gate_counts"].get(key, 0))
+            for key in sorted(
+                set(base["primary_fail_gate_counts"]) | set(cand["primary_fail_gate_counts"])
+            )
         },
         "reject_reason_shift": {
-            key: _as_int(cand["primary_reject_reason_counts"].get(key, 0)) - _as_int(base["primary_reject_reason_counts"].get(key, 0))
-            for key in sorted(set(base["primary_reject_reason_counts"]) | set(cand["primary_reject_reason_counts"]))
+            key: _as_int(cand["primary_reject_reason_counts"].get(key, 0))
+            - _as_int(base["primary_reject_reason_counts"].get(key, 0))
+            for key in sorted(
+                set(base["primary_reject_reason_counts"])
+                | set(cand["primary_reject_reason_counts"])
+            )
         },
     }
 
@@ -194,11 +234,17 @@ def compare_edge_candidate_reports(
         "delta": {
             "candidate_count": cand["candidate_count"] - base["candidate_count"],
             "tradable_count": cand["tradable_count"] - base["tradable_count"],
-            "after_cost_positive_validation_count": cand["after_cost_positive_validation_count"] - base["after_cost_positive_validation_count"],
-            "median_resolved_cost_bps": cand["median_resolved_cost_bps"] - base["median_resolved_cost_bps"],
+            "after_cost_positive_validation_count": cand["after_cost_positive_validation_count"]
+            - base["after_cost_positive_validation_count"],
+            "median_resolved_cost_bps": cand["median_resolved_cost_bps"]
+            - base["median_resolved_cost_bps"],
             "median_expectancy_bps": cand["median_expectancy_bps"] - base["median_expectancy_bps"],
-            "median_avg_dynamic_cost_bps": cand["median_avg_dynamic_cost_bps"] - base["median_avg_dynamic_cost_bps"],
-            "median_bridge_validation_after_cost_bps": cand["median_bridge_validation_after_cost_bps"] - base["median_bridge_validation_after_cost_bps"],
+            "median_avg_dynamic_cost_bps": cand["median_avg_dynamic_cost_bps"]
+            - base["median_avg_dynamic_cost_bps"],
+            "median_bridge_validation_after_cost_bps": cand[
+                "median_bridge_validation_after_cost_bps"
+            ]
+            - base["median_bridge_validation_after_cost_bps"],
         },
     }
 
@@ -295,63 +341,89 @@ def assess_run_comparison(
     artifacts = dict(comparison.get("artifacts", {}))
     promotion_artifacts = dict(artifacts.get("promotion", {}))
     edge_artifacts = dict(artifacts.get("edge_candidates", {}))
-    promotion_artifacts_present = bool(promotion_artifacts.get("baseline_exists", False) and promotion_artifacts.get("candidate_exists", False))
-    edge_artifacts_present = bool(edge_artifacts.get("baseline_exists", False) and edge_artifacts.get("candidate_exists", False))
-    profile_mismatch = (
-        str(baseline_phase2.get("discovery_profile", "") or "") != str(candidate_phase2.get("discovery_profile", "") or "")
-        or str(baseline_phase2.get("search_spec", "") or "") != str(candidate_phase2.get("search_spec", "") or "")
+    promotion_artifacts_present = bool(
+        promotion_artifacts.get("baseline_exists", False)
+        and promotion_artifacts.get("candidate_exists", False)
+    )
+    edge_artifacts_present = bool(
+        edge_artifacts.get("baseline_exists", False)
+        and edge_artifacts.get("candidate_exists", False)
+    )
+    profile_mismatch = str(baseline_phase2.get("discovery_profile", "") or "") != str(
+        candidate_phase2.get("discovery_profile", "") or ""
+    ) or str(baseline_phase2.get("search_spec", "") or "") != str(
+        candidate_phase2.get("search_spec", "") or ""
     )
 
     checks: list[tuple[bool, str]] = []
     if not profile_mismatch:
         checks.append(
             (
-                abs(_as_int(phase2_delta.get("candidate_count", 0))) > resolved_thresholds["max_phase2_candidate_count_delta_abs"],
+                abs(_as_int(phase2_delta.get("candidate_count", 0)))
+                > resolved_thresholds["max_phase2_candidate_count_delta_abs"],
                 f"phase2 candidate_count delta={_as_int(phase2_delta.get('candidate_count', 0))} exceeds {resolved_thresholds['max_phase2_candidate_count_delta_abs']}",
             )
         )
-    checks.extend([
-        (
-            abs(_as_int(phase2_delta.get("survivor_count", 0))) > resolved_thresholds["max_phase2_survivor_count_delta_abs"],
-            f"phase2 survivor_count delta={_as_int(phase2_delta.get('survivor_count', 0))} exceeds {resolved_thresholds['max_phase2_survivor_count_delta_abs']}",
-        ),
-        (
-            _as_int(phase2_delta.get("zero_eval_rows", 0)) > resolved_thresholds["max_phase2_zero_eval_rows_increase"],
-            f"phase2 zero_eval_rows increase={_as_int(phase2_delta.get('zero_eval_rows', 0))} exceeds {resolved_thresholds['max_phase2_zero_eval_rows_increase']}",
-        ),
-        (
-            _as_float(phase2_delta.get("median_survivor_q_value", 0.0)) > resolved_thresholds["max_phase2_survivor_q_value_increase"],
-            f"phase2 survivor q-value increase={_as_float(phase2_delta.get('median_survivor_q_value', 0.0)):.4f} exceeds {resolved_thresholds['max_phase2_survivor_q_value_increase']:.4f}",
-        ),
-        (
-            (-_as_float(phase2_delta.get("median_survivor_estimate_bps", 0.0))) > resolved_thresholds["max_phase2_survivor_estimate_bps_drop"],
-            f"phase2 survivor estimate drop={-_as_float(phase2_delta.get('median_survivor_estimate_bps', 0.0)):.4f} exceeds {resolved_thresholds['max_phase2_survivor_estimate_bps_drop']:.4f}",
-        ),
-        (
-            promotion_artifacts_present and abs(_as_int(promotion_delta.get("promoted_count", 0))) > resolved_thresholds["max_promotion_promoted_count_delta_abs"],
-            f"promotion promoted_count delta={_as_int(promotion_delta.get('promoted_count', 0))} exceeds {resolved_thresholds['max_promotion_promoted_count_delta_abs']}",
-        ),
-        (
-            edge_artifacts_present and abs(_as_int(edge_delta.get("candidate_count", 0))) > resolved_thresholds["max_edge_candidate_count_delta_abs"],
-            f"edge candidate_count delta={_as_int(edge_delta.get('candidate_count', 0))} exceeds {resolved_thresholds['max_edge_candidate_count_delta_abs']}",
-        ),
-        (
-            edge_artifacts_present and abs(_as_int(edge_delta.get("tradable_count", 0))) > resolved_thresholds["max_edge_tradable_count_delta_abs"],
-            f"edge tradable_count delta={_as_int(edge_delta.get('tradable_count', 0))} exceeds {resolved_thresholds['max_edge_tradable_count_delta_abs']}",
-        ),
-        (
-            edge_artifacts_present and abs(_as_int(edge_delta.get("after_cost_positive_validation_count", 0))) > resolved_thresholds["max_edge_after_cost_positive_validation_count_delta_abs"],
-            f"edge after_cost_positive_validation_count delta={_as_int(edge_delta.get('after_cost_positive_validation_count', 0))} exceeds {resolved_thresholds['max_edge_after_cost_positive_validation_count_delta_abs']}",
-        ),
-        (
-            edge_artifacts_present and abs(_as_float(edge_delta.get("median_resolved_cost_bps", 0.0))) > resolved_thresholds["max_edge_median_resolved_cost_bps_delta_abs"],
-            f"edge median_resolved_cost_bps delta={_as_float(edge_delta.get('median_resolved_cost_bps', 0.0)):.4f} exceeds {resolved_thresholds['max_edge_median_resolved_cost_bps_delta_abs']:.4f}",
-        ),
-        (
-            edge_artifacts_present and abs(_as_float(edge_delta.get("median_expectancy_bps", 0.0))) > resolved_thresholds["max_edge_median_expectancy_bps_delta_abs"],
-            f"edge median_expectancy_bps delta={_as_float(edge_delta.get('median_expectancy_bps', 0.0)):.4f} exceeds {resolved_thresholds['max_edge_median_expectancy_bps_delta_abs']:.4f}",
-        ),
-    ])
+    checks.extend(
+        [
+            (
+                abs(_as_int(phase2_delta.get("survivor_count", 0)))
+                > resolved_thresholds["max_phase2_survivor_count_delta_abs"],
+                f"phase2 survivor_count delta={_as_int(phase2_delta.get('survivor_count', 0))} exceeds {resolved_thresholds['max_phase2_survivor_count_delta_abs']}",
+            ),
+            (
+                _as_int(phase2_delta.get("zero_eval_rows", 0))
+                > resolved_thresholds["max_phase2_zero_eval_rows_increase"],
+                f"phase2 zero_eval_rows increase={_as_int(phase2_delta.get('zero_eval_rows', 0))} exceeds {resolved_thresholds['max_phase2_zero_eval_rows_increase']}",
+            ),
+            (
+                _as_float(phase2_delta.get("median_survivor_q_value", 0.0))
+                > resolved_thresholds["max_phase2_survivor_q_value_increase"],
+                f"phase2 survivor q-value increase={_as_float(phase2_delta.get('median_survivor_q_value', 0.0)):.4f} exceeds {resolved_thresholds['max_phase2_survivor_q_value_increase']:.4f}",
+            ),
+            (
+                (-_as_float(phase2_delta.get("median_survivor_estimate_bps", 0.0)))
+                > resolved_thresholds["max_phase2_survivor_estimate_bps_drop"],
+                f"phase2 survivor estimate drop={-_as_float(phase2_delta.get('median_survivor_estimate_bps', 0.0)):.4f} exceeds {resolved_thresholds['max_phase2_survivor_estimate_bps_drop']:.4f}",
+            ),
+            (
+                promotion_artifacts_present
+                and abs(_as_int(promotion_delta.get("promoted_count", 0)))
+                > resolved_thresholds["max_promotion_promoted_count_delta_abs"],
+                f"promotion promoted_count delta={_as_int(promotion_delta.get('promoted_count', 0))} exceeds {resolved_thresholds['max_promotion_promoted_count_delta_abs']}",
+            ),
+            (
+                edge_artifacts_present
+                and abs(_as_int(edge_delta.get("candidate_count", 0)))
+                > resolved_thresholds["max_edge_candidate_count_delta_abs"],
+                f"edge candidate_count delta={_as_int(edge_delta.get('candidate_count', 0))} exceeds {resolved_thresholds['max_edge_candidate_count_delta_abs']}",
+            ),
+            (
+                edge_artifacts_present
+                and abs(_as_int(edge_delta.get("tradable_count", 0)))
+                > resolved_thresholds["max_edge_tradable_count_delta_abs"],
+                f"edge tradable_count delta={_as_int(edge_delta.get('tradable_count', 0))} exceeds {resolved_thresholds['max_edge_tradable_count_delta_abs']}",
+            ),
+            (
+                edge_artifacts_present
+                and abs(_as_int(edge_delta.get("after_cost_positive_validation_count", 0)))
+                > resolved_thresholds["max_edge_after_cost_positive_validation_count_delta_abs"],
+                f"edge after_cost_positive_validation_count delta={_as_int(edge_delta.get('after_cost_positive_validation_count', 0))} exceeds {resolved_thresholds['max_edge_after_cost_positive_validation_count_delta_abs']}",
+            ),
+            (
+                edge_artifacts_present
+                and abs(_as_float(edge_delta.get("median_resolved_cost_bps", 0.0)))
+                > resolved_thresholds["max_edge_median_resolved_cost_bps_delta_abs"],
+                f"edge median_resolved_cost_bps delta={_as_float(edge_delta.get('median_resolved_cost_bps', 0.0)):.4f} exceeds {resolved_thresholds['max_edge_median_resolved_cost_bps_delta_abs']:.4f}",
+            ),
+            (
+                edge_artifacts_present
+                and abs(_as_float(edge_delta.get("median_expectancy_bps", 0.0)))
+                > resolved_thresholds["max_edge_median_expectancy_bps_delta_abs"],
+                f"edge median_expectancy_bps delta={_as_float(edge_delta.get('median_expectancy_bps', 0.0)):.4f} exceeds {resolved_thresholds['max_edge_median_expectancy_bps_delta_abs']:.4f}",
+            ),
+        ]
+    )
     if promotion_artifacts_present:
         for reason, shift in sorted(reject_reason_shift.items()):
             checks.append(
@@ -368,9 +440,13 @@ def assess_run_comparison(
             "phase2 profile/search-spec mismatch detected; candidate-count drift threshold was not enforced"
         )
     if not promotion_artifacts_present:
-        notes.append("promotion artifact missing for baseline or candidate run; promotion drift thresholds were not enforced")
+        notes.append(
+            "promotion artifact missing for baseline or candidate run; promotion drift thresholds were not enforced"
+        )
     if not edge_artifacts_present:
-        notes.append("edge candidate artifact missing for baseline or candidate run; edge drift thresholds were not enforced")
+        notes.append(
+            "edge candidate artifact missing for baseline or candidate run; edge drift thresholds were not enforced"
+        )
     if resolved_mode == "off":
         status = "off"
     elif not violations:
@@ -451,10 +527,16 @@ def write_run_comparison_report(
     report_dir = (
         out_dir
         if out_dir is not None
-        else data_root / "reports" / "research_comparison" / candidate_run_id / f"vs_{baseline_run_id}"
+        else data_root
+        / "reports"
+        / "research_comparison"
+        / candidate_run_id
+        / f"vs_{baseline_run_id}"
     )
     report_dir.mkdir(parents=True, exist_ok=True)
-    output_path = report_out if report_out is not None else report_dir / "research_run_comparison.json"
+    output_path = (
+        report_out if report_out is not None else report_dir / "research_run_comparison.json"
+    )
     baseline_paths = research_diagnostics_paths(data_root=data_root, run_id=baseline_run_id)
     candidate_paths = research_diagnostics_paths(data_root=data_root, run_id=candidate_run_id)
     comparison = compare_run_ids(
@@ -477,6 +559,10 @@ def write_run_comparison_report(
         "assessment": assessment,
     }
     output_path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
-    summary_path = summary_out if summary_out is not None else report_dir / "research_run_comparison_summary.md"
+    summary_path = (
+        summary_out
+        if summary_out is not None
+        else report_dir / "research_run_comparison_summary.md"
+    )
     summary_path.write_text(render_run_comparison_summary(payload), encoding="utf-8")
     return output_path

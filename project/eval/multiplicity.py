@@ -47,7 +47,10 @@ def _normalize_hypothesis_log_frame(df: pd.DataFrame) -> pd.DataFrame:
         out["direction"] = out["direction"].apply(_normalize_direction_value)
     return out
 
-def benjamini_hochberg(p_values: List[float], alpha: float = 0.05) -> Tuple[List[bool], List[float]]:
+
+def benjamini_hochberg(
+    p_values: List[float], alpha: float = 0.05
+) -> Tuple[List[bool], List[float]]:
     """Apply Benjamini-Hochberg procedure for FDR control.
 
     This is a compatibility wrapper over the research validation adjustment
@@ -59,7 +62,10 @@ def benjamini_hochberg(p_values: List[float], alpha: float = 0.05) -> Tuple[List
     reject = np.asarray(q_values, dtype=float) <= float(alpha)
     return reject.tolist(), np.asarray(q_values, dtype=float).tolist()
 
-def benjamini_yekutieli(p_values: List[float], alpha: float = 0.05) -> Tuple[List[bool], List[float]]:
+
+def benjamini_yekutieli(
+    p_values: List[float], alpha: float = 0.05
+) -> Tuple[List[bool], List[float]]:
     """Apply Benjamini-Yekutieli procedure for FDR control under dependency.
 
     This delegates to the research validation adjustment backend to avoid
@@ -71,94 +77,100 @@ def benjamini_yekutieli(p_values: List[float], alpha: float = 0.05) -> Tuple[Lis
     reject = np.asarray(q_values, dtype=float) <= float(alpha)
     return reject.tolist(), np.asarray(q_values, dtype=float).tolist()
 
+
 def compute_multiplicity_metrics(df: pd.DataFrame, alpha: float = 0.05) -> pd.DataFrame:
     """Compute multiple q-value variants: Global, Family, Cluster-adjusted, BY."""
-    if df.empty: return df
+    if df.empty:
+        return df
     out = df.copy()
-    
+
     # 1. Global Q (BH)
     _, out["q_value_global"] = benjamini_hochberg(out["p_value"].fillna(1.0).tolist(), alpha)
-    
+
     # 2. Family Q (BH per family_id)
     if "family_id" in out.columns:
         out["q_value_family"] = 1.0
         for fid, group in out.groupby("family_id"):
             _, qvals = benjamini_hochberg(group["p_value"].fillna(1.0).tolist(), alpha)
             out.loc[group.index, "q_value_family"] = qvals
-            
+
     # 3. Cluster-adjusted Q (BH per cluster_id)
     if "cluster_id" in out.columns:
         out["q_value_cluster"] = 1.0
         for cid, group in out.groupby("cluster_id"):
             _, qvals = benjamini_hochberg(group["p_value"].fillna(1.0).tolist(), alpha)
             out.loc[group.index, "q_value_cluster"] = qvals
-            
+
     # 4. BY Diagnostic Q
     _, out["q_value_by"] = benjamini_yekutieli(out["p_value"].fillna(1.0).tolist(), alpha)
-    
+
     return out
+
 
 def get_program_hypothesis_log_path(program_id: str, data_root: Path) -> Path:
     return data_root / "research" / "programs" / program_id / "hypothesis_log.parquet"
 
+
 def update_program_hypothesis_log(
-    program_id: str, 
-    data_root: Path, 
-    new_hypotheses: pd.DataFrame
+    program_id: str, data_root: Path, new_hypotheses: pd.DataFrame
 ) -> pd.DataFrame:
     """M2: Maintain per-research-program tested-hypothesis log."""
     log_path = get_program_hypothesis_log_path(program_id, data_root)
     log_path.parent.mkdir(parents=True, exist_ok=True)
-    
-    existing_path = log_path if log_path.exists() else log_path.with_suffix('.csv')
+
+    existing_path = log_path if log_path.exists() else log_path.with_suffix(".csv")
     normalized_new = _normalize_hypothesis_log_frame(new_hypotheses)
     if existing_path.exists():
         existing_log = _normalize_hypothesis_log_frame(read_parquet(existing_path))
-        combined = pd.concat([existing_log, normalized_new], ignore_index=True).drop_duplicates(subset=["hypothesis_id"])
+        combined = pd.concat([existing_log, normalized_new], ignore_index=True).drop_duplicates(
+            subset=["hypothesis_id"]
+        )
     else:
         combined = normalized_new
 
     write_parquet(combined, log_path)
     return combined
 
+
 def apply_program_multiplicity_control(
-    candidates: pd.DataFrame, 
-    program_id: str, 
-    data_root: Path,
-    alpha: float = 0.05
+    candidates: pd.DataFrame, program_id: str, data_root: Path, alpha: float = 0.05
 ) -> pd.DataFrame:
     """M2: Apply multiplicity to confirmatory universe (Program-level)."""
     log_path = get_program_hypothesis_log_path(program_id, data_root)
-    existing_path = log_path if log_path.exists() else log_path.with_suffix('.csv')
+    existing_path = log_path if log_path.exists() else log_path.with_suffix(".csv")
     if not existing_path.exists():
         return compute_multiplicity_metrics(candidates, alpha)
 
     full_universe = read_parquet(existing_path)
     # We need p-values for all hypotheses in the universe to do global program-level control.
     # If some runs didn't produce p-values for all hypotheses, we assume 1.0 (conservative).
-    
+
     universe_pvals = full_universe["p_value"].fillna(1.0).tolist()
     _, universe_qvals = benjamini_hochberg(universe_pvals, alpha)
     full_universe["q_value_program"] = universe_qvals
-    
+
     # Map back to candidates
     q_map = full_universe.set_index("hypothesis_id")["q_value_program"].to_dict()
     candidates["q_value_program"] = candidates["hypothesis_id"].map(q_map).fillna(1.0)
-    
+
     return compute_multiplicity_metrics(candidates, alpha)
+
 
 def formalize_ids(df: pd.DataFrame) -> pd.DataFrame:
     """M1: Formalize family and cluster assignment rules."""
     out = df.copy()
     if "family_id" not in out.columns:
         # Family = Event Type + Horizon
-        out["family_id"] = out.apply(lambda r: f"fam_{r.get('event_type')}_{r.get('horizon')}", axis=1)
-    
+        out["family_id"] = out.apply(
+            lambda r: f"fam_{r.get('event_type')}_{r.get('horizon')}", axis=1
+        )
+
     if "cluster_id" not in out.columns:
         # Cluster = Behavior Signature (bounded correlation proxy)
         out["cluster_id"] = out.get("behavior_signature_hash", out["family_id"])
-        
+
     return out
+
 
 def apply_multiplicity_control(candidates: pd.DataFrame, alpha: float = 0.05) -> pd.DataFrame:
     """Compatibility shim for tests."""
@@ -169,6 +181,7 @@ def apply_multiplicity_control(candidates: pd.DataFrame, alpha: float = 0.05) ->
     candidates["q_value_bh"] = qvals
     return candidates
 
+
 def report_discoveries(candidates: pd.DataFrame, alpha: float = 0.05) -> Dict[str, Any]:
     """Compatibility shim for tests."""
     total = len(candidates)
@@ -177,5 +190,5 @@ def report_discoveries(candidates: pd.DataFrame, alpha: float = 0.05) -> Dict[st
         "total_hypotheses": int(total),
         "fdr_target": alpha,
         "discoveries": int(passed),
-        "discovery_rate": float(passed / total) if total > 0 else 0.0
+        "discovery_rate": float(passed / total) if total > 0 else 0.0,
     }

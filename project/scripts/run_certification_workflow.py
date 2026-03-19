@@ -139,7 +139,11 @@ def run_certification_workflow(*, root: Path, config_path: Path) -> Dict[str, An
         kill_switch_status={"is_active": False, "reason": None, "message": ""},
         oms_lineage=dict(config.get("oms_lineage", {})),
         replay_status={
-            "status": str(postflight_audit.get("determinism_status", postflight_audit.get("status", "unknown"))),
+            "status": str(
+                postflight_audit.get(
+                    "determinism_status", postflight_audit.get("status", "unknown")
+                )
+            ),
             "replay_digest": replay_digest,
         },
         live_state_status={
@@ -155,6 +159,33 @@ def run_certification_workflow(*, root: Path, config_path: Path) -> Dict[str, An
         json.dumps(certification_manifest, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
+
+    benchmark_path = config.get("benchmark_matrix_path")
+    if benchmark_path and config.get("enforce_benchmark_certification", False):
+        import subprocess
+        import sys
+
+        benchmark_abs = PROJECT_ROOT.parent / benchmark_path
+        if not benchmark_abs.exists():
+            raise FileNotFoundError(
+                f"Configured benchmark_matrix_path does not exist: {benchmark_abs}"
+            )
+
+        print(f"Running benchmark certification gate against {benchmark_path}...")
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "project.scripts.run_benchmark_matrix",
+                "--matrix",
+                str(benchmark_abs),
+                "--execute",
+                "1",
+            ]
+        )
+        if result.returncode != 0:
+            raise RuntimeError(f"Benchmark certification failed (exit code {result.returncode})")
+        certification_manifest["benchmark_certification_passed"] = True
 
     payload = {
         "workflow_id": str(config.get("workflow_id", "golden_certification_v1")),
@@ -177,9 +208,7 @@ def run_certification_workflow(*, root: Path, config_path: Path) -> Dict[str, An
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(
-        description="Run the certification-grade golden workflow."
-    )
+    parser = argparse.ArgumentParser(description="Run the certification-grade golden workflow.")
     parser.add_argument(
         "--root",
         default=None,

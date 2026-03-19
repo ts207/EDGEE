@@ -14,6 +14,7 @@ from project.runtime.normalized_event import NormalizedEvent
 from project.runtime.oms_replay import audit_oms_replay
 from project.io.utils import write_parquet
 
+
 def _to_normalized_events(rows: List[Dict[str, object]]) -> List[NormalizedEvent]:
     out: List[NormalizedEvent] = []
     for row in rows:
@@ -35,9 +36,12 @@ def _to_normalized_events(rows: List[Dict[str, object]]) -> List[NormalizedEvent
         )
     return out
 
+
 def main() -> int:
     data_root = get_data_root()
-    parser = argparse.ArgumentParser(description="Run OMS replay state-machine validation on normalized events.")
+    parser = argparse.ArgumentParser(
+        description="Run OMS replay state-machine validation on normalized events."
+    )
     parser.add_argument("--run_id", required=True)
     parser.add_argument("--fail_on_violations", type=int, default=0)
     args = parser.parse_args()
@@ -59,7 +63,9 @@ def main() -> int:
         {"path": str(replay_rows_path), "rows": None, "start_ts": None, "end_ts": None},
         {"path": str(report_path), "rows": 1, "start_ts": None, "end_ts": None},
     ]
-    manifest = start_manifest("run_oms_replay_validation", str(args.run_id), params, inputs, outputs)
+    manifest = start_manifest(
+        "run_oms_replay_validation", str(args.run_id), params, inputs, outputs
+    )
 
     try:
         if normalized_path.exists():
@@ -113,6 +119,7 @@ def main() -> int:
     except Exception as exc:
         finalize_manifest(manifest, "failed", error=str(exc), stats={})
         return 1
+
 
 if __name__ == "__main__":
     sys.exit(main())

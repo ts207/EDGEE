@@ -81,16 +81,20 @@ def _normalize_target_candidates(frame: pd.DataFrame) -> pd.DataFrame:
         if "gate_bridge_tradable" in out.columns
         else False
     )
-    out["confirmatory_strict_pass"] = (
-        out["confirmatory_gate_pass"]
-        & out.get("gate_multiplicity_strict", pd.Series(False, index=out.index)).fillna(False).astype(bool)
-    )
+    out["confirmatory_strict_pass"] = out["confirmatory_gate_pass"] & out.get(
+        "gate_multiplicity_strict", pd.Series(False, index=out.index)
+    ).fillna(False).astype(bool)
     if "q_value" in out.columns:
         out["_q_sort"] = pd.to_numeric(out["q_value"], errors="coerce").fillna(1.0)
     else:
         out["_q_sort"] = 1.0
     out = out.sort_values(
-        by=["confirmatory_gate_pass", "confirmatory_bridge_pass", "confirmatory_strict_pass", "_q_sort"],
+        by=[
+            "confirmatory_gate_pass",
+            "confirmatory_bridge_pass",
+            "confirmatory_strict_pass",
+            "_q_sort",
+        ],
         ascending=[False, False, False, True],
     )
     out = out.drop_duplicates(subset=STRUCTURAL_KEY_COLUMNS, keep="first").copy()
@@ -204,12 +208,13 @@ def plan_confirmatory_window(
     origin_end = _parse_iso_date(manifest.get("end"))
     symbols = _run_symbols(manifest)
     funding_by_symbol = {
-        symbol: _list_symbol_funding_months(data_root, symbol)
-        for symbol in symbols
+        symbol: _list_symbol_funding_months(data_root, symbol) for symbol in symbols
     }
-    common_funding_months = sorted(
-        set.intersection(*(set(months) for months in funding_by_symbol.values()))
-    ) if funding_by_symbol else []
+    common_funding_months = (
+        sorted(set.intersection(*(set(months) for months in funding_by_symbol.values())))
+        if funding_by_symbol
+        else []
+    )
 
     target_runs: List[Dict[str, Any]] = []
     for run_id in _candidate_target_run_ids(data_root):
@@ -246,8 +251,7 @@ def plan_confirmatory_window(
         )
 
     forward_local_targets = [
-        row for row in target_runs
-        if row["is_forward"] and row["funding_covered"]
+        row for row in target_runs if row["is_forward"] and row["funding_covered"]
     ]
     forward_local_targets.sort(key=lambda row: (row["days_from_origin_end"], row["run_id"]))
 
@@ -272,7 +276,9 @@ def plan_confirmatory_window(
             "start": origin_start.isoformat() if origin_start else None,
             "end": origin_end.isoformat() if origin_end else None,
             "symbols": symbols,
-            "months": _iter_month_keys(origin_start, origin_end) if origin_start and origin_end else [],
+            "months": _iter_month_keys(origin_start, origin_end)
+            if origin_start and origin_end
+            else [],
         },
         "local_funding_months_by_symbol": funding_by_symbol,
         "local_common_funding_months": common_funding_months,
@@ -291,21 +297,46 @@ def compare_confirmatory_candidates(
     origin_run_id: str,
     target_run_id: str,
 ) -> Dict[str, Any]:
-    origin_path = data_root / "reports" / "edge_candidates" / origin_run_id / "edge_candidates_normalized.parquet"
-    target_path = data_root / "reports" / "phase2" / target_run_id / "search_engine" / "phase2_candidates.parquet"
+    origin_path = (
+        data_root
+        / "reports"
+        / "edge_candidates"
+        / origin_run_id
+        / "edge_candidates_normalized.parquet"
+    )
+    target_path = (
+        data_root
+        / "reports"
+        / "phase2"
+        / target_run_id
+        / "search_engine"
+        / "phase2_candidates.parquet"
+    )
 
     origin = _normalize_origin_candidates(_read_parquet(origin_path))
     target = _normalize_target_candidates(_read_parquet(target_path))
 
     origin_summary = {
         "candidate_count": int(len(origin)),
-        "structural_key_count": int(len(origin[STRUCTURAL_KEY_COLUMNS].drop_duplicates())) if not origin.empty else 0,
+        "structural_key_count": int(len(origin[STRUCTURAL_KEY_COLUMNS].drop_duplicates()))
+        if not origin.empty
+        else 0,
     }
     target_summary = {
         "candidate_count": int(len(target)),
-        "bridge_pass_count": int(target.get("confirmatory_bridge_pass", pd.Series(dtype=bool)).sum()) if not target.empty else 0,
-        "gate_pass_count": int(target.get("confirmatory_gate_pass", pd.Series(dtype=bool)).sum()) if not target.empty else 0,
-        "strict_pass_count": int(target.get("confirmatory_strict_pass", pd.Series(dtype=bool)).sum()) if not target.empty else 0,
+        "bridge_pass_count": int(
+            target.get("confirmatory_bridge_pass", pd.Series(dtype=bool)).sum()
+        )
+        if not target.empty
+        else 0,
+        "gate_pass_count": int(target.get("confirmatory_gate_pass", pd.Series(dtype=bool)).sum())
+        if not target.empty
+        else 0,
+        "strict_pass_count": int(
+            target.get("confirmatory_strict_pass", pd.Series(dtype=bool)).sum()
+        )
+        if not target.empty
+        else 0,
     }
 
     if origin.empty or target.empty:
@@ -337,10 +368,24 @@ def compare_confirmatory_candidates(
 
     matched_summary = {
         "matched_structural_rows": int(len(merged)),
-        "matched_structural_keys": int(len(merged[STRUCTURAL_KEY_COLUMNS].drop_duplicates())) if not merged.empty else 0,
-        "matched_bridge_pass_count": int(merged.get("confirmatory_bridge_pass", pd.Series(dtype=bool)).sum()) if not merged.empty else 0,
-        "matched_gate_pass_count": int(merged.get("confirmatory_gate_pass", pd.Series(dtype=bool)).sum()) if not merged.empty else 0,
-        "matched_strict_pass_count": int(merged.get("confirmatory_strict_pass", pd.Series(dtype=bool)).sum()) if not merged.empty else 0,
+        "matched_structural_keys": int(len(merged[STRUCTURAL_KEY_COLUMNS].drop_duplicates()))
+        if not merged.empty
+        else 0,
+        "matched_bridge_pass_count": int(
+            merged.get("confirmatory_bridge_pass", pd.Series(dtype=bool)).sum()
+        )
+        if not merged.empty
+        else 0,
+        "matched_gate_pass_count": int(
+            merged.get("confirmatory_gate_pass", pd.Series(dtype=bool)).sum()
+        )
+        if not merged.empty
+        else 0,
+        "matched_strict_pass_count": int(
+            merged.get("confirmatory_strict_pass", pd.Series(dtype=bool)).sum()
+        )
+        if not merged.empty
+        else 0,
     }
 
     matched_candidates: List[Dict[str, Any]] = []
@@ -382,9 +427,26 @@ def build_adjacent_survivorship_payload(
     origin_run_id: str,
     target_run_id: str,
 ) -> Dict[str, Any]:
-    origin_path = data_root / "reports" / "edge_candidates" / origin_run_id / "edge_candidates_normalized.parquet"
-    target_path = data_root / "reports" / "phase2" / target_run_id / "search_engine" / "phase2_candidates.parquet"
-    origin = _normalize_origin_candidates(_read_parquet(origin_path)).drop_duplicates(subset=STRUCTURAL_KEY_COLUMNS).copy()
+    origin_path = (
+        data_root
+        / "reports"
+        / "edge_candidates"
+        / origin_run_id
+        / "edge_candidates_normalized.parquet"
+    )
+    target_path = (
+        data_root
+        / "reports"
+        / "phase2"
+        / target_run_id
+        / "search_engine"
+        / "phase2_candidates.parquet"
+    )
+    origin = (
+        _normalize_origin_candidates(_read_parquet(origin_path))
+        .drop_duplicates(subset=STRUCTURAL_KEY_COLUMNS)
+        .copy()
+    )
     target = _normalize_target_candidates(_read_parquet(target_path)).copy()
 
     target_index: Dict[tuple[str, ...], Dict[str, Any]] = {}
@@ -403,11 +465,17 @@ def build_adjacent_survivorship_payload(
                 **{col: row.get(col) for col in STRUCTURAL_KEY_COLUMNS},
                 "origin_candidate_id": row.get("candidate_id"),
                 "origin_q_value": row.get("q_value"),
-                "origin_after_cost_expectancy_per_trade": row.get("after_cost_expectancy_per_trade"),
+                "origin_after_cost_expectancy_per_trade": row.get(
+                    "after_cost_expectancy_per_trade"
+                ),
                 "target_candidate_id": target_row.get("candidate_id"),
                 "target_q_value": target_row.get("q_value"),
-                "target_after_cost_expectancy_per_trade": target_row.get("after_cost_expectancy_per_trade"),
-                "target_stressed_after_cost_expectancy_per_trade": target_row.get("stressed_after_cost_expectancy_per_trade"),
+                "target_after_cost_expectancy_per_trade": target_row.get(
+                    "after_cost_expectancy_per_trade"
+                ),
+                "target_stressed_after_cost_expectancy_per_trade": target_row.get(
+                    "stressed_after_cost_expectancy_per_trade"
+                ),
                 "target_gate_pass": bool(target_row.get("confirmatory_gate_pass", False)),
                 "target_bridge_pass": bool(target_row.get("confirmatory_bridge_pass", False)),
                 "target_regime_stable": bool(target_row.get("gate_c_regime_stable", False)),
@@ -432,7 +500,9 @@ def build_adjacent_survivorship_payload(
         if row["survived_adjacent_window"]:
             bucket["survived_count"] += 1
         for reason in row["failure_reasons"]:
-            bucket["failure_reason_counts"][reason] = bucket["failure_reason_counts"].get(reason, 0) + 1
+            bucket["failure_reason_counts"][reason] = (
+                bucket["failure_reason_counts"].get(reason, 0) + 1
+            )
 
     return {
         "origin_run_id": origin_run_id,
@@ -459,7 +529,15 @@ def write_confirmatory_candidate_report(
         origin_run_id=origin_run_id,
         target_run_id=target_run_id,
     )
-    report_dir = out_dir if out_dir is not None else data_root / "reports" / "confirmatory_comparison" / target_run_id / f"vs_{origin_run_id}"
+    report_dir = (
+        out_dir
+        if out_dir is not None
+        else data_root
+        / "reports"
+        / "confirmatory_comparison"
+        / target_run_id
+        / f"vs_{origin_run_id}"
+    )
     report_dir.mkdir(parents=True, exist_ok=True)
     out_path = report_dir / "confirmatory_candidates.json"
     out_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
@@ -478,7 +556,11 @@ def write_adjacent_survivorship_report(
         origin_run_id=origin_run_id,
         target_run_id=target_run_id,
     )
-    report_dir = out_dir if out_dir is not None else data_root / "reports" / "adjacent_survivorship" / target_run_id / f"vs_{origin_run_id}"
+    report_dir = (
+        out_dir
+        if out_dir is not None
+        else data_root / "reports" / "adjacent_survivorship" / target_run_id / f"vs_{origin_run_id}"
+    )
     report_dir.mkdir(parents=True, exist_ok=True)
     out_path = report_dir / "adjacent_survivorship.json"
     out_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
@@ -495,7 +577,11 @@ def write_confirmatory_window_plan(
         data_root=data_root,
         origin_run_id=origin_run_id,
     )
-    report_dir = out_dir if out_dir is not None else data_root / "reports" / "confirmatory_plan" / origin_run_id
+    report_dir = (
+        out_dir
+        if out_dir is not None
+        else data_root / "reports" / "confirmatory_plan" / origin_run_id
+    )
     report_dir.mkdir(parents=True, exist_ok=True)
     out_path = report_dir / "confirmatory_window_plan.json"
     out_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
@@ -584,9 +670,21 @@ def write_confirmatory_workflow_report(
         target_run_id=target_run_id,
     )
     if target_run_id:
-        report_dir = out_dir if out_dir is not None else data_root / "reports" / "confirmatory_workflow" / str(target_run_id) / f"vs_{origin_run_id}"
+        report_dir = (
+            out_dir
+            if out_dir is not None
+            else data_root
+            / "reports"
+            / "confirmatory_workflow"
+            / str(target_run_id)
+            / f"vs_{origin_run_id}"
+        )
     else:
-        report_dir = out_dir if out_dir is not None else data_root / "reports" / "confirmatory_workflow" / origin_run_id
+        report_dir = (
+            out_dir
+            if out_dir is not None
+            else data_root / "reports" / "confirmatory_workflow" / origin_run_id
+        )
     report_dir.mkdir(parents=True, exist_ok=True)
     out_path = report_dir / "confirmatory_workflow.json"
     out_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")

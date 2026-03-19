@@ -13,6 +13,7 @@ class BaseEventDetector(ABC):
     """
     Abstract base class for all event detectors.
     """
+
     event_type: str = "UNKNOWN"
     required_columns: tuple[str, ...] = ("timestamp",)
     timeframe_minutes: int = 5
@@ -29,11 +30,15 @@ class BaseEventDetector(ABC):
         return {}
 
     @abstractmethod
-    def compute_raw_mask(self, df: pd.DataFrame, *, features: Mapping[str, pd.Series], **params: Any) -> pd.Series:
+    def compute_raw_mask(
+        self, df: pd.DataFrame, *, features: Mapping[str, pd.Series], **params: Any
+    ) -> pd.Series:
         """Compute a boolean mask where True indicates an event trigger."""
         raise NotImplementedError
 
-    def compute_intensity(self, df: pd.DataFrame, *, features: Mapping[str, pd.Series], **params: Any) -> pd.Series:
+    def compute_intensity(
+        self, df: pd.DataFrame, *, features: Mapping[str, pd.Series], **params: Any
+    ) -> pd.Series:
         """Compute numeric intensity for each event fire."""
         mask = self.compute_raw_mask(df, features=features, **params)
         return pd.Series(mask.fillna(False).astype(float), index=df.index, dtype=float)
@@ -88,27 +93,34 @@ class BaseEventDetector(ABC):
         self.check_required_columns(df)
         if df.empty:
             return pd.DataFrame(columns=EVENT_COLUMNS)
-        
+
         # Reset index to ensure integer alignment
         work = df.copy().reset_index(drop=True)
         work["timestamp"] = pd.to_datetime(work["timestamp"], utc=True, errors="coerce")
-        
+
         features = self.prepare_features(work, **params)
         intensity_series = self.compute_intensity(work, features=features, **params)
-        
+
         rows = []
         for sub_idx, idx in enumerate(self.event_indices(work, features=features, **params)):
             ts = work.at[idx, "timestamp"]
             if pd.isna(ts):
                 continue
-                
-            intensity_val = intensity_series.iloc[idx] if hasattr(intensity_series, "iloc") else intensity_series[idx]
+
+            intensity_val = (
+                intensity_series.iloc[idx]
+                if hasattr(intensity_series, "iloc")
+                else intensity_series[idx]
+            )
             intensity = float(np.nan_to_num(intensity_val, nan=1.0))
             current_event_type = self.compute_event_type(idx, features)
             severity = self.compute_severity(idx, intensity, features, **params)
             direction = self.compute_direction(idx, features, **params)
-            meta = {"causal": bool(self.causal), **dict(self.compute_metadata(idx, features, **params))}
-            
+            meta = {
+                "causal": bool(self.causal),
+                **dict(self.compute_metadata(idx, features, **params)),
+            }
+
             row = emit_event(
                 event_type=current_event_type,
                 symbol=symbol,
@@ -119,29 +131,27 @@ class BaseEventDetector(ABC):
                 timeframe_minutes=self.timeframe_minutes,
                 direction=direction,
                 causal=self.causal,
-                metadata={
-                    "event_idx": int(idx),
-                    **meta
-                },
+                metadata={"event_idx": int(idx), **meta},
             )
             rows.append(row)
-            
+
         events = pd.DataFrame(rows) if rows else pd.DataFrame(columns=EVENT_COLUMNS)
-        
+
         # Post-process for legacy compatibility
         if not events.empty:
             events["timestamp"] = events["signal_ts"]
             if "duration_bars" not in events.columns:
                 events["duration_bars"] = 1
-                
+
         return events
 
 
 class MarketEventDetector(BaseEventDetector):
     """
-    Standard base for detectors that require market price data 
+    Standard base for detectors that require market price data
     and provide common return-based direction logic.
     """
+
     required_columns = ("timestamp", "close")
 
     def compute_direction(
@@ -151,11 +161,13 @@ class MarketEventDetector(BaseEventDetector):
         **params: Any,
     ) -> str:
         """
-        Default price-return based direction. 
+        Default price-return based direction.
         Requires 'close_ret' to be present in features.
         """
         if "close_ret" in features:
             ret = float(features["close_ret"].iloc[idx])
-            if ret > 0: return "up"
-            if ret < 0: return "down"
+            if ret > 0:
+                return "up"
+            if ret < 0:
+                return "down"
         return "neutral"

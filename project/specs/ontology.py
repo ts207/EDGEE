@@ -8,7 +8,10 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 import numpy as np
 import pandas as pd
 
-from project.spec_registry import ONTOLOGY_SPEC_RELATIVE_PATHS, ontology_spec_paths as _registry_ontology_spec_paths
+from project.spec_registry import (
+    ONTOLOGY_SPEC_RELATIVE_PATHS,
+    ontology_spec_paths as _registry_ontology_spec_paths,
+)
 
 # State ids that are currently materialized as first-class context columns in
 # market_context_v1. This keeps planner/state filtering and audit behavior
@@ -79,11 +82,14 @@ MATERIALIZED_STATE_COLUMNS_BY_ID: Dict[str, str] = {
     "MS_CONTEXT_STATE_CODE": "ms_context_state_code",
 }
 
+
 def ontology_spec_paths(repo_root: Path) -> Dict[str, Path]:
     return dict(_registry_ontology_spec_paths(repo_root))
 
+
 def _sha256_bytes(payload: bytes) -> str:
     return "sha256:" + hashlib.sha256(payload).hexdigest()
+
 
 def _canonical_spec_bytes(path: Path) -> bytes:
     """
@@ -96,6 +102,7 @@ def _canonical_spec_bytes(path: Path) -> bytes:
         suffix = path.suffix.lower()
         if suffix in {".yaml", ".yml"}:
             from project.spec_registry import load_yaml_path
+
             data = load_yaml_path(path)
         elif suffix == ".json":
             with open(path, "r", encoding="utf-8") as f:
@@ -104,12 +111,13 @@ def _canonical_spec_bytes(path: Path) -> bytes:
             return path.read_bytes()
 
         # Canonicalize: sort keys, remove whitespace, ensure UTF-8
-        return json.dumps(
-            data, sort_keys=True, separators=(",", ":"), ensure_ascii=False
-        ).encode("utf-8")
+        return json.dumps(data, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode(
+            "utf-8"
+        )
     except Exception:
         # Fallback to raw bytes if parsing fails to avoid breaking the pipeline
         return path.read_bytes()
+
 
 def ontology_component_hashes(repo_root: Path) -> Dict[str, Optional[str]]:
     out: Dict[str, Optional[str]] = {}
@@ -119,6 +127,7 @@ def ontology_component_hashes(repo_root: Path) -> Dict[str, Optional[str]]:
             continue
         out[key] = _sha256_bytes(_canonical_spec_bytes(path))
     return out
+
 
 def ontology_spec_hash(repo_root: Path) -> str:
     hasher = hashlib.sha256()
@@ -131,6 +140,7 @@ def ontology_spec_hash(repo_root: Path) -> str:
         hasher.update(_canonical_spec_bytes(path))
     return "sha256:" + hasher.hexdigest()
 
+
 def load_ontology_linkage_hash(atlas_dir: Path) -> Optional[str]:
     path = atlas_dir / "ontology_linkage.json"
     if not path.exists():
@@ -141,6 +151,7 @@ def load_ontology_linkage_hash(atlas_dir: Path) -> Optional[str]:
         return None
     value = str(payload.get("ontology_spec_hash", "")).strip()
     return value or None
+
 
 def load_run_manifest_hashes(data_root: Path, run_id: str) -> Dict[str, Optional[str]]:
     path = data_root / "runs" / run_id / "run_manifest.json"
@@ -153,13 +164,18 @@ def load_run_manifest_hashes(data_root: Path, run_id: str) -> Dict[str, Optional
     return {
         "ontology_spec_hash": str(payload.get("ontology_spec_hash", "")).strip() or None,
         "taxonomy_hash": str(payload.get("taxonomy_hash", "")).strip() or None,
-        "canonical_event_registry_hash": str(payload.get("canonical_event_registry_hash", "")).strip() or None,
+        "canonical_event_registry_hash": str(
+            payload.get("canonical_event_registry_hash", "")
+        ).strip()
+        or None,
         "state_registry_hash": str(payload.get("state_registry_hash", "")).strip() or None,
         "verb_lexicon_hash": str(payload.get("verb_lexicon_hash", "")).strip() or None,
     }
 
+
 def _is_list_like(value: Any) -> bool:
     return isinstance(value, (list, tuple, np.ndarray))
+
 
 def _as_str_list(value: Any) -> List[str]:
     if value is None:
@@ -178,6 +194,7 @@ def _as_str_list(value: Any) -> List[str]:
         if _is_list_like(parsed):
             return [str(v).strip() for v in parsed if str(v).strip()]
     return [token]
+
 
 def validate_candidate_templates_schema(df: pd.DataFrame) -> None:
     required_common = [
@@ -220,18 +237,24 @@ def validate_candidate_templates_schema(df: pd.DataFrame) -> None:
         raise ValueError(f"candidate_templates schema missing common columns: {missing_common}")
 
     event_mask = df.get("object_type", pd.Series(dtype=object)).astype(str).str.lower() == "event"
-    feature_mask = df.get("object_type", pd.Series(dtype=object)).astype(str).str.lower() == "feature"
+    feature_mask = (
+        df.get("object_type", pd.Series(dtype=object)).astype(str).str.lower() == "feature"
+    )
     event_rows = df[event_mask].copy()
     feature_rows = df[feature_mask].copy()
 
     if not event_rows.empty:
         missing_event = [col for col in required_event if col not in event_rows.columns]
         if missing_event:
-            raise ValueError(f"candidate_templates event rows missing required columns: {missing_event}")
+            raise ValueError(
+                f"candidate_templates event rows missing required columns: {missing_event}"
+            )
     if not feature_rows.empty:
         missing_feature = [col for col in required_feature if col not in feature_rows.columns]
         if missing_feature:
-            raise ValueError(f"candidate_templates feature rows missing required columns: {missing_feature}")
+            raise ValueError(
+                f"candidate_templates feature rows missing required columns: {missing_feature}"
+            )
 
     list_columns = [
         "rule_templates",
@@ -254,28 +277,32 @@ def validate_candidate_templates_schema(df: pd.DataFrame) -> None:
             # Accept JSON-encoded list strings if they decode.
             parsed = _as_str_list(value)
             if not (str(value).strip().startswith("[") and parsed):
-                raise ValueError(f"candidate_templates.{col} must be list-like at row {idx}; got {type(value).__name__}")
+                raise ValueError(
+                    f"candidate_templates.{col} must be list-like at row {idx}; got {type(value).__name__}"
+                )
 
     if "conditioning" in df.columns:
         for idx, value in df["conditioning"].items():
             if not isinstance(value, dict):
-                raise ValueError(f"candidate_templates.conditioning must be dict at row {idx}; got {type(value).__name__}")
+                raise ValueError(
+                    f"candidate_templates.conditioning must be dict at row {idx}; got {type(value).__name__}"
+                )
 
     if "ontology_spec_hash" in df.columns:
         hashes = sorted(
-            {
-                str(v).strip()
-                for v in df["ontology_spec_hash"].tolist()
-                if str(v).strip()
-            }
+            {str(v).strip() for v in df["ontology_spec_hash"].tolist() if str(v).strip()}
         )
         if not hashes:
             raise ValueError("candidate_templates.ontology_spec_hash is empty")
         if len(hashes) > 1:
-            raise ValueError(f"candidate_templates has multiple ontology_spec_hash values: {hashes}")
+            raise ValueError(
+                f"candidate_templates has multiple ontology_spec_hash values: {hashes}"
+            )
+
 
 def parse_list_field(value: Any) -> List[str]:
     return _as_str_list(value)
+
 
 def bool_field(value: Any) -> bool:
     if isinstance(value, bool):
@@ -287,6 +314,7 @@ def bool_field(value: Any) -> bool:
     token = str(value).strip().lower()
     return token in {"1", "true", "t", "yes", "y"}
 
+
 def choose_template_ontology_hash(df: pd.DataFrame) -> Optional[str]:
     if "ontology_spec_hash" not in df.columns:
         return None
@@ -295,13 +323,17 @@ def choose_template_ontology_hash(df: pd.DataFrame) -> Optional[str]:
         return hashes[0]
     return None
 
-def ontology_component_hash_fields(component_hashes: Dict[str, Optional[str]]) -> Dict[str, Optional[str]]:
+
+def ontology_component_hash_fields(
+    component_hashes: Dict[str, Optional[str]],
+) -> Dict[str, Optional[str]]:
     return {
         "taxonomy_hash": component_hashes.get("taxonomy"),
         "canonical_event_registry_hash": component_hashes.get("canonical_event_registry"),
         "state_registry_hash": component_hashes.get("state_registry"),
         "verb_lexicon_hash": component_hashes.get("template_verb_lexicon"),
     }
+
 
 def compare_hash_fields(
     expected: str,
@@ -315,6 +347,7 @@ def compare_hash_fields(
         if v != expected:
             mismatches.append(f"{label}={v} (expected {expected})")
     return mismatches
+
 
 def normalize_state_registry_records(state_registry: Dict[str, Any]) -> List[Dict[str, Any]]:
     defaults = state_registry.get("defaults", {}) if isinstance(state_registry, dict) else {}
@@ -355,14 +388,17 @@ def normalize_state_registry_records(state_registry: Dict[str, Any]) -> List[Dic
         )
     return out
 
+
 def state_id_to_context_column(state_id: Any) -> str:
     state = str(state_id or "").strip().upper()
     if not state:
         return ""
     return MATERIALIZED_STATE_COLUMNS_BY_ID.get(state, state.lower())
 
+
 def materialized_state_ids() -> List[str]:
     return sorted(MATERIALIZED_STATE_COLUMNS_BY_ID.keys())
+
 
 def validate_state_registry_source_events(
     *,

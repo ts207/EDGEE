@@ -9,6 +9,7 @@ import websockets
 
 _LOG = logging.getLogger(__name__)
 
+
 class BinanceWebSocketClient:
     """Async WebSocket client for Binance UM futures."""
 
@@ -31,7 +32,7 @@ class BinanceWebSocketClient:
         """Establish connection and start listening."""
         self._running = True
         self._task = asyncio.create_task(self._listen())
-        
+
     async def disconnect(self):
         """Close connection."""
         self._running = False
@@ -50,19 +51,20 @@ class BinanceWebSocketClient:
         else:
             url = f"{self.BASE_URL}/{self.streams[0]}"
         _LOG.info(f"Connecting to Binance WS: {url}")
-        
+
         import random
+
         max_retries = 5
         base_delay = 1.0
         retry_count = 0
-        
+
         while self._running:
             try:
                 async with websockets.connect(url) as ws:
                     self._connection = ws
                     _LOG.info("Connected to Binance WS.")
                     retry_count = 0
-                    
+
                     async for message in ws:
                         if not self._running:
                             break
@@ -84,7 +86,7 @@ class BinanceWebSocketClient:
                         if self.on_reconnect_exhausted is not None:
                             self.on_reconnect_exhausted()
                         break
-                    delay = base_delay * (2 ** retry_count) + random.uniform(0, 1)
+                    delay = base_delay * (2**retry_count) + random.uniform(0, 1)
                     _LOG.error(f"WS connection error: {e}. Reconnecting in {delay:.2f}s...")
                     await asyncio.sleep(delay)
                     retry_count += 1

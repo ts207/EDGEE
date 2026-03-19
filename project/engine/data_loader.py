@@ -18,14 +18,14 @@ from project import PROJECT_ROOT
 
 _DEFAULT_TIMEFRAME = "5m"
 
-def dedupe_timestamp_rows(
-    frame: pd.DataFrame, *, label: str
-) -> Tuple[pd.DataFrame, int]:
+
+def dedupe_timestamp_rows(frame: pd.DataFrame, *, label: str) -> Tuple[pd.DataFrame, int]:
     if frame.empty or "timestamp" not in frame.columns:
         return frame, 0
     out = frame.sort_values("timestamp").copy()
     dupes = int(out["timestamp"].duplicated(keep="last").sum())
     return out.drop_duplicates(subset=["timestamp"], keep="last").reset_index(drop=True), dupes
+
 
 def load_symbol_raw_data(
     data_root: Path,
@@ -39,7 +39,9 @@ def load_symbol_raw_data(
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     feature_dataset = feature_dataset_dir_name()
     feature_candidates = [
-        run_scoped_lake_path(data_root, run_id, "features", "perp", symbol, timeframe, feature_dataset),
+        run_scoped_lake_path(
+            data_root, run_id, "features", "perp", symbol, timeframe, feature_dataset
+        ),
         data_root / "lake" / "features" / "perp" / symbol / timeframe / feature_dataset,
     ]
     bars_candidates = [
@@ -50,20 +52,24 @@ def load_symbol_raw_data(
     bars_dir = choose_partition_dir(bars_candidates)
     feature_files = list_parquet_files(features_dir) if features_dir else []
     bars_files = list_parquet_files(bars_dir) if bars_dir else []
-    
+
     # Prune files by date if possible (optional enhancement, for now we read and filter)
     # Most engines perform best with full vectorized history, but we can pruning early
     features = read_parquet(feature_files, columns=feature_columns)
     bars = read_parquet(bars_files, columns=bars_columns)
-    
+
     if features.empty or bars.empty:
         raise ValueError(f"Missing data for {symbol} (timeframe={timeframe}).")
 
     if "timestamp" not in features.columns:
         # If columns were pruned, ensure timestamp is always present for filtering
-        features = read_parquet(feature_files, columns=(feature_columns + ["timestamp"] if feature_columns else None))
+        features = read_parquet(
+            feature_files, columns=(feature_columns + ["timestamp"] if feature_columns else None)
+        )
     if "timestamp" not in bars.columns:
-        bars = read_parquet(bars_files, columns=(bars_columns + ["timestamp"] if bars_columns else None))
+        bars = read_parquet(
+            bars_files, columns=(bars_columns + ["timestamp"] if bars_columns else None)
+        )
 
     features["timestamp"] = pd.to_datetime(features["timestamp"], utc=True)
     bars["timestamp"] = pd.to_datetime(bars["timestamp"], utc=True)
@@ -80,8 +86,9 @@ def load_symbol_raw_data(
 
     features, _ = dedupe_timestamp_rows(features, label=f"features:{symbol}:{timeframe}")
     bars, _ = dedupe_timestamp_rows(bars, label=f"bars:{symbol}:{timeframe}")
-    
+
     return bars, features
+
 
 def load_universe_snapshots(data_root: Path, run_id: str) -> pd.DataFrame:
     candidates = [

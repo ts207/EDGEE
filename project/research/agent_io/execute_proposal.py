@@ -136,7 +136,9 @@ def execute_proposal(
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Translate a proposal and invoke run_all with the validated config.")
+    parser = argparse.ArgumentParser(
+        description="Translate a proposal and invoke run_all with the validated config."
+    )
     parser.add_argument("--proposal", required=True)
     parser.add_argument("--run_id", required=True)
     parser.add_argument("--registry_root", default="project/configs/registries")

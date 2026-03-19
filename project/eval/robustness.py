@@ -8,6 +8,7 @@ import pandas as pd
 
 LOGGER = logging.getLogger(__name__)
 from project.core.constants import BARS_PER_YEAR_BY_TIMEFRAME
+
 _DEFAULT_RANDOM_SEED = 0
 
 
@@ -33,7 +34,7 @@ def block_bootstrap_pnl(
 
     for _ in range(n_iterations):
         start_indices = rng.integers(0, n - block_size_bars + 1, size=n_blocks)
-        blocks = [pnl[start:start + block_size_bars] for start in start_indices]
+        blocks = [pnl[start : start + block_size_bars] for start in start_indices]
         bootstrapped_pnl = np.concatenate(blocks)[:n]
         mean_ret = np.mean(bootstrapped_pnl)
         ann_ret = mean_ret * periods_per_year
@@ -86,7 +87,9 @@ def simulate_parameter_perturbation(
         "perturbation_return_p05": p05,
         "perturbation_return_p50": float(np.percentile(annualized_returns, 50)),
         "perturbation_return_p95": float(np.percentile(annualized_returns, 95)),
-        "perturbation_degradation_pct": float(p05 / baseline_ann - 1.0) if baseline_ann > 0 else 0.0,
+        "perturbation_degradation_pct": float(p05 / baseline_ann - 1.0)
+        if baseline_ann > 0
+        else 0.0,
         "fraction_positive": float(np.mean([r > 0.0 for r in annualized_returns])),
         "perturbation_random_seed": int(random_seed),
     }
@@ -168,7 +171,9 @@ def evaluate_structural_robustness(
         # If the user passed cost_multiplier but not cost_stress_multipliers, we use it for cost_stress_pass
         legacy_stressed_pnl = raw - cst * cost_multiplier / 10000.0
         legacy_stressed_mean = float(legacy_stressed_pnl.mean())
-        results["cost_stress_retention"] = float(legacy_stressed_mean / base_mean) if base_mean != 0 else 0.0
+        results["cost_stress_retention"] = (
+            float(legacy_stressed_mean / base_mean) if base_mean != 0 else 0.0
+        )
         results["cost_stress_sign_match"] = bool(np.sign(legacy_stressed_mean) == base_sign)
         results["cost_stress_pass"] = bool(legacy_stressed_mean > 0)
 
@@ -176,7 +181,9 @@ def evaluate_structural_robustness(
         entry_delay_pnl = pd.to_numeric(entry_delay_pnl, errors="coerce").dropna()
         if not entry_delay_pnl.empty:
             delay_mean = float(entry_delay_pnl.mean())
-            results["delay_stress_retention"] = float(delay_mean / base_mean) if base_mean != 0 else 0.0
+            results["delay_stress_retention"] = (
+                float(delay_mean / base_mean) if base_mean != 0 else 0.0
+            )
             results["delay_stress_sign_match"] = bool(np.sign(delay_mean) == base_sign)
             results["delay_stress_pass"] = bool(delay_mean > 0)
 
@@ -196,7 +203,9 @@ def evaluate_structural_robustness(
     if results.get("sign_retention_rate", 0) > 0.9:
         score += 0.2
     results["structural_robustness_score"] = float(score)
-    results["robustness_panel_complete"] = bool("cost_stress_pass" in results or "delay_stress_pass" in results)
+    results["robustness_panel_complete"] = bool(
+        "cost_stress_pass" in results or "delay_stress_pass" in results
+    )
     return results
 
 
@@ -205,9 +214,11 @@ def compute_rank_retention(original_ranks: pd.Series, perturbed_ranks: pd.Series
         return 1.0
     try:
         from scipy.stats import kendalltau
+
         tau, _ = kendalltau(original_ranks, perturbed_ranks)
     except ImportError:
         from project.core.stats import _StatsCompat
+
         tau, _ = _StatsCompat.kendalltau(original_ranks, perturbed_ranks)
     return float(tau) if np.isfinite(tau) else 0.0
 
@@ -230,10 +241,14 @@ def evaluate_structural_breaks(
     pre_mean = pre.mean()
     post_mean = post.mean()
     mean_ratio = post_mean / pre_mean if abs(pre_mean) > 1e-9 else 1.0
-    direction_flip = bool(np.sign(pre_mean) != np.sign(post_mean) and abs(pre_mean) > 1e-6 and abs(post_mean) > 1e-6)
+    direction_flip = bool(
+        np.sign(pre_mean) != np.sign(post_mean) and abs(pre_mean) > 1e-6 and abs(post_mean) > 1e-6
+    )
     window = max(20, len(df) // 3)
     rolling_mean = df["pnl"].rolling(window).mean()
-    stability = float(rolling_mean.std() / abs(df["pnl"].mean())) if abs(df["pnl"].mean()) > 1e-9 else 1.0
+    stability = (
+        float(rolling_mean.std() / abs(df["pnl"].mean())) if abs(df["pnl"].mean()) > 1e-9 else 1.0
+    )
     return {
         "pre_mean": float(pre_mean),
         "post_mean": float(post_mean),

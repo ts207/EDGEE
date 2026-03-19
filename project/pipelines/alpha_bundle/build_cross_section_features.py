@@ -16,6 +16,7 @@ from project.io.utils import ensure_dir, list_parquet_files, read_parquet, write
 from project.specs.manifest import finalize_manifest, start_manifest
 from project.core.validation import ensure_utc_timestamp
 
+
 def _resolve_symbol_feature_path(base_feature_dir: Path, symbol: str) -> Optional[Path]:
     # Support both "<SYMBOL>.parquet" and "signals_<SYMBOL>.parquet".
     candidates = [
@@ -27,6 +28,7 @@ def _resolve_symbol_feature_path(base_feature_dir: Path, symbol: str) -> Optiona
             return path
     return None
 
+
 def _dense_rank(values: np.ndarray, symbols_sorted: List[str], ascending: bool) -> np.ndarray:
     # Deterministic dense rank with stable tie-breaker.
     order = np.argsort(values, kind="mergesort")
@@ -37,16 +39,21 @@ def _dense_rank(values: np.ndarray, symbols_sorted: List[str], ascending: bool) 
     rank = 1
     ranks[order[0]] = rank
     for i in range(1, len(order)):
-        if sorted_vals[i] != sorted_vals[i-1]:
+        if sorted_vals[i] != sorted_vals[i - 1]:
             rank += 1
         ranks[order[i]] = rank
     return ranks
 
+
 def main() -> int:
-    p = argparse.ArgumentParser(description="Build CrossSectionAgg + derived CS features (PIT, deterministic)")
+    p = argparse.ArgumentParser(
+        description="Build CrossSectionAgg + derived CS features (PIT, deterministic)"
+    )
     p.add_argument("--run_id", required=True)
     p.add_argument("--universe_snapshot_path", required=True)
-    p.add_argument("--base_feature_dir", required=True, help="Directory of per-symbol feature parquet files")
+    p.add_argument(
+        "--base_feature_dir", required=True, help="Directory of per-symbol feature parquet files"
+    )
     p.add_argument("--base_feature_name", required=True, help="Column name in base feature files")
     p.add_argument("--out_dir", default=None)
     args = p.parse_args()
@@ -58,7 +65,13 @@ def main() -> int:
     ensure_dir(out_dir)
 
     stage = "alpha_cross_section"
-    manifest = start_manifest(stage, run_id, params={"base_feature_name": args.base_feature_name}, inputs=[{"path": args.universe_snapshot_path}], outputs=[{"path": str(out_dir)}])
+    manifest = start_manifest(
+        stage,
+        run_id,
+        params={"base_feature_name": args.base_feature_name},
+        inputs=[{"path": args.universe_snapshot_path}],
+        outputs=[{"path": str(out_dir)}],
+    )
 
     snap = read_parquet([Path(args.universe_snapshot_path)])
     snap["ts_event"] = ensure_utc_timestamp(snap["ts_event"], "ts_event")
@@ -149,8 +162,17 @@ def main() -> int:
     out_path = out_dir / f"cs_{universe_id}_{args.base_feature_name}.parquet"
     write_parquet(out, out_path)
 
-    finalize_manifest(manifest, status="success", stats={"rows": int(len(out)), "out": str(out_path), "ts_events": int(out["ts_event"].nunique())})
+    finalize_manifest(
+        manifest,
+        status="success",
+        stats={
+            "rows": int(len(out)),
+            "out": str(out_path),
+            "ts_events": int(out["ts_event"].nunique()),
+        },
+    )
     return 0
+
 
 if __name__ == "__main__":
     raise SystemExit(main())

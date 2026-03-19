@@ -30,11 +30,13 @@ from project.pipelines.research.phase2_search_engine import _normalize_search_fe
 
 NUMERIC_CONDITION_PATTERN = re.compile(r"^([a-zA-Z0-9_]+)\s*([><!=]=?)\s*([0-9.-]+)$")
 
+
 def _to_float(value: Any, default: float = 0.0) -> float:
     try:
         return float(value)
     except (TypeError, ValueError):
         return default
+
 
 def _condition_mask(events: Any, condition: str) -> pd.Series:
     try:
@@ -51,24 +53,31 @@ def _condition_mask(events: Any, condition: str) -> pd.Series:
         if match:
             feature, operator, raw_threshold = match.groups()
             threshold = _to_float(raw_threshold, np.nan)
-            
+
             if feature not in df_events.columns:
                 return pd.Series(False, index=df_events.index)
-            
+
             values = pd.to_numeric(df_events[feature], errors="coerce")
-            
-            if operator == ">=": return pd.Series(values >= threshold, index=df_events.index)
-            if operator == "<=": return pd.Series(values <= threshold, index=df_events.index)
-            if operator == ">": return pd.Series(values > threshold, index=df_events.index)
-            if operator == "<": return pd.Series(values < threshold, index=df_events.index)
-            if operator == "==": return pd.Series(values == threshold, index=df_events.index)
+
+            if operator == ">=":
+                return pd.Series(values >= threshold, index=df_events.index)
+            if operator == "<=":
+                return pd.Series(values <= threshold, index=df_events.index)
+            if operator == ">":
+                return pd.Series(values > threshold, index=df_events.index)
+            if operator == "<":
+                return pd.Series(values < threshold, index=df_events.index)
+            if operator == "==":
+                return pd.Series(values == threshold, index=df_events.index)
 
         lowered = cond.lower()
         if lowered.startswith("symbol_"):
             symbol = cond[len("symbol_") :].strip().upper()
             if "symbol" in df_events.columns:
-                return pd.Series(df_events["symbol"].astype(str).str.upper() == symbol, index=df_events.index)
-        
+                return pd.Series(
+                    df_events["symbol"].astype(str).str.upper() == symbol, index=df_events.index
+                )
+
         if lowered in {"session_asia", "session_eu", "session_us"}:
             hour_col = None
             if "tod_bucket" in df_events.columns:
@@ -76,7 +85,9 @@ def _condition_mask(events: Any, condition: str) -> pd.Series:
             elif "anchor_hour" in df_events.columns:
                 hour_col = pd.to_numeric(df_events["anchor_hour"], errors="coerce")
             elif "enter_ts" in df_events.columns:
-                hour_col = pd.to_datetime(df_events["enter_ts"], utc=True, errors="coerce").dt.hour.astype(float)
+                hour_col = pd.to_datetime(
+                    df_events["enter_ts"], utc=True, errors="coerce"
+                ).dt.hour.astype(float)
             if hour_col is None:
                 return pd.Series(False, index=df_events.index)
             if lowered == "session_asia":
@@ -89,14 +100,20 @@ def _condition_mask(events: Any, condition: str) -> pd.Series:
 
         if lowered.startswith("bull_bear_") and "bull_bear" in df_events.columns:
             label = lowered.replace("bull_bear_", "", 1)
-            return pd.Series(df_events["bull_bear"].astype(str).str.lower() == label, index=df_events.index)
+            return pd.Series(
+                df_events["bull_bear"].astype(str).str.lower() == label, index=df_events.index
+            )
         if lowered.startswith("vol_regime_") and "vol_regime" in df_events.columns:
             label = lowered.replace("vol_regime_", "", 1).replace("medium", "mid")
-            return pd.Series(df_events["vol_regime"].astype(str).str.lower().replace({"medium": "mid"}) == label, index=df_events.index)
-        
+            return pd.Series(
+                df_events["vol_regime"].astype(str).str.lower().replace({"medium": "mid"}) == label,
+                index=df_events.index,
+            )
+
         return pd.Series(False, index=df_events.index)
     except Exception:
         return pd.Series(False, index=getattr(events, "index", []))
+
 
 def _load_phase1_events(run_id: str, event_type: str) -> pd.DataFrame:
     spec = EVENT_REGISTRY_SPECS.get(str(event_type))
@@ -169,7 +186,9 @@ def _load_phase2_candidates(run_id: str) -> pd.DataFrame:
 
     candidates = pd.concat(frames, ignore_index=True)
     if "gate_bridge_tradable" in candidates.columns:
-        candidates = candidates[candidates["gate_bridge_tradable"].fillna(False).astype(bool)].copy()
+        candidates = candidates[
+            candidates["gate_bridge_tradable"].fillna(False).astype(bool)
+        ].copy()
     elif "gate_all_research" in candidates.columns:
         candidates = candidates[candidates["gate_all_research"].fillna(False).astype(bool)].copy()
     elif "gate_all" in candidates.columns:
@@ -182,7 +201,7 @@ def _parse_transition_event_type(event_type: str) -> tuple[str, str] | None:
     prefix = "TRANSITION_"
     if not text.startswith(prefix):
         return None
-    rest = text[len(prefix):]
+    rest = text[len(prefix) :]
     parts = rest.split("_STATE_", 1)
     if len(parts) != 2:
         return None
@@ -225,10 +244,15 @@ def _build_regime_events(run_id: str, symbol: str, event_type: str, horizon: str
             return pd.DataFrame()
         to_now = pd.to_numeric(working[to_col], errors="coerce").fillna(0.0) > 0
         if from_col in working.columns:
-            from_prev = pd.to_numeric(working[from_col], errors="coerce").fillna(0.0).shift(1).fillna(0.0) > 0
+            from_prev = (
+                pd.to_numeric(working[from_col], errors="coerce").fillna(0.0).shift(1).fillna(0.0)
+                > 0
+            )
             mask = from_prev & to_now
         else:
-            to_prev = pd.to_numeric(working[to_col], errors="coerce").fillna(0.0).shift(1).fillna(0.0) > 0
+            to_prev = (
+                pd.to_numeric(working[to_col], errors="coerce").fillna(0.0).shift(1).fillna(0.0) > 0
+            )
             mask = (~to_prev) & to_now
     else:
         return pd.DataFrame()
@@ -252,7 +276,10 @@ def _load_candidate_events(run_id: str, row: pd.Series) -> pd.DataFrame:
         return _build_regime_events(run_id, symbol, event_type, horizon)
     return pd.DataFrame()
 
-def _pick_return_series(events: pd.DataFrame, event_type: str, fallback_expectancy: float) -> pd.Series:
+
+def _pick_return_series(
+    events: pd.DataFrame, event_type: str, fallback_expectancy: float
+) -> pd.Series:
     signed_cols = ["forward_return_h", "event_return", "future_return_h", "ret_h"]
     for col in signed_cols:
         if col in events.columns:
@@ -261,8 +288,11 @@ def _pick_return_series(events: pd.DataFrame, event_type: str, fallback_expectan
                 return series.fillna(0.0)
     return pd.Series(fallback_expectancy, index=events.index)
 
+
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Evaluate naive entry performance for discovered candidates")
+    parser = argparse.ArgumentParser(
+        description="Evaluate naive entry performance for discovered candidates"
+    )
     parser.add_argument("--run_id", required=True)
     parser.add_argument("--symbols", required=True)
     parser.add_argument("--min_trades", type=int, default=20)
@@ -297,26 +327,29 @@ def main() -> int:
                 continue
 
             expectancy = _pick_return_series(subset, event_type, 0.0).mean()
-            results.append({
-                "candidate_id": row.get("candidate_id"),
-                "hypothesis_id": row.get("hypothesis_id"),
-                "event_type": event_type,
-                "naive_expectancy": float(expectancy),
-                "event_count": len(subset),
-            })
+            results.append(
+                {
+                    "candidate_id": row.get("candidate_id"),
+                    "hypothesis_id": row.get("hypothesis_id"),
+                    "event_type": event_type,
+                    "naive_expectancy": float(expectancy),
+                    "event_count": len(subset),
+                }
+            )
 
         if results:
             eval_df = pd.DataFrame(results)
             out_path = DATA_ROOT / "reports" / "phase2" / args.run_id / "naive_evaluation.parquet"
             ensure_dir(out_path.parent)
             write_parquet(eval_df, out_path)
-            
+
         finalize_manifest(manifest, "success", stats={"evaluated_hypotheses": len(results)})
         return 0
     except Exception as exc:
         logging.exception("Naive evaluation failed")
         finalize_manifest(manifest, "failed", error=str(exc))
         return 1
+
 
 if __name__ == "__main__":
     sys.exit(main())

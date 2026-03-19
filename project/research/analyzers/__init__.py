@@ -34,7 +34,9 @@ def run_analyzer_suite(
     for analyzer in analyzers:
         extra_kwargs = dict(kwargs)
         if analyzer.name == "overlap":
-            result = analyzer.analyze(current_events, market=market, reference_events=reference_events, **extra_kwargs)
+            result = analyzer.analyze(
+                current_events, market=market, reference_events=reference_events, **extra_kwargs
+            )
         else:
             result = analyzer.analyze(current_events, market=market, **extra_kwargs)
         results[analyzer.name] = result

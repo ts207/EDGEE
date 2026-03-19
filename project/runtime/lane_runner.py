@@ -9,6 +9,7 @@ from project.runtime.timebase import DEFAULT_LANE_ID, NEG_INF_US, WatermarkTrack
 
 _MAX_ISSUE_EXAMPLES = 20
 
+
 def _firewall_counter_key(message: str) -> str:
     lowered = str(message).strip().lower()
     if "unknown role" in lowered:
@@ -18,6 +19,7 @@ def _firewall_counter_key(message: str) -> str:
     if "invalid firewall" in lowered:
         return "invalid_firewall_spec"
     return "provenance_forbidden"
+
 
 def run_causal_lane_ticks(
     events: Iterable[NormalizedEvent],
@@ -141,6 +143,7 @@ def run_causal_lane_ticks(
         "replay_digest": str(replay_digest),
         "ticks": ticks,
     }
+
 
 def events_to_tick_records(events: Iterable[NormalizedEvent]) -> List[Dict[str, Any]]:
     return [event_to_record(event) for event in events]

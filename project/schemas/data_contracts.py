@@ -24,6 +24,7 @@ except Exception:  # pragma: no cover
     DataFrame = object  # type: ignore
     Series = object  # type: ignore
 
+
 class _PanderaMissingMixin:
     """Fallback mixin when pandera is unavailable."""
 
@@ -35,6 +36,7 @@ class _PanderaMissingMixin:
         if _args:
             return _args[0]
         return None
+
 
 if pa is not None:
 
@@ -73,10 +75,12 @@ if pa is not None:
         exit_ts: Series[int] = pa.Field(ge=1577836800000)
         event_id: Series[str] = pa.Field(nullable=False)
         signal_column: Series[str] = pa.Field(nullable=False)
-        direction: Optional[Series[str]] = pa.Field(nullable=True, isin=["long", "short", "neutral", "non_directional"])
+        direction: Optional[Series[str]] = pa.Field(
+            nullable=True, isin=["long", "short", "neutral", "non_directional"]
+        )
         sign: Optional[Series[float]] = pa.Field(nullable=True)
         split_label: Optional[Series[str]] = pa.Field(nullable=True)
-        
+
         # Mandated feature parity columns
         rv_96: Optional[Series[float]] = pa.Field(nullable=True)
         funding_abs: Optional[Series[float]] = pa.Field(nullable=True)

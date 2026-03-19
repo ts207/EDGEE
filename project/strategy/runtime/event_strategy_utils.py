@@ -7,12 +7,10 @@ import pandas as pd
 
 from project.core.validation import ensure_utc_timestamp
 
+
 def to_numeric(series: pd.Series, default: float = 0.0) -> pd.Series:
-    return (
-        pd.to_numeric(series, errors="coerce")
-        .replace([np.inf, -np.inf], np.nan)
-        .fillna(default)
-    )
+    return pd.to_numeric(series, errors="coerce").replace([np.inf, -np.inf], np.nan).fillna(default)
+
 
 def prepare_frame(bars: pd.DataFrame, features: pd.DataFrame) -> pd.DataFrame:
     bars_cp = bars.copy()
@@ -33,6 +31,7 @@ def prepare_frame(bars: pd.DataFrame, features: pd.DataFrame) -> pd.DataFrame:
     )
     return merged
 
+
 def finalize_positions(
     merged: pd.DataFrame,
     positions: List[int],
@@ -50,11 +49,8 @@ def finalize_positions(
     }
     return out
 
+
 def rolling_z(series: pd.Series, window: int, min_periods: int) -> pd.Series:
     mean = series.rolling(window=window, min_periods=min_periods).mean()
-    std = (
-        series.rolling(window=window, min_periods=min_periods)
-        .std()
-        .replace(0.0, np.nan)
-    )
+    std = series.rolling(window=window, min_periods=min_periods).std().replace(0.0, np.nan)
     return ((series - mean) / std).replace([np.inf, -np.inf], np.nan).fillna(0.0)

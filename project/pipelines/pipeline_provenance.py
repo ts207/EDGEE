@@ -11,6 +11,7 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 from project import PROJECT_ROOT
 from project.pipelines.pipeline_defaults import DATA_ROOT, utc_now_iso
 
+
 def _sha256_bytes(payload: bytes) -> str:
     return "sha256:" + hashlib.sha256(payload).hexdigest()
 
@@ -88,16 +89,32 @@ def _spec_component_digests(project_root: Path) -> Dict[str, object]:
     project_cfg_root = Path(project_root) / "configs"
     components = {
         "spec": _digest_path_listing(spec_root, suffixes=(".yaml", ".yml", ".json", ".csv")),
-        "project_configs": _digest_path_listing(project_cfg_root, suffixes=(".yaml", ".yml", ".json")),
-        "event_registry": _digest_path_listing(spec_root / "events", suffixes=(".yaml", ".yml", ".json")),
+        "project_configs": _digest_path_listing(
+            project_cfg_root, suffixes=(".yaml", ".yml", ".json")
+        ),
+        "event_registry": _digest_path_listing(
+            spec_root / "events", suffixes=(".yaml", ".yml", ".json")
+        ),
         "gate_specs": _digest_path_listing(spec_root, suffixes=(".yaml", ".yml")),
-        "objective_specs": _digest_path_listing(spec_root / "objectives", suffixes=(".yaml", ".yml", ".json")),
-        "runtime_invariants": _digest_path_listing(spec_root / "runtime", suffixes=(".yaml", ".yml", ".json")),
-        "feature_schemas": _digest_path_listing(spec_root / "features", suffixes=(".yaml", ".yml", ".json")),
-        "state_ontology": _digest_path_listing(spec_root / "states", suffixes=(".yaml", ".yml", ".json")),
-        "hypotheses": _digest_path_listing(spec_root / "hypotheses", suffixes=(".yaml", ".yml", ".json")),
+        "objective_specs": _digest_path_listing(
+            spec_root / "objectives", suffixes=(".yaml", ".yml", ".json")
+        ),
+        "runtime_invariants": _digest_path_listing(
+            spec_root / "runtime", suffixes=(".yaml", ".yml", ".json")
+        ),
+        "feature_schemas": _digest_path_listing(
+            spec_root / "features", suffixes=(".yaml", ".yml", ".json")
+        ),
+        "state_ontology": _digest_path_listing(
+            spec_root / "states", suffixes=(".yaml", ".yml", ".json")
+        ),
+        "hypotheses": _digest_path_listing(
+            spec_root / "hypotheses", suffixes=(".yaml", ".yml", ".json")
+        ),
     }
-    component_hashes = {k: _sha256_text(json.dumps(v, sort_keys=True)) for k, v in components.items()}
+    component_hashes = {
+        k: _sha256_text(json.dumps(v, sort_keys=True)) for k, v in components.items()
+    }
     return {"components": components, "component_hashes": component_hashes}
 
 
@@ -143,14 +160,17 @@ def data_fingerprint(
         "spec_components": spec_payload["components"],
     }
 
+
 def feature_schema_metadata() -> Tuple[str, str]:
     """Retrieves feature schema version and its registry hash."""
     # Importing from project.specs.manifest to reuse existing logic
     try:
         from project.specs.manifest import feature_schema_identity
+
         return feature_schema_identity()
     except ImportError:
         return "v2", "unknown"
+
 
 def git_commit(project_root: Path) -> str:
     """Gets the current git commit hash."""
@@ -163,9 +183,12 @@ def git_commit(project_root: Path) -> str:
     except Exception:
         return "unknown"
 
+
 def _get_data_root() -> Path:
     from project import PROJECT_ROOT
+
     return Path(os.getenv("BACKTEST_DATA_ROOT", PROJECT_ROOT.parent / "data"))
+
 
 def write_run_manifest(run_id: str, manifest: Dict[str, object]) -> None:
     """Writes the run manifest to disk."""
@@ -173,6 +196,7 @@ def write_run_manifest(run_id: str, manifest: Dict[str, object]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as f:
         json.dump(manifest, f, indent=2, sort_keys=True)
+
 
 def read_run_manifest(run_id: str) -> Dict[str, object]:
     """Reads the run manifest from disk."""
@@ -240,7 +264,11 @@ def reconcile_run_manifest_from_stage_manifests(
         if isinstance(finished_at, str) and finished_at.strip():
             stage_finished_times.append(finished_at)
 
-        if stage_instance not in stage_instance_timings_sec and isinstance(started_at, str) and isinstance(finished_at, str):
+        if (
+            stage_instance not in stage_instance_timings_sec
+            and isinstance(started_at, str)
+            and isinstance(finished_at, str)
+        ):
             try:
                 started_ts = datetime.fromisoformat(started_at.replace("Z", "+00:00"))
                 finished_ts = datetime.fromisoformat(finished_at.replace("Z", "+00:00"))
@@ -262,6 +290,7 @@ def reconcile_run_manifest_from_stage_manifests(
     write_run_manifest(run_id, run_manifest)
     return run_manifest
 
+
 def maybe_emit_run_hash(manifest: Dict[str, object]) -> None:
     """Emits a run hash for tracking if requested."""
     if manifest.get("emit_run_hash"):
@@ -269,13 +298,21 @@ def maybe_emit_run_hash(manifest: Dict[str, object]) -> None:
         run_hash = hashlib.sha256(json.dumps(manifest, sort_keys=True).encode()).hexdigest()
         print(f"Run Hash [{run_id}]: {run_hash}")
 
+
 def refresh_runtime_lineage_fields(manifest: Dict[str, object], **kwargs) -> None:
     """Updates manifest with runtime lineage information."""
     manifest["runtime_lineage_refreshed_at"] = utc_now_iso()
-    if kwargs.get("determinism_replay_checks_requested") and not str(manifest.get("determinism_status", "")).strip():
+    if (
+        kwargs.get("determinism_replay_checks_requested")
+        and not str(manifest.get("determinism_status", "")).strip()
+    ):
         manifest["determinism_status"] = "requested"
-    if kwargs.get("oms_replay_checks_requested") and not str(manifest.get("oms_replay_status", "")).strip():
+    if (
+        kwargs.get("oms_replay_checks_requested")
+        and not str(manifest.get("oms_replay_status", "")).strip()
+    ):
         manifest["oms_replay_status"] = "requested"
+
 
 def config_digest(configs: List[str]) -> str:
     """Generates a digest for a set of configuration files."""
@@ -294,6 +331,7 @@ def effective_config_digest(path: Path) -> str:
         return _sha256_text("")
     return _sha256_bytes(Path(path).read_bytes())
 
+
 def claim_map_hash(project_root: Path) -> str:
     """Generates a hash for the claim test map if it exists."""
     path = project_root / "claim_test_map.csv"
@@ -301,9 +339,11 @@ def claim_map_hash(project_root: Path) -> str:
         return hashlib.sha256(b"").hexdigest()
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
+
 def build_initial_run_manifest(**fields) -> Dict[str, object]:
     """Constructs the initial run manifest dictionary."""
     return dict(fields)
+
 
 def resolve_existing_manifest_state(
     *,
@@ -323,7 +363,7 @@ def resolve_existing_manifest_state(
                 existing_manifest = json.load(f)
         except Exception:
             existing_manifest = {}
-        
+
         existing_ontology_hash = str(existing_manifest.get("ontology_spec_hash", "")).strip()
         if existing_ontology_hash and existing_ontology_hash != ontology_hash:
             if not allow_ontology_hash_mismatch:
@@ -331,7 +371,9 @@ def resolve_existing_manifest_state(
                     f"Ontology hash mismatch for resume. Existing: {existing_ontology_hash}, Current: {ontology_hash}. "
                     "Use --allow_ontology_hash_mismatch 1 to override."
                 )
-        existing_effective_config_hash = str(existing_manifest.get("effective_config_hash", "")).strip()
+        existing_effective_config_hash = str(
+            existing_manifest.get("effective_config_hash", "")
+        ).strip()
         if (
             resume_from_failed_stage
             and existing_effective_config_hash
@@ -339,31 +381,36 @@ def resolve_existing_manifest_state(
             and existing_effective_config_hash != effective_config_hash
         ):
             existing_manifest = {}
-    
+
     resume_from_index = 0
     if resume_from_failed_stage and existing_manifest:
         failed_instance = str(existing_manifest.get("failed_stage_instance", "")).strip()
         if failed_instance in planned_stage_instances:
             resume_from_index = planned_stage_instances.index(failed_instance)
-                
+
     return existing_manifest, existing_ontology_hash, resume_from_index
+
 
 def resolve_objective_name(name: str) -> str:
     """Resolves the objective name, defaulting to retail_profitability."""
     return name or "retail_profitability"
 
-def objective_spec_metadata(objective_name: str, explicit_path: str | None) -> Tuple[Dict[str, Any], str, str]:
+
+def objective_spec_metadata(
+    objective_name: str, explicit_path: str | None
+) -> Tuple[Dict[str, Any], str, str]:
     """Retrieves metadata and hash for an objective specification."""
     if explicit_path:
         path = Path(explicit_path)
     else:
         path = PROJECT_ROOT.parent / "spec" / "objectives" / f"{objective_name}.yaml"
-    
+
     if not path.exists():
         return {}, "unknown_hash", str(path)
-    
+
     try:
         import yaml
+
         content = path.read_text(encoding="utf-8")
         spec = yaml.safe_load(content)
         if isinstance(spec, dict) and isinstance(spec.get("objective"), dict):
@@ -373,25 +420,32 @@ def objective_spec_metadata(objective_name: str, explicit_path: str | None) -> T
     except Exception:
         return {}, "error_hash", str(path)
 
+
 def resolve_retail_profile_name(name: str) -> str:
     """Resolves the retail profile name, defaulting to capital_constrained."""
     return name or "capital_constrained"
 
-def retail_profile_metadata(profile_name: str, explicit_path: str | None) -> Tuple[Dict[str, Any], str, str]:
+
+def retail_profile_metadata(
+    profile_name: str, explicit_path: str | None
+) -> Tuple[Dict[str, Any], str, str]:
     """Retrieves metadata and hash for a retail profile."""
     if explicit_path:
         path = Path(explicit_path)
     else:
         path = PROJECT_ROOT / "configs" / "retail_profiles.yaml"
-    
+
     if not path.exists():
         return {}, "unknown_hash", str(path)
-    
+
     try:
         import yaml
+
         content = path.read_text(encoding="utf-8")
         registry = yaml.safe_load(content)
-        profile = registry.get("profiles", {}).get(profile_name, {}) if isinstance(registry, dict) else {}
+        profile = (
+            registry.get("profiles", {}).get(profile_name, {}) if isinstance(registry, dict) else {}
+        )
         if isinstance(profile, dict) and "id" not in profile:
             profile = {"id": str(profile_name), **profile}
         # We hash the whole file for the registry hash

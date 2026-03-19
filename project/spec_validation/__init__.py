@@ -9,6 +9,8 @@ from project.spec_validation.ontology import (
     get_searchable_event_families,
     get_searchable_state_families,
     get_state_ids_for_family,
+    load_ontology_events,
+    load_ontology_states,
     validate_ontology,
 )
 from project.spec_validation.search import (
@@ -25,6 +27,8 @@ __all__ = [
     "get_searchable_event_families",
     "get_searchable_state_families",
     "get_state_ids_for_family",
+    "load_ontology_events",
+    "load_ontology_states",
     "loaders",
     "resolve_entry_lags",
     "resolve_execution_templates",
@@ -33,4 +37,3 @@ __all__ = [
     "validate_grammar",
     "validate_ontology",
 ]
-

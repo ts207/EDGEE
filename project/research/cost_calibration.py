@@ -7,7 +7,12 @@ from typing import Dict, Optional
 import numpy as np
 import pandas as pd
 
-from project.io.utils import choose_partition_dir, list_parquet_files, read_parquet, run_scoped_lake_path
+from project.io.utils import (
+    choose_partition_dir,
+    list_parquet_files,
+    read_parquet,
+    run_scoped_lake_path,
+)
 
 
 @dataclass(frozen=True)
@@ -61,7 +66,9 @@ class ToBRegimeCostCalibrator:
             fallback_source = "static" if self.mode == "auto" else "fallback:no_tob"
             return self._static(source=fallback_source, valid=self.mode == "auto")
 
-        event_ts = pd.to_datetime(events_df[ts_col], utc=True, errors="coerce").dropna().sort_values()
+        event_ts = (
+            pd.to_datetime(events_df[ts_col], utc=True, errors="coerce").dropna().sort_values()
+        )
         if event_ts.empty:
             return self._static(source="fallback:no_valid_event_ts", valid=False)
 
@@ -78,16 +85,26 @@ class ToBRegimeCostCalibrator:
         coverage = float(len(matched) / len(event_grid)) if len(event_grid) else 0.0
         if matched.empty or coverage < self.min_tob_coverage:
             fallback_source = "static" if self.mode == "auto" else "fallback:low_tob_coverage"
-            return self._static(source=fallback_source, valid=self.mode == "auto", coverage=coverage)
+            return self._static(
+                source=fallback_source, valid=self.mode == "auto", coverage=coverage
+            )
 
-        event_spread = float(pd.to_numeric(matched["spread_bps"], errors="coerce").dropna().quantile(0.90))
-        event_depth = float(pd.to_numeric(matched["depth_usd"], errors="coerce").dropna().quantile(0.10))
+        event_spread = float(
+            pd.to_numeric(matched["spread_bps"], errors="coerce").dropna().quantile(0.90)
+        )
+        event_depth = float(
+            pd.to_numeric(matched["depth_usd"], errors="coerce").dropna().quantile(0.10)
+        )
         base_spread = float(profile["base_spread_bps"])
         base_depth = float(profile["base_depth_usd"])
         if not np.isfinite(event_spread) or event_spread <= 0.0:
-            return self._static(source="fallback:invalid_event_spread", valid=False, coverage=coverage)
+            return self._static(
+                source="fallback:invalid_event_spread", valid=False, coverage=coverage
+            )
         if not np.isfinite(event_depth) or event_depth <= 0.0:
-            return self._static(source="fallback:invalid_event_depth", valid=False, coverage=coverage)
+            return self._static(
+                source="fallback:invalid_event_depth", valid=False, coverage=coverage
+            )
 
         spread_mult = float(event_spread / max(base_spread, 1e-6))
         depth_mult = float(np.sqrt(max(base_depth, 1e-6) / max(event_depth, 1e-6)))
@@ -152,14 +169,12 @@ class ToBRegimeCostCalibrator:
 
         spread = pd.to_numeric(frame[spread_col], errors="coerce")
         if {"bid_depth_usd_mean", "ask_depth_usd_mean"}.issubset(frame.columns):
-            depth = (
-                pd.to_numeric(frame["bid_depth_usd_mean"], errors="coerce")
-                + pd.to_numeric(frame["ask_depth_usd_mean"], errors="coerce")
+            depth = pd.to_numeric(frame["bid_depth_usd_mean"], errors="coerce") + pd.to_numeric(
+                frame["ask_depth_usd_mean"], errors="coerce"
             )
         elif {"bid_depth_usd", "ask_depth_usd"}.issubset(frame.columns):
-            depth = (
-                pd.to_numeric(frame["bid_depth_usd"], errors="coerce")
-                + pd.to_numeric(frame["ask_depth_usd"], errors="coerce")
+            depth = pd.to_numeric(frame["bid_depth_usd"], errors="coerce") + pd.to_numeric(
+                frame["ask_depth_usd"], errors="coerce"
             )
         else:
             self._symbol_cache[key] = None
@@ -172,7 +187,9 @@ class ToBRegimeCostCalibrator:
                 "depth_usd": depth,
             }
         )
-        payload = payload.replace([np.inf, -np.inf], np.nan).dropna(subset=["spread_bps", "depth_usd"])
+        payload = payload.replace([np.inf, -np.inf], np.nan).dropna(
+            subset=["spread_bps", "depth_usd"]
+        )
         payload = payload[(payload["spread_bps"] > 0.0) & (payload["depth_usd"] > 0.0)].copy()
         if payload.empty:
             self._symbol_cache[key] = None

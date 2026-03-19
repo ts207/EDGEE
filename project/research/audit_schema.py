@@ -57,12 +57,14 @@ def normalize_promotion_trace_rows(audit_df: pd.DataFrame) -> pd.DataFrame:
         trace_payload = _trace_payload(row.get("promotion_metrics_trace", {}))
         for stage, meta in sorted(trace_payload.items()):
             meta = meta if isinstance(meta, dict) else {}
-            rows.append({
-                **base,
-                "stage": str(stage).strip(),
-                "statistic": json.dumps(meta.get("observed", {}), sort_keys=True),
-                "threshold": json.dumps(meta.get("thresholds", {}), sort_keys=True),
-                "pass_fail": bool(meta.get("passed", False)),
-            })
+            rows.append(
+                {
+                    **base,
+                    "stage": str(stage).strip(),
+                    "statistic": json.dumps(meta.get("observed", {}), sort_keys=True),
+                    "threshold": json.dumps(meta.get("thresholds", {}), sort_keys=True),
+                    "pass_fail": bool(meta.get("passed", False)),
+                }
+            )
 
     return pd.DataFrame(rows, columns=PROMOTION_SUMMARY_COLUMNS)

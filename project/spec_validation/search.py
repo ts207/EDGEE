@@ -8,6 +8,8 @@ from project.spec_validation.ontology import (
     get_searchable_state_families,
     get_event_family,
 )
+
+
 def expand_triggers(search_cfg: Dict[str, Any]) -> Dict[str, Any]:
     triggers = search_cfg.get("triggers", {})
 
@@ -55,13 +57,15 @@ def expand_triggers(search_cfg: Dict[str, Any]) -> Dict[str, Any]:
         "event_family_map": event_family_map,
     }
 
+
 def resolve_templates(search_cfg: Dict[str, Any]) -> List[str]:
-    # Check both 'templates' and 'template_ids' if needed, 
+    # Check both 'templates' and 'template_ids' if needed,
     # but generator currently uses 'templates'
     templates = search_cfg.get("templates", [])
     if templates == "*":
         return list(get_domain_registry().default_templates())
     return templates
+
 
 def resolve_execution_templates(family: str) -> List[str]:
     """
@@ -80,13 +84,14 @@ def resolve_filter_templates(family: str) -> List[Dict[str, Any]]:
     """
     return list(get_domain_registry().family_filter_templates(family))
 
+
 def resolve_entry_lags(search_cfg: Dict[str, Any]) -> List[int]:
     # Support both 'entry_lag' and legacy 'entry_lags'
     lags = search_cfg.get("entry_lag", search_cfg.get("entry_lags", []))
     if lags == "*":
         return list(get_domain_registry().default_entry_lags())
-    
+
     if not lags:
-        return [1] # Default to 1 bar lag
-        
+        return [1]  # Default to 1 bar lag
+
     return [lags] if isinstance(lags, int) else lags

@@ -205,7 +205,9 @@ def _partition_complete(path: Path, expected_rows: int) -> bool:
         return False
 
 
-async def _download_archive(session: aiohttp.ClientSession, url: str, max_retries: int, backoff_sec: float) -> Optional[bytes]:
+async def _download_archive(
+    session: aiohttp.ClientSession, url: str, max_retries: int, backoff_sec: float
+) -> Optional[bytes]:
     """
     Download a ZIP archive from the given URL using aiohttp.
 
@@ -274,7 +276,10 @@ async def _process_month(
             / f"year={month_start.year}"
             / f"month={month_start.month:02d}"
         )
-        out_path = out_dir / f"ohlcv_{symbol}_{timeframe}_{month_start.year}-{month_start.month:02d}.parquet"
+        out_path = (
+            out_dir
+            / f"ohlcv_{symbol}_{timeframe}_{month_start.year}-{month_start.month:02d}.parquet"
+        )
 
         # Skip if the partition already exists with expected rows unless force is set
         if not force and _partition_complete(out_path, expected_rows):

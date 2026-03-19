@@ -23,7 +23,6 @@ class CanonicalEventTimestamps:
     signal_ts: pd.Timestamp
 
 
-
 def _coerce_utc_timestamp(value: Any) -> pd.Timestamp:
     ts = pd.Timestamp(value)
     if pd.isna(ts):
@@ -33,7 +32,6 @@ def _coerce_utc_timestamp(value: Any) -> pd.Timestamp:
     else:
         ts = ts.tz_convert("UTC")
     return ts
-
 
 
 def next_bar_timestamp(
@@ -60,7 +58,6 @@ def next_bar_timestamp(
     return eval_ts + pd.Timedelta(minutes=int(timeframe_minutes) * bars)
 
 
-
 def compute_canonical_timestamps(
     eval_bar_ts: Any,
     *,
@@ -80,7 +77,6 @@ def compute_canonical_timestamps(
         detected_ts=eval_ts,
         signal_ts=signal_ts,
     )
-
 
 
 def normalize_timestamp_fields(

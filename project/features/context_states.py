@@ -50,8 +50,7 @@ def _proximity_softmax(
 ) -> pd.DataFrame:
     numeric = pd.to_numeric(value, errors="coerce").astype(float)
     scores = {
-        key: -((numeric - center) / max(scale, 1e-6)) ** 2
-        for key, center in centers.items()
+        key: -(((numeric - center) / max(scale, 1e-6)) ** 2) for key, center in centers.items()
     }
     probs = _softmax_from_scores(scores)
     valid_mask = numeric.notna() if mask is None else mask.fillna(False)
@@ -236,16 +235,19 @@ def calculate_ms_funding_probabilities(
         neg = np.sum(x < 0)
         return float(max(pos, neg) / len(x))
 
-    consistency = funding_rate_bps.rolling(window=window, min_periods=min_p_short).apply(_sign_consist, raw=True).shift(1)
+    consistency = (
+        funding_rate_bps.rolling(window=window, min_periods=min_p_short)
+        .apply(_sign_consist, raw=True)
+        .shift(1)
+    )
     baseline_65 = p_65.clip(lower=abs_floor_bps)
     baseline_ext = p_ext.clip(lower=abs_floor_bps)
     valid = funding_rate_bps.notna() & p_65.notna() & p_ext.notna() & consistency.notna()
 
     neutral_score = -((abs_mean / baseline_65).fillna(0.0))
-    persistent_score = (
-        ((consistency - 0.80) / 0.10).fillna(-5.0)
-        + ((abs_mean / baseline_65) - 1.0).fillna(-5.0)
-    )
+    persistent_score = ((consistency - 0.80) / 0.10).fillna(-5.0) + (
+        (abs_mean / baseline_65) - 1.0
+    ).fillna(-5.0)
     extreme_score = (((abs_mean / baseline_ext) - 1.0) / 0.20).fillna(-5.0)
     persistent_flag = (consistency >= 0.80) & (abs_mean >= baseline_65)
     extreme_flag = abs_mean >= baseline_ext

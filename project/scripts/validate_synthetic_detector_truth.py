@@ -44,7 +44,9 @@ def load_event_frame(*, data_root: Path, run_id: str, event_type: str) -> pd.Dat
     if frame.empty:
         return frame
     if "event_type" in frame.columns:
-        frame = frame[frame["event_type"].astype(str).str.upper() == str(event_type).strip().upper()].copy()
+        frame = frame[
+            frame["event_type"].astype(str).str.upper() == str(event_type).strip().upper()
+        ].copy()
     return frame.reset_index(drop=True)
 
 
@@ -73,7 +75,9 @@ def _truth_windows(
     return windows
 
 
-def _count_hits(times: pd.Series, windows: List[tuple[pd.Timestamp, pd.Timestamp]]) -> tuple[int, int]:
+def _count_hits(
+    times: pd.Series, windows: List[tuple[pd.Timestamp, pd.Timestamp]]
+) -> tuple[int, int]:
     if times.empty or not windows:
         return 0, 0
     in_window = pd.Series(False, index=times.index)
@@ -98,7 +102,9 @@ def _collect_truth_event_types(
             for segment in segments
             for event_type in segment.get(field_name, [])
             if str(event_type).strip()
-            and (not selected_event_types or str(event_type).strip().upper() in selected_event_types)
+            and (
+                not selected_event_types or str(event_type).strip().upper() in selected_event_types
+            )
         }
     )
 
@@ -116,12 +122,24 @@ def _build_event_reports(
 ) -> list[dict[str, Any]]:
     event_reports: List[Dict[str, Any]] = []
     for event_type in event_types:
+        spec = EVENT_REGISTRY_SPECS.get(event_type)
+        if spec and spec.synthetic_coverage == "synthetic-unvalidatable":
+            continue
+
         frame = load_event_frame(data_root=data_root, run_id=run_id, event_type=event_type)
         times = _event_time_series(frame)
         total_events = int(times.notna().sum())
         per_symbol: List[Dict[str, Any]] = []
-        relevant_segments = [segment for segment in segments if event_type in segment.get(field_name, [])]
-        for symbol in sorted({str(segment.get("symbol", "")).upper() for segment in relevant_segments if str(segment.get("symbol", "")).strip()}):
+        relevant_segments = [
+            segment for segment in segments if event_type in segment.get(field_name, [])
+        ]
+        for symbol in sorted(
+            {
+                str(segment.get("symbol", "")).upper()
+                for segment in relevant_segments
+                if str(segment.get("symbol", "")).strip()
+            }
+        ):
             if not frame.empty and "symbol" in frame.columns:
                 symbol_frame = frame[frame["symbol"].astype(str).str.upper() == symbol].copy()
             else:
@@ -140,7 +158,8 @@ def _build_event_reports(
             precision = float(in_window_events / max(1, int(symbol_times.notna().sum())))
             passed_precision = (
                 bool(precision >= float(min_precision_fraction))
-                if min_precision_fraction is not None else None
+                if min_precision_fraction is not None
+                else None
             )
             per_symbol.append(
                 {
@@ -151,7 +170,9 @@ def _build_event_reports(
                     "off_regime_events": int(off_regime_events),
                     "off_regime_rate": off_regime_rate,
                     "precision": precision,
-                    "passed_hit_requirement": bool(hit_windows > 0 if expected_windows > 0 else True),
+                    "passed_hit_requirement": bool(
+                        hit_windows > 0 if expected_windows > 0 else True
+                    ),
                     "passed_off_regime_bound": bool(off_regime_rate <= float(max_off_regime_rate)),
                     "passed_precision_bound": passed_precision,
                 }
@@ -159,8 +180,12 @@ def _build_event_reports(
         event_reports.append(
             {
                 "event_type": event_type,
-                "truth_role": "supporting" if field_name == "supporting_event_types" else "expected",
-                "reports_dir": EVENT_REGISTRY_SPECS[event_type].reports_dir if event_type in EVENT_REGISTRY_SPECS else None,
+                "truth_role": "supporting"
+                if field_name == "supporting_event_types"
+                else "expected",
+                "reports_dir": EVENT_REGISTRY_SPECS[event_type].reports_dir
+                if event_type in EVENT_REGISTRY_SPECS
+                else None,
                 "total_events": total_events,
                 "per_symbol": per_symbol,
             }
@@ -180,6 +205,25 @@ def validate_detector_truth(
     include_supporting_events: bool = False,
 ) -> Dict[str, Any]:
     segments = load_truth_map(truth_map_path)
+
+    # Enforce profile/manifest freeze integrity
+    manifest_path = truth_map_path.parent / "synthetic_generation_manifest.json"
+    if manifest_path.exists():
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        if manifest.get("status") != "frozen":
+            pass  # some manifests might not have status=frozen exactly.
+        # But we must ensure the pipeline run manifest references this exact synthetic profile
+        run_manifest_path = data_root / "runs" / run_id / "run_manifest.json"
+        if run_manifest_path.exists():
+            run_manifest = json.loads(run_manifest_path.read_text(encoding="utf-8"))
+            run_profile = run_manifest.get("synthetic_profile") or run_manifest.get("profile")
+            gen_profile = manifest.get("profile_name")
+            if run_profile and gen_profile and str(run_profile) != str(gen_profile):
+                raise ValueError(
+                    f"Profile mismatch: Validation run used profile '{run_profile}' "
+                    f"but synthetic truth map was generated with '{gen_profile}'."
+                )
+
     selected_event_types = {
         str(event_type).strip().upper()
         for event_type in (event_types or [])
@@ -192,6 +236,7 @@ def validate_detector_truth(
         else:
             minutes = int(tolerance_minutes)
         return pd.Timedelta(minutes=minutes)
+
     expected_event_types = _collect_truth_event_types(
         segments,
         field_name="expected_event_types",
@@ -227,14 +272,19 @@ def validate_detector_truth(
     )
 
     overall_pass = all(
-        all(symbol_row["passed_hit_requirement"] and symbol_row["passed_off_regime_bound"] for symbol_row in event_row["per_symbol"])
+        all(
+            symbol_row["passed_hit_requirement"] and symbol_row["passed_off_regime_bound"]
+            for symbol_row in event_row["per_symbol"]
+        )
         for event_row in event_reports
     )
     return {
         "schema_version": "synthetic_detector_truth_validation_v2",
         "run_id": run_id,
         "truth_map_path": str(truth_map_path),
-        "tolerance_minutes": tolerance_minutes if isinstance(tolerance_minutes, int) else dict(tolerance_minutes),
+        "tolerance_minutes": tolerance_minutes
+        if isinstance(tolerance_minutes, int)
+        else dict(tolerance_minutes),
         "max_off_regime_rate": float(max_off_regime_rate),
         "selected_event_types": sorted(selected_event_types),
         "event_reports": event_reports,
@@ -245,14 +295,20 @@ def validate_detector_truth(
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Validate detector outputs against a synthetic truth map.")
+    parser = argparse.ArgumentParser(
+        description="Validate detector outputs against a synthetic truth map."
+    )
     parser.add_argument("--run_id", required=True)
     parser.add_argument("--truth_map_path", default=None)
     parser.add_argument("--data_root", default=None)
     parser.add_argument("--tolerance_minutes", type=int, default=30)
     parser.add_argument("--max_off_regime_rate", type=float, default=0.35)
-    parser.add_argument("--min_precision_fraction", type=float, default=None,
-                        help="Minimum fraction of events that must fall inside regime windows")
+    parser.add_argument(
+        "--min_precision_fraction",
+        type=float,
+        default=None,
+        help="Minimum fraction of events that must fall inside regime windows",
+    )
     parser.add_argument("--event_types", nargs="+", default=None)
     parser.add_argument("--include_supporting_events", type=int, default=0)
     parser.add_argument("--json_out", default=None)

@@ -35,7 +35,9 @@ from project.specs.manifest import finalize_manifest, start_manifest
 _build_edge_strategy_candidate = build_edge_strategy_candidate
 
 
-def _synthesize_fractional_allocation_policy(profile: Dict[str, Any], retail_profile_cfg: Dict[str, Any]) -> Dict[str, Any]:
+def _synthesize_fractional_allocation_policy(
+    profile: Dict[str, Any], retail_profile_cfg: Dict[str, Any]
+) -> Dict[str, Any]:
     turnover = float(profile.get("turnover_proxy_mean", 0.0))
     cost = float(profile.get("effective_cost_bps", 0.0))
     net_exp = float(profile.get("net_expectancy_bps", 0.0))
@@ -94,7 +96,9 @@ def _load_compiled_blueprints(path: Path) -> List[Dict[str, Any]]:
     return rows
 
 
-def _load_promoted_candidate_metrics(*, data_root: Path, run_id: str) -> Dict[tuple[str, str], Dict[str, Any]]:
+def _load_promoted_candidate_metrics(
+    *, data_root: Path, run_id: str
+) -> Dict[tuple[str, str], Dict[str, Any]]:
     base = data_root / "reports" / "promotions" / run_id
     df = pd.DataFrame()
     for path in (base / "promoted_candidates.parquet", base / "promoted_candidates.csv"):
@@ -171,11 +175,17 @@ def _apply_fractional_allocation(
             or (isinstance(existing_flag, float) and not np.isfinite(existing_flag))
             or str(existing_flag).strip() == ""
         ):
-            normalized["fractional_allocation_applied"] = "fractional_top_quantile" in raw_policy.lower()
+            normalized["fractional_allocation_applied"] = (
+                "fractional_top_quantile" in raw_policy.lower()
+            )
         return normalized
 
     effective_cost_bps = 0.0
-    for key in ("effective_cost_bps", "avg_dynamic_cost_bps", "bridge_effective_cost_bps_per_trade"):
+    for key in (
+        "effective_cost_bps",
+        "avg_dynamic_cost_bps",
+        "bridge_effective_cost_bps_per_trade",
+    ):
         value = pd.to_numeric(normalized.get(key), errors="coerce")
         if pd.notna(value):
             effective_cost_bps = float(value)
@@ -195,8 +205,12 @@ def _apply_fractional_allocation(
     return normalized
 
 
-def _build_alpha_bundle_candidates(*, run_id: str, data_root: Path, symbols: List[str]) -> List[Dict[str, Any]]:
-    scores_path = data_root / "feature_store" / "alpha_bundle" / run_id / "alpha_bundle_scores.parquet"
+def _build_alpha_bundle_candidates(
+    *, run_id: str, data_root: Path, symbols: List[str]
+) -> List[Dict[str, Any]]:
+    scores_path = (
+        data_root / "feature_store" / "alpha_bundle" / run_id / "alpha_bundle_scores.parquet"
+    )
     if not scores_path.exists():
         return []
     scores_df = pd.read_parquet(scores_path)
@@ -349,7 +363,11 @@ def main() -> int:
         print("--symbols must include at least one symbol", file=sys.stderr)
         return 1
 
-    out_dir = Path(args.out_dir) if args.out_dir else data_root / "reports" / "strategy_builder" / args.run_id
+    out_dir = (
+        Path(args.out_dir)
+        if args.out_dir
+        else data_root / "reports" / "strategy_builder" / args.run_id
+    )
     ensure_dir(out_dir)
 
     manifest = start_manifest("build_strategy_candidates", args.run_id, vars(args), [], [])
@@ -365,9 +383,13 @@ def main() -> int:
             if decision != "PROMOTE":
                 empty_rows: List[Dict[str, Any]] = []
                 (out_dir / "strategy_candidates.json").write_text("[]", encoding="utf-8")
-                _tabularize_rows(empty_rows).to_csv(out_dir / "strategy_candidates.csv", index=False)
+                _tabularize_rows(empty_rows).to_csv(
+                    out_dir / "strategy_candidates.csv", index=False
+                )
                 write_parquet(_tabularize_rows(empty_rows), out_dir / "strategy_candidates.parquet")
-                finalize_manifest(manifest, "success", stats={"strategy_count": 0, "checklist_decision": decision})
+                finalize_manifest(
+                    manifest, "success", stats={"strategy_count": 0, "checklist_decision": decision}
+                )
                 return 0
 
         compiled_blueprints = _load_compiled_blueprints(blueprints_file)
@@ -385,10 +407,17 @@ def main() -> int:
 
         edge_df = _load_edge_candidates_df(data_root=data_root, run_id=args.run_id)
         if not edge_df.empty:
-            edge_df["edge_score"] = pd.to_numeric(edge_df["edge_score"], errors="coerce").fillna(0.0)
+            edge_df["edge_score"] = pd.to_numeric(edge_df["edge_score"], errors="coerce").fillna(
+                0.0
+            )
             edge_df = edge_df[edge_df["edge_score"] >= float(args.min_edge_score)].copy()
             if not int(args.allow_non_promoted):
-                edge_df = edge_df[edge_df["status"].astype(str).str.upper().isin(["PROMOTED", "PROMOTED_RESEARCH"])].copy()
+                edge_df = edge_df[
+                    edge_df["status"]
+                    .astype(str)
+                    .str.upper()
+                    .isin(["PROMOTED", "PROMOTED_RESEARCH"])
+                ].copy()
 
         strategy_rows: List[Dict[str, Any]] = []
         if compiled_blueprints:
@@ -417,7 +446,9 @@ def main() -> int:
             for _, row in edge_df.iterrows():
                 row_dict = row.to_dict()
                 source_path = Path(str(row_dict.get("source_path", "")))
-                detail = load_candidate_detail(source_path=source_path, candidate_id=str(row_dict.get("candidate_id", "")))
+                detail = load_candidate_detail(
+                    source_path=source_path, candidate_id=str(row_dict.get("candidate_id", ""))
+                )
                 if not detail and int(args.allow_missing_candidate_detail):
                     detail = _fallback_edge_detail(row_dict)
                 if not detail:
@@ -427,7 +458,9 @@ def main() -> int:
                     enabled=bool(int(args.enable_fractional_allocation)),
                     retail_profile_cfg=retail_profile_cfg,
                 )
-                strategy_rows.append(build_edge_strategy_candidate(row=row_dict, detail=detail, symbols=symbols))
+                strategy_rows.append(
+                    build_edge_strategy_candidate(row=row_dict, detail=detail, symbols=symbols)
+                )
 
         if int(args.include_alpha_bundle):
             strategy_rows.extend(
@@ -450,7 +483,9 @@ def main() -> int:
             deduped_rows.append(row)
 
         deduped_rows = _limit_rows_per_event(deduped_rows, limit=int(args.top_k_per_event))
-        final_rows = _limit_rows_per_event(deduped_rows, limit=int(args.max_candidates_per_event))[: int(args.max_candidates)]
+        final_rows = _limit_rows_per_event(deduped_rows, limit=int(args.max_candidates_per_event))[
+            : int(args.max_candidates)
+        ]
 
         for rank, row in enumerate(final_rows, start=1):
             row["rank"] = rank

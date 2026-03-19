@@ -12,27 +12,90 @@ from project import PROJECT_ROOT
 ALLOWED_DEPENDENCIES = {
     "project.core": ["project.spec_registry", "project.artifacts", "project.specs", "project.io"],
     "project.io": ["project.core", "project.artifacts"],
-    "project.specs": ["project.core", "project.io", "project.spec_registry", "project.schemas", "project.artifacts"],
+    "project.specs": [
+        "project.core",
+        "project.io",
+        "project.spec_registry",
+        "project.schemas",
+        "project.artifacts",
+    ],
     "project.domain": ["project.core", "project.specs", "project.spec_registry"],
     "project.runtime": ["project.core", "project.specs"],
-    "project.events": ["project.core", "project.io", "project.specs", "project.spec_registry", "project.research", "project.features", "project.artifacts", "project.contracts", "project.domain"],
-    "project.features": ["project.core", "project.io", "project.events", "project.spec_registry", "project.artifacts", "project.contracts"],
-    "project.strategy": ["project.compilers", "project.core", "project.strategy.runtime", "project.events", "project.domain", "project.engine", "project.schemas"],
-    "project.strategy.runtime": ["project.core", "project.strategy", "project.events", "project.compilers"],
-    "project.engine": ["project.core", "project.io", "project.events", "project.features", "project.strategy.runtime", "project.strategy", "project.portfolio"],
-    "project.compilers": ["project.core", "project.specs", "project.events", "project.domain", "project.strategy", "project.schemas"],
+    "project.events": [
+        "project.core",
+        "project.io",
+        "project.specs",
+        "project.spec_registry",
+        "project.research",
+        "project.features",
+        "project.artifacts",
+        "project.contracts",
+        "project.domain",
+    ],
+    "project.features": [
+        "project.core",
+        "project.io",
+        "project.events",
+        "project.spec_registry",
+        "project.artifacts",
+        "project.contracts",
+    ],
+    "project.strategy": [
+        "project.compilers",
+        "project.core",
+        "project.strategy.runtime",
+        "project.events",
+        "project.domain",
+        "project.engine",
+        "project.schemas",
+    ],
+    "project.strategy.runtime": [
+        "project.core",
+        "project.strategy",
+        "project.events",
+        "project.compilers",
+    ],
+    "project.engine": [
+        "project.core",
+        "project.io",
+        "project.events",
+        "project.features",
+        "project.strategy.runtime",
+        "project.strategy",
+        "project.portfolio",
+    ],
+    "project.compilers": [
+        "project.core",
+        "project.specs",
+        "project.events",
+        "project.domain",
+        "project.strategy",
+        "project.schemas",
+    ],
     "project.portfolio": ["project.core", "project.specs", "project.strategy"],
     "project.research": [
-        "project.core", "project.io", "project.specs", "project.runtime", 
-        "project.events", "project.features", "project.strategy",
-        "project.strategy.runtime", "project.engine", "project.eval",
+        "project.core",
+        "project.io",
+        "project.specs",
+        "project.runtime",
+        "project.events",
+        "project.features",
+        "project.strategy",
+        "project.strategy.runtime",
+        "project.engine",
+        "project.eval",
         "project.spec_registry",
-        "project.artifacts", "project.schemas", "project.spec_validation", "project.contracts",
-        "project.domain", "project.compilers", "project.portfolio"
+        "project.artifacts",
+        "project.schemas",
+        "project.spec_validation",
+        "project.contracts",
+        "project.domain",
+        "project.compilers",
+        "project.portfolio",
     ],
-
-    "project.pipelines": ["*"], # Pipelines can import anything below
+    "project.pipelines": ["*"],  # Pipelines can import anything below
 }
+
 
 def get_package_name(file_path: Path) -> str:
     """Converts a file path to its project package name."""
@@ -40,12 +103,14 @@ def get_package_name(file_path: Path) -> str:
     parts = rel_path.with_suffix("").parts
     return ".".join(parts)
 
+
 def get_base_package(pkg: str) -> str:
     """Returns the top-level project package (e.g., project.core)."""
     parts = pkg.split(".")
     if len(parts) >= 2 and parts[0] == "project":
         return ".".join(parts[:2])
     return parts[0]
+
 
 def test_dependency_matrix():
     """
@@ -56,7 +121,7 @@ def test_dependency_matrix():
         for file in files:
             if not file.endswith(".py") or file == "__init__.py":
                 continue
-            
+
             file_path = Path(root) / file
             current_pkg = get_package_name(file_path)
             current_base = get_base_package(current_pkg)
@@ -66,20 +131,20 @@ def test_dependency_matrix():
 
             if current_base not in ALLOWED_DEPENDENCIES:
                 continue
-                
+
             allowed = ALLOWED_DEPENDENCIES[current_base]
             if "*" in allowed:
                 continue
-                
+
             content = file_path.read_text(encoding="utf-8")
             # Find all internal project imports
             imports = re.findall(r"(?:from|import)\s+(project\.[a-zA-Z0-9_\.]+)", content)
-            
+
             for imp in imports:
                 imp_base = get_base_package(imp)
                 if imp_base == current_base:
                     continue
-                
+
                 # Check if it's an allowed cross-package import
                 if imp_base not in allowed and "project" in imp_base:
                     # Special case for research shared helpers if they move
@@ -88,11 +153,20 @@ def test_dependency_matrix():
     if violations:
         pytest.fail("\n".join(sorted(set(violations))))
 
+
 def test_no_upward_imports_from_domain():
     """
     domain/* cannot import project.pipelines.*
     """
-    domain_dirs = ["engine", "features", "events", "runtime", "strategy", "strategy_dsl", "strategies"]
+    domain_dirs = [
+        "engine",
+        "features",
+        "events",
+        "runtime",
+        "strategy",
+        "strategy_dsl",
+        "strategies",
+    ]
     violations = []
     for d in domain_dirs:
         path = PROJECT_ROOT / d
@@ -106,10 +180,13 @@ def test_no_upward_imports_from_domain():
                         continue
                     content = file_path.read_text(encoding="utf-8")
                     if "project.pipelines" in content:
-                        violations.append(f"Architectural Violation: {file_path} imports project.pipelines")
-    
+                        violations.append(
+                            f"Architectural Violation: {file_path} imports project.pipelines"
+                        )
+
     if violations:
         pytest.fail("\n".join(violations))
+
 
 def test_wrappers_are_pure_reexports():
     """
@@ -129,18 +206,24 @@ def test_wrappers_are_pure_reexports():
                 if file.endswith(".py") and file != "__init__.py":
                     file_path = Path(root) / file
                     content = file_path.read_text(encoding="utf-8")
-                    
+
                     if 'if __name__ == "__main__":' in content:
                         continue
 
                     if "COMPAT WRAPPER" not in content:
-                        raise ImportError(f"Architectural Violation: {file_path} is missing 'COMPAT WRAPPER' marker")
-                    
+                        raise ImportError(
+                            f"Architectural Violation: {file_path} is missing 'COMPAT WRAPPER' marker"
+                        )
+
                     if "from project." not in content and "import project." not in content:
-                        raise ImportError(f"Architectural Violation: {file_path} does not import from project root")
-                    
+                        raise ImportError(
+                            f"Architectural Violation: {file_path} does not import from project root"
+                        )
+
                     if "def " in content or "class " in content:
-                        raise ImportError(f"Architectural Violation: {file_path} contains local logic (def/class)")
+                        raise ImportError(
+                            f"Architectural Violation: {file_path} contains local logic (def/class)"
+                        )
 
 
 def test_explicit_package_roots_stay_shallow() -> None:
@@ -169,7 +252,9 @@ def test_explicit_package_roots_stay_shallow() -> None:
             for node in ast.walk(tree)
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
         ]
-        assert not defs, f"Architectural Violation: {path.relative_to(PROJECT_ROOT.parent)} should remain a pure re-export surface, found {defs}"
+        assert not defs, (
+            f"Architectural Violation: {path.relative_to(PROJECT_ROOT.parent)} should remain a pure re-export surface, found {defs}"
+        )
 
     for path in lazy_roots:
         tree = ast.parse(path.read_text(encoding="utf-8"))
@@ -186,12 +271,24 @@ def test_explicit_package_roots_stay_shallow() -> None:
 def test_preferred_root_surfaces_replace_cross_domain_deep_imports() -> None:
     preferred = {
         "project.artifacts.catalog": ("project.artifacts", PROJECT_ROOT / "artifacts"),
-        "project.compilers.executable_strategy_spec": ("project.compilers", PROJECT_ROOT / "compilers"),
+        "project.compilers.executable_strategy_spec": (
+            "project.compilers",
+            PROJECT_ROOT / "compilers",
+        ),
         "project.portfolio.allocation_spec": ("project.portfolio", PROJECT_ROOT / "portfolio"),
         "project.portfolio.sizing": ("project.portfolio", PROJECT_ROOT / "portfolio"),
-        "project.spec_validation.loaders": ("project.spec_validation", PROJECT_ROOT / "spec_validation"),
-        "project.spec_validation.ontology": ("project.spec_validation", PROJECT_ROOT / "spec_validation"),
-        "project.spec_validation.search": ("project.spec_validation", PROJECT_ROOT / "spec_validation"),
+        "project.spec_validation.loaders": (
+            "project.spec_validation",
+            PROJECT_ROOT / "spec_validation",
+        ),
+        "project.spec_validation.ontology": (
+            "project.spec_validation",
+            PROJECT_ROOT / "spec_validation",
+        ),
+        "project.spec_validation.search": (
+            "project.spec_validation",
+            PROJECT_ROOT / "spec_validation",
+        ),
         "project.eval.splits": ("project.eval", PROJECT_ROOT / "eval"),
         "project.live.runner": ("project.live", PROJECT_ROOT / "live"),
         "project.live.health_checks": ("project.live", PROJECT_ROOT / "live"),
@@ -200,6 +297,9 @@ def test_preferred_root_surfaces_replace_cross_domain_deep_imports() -> None:
     violations: list[str] = []
     exemptions = {
         PROJECT_ROOT / "scripts" / "run_live_engine.py",
+        # test_splits.py imports _normalize_ts (a private function) directly from the submodule
+        # — importing private internals via package root is not appropriate
+        PROJECT_ROOT / "tests" / "eval" / "test_splits.py",
     }
     for file_path in PROJECT_ROOT.rglob("*.py"):
         if file_path in exemptions:
@@ -214,6 +314,7 @@ def test_preferred_root_surfaces_replace_cross_domain_deep_imports() -> None:
                 )
     if violations:
         pytest.fail("\n".join(sorted(set(violations))))
+
 
 def test_file_size_thresholds():
     """
@@ -230,14 +331,26 @@ def test_file_size_thresholds():
             if len(lines) > THRESHOLD:
                 # Exclude specific files that are known monoliths to be refactored
                 rel_path = str(file_path.relative_to(PROJECT_ROOT.parent))
-                if any(x in rel_path for x in ["dsl_interpreter_v1.py", "stage_registry.py", "shrinkage.py", "promotion/promotion_decisions.py", "promotion/promotion_reporting.py", "execution_engine.py"]):
+                if any(
+                    x in rel_path
+                    for x in [
+                        "dsl_interpreter_v1.py",
+                        "stage_registry.py",
+                        "shrinkage.py",
+                        "promotion/promotion_decisions.py",
+                        "promotion/promotion_reporting.py",
+                        "execution_engine.py",
+                    ]
+                ):
                     continue
                 oversized.append(f"{rel_path}: {len(lines)} lines")
-    
+
     if oversized:
         # Enforce strictly to prevent unchecked growth
         issues = "\n".join(f"  {f}" for f in oversized)
-        raise AssertionError(f"Architectural Violation: {len(oversized)} files exceed the {THRESHOLD} LOC threshold:\n{issues}")
+        raise AssertionError(
+            f"Architectural Violation: {len(oversized)} files exceed the {THRESHOLD} LOC threshold:\n{issues}"
+        )
 
 
 def test_phase2_helper_imports_use_research_compat():
@@ -332,7 +445,10 @@ def test_research_pipeline_wrappers_only_depend_on_cli_services_and_specs() -> N
         content = wrapper_path.read_text(encoding="utf-8")
         imports = re.findall(r"(?:from|import)\s+(project\.[a-zA-Z0-9_\.]+)", content)
         for imported in imports:
-            if any(imported == prefix or imported.startswith(f"{prefix}.") for prefix in allowed_import_prefixes):
+            if any(
+                imported == prefix or imported.startswith(f"{prefix}.")
+                for prefix in allowed_import_prefixes
+            ):
                 continue
             violations.append(
                 f"Architectural Violation: {wrapper_path.relative_to(PROJECT_ROOT.parent)} imports {imported}"

@@ -23,6 +23,7 @@ def calculate_kendalls_tau(x: np.ndarray | pd.Series, y: np.ndarray | pd.Series)
     """
     try:
         from scipy import stats as scipy_stats
+
         tau, _ = scipy_stats.kendalltau(x, y)
     except ImportError:
         tau, _ = _StatsCompat.kendalltau(x, y)
@@ -35,10 +36,13 @@ def test_cointegration(x: pd.Series, y: pd.Series) -> float:
     Returns the p-value for the residual unit-root test.
     Uses statsmodels when available and falls back to a residual ADF-style t test.
     """
-    aligned = pd.concat([
-        pd.to_numeric(pd.Series(x), errors="coerce"),
-        pd.to_numeric(pd.Series(y), errors="coerce"),
-    ], axis=1).dropna()
+    aligned = pd.concat(
+        [
+            pd.to_numeric(pd.Series(x), errors="coerce"),
+            pd.to_numeric(pd.Series(y), errors="coerce"),
+        ],
+        axis=1,
+    ).dropna()
     if len(aligned) < 20:
         return 1.0
 
@@ -46,6 +50,7 @@ def test_cointegration(x: pd.Series, y: pd.Series) -> float:
     ya = aligned.iloc[:, 1].to_numpy(dtype=float)
     try:
         from statsmodels.tsa.stattools import coint
+
         _stat, pvalue, _crit = coint(xa, ya)
         return float(np.clip(pvalue, 0.0, 1.0))
     except Exception:
@@ -64,7 +69,7 @@ def test_cointegration(x: pd.Series, y: pd.Series) -> float:
     fitted = design @ coef
     errors = delta - fitted
     dof = max(len(delta) - design.shape[1], 1)
-    sse = float(np.sum(errors ** 2))
+    sse = float(np.sum(errors**2))
     sigma2 = sse / dof
     xtx_inv = np.linalg.pinv(design.T @ design)
     se_gamma = math.sqrt(max(sigma2 * xtx_inv[1, 1], 1e-18))
@@ -91,10 +96,42 @@ def _norm_cdf(x: object) -> float | np.ndarray:
 
 def _norm_ppf(p: object) -> float | np.ndarray:
     arr = np.clip(_to_array(p), 1e-12, 1.0 - 1e-12)
-    a = np.array([-3.969683028665376e01, 2.209460984245205e02, -2.759285104469687e02, 1.383577518672690e02, -3.066479806614716e01, 2.506628277459239e00], dtype=float)
-    b = np.array([-5.447609879822406e01, 1.615858368580409e02, -1.556989798598866e02, 6.680131188771972e01, -1.328068155288572e01], dtype=float)
-    c = np.array([-7.784894002430293e-03, -3.223964580411365e-01, -2.400758277161838e00, -2.549732539343734e00, 4.374664141464968e00, 2.938163982698783e00], dtype=float)
-    d = np.array([7.784695709041462e-03, 3.224671290700398e-01, 2.445134137142996e00, 3.754408661907416e00], dtype=float)
+    a = np.array(
+        [
+            -3.969683028665376e01,
+            2.209460984245205e02,
+            -2.759285104469687e02,
+            1.383577518672690e02,
+            -3.066479806614716e01,
+            2.506628277459239e00,
+        ],
+        dtype=float,
+    )
+    b = np.array(
+        [
+            -5.447609879822406e01,
+            1.615858368580409e02,
+            -1.556989798598866e02,
+            6.680131188771972e01,
+            -1.328068155288572e01,
+        ],
+        dtype=float,
+    )
+    c = np.array(
+        [
+            -7.784894002430293e-03,
+            -3.223964580411365e-01,
+            -2.400758277161838e00,
+            -2.549732539343734e00,
+            4.374664141464968e00,
+            2.938163982698783e00,
+        ],
+        dtype=float,
+    )
+    d = np.array(
+        [7.784695709041462e-03, 3.224671290700398e-01, 2.445134137142996e00, 3.754408661907416e00],
+        dtype=float,
+    )
     plow = 0.02425
     phigh = 1.0 - plow
     x = np.zeros_like(arr, dtype=float)
@@ -103,15 +140,25 @@ def _norm_ppf(p: object) -> float | np.ndarray:
     mid_mask = ~(low_mask | high_mask)
     if np.any(low_mask):
         q = np.sqrt(-2.0 * np.log(arr[low_mask]))
-        x[low_mask] = (((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) / ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1.0)
+        x[low_mask] = (((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) / (
+            (((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1.0
+        )
     if np.any(mid_mask):
         q = arr[mid_mask] - 0.5
         r = q * q
-        x[mid_mask] = (((((a[0] * r + a[1]) * r + a[2]) * r + a[3]) * r + a[4]) * r + a[5]) * q / (((((b[0] * r + b[1]) * r + b[2]) * r + b[3]) * r + b[4]) * r + 1.0)
+        x[mid_mask] = (
+            (((((a[0] * r + a[1]) * r + a[2]) * r + a[3]) * r + a[4]) * r + a[5])
+            * q
+            / (((((b[0] * r + b[1]) * r + b[2]) * r + b[3]) * r + b[4]) * r + 1.0)
+        )
     if np.any(high_mask):
         q = np.sqrt(-2.0 * np.log(1.0 - arr[high_mask]))
         # Note: Rational part is negative for these coefficients, so multiply by -1.0 to get positive x (Finding 94)
-        x[high_mask] = -1.0 * (((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) / ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1.0)
+        x[high_mask] = (
+            -1.0
+            * (((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5])
+            / ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1.0)
+        )
     return _to_output(x, p)
 
 
@@ -119,13 +166,13 @@ def _student_t_pdf(x: np.ndarray, df: float) -> np.ndarray:
     if df > 100:
         # Normal approximation for large df
         return (1.0 / math.sqrt(2 * math.pi)) * np.exp(-0.5 * x**2)
-    
+
     try:
         coeff = math.gamma((df + 1.0) / 2.0) / (math.sqrt(df * math.pi) * math.gamma(df / 2.0))
     except OverflowError:
         # Fallback if gamma still overflows
         return (1.0 / math.sqrt(2 * math.pi)) * np.exp(-0.5 * x**2)
-        
+
     return coeff * np.power(1.0 + (x * x) / df, -(df + 1.0) / 2.0)
 
 
@@ -179,7 +226,7 @@ def _skew(values: Iterable[float]) -> float:
     if m2 <= 0.0:
         return 0.0
     m3 = float(np.mean(centered**3))
-    return float(m3 / (m2 ** 1.5))
+    return float(m3 / (m2**1.5))
 
 
 def _kurtosis(values: Iterable[float], fisher: bool = True) -> float:
@@ -212,8 +259,8 @@ def _kendalltau(x: object, y: object) -> Tuple[float, float]:
     ties_x = 0
     ties_y = 0
     for i in range(n - 1):
-        dx = xa[i + 1:] - xa[i]
-        dy = ya[i + 1:] - ya[i]
+        dx = xa[i + 1 :] - xa[i]
+        dy = ya[i + 1 :] - ya[i]
         sx = np.sign(dx)
         sy = np.sign(dy)
         prod = sx * sy
@@ -221,7 +268,9 @@ def _kendalltau(x: object, y: object) -> Tuple[float, float]:
         discordant += int(np.sum(prod < 0))
         ties_x += int(np.sum((sx == 0) & (sy != 0)))
         ties_y += int(np.sum((sy == 0) & (sx != 0)))
-    denom = math.sqrt(max((concordant + discordant + ties_x) * (concordant + discordant + ties_y), 0))
+    denom = math.sqrt(
+        max((concordant + discordant + ties_x) * (concordant + discordant + ties_y), 0)
+    )
     tau = 0.0 if denom == 0.0 else float((concordant - discordant) / denom)
     if n < 3 or not np.isfinite(tau):
         return tau, 1.0
@@ -294,6 +343,7 @@ except ImportError:
 
 # --- Appended from bh_fdr_grouping.py ---
 
+
 def canonical_bh_group_key(
     *,
     canonical_family: str,
@@ -320,7 +370,12 @@ def canonical_bh_group_key(
     sym = str(symbol or "").strip().upper()
     direction = str(direction_bucket or "").strip().lower()
 
-    parts = [family or "UNKNOWN_FAMILY", event_type or "UNKNOWN_EVENT_TYPE", verb or "UNKNOWN_VERB", h or "UNKNOWN_HORIZON"]
+    parts = [
+        family or "UNKNOWN_FAMILY",
+        event_type or "UNKNOWN_EVENT_TYPE",
+        verb or "UNKNOWN_VERB",
+        h or "UNKNOWN_HORIZON",
+    ]
     if state:
         parts.append(state)
     if direction:
@@ -330,13 +385,17 @@ def canonical_bh_group_key(
     return "::".join(parts)
 
 
-def newey_west_t_stat_for_mean(values: object, max_lag: Optional[int] = None) -> NeweyWestMeanResult:
+def newey_west_t_stat_for_mean(
+    values: object, max_lag: Optional[int] = None
+) -> NeweyWestMeanResult:
     """Compute a HAC/Newey-West t-statistic for the sample mean."""
     arr = pd.to_numeric(pd.Series(values), errors="coerce").to_numpy(dtype=float)
     arr = arr[np.isfinite(arr)]
     n = int(arr.size)
     if n < 2:
-        return NeweyWestMeanResult(t_stat=float("nan"), se=float("nan"), mean=float("nan"), n=n, max_lag=0)
+        return NeweyWestMeanResult(
+            t_stat=float("nan"), se=float("nan"), mean=float("nan"), n=n, max_lag=0
+        )
     mean = float(np.mean(arr))
     centered = arr - mean
     if max_lag is None:
@@ -349,7 +408,9 @@ def newey_west_t_stat_for_mean(values: object, max_lag: Optional[int] = None) ->
         cov = float(np.dot(centered[lag:], centered[:-lag]) / n)
         lr_var += 2.0 * weight * cov
     if not np.isfinite(lr_var) or lr_var <= 0.0:
-        return NeweyWestMeanResult(t_stat=float("nan"), se=float("nan"), mean=mean, n=n, max_lag=max_lag)
+        return NeweyWestMeanResult(
+            t_stat=float("nan"), se=float("nan"), mean=mean, n=n, max_lag=max_lag
+        )
     se = math.sqrt(lr_var / n)
     t_stat = float(mean / se) if se > 0.0 else float("nan")
     return NeweyWestMeanResult(t_stat=t_stat, se=float(se), mean=mean, n=n, max_lag=max_lag)
@@ -372,12 +433,16 @@ def bh_adjust(p_values: np.ndarray) -> np.ndarray:
     return np.clip(adj, 0.0, 1.0)
 
 
-def subsample_non_overlapping_positions(positions: object, min_separation: int) -> NonOverlappingSubsampleResult:
+def subsample_non_overlapping_positions(
+    positions: object, min_separation: int
+) -> NonOverlappingSubsampleResult:
     arr = pd.to_numeric(pd.Series(positions), errors="coerce").to_numpy(dtype=float)
     arr = arr[np.isfinite(arr)]
     if arr.size == 0:
         out = np.asarray([], dtype=int)
-        return NonOverlappingSubsampleResult(selected_positions=out, sample_size=0, min_separation=int(max(1, min_separation)))
+        return NonOverlappingSubsampleResult(
+            selected_positions=out, sample_size=0, min_separation=int(max(1, min_separation))
+        )
     pos = np.sort(arr.astype(int, copy=False))
     selected = [int(pos[0])]
     min_sep = int(max(1, min_separation))
@@ -385,4 +450,6 @@ def subsample_non_overlapping_positions(positions: object, min_separation: int) 
         if int(value) - int(selected[-1]) >= min_sep:
             selected.append(int(value))
     out = np.asarray(selected, dtype=int)
-    return NonOverlappingSubsampleResult(selected_positions=out, sample_size=int(out.size), min_separation=min_sep)
+    return NonOverlappingSubsampleResult(
+        selected_positions=out, sample_size=int(out.size), min_separation=min_sep
+    )

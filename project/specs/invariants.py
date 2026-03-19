@@ -5,7 +5,11 @@ import json
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional
 
-from project.spec_registry import RUNTIME_SPEC_RELATIVE_PATHS, load_runtime_spec, runtime_spec_paths as _registry_runtime_spec_paths
+from project.spec_registry import (
+    RUNTIME_SPEC_RELATIVE_PATHS,
+    load_runtime_spec,
+    runtime_spec_paths as _registry_runtime_spec_paths,
+)
 
 _REQUIRED_FIREWALL_ROLES = ("alpha", "events", "execution")
 _ALLOWED_WATERMARK_POLICIES = {"bounded_out_of_orderness"}
@@ -13,11 +17,14 @@ _ALLOWED_IDLE_SOURCE_POLICIES = {"stall", "allow_advance"}
 _REQUIRED_HASH_VERSION_FIELDS = {"schema_version", "config_version", "model_version"}
 _SUPPORTED_HASH_ALGOS = {"blake2b_256"}
 
+
 def runtime_spec_paths(repo_root: Path) -> Dict[str, Path]:
     return dict(_registry_runtime_spec_paths(repo_root))
 
+
 def _sha256_bytes(payload: bytes) -> str:
     return "sha256:" + hashlib.sha256(payload).hexdigest()
+
 
 def _canonical_spec_bytes(path: Path) -> bytes:
     if not path.exists():
@@ -37,6 +44,7 @@ def _canonical_spec_bytes(path: Path) -> bytes:
     except Exception:
         return path.read_bytes()
 
+
 def runtime_component_hashes(repo_root: Path) -> Dict[str, Optional[str]]:
     out: Dict[str, Optional[str]] = {}
     for key, path in runtime_spec_paths(repo_root).items():
@@ -46,12 +54,16 @@ def runtime_component_hashes(repo_root: Path) -> Dict[str, Optional[str]]:
         out[key] = _sha256_bytes(_canonical_spec_bytes(path))
     return out
 
-def runtime_component_hash_fields(component_hashes: Mapping[str, Optional[str]]) -> Dict[str, Optional[str]]:
+
+def runtime_component_hash_fields(
+    component_hashes: Mapping[str, Optional[str]],
+) -> Dict[str, Optional[str]]:
     return {
         "runtime_lanes_hash": component_hashes.get("lanes"),
         "runtime_firewall_hash": component_hashes.get("firewall"),
         "runtime_hashing_hash": component_hashes.get("hashing"),
     }
+
 
 def runtime_spec_hash(repo_root: Path) -> str:
     hasher = hashlib.sha256()
@@ -63,17 +75,25 @@ def runtime_spec_hash(repo_root: Path) -> str:
         hasher.update(_canonical_spec_bytes(paths[key]))
     return "sha256:" + hasher.hexdigest()
 
+
 def _load_yaml_mapping(path: Path) -> Dict[str, Any]:
     if not path.exists():
         raise FileNotFoundError(f"Missing runtime invariants spec: {path}")
-    payload = load_runtime_spec(path.stem) if Path(path).resolve().parent == _registry_runtime_spec_paths().get(path.stem, Path()).resolve().parent else None
+    payload = (
+        load_runtime_spec(path.stem)
+        if Path(path).resolve().parent
+        == _registry_runtime_spec_paths().get(path.stem, Path()).resolve().parent
+        else None
+    )
     if payload is None:
         import yaml
+
         with Path(path).open("r", encoding="utf-8") as handle:
             payload = yaml.safe_load(handle)
     if not isinstance(payload, dict):
         raise ValueError(f"Runtime invariants spec must be a mapping: {path}")
     return dict(payload)
+
 
 def load_runtime_invariants_specs(repo_root: Path) -> Dict[str, Dict[str, Any]]:
     paths = runtime_spec_paths(repo_root)
@@ -83,12 +103,14 @@ def load_runtime_invariants_specs(repo_root: Path) -> Dict[str, Dict[str, Any]]:
         "hashing": _load_yaml_mapping(paths["hashing"]),
     }
 
+
 def _as_positive_int(value: Any) -> Optional[int]:
     try:
         ivalue = int(value)
     except Exception:
         return None
     return ivalue if ivalue > 0 else None
+
 
 def _as_non_negative_int(value: Any) -> Optional[int]:
     try:
@@ -97,6 +119,7 @@ def _as_non_negative_int(value: Any) -> Optional[int]:
         return None
     return ivalue if ivalue >= 0 else None
 
+
 def _as_str_list(value: Any) -> List[str]:
     if isinstance(value, list):
         return [str(x).strip() for x in value if str(x).strip()]
@@ -104,6 +127,7 @@ def _as_str_list(value: Any) -> List[str]:
         return []
     token = str(value).strip()
     return [token] if token else []
+
 
 def validate_runtime_invariants_specs(repo_root: Path) -> List[str]:
     issues: List[str] = []
@@ -125,6 +149,8 @@ def validate_runtime_invariants_specs(repo_root: Path) -> List[str]:
     issues.extend(_validate_firewall_spec(specs["firewall"]))
     issues.extend(_validate_hashing_spec(specs["hashing"]))
     return issues
+
+
 def _validate_lanes_spec(spec: Mapping[str, Any]) -> List[str]:
     issues: List[str] = []
     schema_version = _as_positive_int(spec.get("schema_version"))
@@ -183,9 +209,7 @@ def _validate_lanes_spec(spec: Mapping[str, Any]) -> List[str]:
         processing_time_gate = lane.get("processing_time_gate")
         if not isinstance(processing_time_gate, dict):
             issues.append(f"{prefix}: processing_time_gate must be a mapping")
-        elif not isinstance(
-            processing_time_gate.get("require_recv_time_leq_decision_time"), bool
-        ):
+        elif not isinstance(processing_time_gate.get("require_recv_time_leq_decision_time"), bool):
             issues.append(
                 f"{prefix}: processing_time_gate.require_recv_time_leq_decision_time must be a bool"
             )
@@ -199,6 +223,7 @@ def _validate_lanes_spec(spec: Mapping[str, Any]) -> List[str]:
                 issues.append(f"{prefix}: inputs.normalized_event_types must be a non-empty list")
 
     return issues
+
 
 def _validate_firewall_spec(spec: Mapping[str, Any]) -> List[str]:
     issues: List[str] = []
@@ -217,7 +242,9 @@ def _validate_firewall_spec(spec: Mapping[str, Any]) -> List[str]:
 
     for role_name, role_cfg in roles.items():
         if not isinstance(role_cfg, dict):
-            issues.append(f"runtime firewall spec role '{role_name}': role config must be a mapping")
+            issues.append(
+                f"runtime firewall spec role '{role_name}': role config must be a mapping"
+            )
             continue
         provenance = _as_str_list(role_cfg.get("allowed_provenance"))
         if not provenance:
@@ -226,11 +253,15 @@ def _validate_firewall_spec(spec: Mapping[str, Any]) -> List[str]:
             )
         allow_exec_state = role_cfg.get("allow_exec_state")
         if not isinstance(allow_exec_state, bool):
-            issues.append(f"runtime firewall spec role '{role_name}': allow_exec_state must be bool")
+            issues.append(
+                f"runtime firewall spec role '{role_name}': allow_exec_state must be bool"
+            )
         elif role_name == "execution" and not allow_exec_state:
             issues.append("runtime firewall spec role 'execution': allow_exec_state must be true")
         elif role_name in {"alpha", "events"} and allow_exec_state:
-            issues.append(f"runtime firewall spec role '{role_name}': allow_exec_state must be false")
+            issues.append(
+                f"runtime firewall spec role '{role_name}': allow_exec_state must be false"
+            )
 
         if role_name == "execution":
             allowed_market_fields = _as_str_list(role_cfg.get("allowed_market_state_fields"))
@@ -243,6 +274,7 @@ def _validate_firewall_spec(spec: Mapping[str, Any]) -> List[str]:
     if "posttrade" in {item.lower() for item in alpha_provenance}:
         issues.append("runtime firewall spec role 'alpha': posttrade provenance is forbidden")
     return issues
+
 
 def _validate_hashing_spec(spec: Mapping[str, Any]) -> List[str]:
     issues: List[str] = []
@@ -260,8 +292,7 @@ def _validate_hashing_spec(spec: Mapping[str, Any]) -> List[str]:
     missing_required = sorted(_REQUIRED_HASH_VERSION_FIELDS - required_fields)
     if missing_required:
         issues.append(
-            "runtime hashing spec: require_version_fields missing "
-            + ", ".join(missing_required)
+            "runtime hashing spec: require_version_fields missing " + ", ".join(missing_required)
         )
 
     domains = _as_str_list(spec.get("domains"))
@@ -274,7 +305,5 @@ def _validate_hashing_spec(spec: Mapping[str, Any]) -> List[str]:
     else:
         for bool_field in ("json_sort_keys", "ensure_ascii"):
             if not isinstance(canonicalization.get(bool_field), bool):
-                issues.append(
-                    f"runtime hashing spec: canonicalization.{bool_field} must be a bool"
-                )
+                issues.append(f"runtime hashing spec: canonicalization.{bool_field} must be a bool")
     return issues

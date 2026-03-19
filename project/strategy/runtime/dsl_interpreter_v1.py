@@ -11,12 +11,16 @@ from project.strategy.runtime.dsl_runtime.interpreter import DslInterpreterV1 as
 try:
     from numba import njit  # type: ignore
 except ImportError:
+
     def njit(*args, **kwargs):
         if args and callable(args[0]) and not kwargs:
             return args[0]
+
         def _decorator(fn):
             return fn
+
         return _decorator
+
 
 @dataclass
 class DslInterpreterV1:
@@ -24,6 +28,7 @@ class DslInterpreterV1:
     Façade for the Strategy DSL interpreter.
     Logic is decomposed into project.strategy.dsl.* and project.strategy.runtime.dsl_runtime.*.
     """
+
     name: str = "dsl_interpreter_v1"
     required_features: List[str] = field(default_factory=lambda: ["high_96", "low_96"])
 
@@ -32,6 +37,7 @@ class DslInterpreterV1:
     ) -> pd.Series:
         impl = _InterpreterImpl(name=self.name, required_features=self.required_features)
         return impl.generate_positions(bars, features, params)
+
 
 def generate_positions_numba(
     timestamps,
@@ -108,7 +114,9 @@ def generate_positions_numba(
         random_rolls,
     )
 
+
 def _build_blueprint(raw: dict):
     """Shim that delegates to the canonical blueprint builder."""
     from project.strategy.dsl.normalize import build_blueprint
+
     return build_blueprint(raw)

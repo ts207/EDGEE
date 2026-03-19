@@ -7,7 +7,10 @@ from typing import Dict
 
 from project.io.utils import ensure_dir
 
-def append_selection_log(data_root: Path, run_id: str, stage: str, details: Dict[str, object]) -> Path:
+
+def append_selection_log(
+    data_root: Path, run_id: str, stage: str, details: Dict[str, object]
+) -> Path:
     out_dir = Path(data_root) / "reports" / "eval" / str(run_id)
     ensure_dir(out_dir)
     path = out_dir / "selection_log.json"

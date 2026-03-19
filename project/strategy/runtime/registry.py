@@ -15,6 +15,7 @@ _REGISTRY: Dict[str, Strategy] = {
 
 _SYMBOL_SUFFIX_PATTERN = re.compile(r"^(?P<base>[a-z0-9_]+)_(?P<symbol>[A-Z0-9]+)$")
 
+
 def parse_strategy_name(name: str) -> tuple[str, str | None]:
     """
     Parse a strategy name into (base, variant).
@@ -42,6 +43,7 @@ def parse_strategy_name(name: str) -> tuple[str, str | None]:
 
     return base, (variant if sep else None)
 
+
 @dataclass
 class _AliasedStrategy:
     name: str
@@ -57,17 +59,14 @@ class _AliasedStrategy:
         out = self._base.generate_positions(bars, features, dict(params or {}))
         if not hasattr(out, "attrs"):
             return out
-        metadata = (
-            out.attrs.get("strategy_metadata", {})
-            if isinstance(out.attrs, dict)
-            else {}
-        )
+        metadata = out.attrs.get("strategy_metadata", {}) if isinstance(out.attrs, dict) else {}
         if not isinstance(metadata, dict):
             metadata = {}
         metadata.setdefault("base_strategy_id", getattr(self._base, "name", ""))
         metadata["strategy_id"] = self.name
         out.attrs["strategy_metadata"] = metadata
         return out
+
 
 @dataclass
 class _SymbolScopedStrategy:
@@ -87,11 +86,7 @@ class _SymbolScopedStrategy:
         out = self._base.generate_positions(bars, features, merged_params)
         if not hasattr(out, "attrs"):
             return out
-        metadata = (
-            out.attrs.get("strategy_metadata", {})
-            if isinstance(out.attrs, dict)
-            else {}
-        )
+        metadata = out.attrs.get("strategy_metadata", {}) if isinstance(out.attrs, dict) else {}
         if not isinstance(metadata, dict):
             metadata = {}
         metadata.setdefault("base_strategy_id", getattr(self._base, "name", ""))
@@ -99,6 +94,7 @@ class _SymbolScopedStrategy:
         metadata["strategy_symbol"] = self.symbol
         out.attrs["strategy_metadata"] = metadata
         return out
+
 
 def get_strategy(name: str) -> Strategy:
     key = name.strip()
@@ -114,12 +110,11 @@ def get_strategy(name: str) -> Strategy:
         base_name = match.group("base")
         symbol = match.group("symbol")
         if base_name in _REGISTRY:
-            return _SymbolScopedStrategy(
-                name=key, symbol=symbol, _base=_REGISTRY[base_name]
-            )
+            return _SymbolScopedStrategy(name=key, symbol=symbol, _base=_REGISTRY[base_name])
 
     available = ", ".join(sorted(_REGISTRY.keys()))
     raise ValueError(f"Unknown strategy '{name}'. Available strategies: {available}")
+
 
 @dataclass
 class ResolvedStrategy:
@@ -127,6 +122,7 @@ class ResolvedStrategy:
     base: str
     variant: str | None
     metadata: dict
+
 
 def resolve_strategy(name: str) -> ResolvedStrategy:
     """
@@ -148,6 +144,7 @@ def resolve_strategy(name: str) -> ResolvedStrategy:
         metadata=metadata,
     )
 
+
 def is_dsl_strategy(name: str) -> tuple[bool, str | None]:
     """
     Check if a strategy name resolves to a DSL interpreter strategy.
@@ -163,6 +160,7 @@ def is_dsl_strategy(name: str) -> tuple[bool, str | None]:
     is_dsl = resolved.base == "dsl_interpreter_v1"
 
     return is_dsl, resolved.variant
+
 
 def list_strategies() -> List[str]:
     return sorted(_REGISTRY.keys())

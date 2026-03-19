@@ -21,6 +21,7 @@ from project.specs.manifest import start_manifest, finalize_manifest
 from project.events.registry import collect_registry_events
 from project.io.utils import ensure_dir
 
+
 def main() -> int:
     DATA_ROOT = get_data_root()
     parser = argparse.ArgumentParser("Cluster phase 1 events by correlation")
@@ -30,9 +31,7 @@ def main() -> int:
     args = parser.parse_args()
 
     symbols = [s.strip().upper() for s in args.symbols.split(",") if s.strip()]
-    manifest = start_manifest(
-        "phase1_correlation_clustering", args.run_id, vars(args), [], []
-    )
+    manifest = start_manifest("phase1_correlation_clustering", args.run_id, vars(args), [], [])
 
     try:
         # Collect all phase 1 events generated so far for this run
@@ -118,6 +117,7 @@ def main() -> int:
     except Exception as e:
         finalize_manifest(manifest, "failed", error=str(e), stats={})
         return 1
+
 
 if __name__ == "__main__":
     sys.exit(main())

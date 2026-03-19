@@ -24,7 +24,10 @@ def _should_suppress_missing_value_warning(val: Any, default: Any, context: str 
     default_is_missing = default is None or _is_non_finite_number(default)
     return bool(val_is_missing and default_is_missing)
 
-def safe_float(val: Any, default: Optional[float] = None, *, context: str | None = None) -> Optional[float]:
+
+def safe_float(
+    val: Any, default: Optional[float] = None, *, context: str | None = None
+) -> Optional[float]:
     """
     Attempt to coerce ``val`` to a finite ``float``.
 
@@ -53,7 +56,10 @@ def safe_float(val: Any, default: Optional[float] = None, *, context: str | None
         )
         return default
 
-def safe_int(val: Any, default: Optional[int] = None, *, context: str | None = None) -> Optional[int]:
+
+def safe_int(
+    val: Any, default: Optional[int] = None, *, context: str | None = None
+) -> Optional[int]:
     """
     Attempt to coerce ``val`` to an integer via float.
 
@@ -78,6 +84,7 @@ def safe_int(val: Any, default: Optional[int] = None, *, context: str | None = N
             exc,
         )
         return default
+
 
 def as_bool(val: Any) -> bool:
     if isinstance(val, bool):

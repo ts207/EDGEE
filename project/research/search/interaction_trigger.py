@@ -6,27 +6,23 @@ import pandas as pd
 
 log = logging.getLogger(__name__)
 
+
 def build_interactions(df: pd.DataFrame) -> pd.DataFrame:
     """
     Apply all registered interaction motifs to the event stream.
     """
     motifs = get_domain_registry().interaction_rows()
-    
+
     interaction_events = []
     for motif in motifs:
-        log.info("Detecting interaction: %s", motif['name'])
+        log.info("Detecting interaction: %s", motif["name"])
         int_df = detect_interactions(
-            df,
-            motif['left'],
-            motif['right'],
-            motif['op'],
-            motif.get('lag', 6),
-            motif['name']
+            df, motif["left"], motif["right"], motif["op"], motif.get("lag", 6), motif["name"]
         )
         if not int_df.empty:
             interaction_events.append(int_df)
-            
+
     if not interaction_events:
         return pd.DataFrame()
-        
+
     return pd.concat(interaction_events, ignore_index=True)

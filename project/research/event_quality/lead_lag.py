@@ -6,6 +6,7 @@ Two analyses:
 1. event_return_lead_lag: mean return + t-stat at multiple forward horizons per event
 2. event_event_lead_lag: causal ordering — how often does event B follow event A within k bars?
 """
+
 from __future__ import annotations
 
 import re
@@ -29,7 +30,7 @@ def compute_event_return_lead_lag(
     """
     For each event and each forward horizon h, compute the mean return and t-stat.
     Reveals the "peak predictive lag" per event.
-    
+
     - n: number of valid event-fires with forward return available
     - mean_return_bps: mean forward log-return in basis points
     - t_stat: t-statistic (mean / se)
@@ -62,26 +63,32 @@ def compute_event_return_lead_lag(
             valid_idx = fire_indices[fire_indices + h < n_bars]
             n = len(valid_idx)
             if n < min_n:
-                rows.append({
-                    "event_id": eid, "horizon_bars": h,
-                    "n": n, "mean_return_bps": float("nan"), "t_stat": float("nan"),
-                })
+                rows.append(
+                    {
+                        "event_id": eid,
+                        "horizon_bars": h,
+                        "n": n,
+                        "mean_return_bps": float("nan"),
+                        "t_stat": float("nan"),
+                    }
+                )
                 continue
 
-            fwd_returns = (
-                np.log(np.maximum(close[valid_idx + h], 1e-12))
-                - np.log(np.maximum(close[valid_idx], 1e-12))
+            fwd_returns = np.log(np.maximum(close[valid_idx + h], 1e-12)) - np.log(
+                np.maximum(close[valid_idx], 1e-12)
             )
             mean_r = float(fwd_returns.mean())
             std_r = float(fwd_returns.std(ddof=1))
             t = mean_r / (std_r / np.sqrt(n)) if std_r > 1e-10 else 0.0
-            rows.append({
-                "event_id": eid,
-                "horizon_bars": h,
-                "n": n,
-                "mean_return_bps": round(mean_r * 10_000, 4),
-                "t_stat": round(t, 4),
-            })
+            rows.append(
+                {
+                    "event_id": eid,
+                    "horizon_bars": h,
+                    "n": n,
+                    "mean_return_bps": round(mean_r * 10_000, 4),
+                    "t_stat": round(t, 4),
+                }
+            )
 
     return pd.DataFrame(rows) if rows else pd.DataFrame()
 
@@ -108,8 +115,7 @@ def compute_event_event_lead_lag(
         return pd.DataFrame()
 
     arrays: dict[str, np.ndarray] = {
-        eid: features[col].fillna(False).astype(bool).to_numpy()
-        for eid, col in event_cols
+        eid: features[col].fillna(False).astype(bool).to_numpy() for eid, col in event_cols
     }
     n_bars = len(features)
 
@@ -133,13 +139,15 @@ def compute_event_event_lead_lag(
                 else:
                     freq = float(arr_b[target_indices[valid]].sum() / n_valid)
 
-                rows.append({
-                    "source_event": eid_a,
-                    "target_event": eid_b,
-                    "lag_bars": lag,
-                    "frequency": round(freq, 6),
-                    "n_source": n_valid,
-                    "n_source_total": n_a,
-                })
+                rows.append(
+                    {
+                        "source_event": eid_a,
+                        "target_event": eid_b,
+                        "lag_bars": lag,
+                        "frequency": round(freq, 6),
+                        "n_source": n_valid,
+                        "n_source_total": n_a,
+                    }
+                )
 
     return pd.DataFrame(rows) if rows else pd.DataFrame()

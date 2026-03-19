@@ -3,10 +3,11 @@ import math
 from dataclasses import dataclass
 from typing import Optional
 
+
 @dataclass(frozen=True)
 class SymbolConstraints:
-    tick_size: Optional[float]   # minimum price increment
-    step_size: Optional[float]   # minimum quantity increment (lot size)
+    tick_size: Optional[float]  # minimum price increment
+    step_size: Optional[float]  # minimum quantity increment (lot size)
     min_notional: Optional[float]  # minimum order value in quote currency
 
     def round_qty(self, qty: float) -> float:
@@ -21,8 +22,10 @@ class SymbolConstraints:
         notional = abs(qty) * abs(price)
         return 0.0 if notional < self.min_notional else qty
 
+
 import numpy as np
 import pandas as pd
+
 
 def apply_constraints(
     requested_qty: pd.Series,
@@ -33,19 +36,20 @@ def apply_constraints(
     qty = requested_qty.copy()
     sign = np.sign(qty)
     abs_qty = qty.abs()
-    
+
     # 1. Round to step size
     if constraints.step_size is not None and constraints.step_size > 0.0:
         precision = max(0, -int(math.floor(math.log10(constraints.step_size))))
         abs_qty = np.floor(abs_qty / constraints.step_size) * constraints.step_size
         abs_qty = abs_qty.round(precision)
-        
+
     # 2. Enforce minimum notional
     if constraints.min_notional is not None and constraints.min_notional > 0.0:
         notional = abs_qty * price.abs()
         abs_qty = np.where(notional < constraints.min_notional, 0.0, abs_qty)
-        
+
     return pd.Series(sign * abs_qty, index=qty.index)
+
 
 def load_symbol_constraints(symbol: str, meta_dir) -> SymbolConstraints:
     """
@@ -54,6 +58,7 @@ def load_symbol_constraints(symbol: str, meta_dir) -> SymbolConstraints:
     """
     import json
     from pathlib import Path
+
     path = Path(meta_dir) / f"{symbol}.json"
     if not path.exists():
         return SymbolConstraints(tick_size=None, step_size=None, min_notional=None)

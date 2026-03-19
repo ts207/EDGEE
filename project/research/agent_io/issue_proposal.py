@@ -12,7 +12,11 @@ import pandas as pd
 from project.core.config import get_data_root
 from project.research.agent_io.execute_proposal import execute_proposal
 from project.research.agent_io.proposal_schema import load_agent_proposal
-from project.research.knowledge.memory import ensure_memory_store, read_memory_table, write_memory_table
+from project.research.knowledge.memory import (
+    ensure_memory_store,
+    read_memory_table,
+    write_memory_table,
+)
 from project.research.knowledge.schemas import canonical_json
 
 
@@ -23,7 +27,9 @@ def _proposal_signature(payload: Dict[str, Any]) -> str:
 
 def generate_run_id(program_id: str, proposal_payload: Dict[str, Any]) -> str:
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    compact_program = "".join(ch if ch.isalnum() else "_" for ch in str(program_id).strip().lower()).strip("_")
+    compact_program = "".join(
+        ch if ch.isalnum() else "_" for ch in str(program_id).strip().lower()
+    ).strip("_")
     compact_program = compact_program[:24] or "proposal"
     return f"{compact_program}_{stamp}_{_proposal_signature(proposal_payload)}"
 
@@ -61,10 +67,14 @@ def issue_proposal(
     resolved_data_root = Path(data_root) if data_root is not None else get_data_root()
     proposal = load_agent_proposal(proposal_path)
     proposal_payload = proposal.to_dict()
-    resolved_run_id = str(run_id).strip() if run_id else generate_run_id(proposal.program_id, proposal_payload)
+    resolved_run_id = (
+        str(run_id).strip() if run_id else generate_run_id(proposal.program_id, proposal_payload)
+    )
     paths = ensure_memory_store(proposal.program_id, data_root=resolved_data_root)
 
-    proposal_copy_path = _proposal_artifact_path(paths, resolved_run_id, Path(proposal_path).name or "proposal.yaml")
+    proposal_copy_path = _proposal_artifact_path(
+        paths, resolved_run_id, Path(proposal_path).name or "proposal.yaml"
+    )
     _write_proposal_copy(proposal_copy_path, proposal_path)
 
     execution = execute_proposal(
@@ -116,7 +126,9 @@ def issue_proposal(
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Choose a run_id, store a proposal under memory, and invoke run_all.")
+    parser = argparse.ArgumentParser(
+        description="Choose a run_id, store a proposal under memory, and invoke run_all."
+    )
     parser.add_argument("--proposal", required=True)
     parser.add_argument("--registry_root", default="project/configs/registries")
     parser.add_argument("--data_root", default=None)

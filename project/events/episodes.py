@@ -16,7 +16,6 @@ class Episode:
     duration_bars: int
 
 
-
 def build_episodes(
     mask: pd.Series,
     *,
@@ -33,10 +32,19 @@ def build_episodes(
             peak_idx = int(numeric_score.iloc[start : end + 1].idxmax())
         else:
             peak_idx = int(start)
-        episodes.append(Episode(start_idx=int(start), end_idx=int(end), peak_idx=peak_idx, duration_bars=int(end - start + 1)))
+        episodes.append(
+            Episode(
+                start_idx=int(start),
+                end_idx=int(end),
+                peak_idx=peak_idx,
+                duration_bars=int(end - start + 1),
+            )
+        )
     return episodes
 
 
-
 def episodes_to_frame(episodes: list[Episode]) -> pd.DataFrame:
-    return pd.DataFrame([ep.__dict__ for ep in episodes], columns=["start_idx", "end_idx", "peak_idx", "duration_bars"])
+    return pd.DataFrame(
+        [ep.__dict__ for ep in episodes],
+        columns=["start_idx", "end_idx", "peak_idx", "duration_bars"],
+    )

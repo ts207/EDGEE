@@ -11,9 +11,10 @@ from project.io.utils import write_parquet
 
 LOGGER = logging.getLogger(__name__)
 
+
 class FeatureAuditRegistry:
     """Registry for tracking feature provenance and staleness."""
-    
+
     def __init__(self):
         self.metadata: Dict[str, Dict[str, Any]] = {}
         self.audit_records: List[pd.DataFrame] = []
@@ -43,13 +44,15 @@ class FeatureAuditRegistry:
                 "min_lag": min_lag,
                 "run_id": run_id,
             }
-        
-        audit_df = pd.DataFrame({
-            "run_id": run_id,
-            "symbol": symbol,
-            "feature_table": source_table,
-            "age_seconds": age_seconds,
-        })
+
+        audit_df = pd.DataFrame(
+            {
+                "run_id": run_id,
+                "symbol": symbol,
+                "feature_table": source_table,
+                "age_seconds": age_seconds,
+            }
+        )
         # Add column names as context
         audit_df["features"] = ",".join(feature_cols)
         self.audit_records.append(audit_df)
@@ -57,18 +60,15 @@ class FeatureAuditRegistry:
     def get_summary(self) -> Dict[str, Any]:
         if not self.audit_records:
             return {}
-        
+
         full_audit = pd.concat(self.audit_records, ignore_index=True)
-        summary = {
-            "feature_manifest": self.metadata,
-            "staleness_diagnostics": {}
-        }
-        
+        summary = {"feature_manifest": self.metadata, "staleness_diagnostics": {}}
+
         for table, group in full_audit.groupby("feature_table"):
             ages = group["age_seconds"].dropna()
             if ages.empty:
                 continue
-            
+
             summary["staleness_diagnostics"][str(table)] = {
                 "mean": float(ages.mean()),
                 "median": float(ages.median()),
@@ -78,21 +78,22 @@ class FeatureAuditRegistry:
                 "stale_count_1h": int((ages > 3600).sum()),
                 "stale_rate_1h": float((ages > 3600).mean()),
             }
-        
+
         return summary
 
     def write_artifacts(self, out_dir: Path):
         """Write feature manifest and audit data to disk."""
         out_dir.mkdir(parents=True, exist_ok=True)
-        
+
         # 1. Feature Manifest (JSON)
         with open(out_dir / "feature_manifest.json", "w") as f:
             json.dump(self.metadata, f, indent=2)
-            
+
         # 2. Join Audit (Parquet)
         if self.audit_records:
             full_audit = pd.concat(self.audit_records, ignore_index=True)
             write_parquet(full_audit, out_dir / "feature_join_audit.parquet")
+
 
 def compute_feature_age(
     events_ts: pd.Series,
@@ -101,6 +102,7 @@ def compute_feature_age(
     """Compute age of feature data at the point of join (seconds)."""
     # events_ts and feature_ts must be UTC datetime64[ns]
     return (events_ts - feature_ts).dt.total_seconds()
+
 
 def enforce_staleness_thresholds(
     age_seconds: pd.Series,
@@ -111,11 +113,11 @@ def enforce_staleness_thresholds(
     """Reject features if excessive stale usage is detected in confirmatory mode."""
     stale_mask = age_seconds > max_staleness_seconds
     stale_rate = stale_mask.mean()
-    
-    if stale_rate > 0.05: # Threshold: 5% stale rows
+
+    if stale_rate > 0.05:  # Threshold: 5% stale rows
         msg = f"Feature {feature_name} has excessive stale usage: {stale_rate:.2%} > 5.00% (max_age={max_staleness_seconds}s)"
         is_promo = str(run_mode).lower() in {"production", "certification", "promotion", "deploy"}
-        
+
         if is_promo:
             raise ValueError(msg)
         else:

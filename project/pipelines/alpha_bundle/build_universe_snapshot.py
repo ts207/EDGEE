@@ -16,9 +16,11 @@ from project.io.utils import ensure_dir, list_parquet_files, read_parquet, write
 from project.specs.manifest import finalize_manifest, start_manifest
 from project.core.validation import ensure_utc_timestamp
 
+
 def _stable_symbol_sort(symbols: List[str]) -> List[str]:
     # Deterministic ordering. If you maintain a canonical ID mapping, apply it here.
     return sorted(symbols)
+
 
 def main() -> int:
     p = argparse.ArgumentParser(description="Build UniverseSnapshot (deterministic, PIT-safe)")
@@ -33,9 +35,18 @@ def main() -> int:
     p.add_argument("--bar_interval", default="15m")
     p.add_argument("--start", default=None, help="ISO start (inclusive), e.g. 2021-01-01T00:00:00Z")
     p.add_argument("--end", default=None, help="ISO end (exclusive), e.g. 2022-01-01T00:00:00Z")
-    p.add_argument("--adv_window_bars", type=int, default=96, help="Rolling window (bars) for ADV proxy (default 96 = 1 day at 15m)")
-    p.add_argument("--adv_min_usd", type=float, default=1_000_000.0, help="Minimum rolling USD ADV proxy")
-    p.add_argument("--out_dir", default=None, help="Defaults to data/feature_store/universe_snapshots")
+    p.add_argument(
+        "--adv_window_bars",
+        type=int,
+        default=96,
+        help="Rolling window (bars) for ADV proxy (default 96 = 1 day at 15m)",
+    )
+    p.add_argument(
+        "--adv_min_usd", type=float, default=1_000_000.0, help="Minimum rolling USD ADV proxy"
+    )
+    p.add_argument(
+        "--out_dir", default=None, help="Defaults to data/feature_store/universe_snapshots"
+    )
     args = p.parse_args()
 
     run_id = args.run_id
@@ -44,13 +55,23 @@ def main() -> int:
 
     project_root = PROJECT_ROOT
     data_root = get_data_root()
-    out_dir = Path(args.out_dir) if args.out_dir else data_root / "feature_store" / "universe_snapshots"
+    out_dir = (
+        Path(args.out_dir) if args.out_dir else data_root / "feature_store" / "universe_snapshots"
+    )
     ensure_dir(out_dir)
 
     stage = "alpha_universe_snapshot"
-    manifest = start_manifest(stage, run_id, params={"universe_id": args.universe_id}, inputs=[], outputs=[{"path": str(out_dir)}])
+    manifest = start_manifest(
+        stage,
+        run_id,
+        params={"universe_id": args.universe_id},
+        inputs=[],
+        outputs=[{"path": str(out_dir)}],
+    )
 
-    cleaned_root = Path(args.cleaned_root) if args.cleaned_root else (data_root / "lake" / "cleaned")
+    cleaned_root = (
+        Path(args.cleaned_root) if args.cleaned_root else (data_root / "lake" / "cleaned")
+    )
 
     # Load bars for each symbol and build included_flags per ts_event.
     # This produces a PIT-consistent membership snapshot at each bar timestamp.
@@ -74,7 +95,11 @@ def main() -> int:
             dfb = dfb[dfb[tcol] < end_ts]
 
         price_col = "mid" if "mid" in dfb.columns else ("close" if "close" in dfb.columns else None)
-        vol_col = "volume" if "volume" in dfb.columns else ("quote_volume" if "quote_volume" in dfb.columns else None)
+        vol_col = (
+            "volume"
+            if "volume" in dfb.columns
+            else ("quote_volume" if "quote_volume" in dfb.columns else None)
+        )
         if price_col is None or vol_col is None:
             raise ValueError(f"Bars for {sym} must include price (mid/close) and volume")
 
@@ -85,7 +110,11 @@ def main() -> int:
             usd_vol = dfb[price_col].astype(float) * dfb[vol_col].astype(float)
         adv = usd_vol.rolling(args.adv_window_bars, min_periods=args.adv_window_bars).mean()
 
-        is_gap = dfb["is_gap"].astype(bool) if "is_gap" in dfb.columns else pd.Series(False, index=dfb.index)
+        is_gap = (
+            dfb["is_gap"].astype(bool)
+            if "is_gap" in dfb.columns
+            else pd.Series(False, index=dfb.index)
+        )
         ok = (
             np.isfinite(dfb[price_col].astype(float))
             & np.isfinite(usd_vol.astype(float))
@@ -112,24 +141,40 @@ def main() -> int:
             # exact timestamp match for bar clocks; if missing, treat as excluded
             m = dfp[dfp["ts_event"] == ts]
             flags.append(bool(m.iloc[-1]["included"]) if not m.empty else False)
-        payload = json.dumps({"universe_id": args.universe_id, "ts_event": ts.isoformat(), "symbols_sorted": symbols_sorted, "included_flags": flags}, sort_keys=True).encode("utf-8")
+        payload = json.dumps(
+            {
+                "universe_id": args.universe_id,
+                "ts_event": ts.isoformat(),
+                "symbols_sorted": symbols_sorted,
+                "included_flags": flags,
+            },
+            sort_keys=True,
+        ).encode("utf-8")
         import hashlib
-        rows.append({
-            "ts_event": ts,
-            "universe_id": args.universe_id,
-            "symbols_sorted": symbols_sorted,
-            "included_flags": flags,
-            "snapshot_hash": hashlib.sha256(payload).hexdigest(),
-            "universe_snapshot_version": 1,
-        })
+
+        rows.append(
+            {
+                "ts_event": ts,
+                "universe_id": args.universe_id,
+                "symbols_sorted": symbols_sorted,
+                "included_flags": flags,
+                "snapshot_hash": hashlib.sha256(payload).hexdigest(),
+                "universe_snapshot_version": 1,
+            }
+        )
 
     df = pd.DataFrame(rows)
     df["ts_event"] = ensure_utc_timestamp(df["ts_event"], "ts_event")
     out_path = out_dir / f"universe_snapshot_{args.universe_id}.parquet"
     write_parquet(df, out_path)
 
-    finalize_manifest(manifest, status="success", stats={"rows": int(len(df)), "out": str(out_path), "symbols": len(symbols_sorted)})
+    finalize_manifest(
+        manifest,
+        status="success",
+        stats={"rows": int(len(df)), "out": str(out_path), "symbols": len(symbols_sorted)},
+    )
     return 0
+
 
 if __name__ == "__main__":
     raise SystemExit(main())

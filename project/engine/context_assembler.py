@@ -35,6 +35,7 @@ _CONTEXT_COLUMNS = [
     "ms_context_state_code",
 ]
 
+
 def load_context_data(
     data_root: Path, symbol: str, run_id: str, timeframe: str = "15m"
 ) -> pd.DataFrame:
@@ -87,6 +88,7 @@ def load_context_data(
 
     return context[["timestamp", *_CONTEXT_COLUMNS]].sort_values("timestamp").reset_index(drop=True)
 
+
 def apply_context_defaults(frame: pd.DataFrame) -> pd.DataFrame:
     out = frame.copy()
     if "fp_def_version" not in out.columns:
@@ -94,9 +96,13 @@ def apply_context_defaults(frame: pd.DataFrame) -> pd.DataFrame:
     out["fp_def_version"] = out["fp_def_version"].fillna(FP_DEF_VERSION)
 
     for col, default in [
-        ("fp_active", 0), ("fp_age_bars", 0), ("fp_norm_due", 0),
-        ("fp_severity", 0.0), ("fp_event_id", None),
-        ("fp_enter_ts", pd.NaT), ("fp_exit_ts", pd.NaT),
+        ("fp_active", 0),
+        ("fp_age_bars", 0),
+        ("fp_norm_due", 0),
+        ("fp_severity", 0.0),
+        ("fp_event_id", None),
+        ("fp_enter_ts", pd.NaT),
+        ("fp_exit_ts", pd.NaT),
     ]:
         if col not in out.columns:
             out[col] = default
@@ -109,9 +115,12 @@ def apply_context_defaults(frame: pd.DataFrame) -> pd.DataFrame:
     out.loc[inactive, "fp_event_id"] = None
     out.loc[inactive, "fp_enter_ts"] = pd.NaT
     out.loc[inactive, "fp_exit_ts"] = pd.NaT
-    out["fp_severity"] = pd.to_numeric(out["fp_severity"], errors="coerce").fillna(0.0).astype(float)
+    out["fp_severity"] = (
+        pd.to_numeric(out["fp_severity"], errors="coerce").fillna(0.0).astype(float)
+    )
     out.loc[inactive, "fp_severity"] = 0.0
     return out
+
 
 def merge_event_flags(features: pd.DataFrame, event_flags: pd.DataFrame | None) -> pd.DataFrame:
     if event_flags is None or event_flags.empty:
@@ -128,7 +137,10 @@ def merge_event_flags(features: pd.DataFrame, event_flags: pd.DataFrame | None) 
         merged[col] = merged[col].astype("boolean").fillna(False).astype(bool)
     return merged
 
-def merge_event_features(features: pd.DataFrame, event_features: pd.DataFrame | None, ffill_limit: int = 12) -> pd.DataFrame:
+
+def merge_event_features(
+    features: pd.DataFrame, event_features: pd.DataFrame | None, ffill_limit: int = 12
+) -> pd.DataFrame:
     if event_features is None or event_features.empty:
         return features
     out = features.copy()
@@ -140,6 +152,7 @@ def merge_event_features(features: pd.DataFrame, event_features: pd.DataFrame | 
     if event_cols and ffill_limit > 0:
         merged[event_cols] = merged[event_cols].ffill(limit=ffill_limit)
     return merged
+
 
 def assemble_symbol_context(
     bars: pd.DataFrame,
@@ -160,10 +173,10 @@ def assemble_symbol_context(
         context = context[context["timestamp"] >= start_ts].copy()
     if end_ts is not None:
         context = context[context["timestamp"] <= end_ts].copy()
-    
+
     features = features.merge(context, on="timestamp", how="left", validate="one_to_one")
     features = apply_context_defaults(features)
-    
+
     if isinstance(event_flags, pd.DataFrame):
         flags = event_flags.copy()
         if not flags.empty and "timestamp" in flags.columns:
@@ -188,15 +201,15 @@ def assemble_symbol_context(
         for tf, htf_df in higher_timeframe_features.items():
             if htf_df.empty:
                 continue
-            
+
             # Ensure columns are prefixed/suffixed to avoid collisions
             htf_df = htf_df.copy()
             htf_df["timestamp"] = pd.to_datetime(htf_df["timestamp"], utc=True)
             htf_df = htf_df.sort_values("timestamp")
-            
+
             cols_to_map = [c for c in htf_df.columns if c != "timestamp"]
             htf_df = htf_df.rename(columns={c: f"{c}_{tf}" for c in cols_to_map})
-            
+
             # Use backward merge_asof to prevent lookahead bias
             # This ensures that at time T, we only see features from higher timeframes
             # that were completed at or before time T.

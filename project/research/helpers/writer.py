@@ -9,11 +9,13 @@ import yaml
 
 from project.strategy.dsl import Blueprint
 
+
 def _replace_model(instance: Any, **updates: object) -> Any:
     model_copy = getattr(instance, "model_copy", None)
     if callable(model_copy):
         return model_copy(update=updates)
     return dataclasses.replace(instance, **updates)
+
 
 def sort_blueprints_for_write(
     blueprints: Sequence[Blueprint],
@@ -36,6 +38,7 @@ def sort_blueprints_for_write(
 
     return sorted(list(blueprints), key=_sort_key)
 
+
 def apply_portfolio_cap(
     blueprints: Sequence[Blueprint],
     max_concurrent_positions: int | None,
@@ -49,6 +52,7 @@ def apply_portfolio_cap(
     dropped_ids = [bp.id for bp in out[cap:]]
     return out[:cap], dropped_ids
 
+
 def apply_retail_constraints(
     blueprints: Sequence[Blueprint],
     retail_constraints: Dict[str, object],
@@ -60,10 +64,9 @@ def apply_retail_constraints(
         constraints = dict(bp.lineage.constraints)
         constraints.update(retail_constraints)
         new_lineage = _replace_model(bp.lineage, constraints=constraints)
-        updated.append(
-            _replace_model(bp, lineage=new_lineage)
-        )
+        updated.append(_replace_model(bp, lineage=new_lineage))
     return updated
+
 
 def write_blueprint_artifacts(
     *,
@@ -73,9 +76,7 @@ def write_blueprint_artifacts(
 ) -> None:
     tmp_jsonl = out_jsonl.with_suffix(".jsonl.tmp")
     lines = [json.dumps(bp.to_dict(), sort_keys=True) for bp in blueprints]
-    tmp_jsonl.write_text(
-        "\n".join(lines) + ("\n" if lines else ""), encoding="utf-8"
-    )
+    tmp_jsonl.write_text("\n".join(lines) + ("\n" if lines else ""), encoding="utf-8")
     tmp_jsonl.replace(out_jsonl)
 
     tmp_yaml = out_yaml.with_suffix(".yaml.tmp")

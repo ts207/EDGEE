@@ -9,6 +9,7 @@ from project.io.utils import ensure_dir
 
 _LOG = logging.getLogger(__name__)
 
+
 def run_generic_detector_task(
     run_id: str,
     event_type: str,
@@ -49,6 +50,7 @@ def run_generic_detector_task(
         argv.append(str(value))
     return int(analyze_events_main(argv))
 
+
 def run_task(run_id: str, args_list: List[str]) -> int:
     """Entry point for in-process DAG execution."""
     parser = argparse.ArgumentParser()
@@ -57,9 +59,9 @@ def run_task(run_id: str, args_list: List[str]) -> int:
     parser.add_argument("--timeframe", default="5m")
     # ... other params ...
     args, unknown = parser.parse_known_args(args_list)
-    
+
     symbols = [s.strip().upper() for s in args.symbols.split(",") if s.strip()]
-    
+
     params: Dict[str, Any] = {}
     idx = 0
     while idx < len(unknown):
@@ -75,7 +77,7 @@ def run_task(run_id: str, args_list: List[str]) -> int:
             continue
         params[key] = unknown[next_idx]
         idx += 2
-    
+
     return run_generic_detector_task(
         run_id=run_id,
         event_type=args.event_type,

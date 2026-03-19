@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 from typing import Optional
 
+
 def trailing_quantile(
     series: pd.Series,
     *,
@@ -13,7 +14,7 @@ def trailing_quantile(
 ) -> pd.Series:
     """
     Compute rolling quantile with explicit lag to ensure PIT safety.
-    
+
     Parameters
     ----------
     series : pd.Series
@@ -25,7 +26,7 @@ def trailing_quantile(
     lag : int
         Number of bars to shift the result. Default 1 (causal).
         lag=0 would include the current bar in the result's 'current' position
-        but the rolling window itself always includes the current bar of the 
+        but the rolling window itself always includes the current bar of the
         underlying rolling object. Shifting ensures the value at 't' only
         uses data from <= t-lag.
     min_periods : int | None
@@ -33,11 +34,12 @@ def trailing_quantile(
     """
     if min_periods is None:
         min_periods = window
-        
+
     rolled = series.rolling(window=window, min_periods=min_periods).quantile(q)
     if lag > 0:
         return rolled.shift(lag)
     return rolled
+
 
 def trailing_mean(
     series: pd.Series,
@@ -51,6 +53,7 @@ def trailing_mean(
     rolled = series.rolling(window=window, min_periods=min_periods).mean()
     return rolled.shift(lag) if lag > 0 else rolled
 
+
 def trailing_std(
     series: pd.Series,
     *,
@@ -63,6 +66,7 @@ def trailing_std(
     rolled = series.rolling(window=window, min_periods=min_periods).std()
     return rolled.shift(lag) if lag > 0 else rolled
 
+
 def trailing_median(
     series: pd.Series,
     *,
@@ -74,6 +78,7 @@ def trailing_median(
         min_periods = window
     rolled = series.rolling(window=window, min_periods=min_periods).median()
     return rolled.shift(lag) if lag > 0 else rolled
+
 
 def trailing_percentile_rank(
     series: pd.Series,
@@ -88,7 +93,7 @@ def trailing_percentile_rank(
     """
     if min_periods is None:
         min_periods = window
-        
+
     def _rank(x):
         if len(x) < 2:
             return np.nan
@@ -103,7 +108,9 @@ def trailing_percentile_rank(
             return np.nan
         return (past < current).sum() / len(past)
 
-    # We use window + 1 because the apply function receives the current point 
+    # We use window + 1 because the apply function receives the current point
     # and we want 'window' points of history.
     rolled = series.rolling(window=window + 1, min_periods=min_periods + 1).apply(_rank, raw=True)
-    return rolled.shift(lag-1) if lag > 0 else rolled # If lag=1, no extra shift needed beyond window inclusion
+    return (
+        rolled.shift(lag - 1) if lag > 0 else rolled
+    )  # If lag=1, no extra shift needed beyond window inclusion

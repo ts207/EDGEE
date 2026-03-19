@@ -12,9 +12,12 @@ from project.specs.manifest import finalize_manifest, start_manifest
 from project.specs.invariants import load_runtime_invariants_specs
 from project.runtime.replay import determinism_replay_check
 
+
 def main() -> int:
     data_root = get_data_root()
-    parser = argparse.ArgumentParser(description="Run deterministic replay digest checks on causal ticks.")
+    parser = argparse.ArgumentParser(
+        description="Run deterministic replay digest checks on causal ticks."
+    )
     parser.add_argument("--run_id", required=True)
     parser.add_argument("--fail_on_mismatch", type=int, default=0)
     args = parser.parse_args()
@@ -34,7 +37,9 @@ def main() -> int:
     outputs: List[Dict[str, object]] = [
         {"path": str(report_path), "rows": 1, "start_ts": None, "end_ts": None}
     ]
-    manifest = start_manifest("run_determinism_replay_checks", str(args.run_id), params, inputs, outputs)
+    manifest = start_manifest(
+        "run_determinism_replay_checks", str(args.run_id), params, inputs, outputs
+    )
 
     try:
         ticks: List[Dict[str, object]]
@@ -80,6 +85,7 @@ def main() -> int:
     except Exception as exc:
         finalize_manifest(manifest, "failed", error=str(exc), stats={})
         return 1
+
 
 if __name__ == "__main__":
     sys.exit(main())

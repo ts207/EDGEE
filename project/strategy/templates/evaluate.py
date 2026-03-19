@@ -10,26 +10,29 @@ try:
 except ImportError:
     pass  # We will rely on sys.path or the package root correctly mapping engine
 
-def evaluate_candidates(specs: List[StrategySpec], bundle: DataBundle, engine_cfg: Dict[str, Any]) -> pd.DataFrame:
+
+def evaluate_candidates(
+    specs: List[StrategySpec], bundle: DataBundle, engine_cfg: Dict[str, Any]
+) -> pd.DataFrame:
     metrics = []
-    
+
     # Pre-compute close-to-close returns once since they are spec-invariant.
     if "close" not in bundle.prices.columns:
         raise ValueError("DataBundle prices must contain a 'close' column.")
-    
+
     close = bundle.prices["close"].astype(float)
     ret = compute_returns(close)
-    
+
     cost_bps = engine_cfg.get("cost_bps", 5.0)
     execution_lag = int(engine_cfg.get("execution_lag_bars", 1))
-    
+
     for spec in specs:
         pos, debug = compile_positions(spec, bundle)
-        
+
         # Apply standard execution latency lag to prevent lookahead biases.
         if execution_lag > 0:
             pos = pos.shift(execution_lag).fillna(0).astype(int)
-            
+
         pnl_df = compute_pnl_components(
             pos=pos,
             ret=ret,
@@ -37,16 +40,16 @@ def evaluate_candidates(specs: List[StrategySpec], bundle: DataBundle, engine_cf
             funding_rate=None,
             borrow_rate=None,
         )
-        
+
         pnl = pnl_df["pnl"]
-        
+
         pos_float = pos.astype(float)
         turnover = (pos_float - pos_float.shift(1).fillna(0.0)).abs().sum()
         trades = int(turnover / 2.0)
-        
+
         total_pnl_raw = float(pnl.sum())
         net_expectancy_bps = (total_pnl_raw / trades * 10000.0) if trades > 0 else 0.0
-        
+
         res = {
             "strategy_id": spec.strategy_id,
             "event_family": spec.event_family,
@@ -56,9 +59,9 @@ def evaluate_candidates(specs: List[StrategySpec], bundle: DataBundle, engine_cf
             "total_pnl": total_pnl_raw,
             "net_expectancy_bps": net_expectancy_bps,
             "mean_pnl": float(pnl.mean()),
-            "std_pnl": float(pnl.std())
+            "std_pnl": float(pnl.std()),
         }
         res.update(spec.params)
         metrics.append(res)
-        
+
     return pd.DataFrame(metrics)

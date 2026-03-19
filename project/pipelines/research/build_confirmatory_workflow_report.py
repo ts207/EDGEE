@@ -5,11 +5,15 @@ import sys
 from pathlib import Path
 
 from project.core.config import get_data_root
-from project.research.services.confirmatory_candidate_service import write_confirmatory_workflow_report
+from project.research.services.confirmatory_candidate_service import (
+    write_confirmatory_workflow_report,
+)
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Write a confirmatory workflow report combining window readiness and candidate comparison.")
+    parser = argparse.ArgumentParser(
+        description="Write a confirmatory workflow report combining window readiness and candidate comparison."
+    )
     parser.add_argument("--origin_run_id", required=True)
     parser.add_argument("--target_run_id", default=None)
     parser.add_argument("--data_root", default=None)

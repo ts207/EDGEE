@@ -32,10 +32,7 @@ def get_feature_definition(name: str) -> FeatureDefinition | None:
 
 
 def list_feature_definitions() -> list[FeatureDefinition]:
-    return [
-        _FEATURE_DEFINITIONS[key]
-        for key in sorted(_FEATURE_DEFINITIONS)
-    ]
+    return [_FEATURE_DEFINITIONS[key] for key in sorted(_FEATURE_DEFINITIONS)]
 
 
 def has_feature_definition(name: str) -> bool:
@@ -338,7 +335,11 @@ def ensure_market_context_feature_definitions_registered() -> None:
         FeatureDefinition(
             name="ms_funding_confidence",
             definition="Confidence of the canonical funding regime classification.",
-            dependencies=("prob_funding_neutral", "prob_funding_persistent", "prob_funding_extreme"),
+            dependencies=(
+                "prob_funding_neutral",
+                "prob_funding_persistent",
+                "prob_funding_extreme",
+            ),
             units="probability",
             source_stage="build_market_context",
             owner="project.pipelines.features.build_market_context",
@@ -346,7 +347,11 @@ def ensure_market_context_feature_definitions_registered() -> None:
         FeatureDefinition(
             name="ms_funding_entropy",
             definition="Normalized entropy of the funding regime probability distribution.",
-            dependencies=("prob_funding_neutral", "prob_funding_persistent", "prob_funding_extreme"),
+            dependencies=(
+                "prob_funding_neutral",
+                "prob_funding_persistent",
+                "prob_funding_extreme",
+            ),
             units="entropy",
             source_stage="build_market_context",
             owner="project.pipelines.features.build_market_context",

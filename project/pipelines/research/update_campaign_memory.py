@@ -77,21 +77,35 @@ def _build_belief_state(
             ascending=[False, False, True],
         ).head(int(promising_top_k))
         promising_regions = ranked[
-            [c for c in ["event_type", "template_id", "direction", "horizon", "region_key"] if c in ranked.columns]
+            [
+                c
+                for c in ["event_type", "template_id", "direction", "horizon", "region_key"]
+                if c in ranked.columns
+            ]
         ].to_dict(orient="records")
 
     avoid_regions = []
     if not tested_regions.empty:
-        rejected = tested_regions[tested_regions["primary_fail_gate"].astype(str) != ""].head(int(avoid_top_k))
+        rejected = tested_regions[tested_regions["primary_fail_gate"].astype(str) != ""].head(
+            int(avoid_top_k)
+        )
         avoid_regions = rejected[
-            [c for c in ["event_type", "template_id", "primary_fail_gate", "region_key"] if c in rejected.columns]
+            [
+                c
+                for c in ["event_type", "template_id", "primary_fail_gate", "region_key"]
+                if c in rejected.columns
+            ]
         ].to_dict(orient="records")
 
     open_repairs = []
     if not failures.empty:
-        open_repairs = failures[
-            [c for c in ["stage", "failure_class", "failure_detail"] if c in failures.columns]
-        ].head(int(repair_top_k)).to_dict(orient="records")
+        open_repairs = (
+            failures[
+                [c for c in ["stage", "failure_class", "failure_detail"] if c in failures.columns]
+            ]
+            .head(int(repair_top_k))
+            .to_dict(orient="records")
+        )
 
     return {
         "current_focus": str(reflection.get("recommended_next_action", "")),
@@ -123,17 +137,27 @@ def _build_next_actions(
                 ["_gate_rank", "after_cost_expectancy", "q_value"],
                 ascending=[False, False, True],
             )
-            .head(int(exploit_top_k))[[c for c in ["event_type", "template_id", "direction", "horizon", "region_key"] if c in tested_regions.columns]]
+            .head(int(exploit_top_k))[
+                [
+                    c
+                    for c in ["event_type", "template_id", "direction", "horizon", "region_key"]
+                    if c in tested_regions.columns
+                ]
+            ]
             .to_dict(orient="records")
         )
 
     repair = []
     if not failures.empty:
-        repair = failures.head(int(repair_top_k))[[c for c in ["stage", "failure_class", "failure_detail"] if c in failures.columns]].to_dict(orient="records")
+        repair = failures.head(int(repair_top_k))[
+            [c for c in ["stage", "failure_class", "failure_detail"] if c in failures.columns]
+        ].to_dict(orient="records")
 
     recommended_experiment = {}
     try:
-        recommended_experiment = json.loads(str(reflection.get("recommended_next_experiment", "{}")))
+        recommended_experiment = json.loads(
+            str(reflection.get("recommended_next_experiment", "{}"))
+        )
     except json.JSONDecodeError:
         recommended_experiment = {}
 
@@ -185,8 +209,12 @@ def update_campaign_memory(
 ) -> Dict[str, Any]:
     paths = ensure_memory_store(program_id, data_root=data_root)
 
-    incoming_tested = build_tested_regions_snapshot(run_id=run_id, program_id=program_id, data_root=data_root)
-    incoming_failures = build_failures_snapshot(run_id=run_id, program_id=program_id, data_root=data_root)
+    incoming_tested = build_tested_regions_snapshot(
+        run_id=run_id, program_id=program_id, data_root=data_root
+    )
+    incoming_failures = build_failures_snapshot(
+        run_id=run_id, program_id=program_id, data_root=data_root
+    )
     reflection_row = build_run_reflection(run_id=run_id, program_id=program_id, data_root=data_root)
     reflection_df = pd.DataFrame([reflection_row])
 
@@ -209,10 +237,30 @@ def update_campaign_memory(
     write_memory_table(program_id, "tested_regions", tested_regions, data_root=data_root)
     write_memory_table(program_id, "failures", failures, data_root=data_root)
     write_memory_table(program_id, "reflections", reflections, data_root=data_root)
-    write_memory_table(program_id, "region_statistics", compute_region_statistics(tested_regions), data_root=data_root)
-    write_memory_table(program_id, "event_statistics", compute_event_statistics(tested_regions), data_root=data_root)
-    write_memory_table(program_id, "template_statistics", compute_template_statistics(tested_regions), data_root=data_root)
-    write_memory_table(program_id, "context_statistics", compute_context_statistics(tested_regions), data_root=data_root)
+    write_memory_table(
+        program_id,
+        "region_statistics",
+        compute_region_statistics(tested_regions),
+        data_root=data_root,
+    )
+    write_memory_table(
+        program_id,
+        "event_statistics",
+        compute_event_statistics(tested_regions),
+        data_root=data_root,
+    )
+    write_memory_table(
+        program_id,
+        "template_statistics",
+        compute_template_statistics(tested_regions),
+        data_root=data_root,
+    )
+    write_memory_table(
+        program_id,
+        "context_statistics",
+        compute_context_statistics(tested_regions),
+        data_root=data_root,
+    )
 
     _write_json(
         paths.belief_state,
@@ -293,7 +341,10 @@ def main(argv: list[str] | None = None) -> int:
         run_manifest = load_run_manifest(str(args.run_id))
     program_id = str(args.program_id or run_manifest.get("program_id", "")).strip()
     if not program_id:
-        _LOG.info("Skipping campaign memory update for run %s because no program_id was provided.", args.run_id)
+        _LOG.info(
+            "Skipping campaign memory update for run %s because no program_id was provided.",
+            args.run_id,
+        )
         return 0
 
     manifest = start_manifest("update_campaign_memory", str(args.run_id), vars(args), [], [])
@@ -313,7 +364,10 @@ def main(argv: list[str] | None = None) -> int:
         )
         paths = ensure_memory_store(program_id, data_root=data_root)
         manifest["outputs"] = [
-            {"path": str(paths.tested_regions), "artifact_type": "experiment.memory.tested_regions"},
+            {
+                "path": str(paths.tested_regions),
+                "artifact_type": "experiment.memory.tested_regions",
+            },
             {"path": str(paths.reflections), "artifact_type": "experiment.memory.reflections"},
             {"path": str(paths.failures), "artifact_type": "experiment.memory.failures"},
             {

@@ -26,17 +26,23 @@ from project.events.registry import (
 from project.specs.manifest import finalize_manifest, start_manifest
 from project.schemas.data_contracts import EventRegistrySchema
 
+
 def _parse_symbols(symbols_csv: str) -> List[str]:
     DATA_ROOT = get_data_root()
     symbols = [s.strip().upper() for s in str(symbols_csv).split(",") if s.strip()]
     return list(dict.fromkeys(symbols))
 
+
 def main() -> int:
     DATA_ROOT = get_data_root()
-    parser = argparse.ArgumentParser(description="Build canonical event registry artifacts from phase1 outputs")
+    parser = argparse.ArgumentParser(
+        description="Build canonical event registry artifacts from phase1 outputs"
+    )
     parser.add_argument("--run_id", required=True)
     parser.add_argument("--symbols", required=True)
-    parser.add_argument("--event_type", default="all", choices=["all", *sorted(EVENT_REGISTRY_SPECS.keys())])
+    parser.add_argument(
+        "--event_type", default="all", choices=["all", *sorted(EVENT_REGISTRY_SPECS.keys())]
+    )
     parser.add_argument("--timeframe", default="5m")
     parser.add_argument("--log_path", default=None)
     args = parser.parse_args()
@@ -45,13 +51,19 @@ def main() -> int:
     log_handlers = [logging.StreamHandler(sys.stdout)]
     if args.log_path:
         log_handlers.append(logging.FileHandler(args.log_path))
-    logging.basicConfig(level=logging.INFO, handlers=log_handlers, format="%(asctime)s %(levelname)s %(message)s")
+    logging.basicConfig(
+        level=logging.INFO, handlers=log_handlers, format="%(asctime)s %(levelname)s %(message)s"
+    )
 
     try:
         assert_event_specs_available()
 
         symbols = _parse_symbols(args.symbols)
-        selected_event_types = sorted(EVENT_REGISTRY_SPECS.keys()) if args.event_type == "all" else [str(args.event_type)]
+        selected_event_types = (
+            sorted(EVENT_REGISTRY_SPECS.keys())
+            if args.event_type == "all"
+            else [str(args.event_type)]
+        )
 
         params = {
             "run_id": args.run_id,
@@ -68,8 +80,15 @@ def main() -> int:
             # Try both relative paths
             src = DATA_ROOT / "reports" / spec.reports_dir / args.run_id / spec.events_file
             if not src.exists():
-                src = DATA_ROOT / "data" / "reports" / spec.reports_dir / args.run_id / spec.events_file
-            
+                src = (
+                    DATA_ROOT
+                    / "data"
+                    / "reports"
+                    / spec.reports_dir
+                    / args.run_id
+                    / spec.events_file
+                )
+
             logging.info(f"Adding input source for {event_type}: {src} (exists={src.exists()})")
             inputs.append({"path": str(src), "rows": None, "start_ts": None, "end_ts": None})
 
@@ -82,11 +101,11 @@ def main() -> int:
         logging.info(f"Collected {len(incoming_events)} incoming events")
         if not incoming_events.empty:
             logging.info(f"Incoming event types: {incoming_events['event_type'].unique()}")
-        
+
         logging.info(f"Loading existing events for run {args.run_id}")
         existing_events = load_registry_events(data_root=DATA_ROOT, run_id=args.run_id)
         logging.info(f"Loaded {len(existing_events)} existing events")
-        
+
         logging.info("Merging events")
         events = merge_registry_events(
             existing=existing_events,
@@ -94,7 +113,7 @@ def main() -> int:
             selected_event_types=selected_event_types,
         )
         logging.info(f"Merged total events: {len(events)}")
-        
+
         if args.event_type == "all":
             logging.info("Building event flags for all event types")
             flags = build_event_flags(
@@ -106,7 +125,9 @@ def main() -> int:
             )
         else:
             logging.info(f"Building event flags for selected types: {selected_event_types}")
-            selected_events = events[events["event_type"].astype(str).isin(selected_event_types)].copy()
+            selected_events = events[
+                events["event_type"].astype(str).isin(selected_event_types)
+            ].copy()
             selected_flags = build_event_flags(
                 events=selected_events,
                 symbols=symbols,
@@ -129,10 +150,19 @@ def main() -> int:
 
         if not events.empty:
             logging.info("Converting timestamps to int64")
-            for _ts_col in ("phenom_enter_ts", "eval_bar_ts", "enter_ts", "detected_ts", "signal_ts", "exit_ts"):
+            for _ts_col in (
+                "phenom_enter_ts",
+                "eval_bar_ts",
+                "enter_ts",
+                "detected_ts",
+                "signal_ts",
+                "exit_ts",
+            ):
                 if _ts_col in events.columns:
-                    events[_ts_col] = pd.to_numeric(events[_ts_col], errors="coerce").fillna(0).astype("int64")
-            
+                    events[_ts_col] = (
+                        pd.to_numeric(events[_ts_col], errors="coerce").fillna(0).astype("int64")
+                    )
+
             logging.info("Validating events against EventRegistrySchema")
             EventRegistrySchema.validate(events)
 
@@ -144,16 +174,24 @@ def main() -> int:
             event_flags=flags,
         )
 
-        per_family_counts: Dict[str, int] = {event_type: 0 for event_type in sorted(EVENT_REGISTRY_SPECS.keys())}
+        per_family_counts: Dict[str, int] = {
+            event_type: 0 for event_type in sorted(EVENT_REGISTRY_SPECS.keys())
+        }
         if not events.empty:
-            for event_type, count in events.groupby("event_type", sort=True).size().to_dict().items():
+            for event_type, count in (
+                events.groupby("event_type", sort=True).size().to_dict().items()
+            ):
                 per_family_counts[str(event_type)] = int(count)
-        
-        incoming_per_family_counts: Dict[str, int] = {event_type: 0 for event_type in selected_event_types}
+
+        incoming_per_family_counts: Dict[str, int] = {
+            event_type: 0 for event_type in selected_event_types
+        }
         if not incoming_events.empty:
-            for event_type, count in incoming_events.groupby("event_type", sort=True).size().to_dict().items():
+            for event_type, count in (
+                incoming_events.groupby("event_type", sort=True).size().to_dict().items()
+            ):
                 incoming_per_family_counts[str(event_type)] = int(count)
-        
+
         summary = {
             "run_id": args.run_id,
             "selected_event_types": selected_event_types,
@@ -167,8 +205,22 @@ def main() -> int:
         summary_path = Path(paths["registry_root"]) / "registry_manifest.json"
         summary_path.write_text(json.dumps(summary, indent=2, sort_keys=True), encoding="utf-8")
 
-        outputs.append({"path": str(paths["events_path"]), "rows": int(len(events)), "start_ts": None, "end_ts": None})
-        outputs.append({"path": str(paths["event_flags_path"]), "rows": int(len(flags)), "start_ts": None, "end_ts": None})
+        outputs.append(
+            {
+                "path": str(paths["events_path"]),
+                "rows": int(len(events)),
+                "start_ts": None,
+                "end_ts": None,
+            }
+        )
+        outputs.append(
+            {
+                "path": str(paths["event_flags_path"]),
+                "rows": int(len(flags)),
+                "start_ts": None,
+                "end_ts": None,
+            }
+        )
         outputs.append({"path": str(summary_path), "rows": 1, "start_ts": None, "end_ts": None})
 
         finalize_manifest(
@@ -179,7 +231,9 @@ def main() -> int:
                 "event_rows": int(len(events)),
                 "event_flag_rows": int(len(flags)),
                 "selected_event_family_count": int(len(selected_event_types)),
-                "event_family_count": int(sum(1 for value in per_family_counts.values() if int(value) > 0)),
+                "event_family_count": int(
+                    sum(1 for value in per_family_counts.values() if int(value) > 0)
+                ),
                 "per_family_counts": per_family_counts,
             },
         )
@@ -188,9 +242,10 @@ def main() -> int:
     except Exception as exc:
         logging.error(f"Build event registry failed: {exc}")
         logging.error(traceback.format_exc())
-        if 'manifest' in locals():
+        if "manifest" in locals():
             finalize_manifest(manifest, "failed", error=str(exc), stats={})
         return 1
+
 
 if __name__ == "__main__":
     sys.exit(main())
