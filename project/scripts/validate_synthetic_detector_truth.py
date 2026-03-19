@@ -200,7 +200,7 @@ def validate_detector_truth(
     truth_map_path: Path,
     tolerance_minutes: Union[int, Dict[str, int]] = 30,
     max_off_regime_rate: float = 0.35,
-    min_precision_fraction: float | None = None,
+    min_precision_fraction: float | None = 0.5,
     event_types: Iterable[str] | None = None,
     include_supporting_events: bool = False,
 ) -> Dict[str, Any]:
@@ -273,7 +273,13 @@ def validate_detector_truth(
 
     overall_pass = all(
         all(
-            symbol_row["passed_hit_requirement"] and symbol_row["passed_off_regime_bound"]
+            symbol_row["passed_hit_requirement"]
+            and symbol_row["passed_off_regime_bound"]
+            and (
+                symbol_row["passed_precision_bound"] is not False
+                if min_precision_fraction is not None
+                else True
+            )
             for symbol_row in event_row["per_symbol"]
         )
         for event_row in event_reports
@@ -286,6 +292,9 @@ def validate_detector_truth(
         if isinstance(tolerance_minutes, int)
         else dict(tolerance_minutes),
         "max_off_regime_rate": float(max_off_regime_rate),
+        "min_precision_fraction": (
+            float(min_precision_fraction) if min_precision_fraction is not None else None
+        ),
         "selected_event_types": sorted(selected_event_types),
         "event_reports": event_reports,
         "supporting_event_reports": supporting_event_reports,
@@ -306,7 +315,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--min_precision_fraction",
         type=float,
-        default=None,
+        default=0.5,
         help="Minimum fraction of events that must fall inside regime windows",
     )
     parser.add_argument("--event_types", nargs="+", default=None)

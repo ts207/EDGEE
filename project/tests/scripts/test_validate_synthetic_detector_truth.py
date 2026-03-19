@@ -433,7 +433,7 @@ def test_rejects_high_off_regime_rate(tmp_path):
 
 
 def test_rejects_low_precision(tmp_path):
-    """TICKET-015: min_precision_fraction gate rejects detectors with low precision."""
+    """TICKET-015: default precision gate rejects detectors with low precision."""
     import pandas as pd
     from project.scripts.validate_synthetic_detector_truth import validate_detector_truth
 
@@ -467,16 +467,16 @@ def test_rejects_low_precision(tmp_path):
         run_id=run_id,
         truth_map_path=truth_map_path,
         event_types=["VOL_SHOCK"],
-        min_precision_fraction=0.5,
     )
     per_symbol = report["event_reports"][0]["per_symbol"][0]
     assert not per_symbol.get("passed_precision_bound", True), (
         f"Expected precision gate to fail at ~17%; got: {per_symbol}"
     )
+    assert not report["passed"]
 
 
 def test_accepts_clean_detector(tmp_path):
-    """TICKET-015: a clean detector with low off-regime rate passes new thresholds."""
+    """TICKET-015: a clean detector with low off-regime rate passes new defaults."""
     import pandas as pd
     from project.scripts.validate_synthetic_detector_truth import validate_detector_truth
 
@@ -507,8 +507,8 @@ def test_accepts_clean_detector(tmp_path):
         run_id=run_id,
         truth_map_path=truth_map_path,
         event_types=["VOL_SHOCK"],
-        min_precision_fraction=0.5,
     )
     per_symbol = report["event_reports"][0]["per_symbol"][0]
     assert per_symbol["passed_off_regime_bound"]
     assert per_symbol["passed_precision_bound"]
+    assert report["passed"]

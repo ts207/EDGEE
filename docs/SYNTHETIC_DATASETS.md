@@ -80,6 +80,8 @@ Important distinction:
 
 - `expected_event_types` are the hard pass or fail truth contract
 - `supporting_event_types` are informational supporting signals
+- expected-event validation now enforces both the off-regime ceiling and a minimum
+  in-regime precision threshold by default
 
 To include supporting-signal reporting without changing the main pass or fail result:
 
@@ -87,6 +89,14 @@ To include supporting-signal reporting without changing the main pass or fail re
 python3 -m project.scripts.validate_synthetic_detector_truth \
   --run_id my_run \
   --include_supporting_events 1
+```
+
+To override the default precision floor explicitly:
+
+```bash
+python3 -m project.scripts.validate_synthetic_detector_truth \
+  --run_id my_run \
+  --min_precision_fraction 0.5
 ```
 
 ## Recommended Workflow
