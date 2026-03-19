@@ -7,15 +7,12 @@ description: >
 defaults:
   mode: research
   flags:
-    run_hypothesis_generator: 0
     run_phase2_conditional: 1
     phase2_event_type: LIQUIDITY_VACUUM
     run_bridge_eval_phase2: 1
     run_recommendations_checklist: 0
     run_strategy_blueprint_compiler: 0
     run_strategy_builder: 0
-    run_backtest: 0
-    run_make_report: 0
     skip_ingest_ohlcv: 1
     skip_ingest_funding: 1
     skip_ingest_spot_ohlcv: 1

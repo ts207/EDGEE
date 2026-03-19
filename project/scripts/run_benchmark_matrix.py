@@ -3,6 +3,7 @@ from project.core.config import get_data_root
 
 import argparse
 import json
+import os
 import shlex
 import subprocess
 import sys
@@ -89,6 +90,14 @@ def _build_run_command(
 
 def _ensure_dir(path: Path) -> None:
     path.mkdir(parents=True, exist_ok=True)
+
+
+def _subprocess_env() -> Dict[str, str]:
+    env = os.environ.copy()
+    repo_root = str(REPO_ROOT)
+    existing = str(env.get("PYTHONPATH", "")).strip()
+    env["PYTHONPATH"] = f"{repo_root}:{existing}" if existing else repo_root
+    return env
 
 
 def _resolve_repo_path(path_like: str) -> Path:
@@ -239,7 +248,7 @@ def main() -> int:
         if execute:
             row["started_at"] = _utc_now_iso()
             t0 = time.perf_counter()
-            result = subprocess.run(cmd)
+            result = subprocess.run(cmd, cwd=REPO_ROOT, env=_subprocess_env())
             row["finished_at"] = _utc_now_iso()
             row["duration_sec"] = round(time.perf_counter() - t0, 3)
             row["returncode"] = int(result.returncode)
