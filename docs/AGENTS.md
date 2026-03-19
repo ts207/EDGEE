@@ -2,7 +2,7 @@
 
 This file defines the repository-local operating rules for coding agents working in this repo.
 
-Use it together with [CLAUDE.md](./CLAUDE.md). `CLAUDE.md` explains how research should be run. This file explains how an implementation agent should work safely inside the codebase.
+Use it together with [CLAUDE.md](../CLAUDE.md). `CLAUDE.md` explains how research should be run. This file explains how an implementation agent should work safely inside the codebase.
 
 ## Core Role
 

@@ -100,7 +100,7 @@ These docs define the maintained benchmark and certification posture.
 
 Current maintained review artifact:
 
-- [benchmark_review.json](../data/reports/benchmarks/latest/benchmark_review.json)
+- `data/reports/benchmarks/latest/benchmark_review.json` when the benchmark maintenance cycle has populated local artifacts
 
 ### 5. Reference Surfaces
 

@@ -158,8 +158,8 @@ Current operator default:
 
 - use the terminal entrypoint for a quick summary of the latest maintained state:
   - `PYTHONPATH=. python3 project/scripts/show_benchmark_review.py`
-- start with the latest verified benchmark review artifact:
-  - [data/reports/benchmarks/latest/benchmark_review.json](../data/reports/benchmarks/latest/benchmark_review.json)
+- when benchmark artifacts are populated locally, start with:
+  - `data/reports/benchmarks/latest/benchmark_review.json`
 - use `VOL_SHOCK` as the maintained non-empty live context-comparison slice
 - use `ZSCORE_STRETCH` as the maintained live statistical-dislocation comparison slice
 - use `LIQUIDITY_GAP_PRINT` as the maintained live liquidity-dislocation comparison slice

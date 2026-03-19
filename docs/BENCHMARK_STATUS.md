@@ -6,11 +6,15 @@ Use it with [Research Operator Playbook](./RESEARCH_OPERATOR_PLAYBOOK.md), not i
 
 ## Current Verified Baseline
 
-The latest verified maintained benchmark rerun is available at:
+This document records the maintained benchmark policy baseline.
 
-- review artifact: [data/reports/benchmarks/latest/benchmark_review.json](../data/reports/benchmarks/latest/benchmark_review.json)
-- summary artifact: [data/reports/benchmarks/latest/benchmark_summary.json](../data/reports/benchmarks/latest/benchmark_summary.json)
-- certification artifact: [data/reports/benchmarks/latest/benchmark_certification.json](../data/reports/benchmarks/latest/benchmark_certification.json)
+The canonical local artifact location, when a certified maintenance cycle has been run, is:
+
+- `data/reports/benchmarks/latest/benchmark_review.json`
+- `data/reports/benchmarks/latest/benchmark_summary.json`
+- `data/reports/benchmarks/latest/benchmark_certification.json`
+
+On a fresh or cleaned working tree, those artifacts may be absent until the maintenance cycle is executed.
 
 ### Quick Terminal Review
 
@@ -28,7 +32,7 @@ To rebuild the benchmark matrix and certify the results in one command:
 PYTHONPATH=. python3 project/scripts/run_benchmark_maintenance_cycle.py
 ```
 
-Results are archived in `data/reports/benchmarks/history/` and linked to `data/reports/benchmarks/latest/`.
+Results are archived in `data/reports/benchmarks/history/` and a certified passing run updates `data/reports/benchmarks/latest/`.
 
 ### Governance and Triage
 
