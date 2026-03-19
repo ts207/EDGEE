@@ -108,19 +108,43 @@ Systemd templates live under `deploy/systemd/`, with environment templates under
 - `scripts/`: helper scripts for artifact regeneration, audits, and operations
 - `data/`: local run outputs when using the default data root
 
-## Documentation
+## Documentation Sets
+
+The repo docs are organized by operating task, not only by file name.
+
+Start with:
 
 - [CLAUDE.md](CLAUDE.md): repo-specific operating guide for external controllers
-- [docs/README.md](docs/README.md): documentation map for the research-agent docs set
-- [docs/AUTONOMOUS_RESEARCH_LOOP.md](docs/AUTONOMOUS_RESEARCH_LOOP.md): loop-level operating policy
-- [docs/EXPERIMENT_PROTOCOL.md](docs/EXPERIMENT_PROTOCOL.md): how to scope and evaluate experiments
-- [docs/SYNTHETIC_DATASETS.md](docs/SYNTHETIC_DATASETS.md): synthetic data generation and validation policy
-- [docs/ARCHITECTURE_SURFACE_INVENTORY.md](docs/ARCHITECTURE_SURFACE_INVENTORY.md): public package surface policy
-- [docs/RESEARCH_CALIBRATION_BASELINE.md](docs/RESEARCH_CALIBRATION_BASELINE.md): current drift-threshold baseline
-- [docs/ARCHITECTURE_MAINTENANCE_CHECKLIST.md](docs/ARCHITECTURE_MAINTENANCE_CHECKLIST.md): maintenance checklist after refactors
-- [CONTRIBUTING.md](CONTRIBUTING.md): repository contribution guidelines
+- [docs/README.md](docs/README.md): workflow-first map of the maintained docs set
 
-Generated diagnostics under `docs/generated/` are machine-owned outputs. Do not hand-edit them.
+Use these sets depending on the question:
+
+- Operator and policy:
+  [docs/RESEARCH_OPERATOR_PLAYBOOK.md](docs/RESEARCH_OPERATOR_PLAYBOOK.md),
+  [docs/AUTONOMOUS_RESEARCH_LOOP.md](docs/AUTONOMOUS_RESEARCH_LOOP.md),
+  [docs/OPERATIONS_AND_GUARDRAILS.md](docs/OPERATIONS_AND_GUARDRAILS.md)
+- Experiment design and evaluation:
+  [docs/EXPERIMENT_PROTOCOL.md](docs/EXPERIMENT_PROTOCOL.md),
+  [docs/ARTIFACTS_AND_CONTRACTS.md](docs/ARTIFACTS_AND_CONTRACTS.md),
+  [docs/RESEARCH_WORKFLOW_EXAMPLE.md](docs/RESEARCH_WORKFLOW_EXAMPLE.md)
+- Synthetic calibration:
+  [docs/SYNTHETIC_DATASETS.md](docs/SYNTHETIC_DATASETS.md),
+  [docs/RESEARCH_CALIBRATION_BASELINE.md](docs/RESEARCH_CALIBRATION_BASELINE.md)
+- Benchmark and certification:
+  [docs/BENCHMARK_STATUS.md](docs/BENCHMARK_STATUS.md),
+  [docs/BENCHMARK_GOVERNANCE_RUNBOOK.md](docs/BENCHMARK_GOVERNANCE_RUNBOOK.md),
+  [docs/BENCHMARK_TRIAGE.md](docs/BENCHMARK_TRIAGE.md)
+- Reference and architecture:
+  [docs/FAMILIES_TEMPLATES_AND_REGIMES.md](docs/FAMILIES_TEMPLATES_AND_REGIMES.md),
+  [docs/FEATURE_CATALOG.md](docs/FEATURE_CATALOG.md),
+  [docs/ARCHITECTURE_SURFACE_INVENTORY.md](docs/ARCHITECTURE_SURFACE_INVENTORY.md),
+  [docs/ARCHITECTURE_MAINTENANCE_CHECKLIST.md](docs/ARCHITECTURE_MAINTENANCE_CHECKLIST.md)
+
+Interpretation rules:
+
+- `docs/generated/` is machine-owned evidence. Do not hand-edit it.
+- `docs/plans/` and `docs/superpowers/plans/` are planning history, not current policy.
+- Use `docs/README.md` as the maintained map when adding or updating docs.
 
 ## Agent Quickstart
 
