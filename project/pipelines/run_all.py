@@ -90,7 +90,10 @@ _data_fingerprint_impl = compute_data_fingerprint
 
 def _validate_phase2_event_chain():
     """Wrapper that passes the module-level PHASE2_EVENT_CHAIN so tests can monkeypatch it."""
-    return validate_phase2_event_chain(phase2_event_chain=PHASE2_EVENT_CHAIN)
+    return validate_phase2_event_chain(
+        phase2_event_chain=PHASE2_EVENT_CHAIN,
+        event_registry_specs=EVENT_REGISTRY_SPECS,
+    )
 
 
 def _data_fingerprint(symbols, run_id, **kwargs):
