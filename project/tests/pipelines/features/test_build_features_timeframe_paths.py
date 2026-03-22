@@ -60,7 +60,7 @@ def test_main_writes_output_to_requested_timeframe_path(monkeypatch, tmp_path):
     monkeypatch.setattr(
         build_features,
         "build_features",
-        lambda bars, funding, symbol, run_id, data_root, timeframe: bars.copy(),
+        lambda bars, funding, symbol, run_id, data_root, timeframe, market="perp": bars.copy(),
     )
     monkeypatch.setattr(
         build_features, "write_parquet", lambda _df, path: captured_writes.append(path)
@@ -122,7 +122,7 @@ def test_main_writes_feature_quality_report(monkeypatch, tmp_path):
     monkeypatch.setattr(
         build_features,
         "build_features",
-        lambda bars, funding, symbol, run_id, data_root, timeframe: bars.copy(),
+        lambda bars, funding, symbol, run_id, data_root, timeframe, market="perp": bars.copy(),
     )
     monkeypatch.setattr(build_features, "write_parquet", lambda _df, path: path)
     monkeypatch.setattr(
@@ -191,7 +191,7 @@ def test_main_writes_feature_quality_report_with_baseline(monkeypatch, tmp_path)
     monkeypatch.setattr(
         build_features,
         "build_features",
-        lambda bars, funding, symbol, run_id, data_root, timeframe: bars.copy(),
+        lambda bars, funding, symbol, run_id, data_root, timeframe, market="perp": bars.copy(),
     )
     monkeypatch.setattr(build_features, "write_parquet", lambda _df, path: path)
     monkeypatch.setattr(

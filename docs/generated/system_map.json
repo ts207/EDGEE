@@ -475,12 +475,30 @@
     },
     {
       "external_inputs": [
+        "edge_candidates.normalized"
+      ],
+      "inputs": [
+        "edge_candidates.normalized"
+      ],
+      "optional_inputs": [],
+      "outputs": [
+        "research.negative_control_summary"
+      ],
+      "stage_patterns": [
+        "generate_negative_control_summary"
+      ],
+      "version": "phase5_artifact_contract_v1"
+    },
+    {
+      "external_inputs": [
         "edge_candidates.normalized",
+        "research.negative_control_summary",
         "phase2.bridge_metrics.*",
         "phase2.naive_entry_eval"
       ],
       "inputs": [
-        "edge_candidates.normalized"
+        "edge_candidates.normalized",
+        "research.negative_control_summary"
       ],
       "optional_inputs": [
         "phase2.bridge_metrics.*",
@@ -790,6 +808,7 @@
       "schema_version": "phase5_stage_contract_v1",
       "script_patterns": [
         "pipelines/research/evaluate_naive_entry.py",
+        "pipelines/research/generate_negative_control_summary.py",
         "pipelines/research/promote_candidates.py",
         "pipelines/research/update_edge_registry.py",
         "pipelines/research/update_campaign_memory.py",
@@ -797,6 +816,7 @@
       ],
       "stage_patterns": [
         "evaluate_naive_entry",
+        "generate_negative_control_summary",
         "promote_candidates",
         "update_edge_registry",
         "update_campaign_memory",

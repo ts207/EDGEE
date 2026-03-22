@@ -57,8 +57,8 @@ Legacy wrapper surfaces have been removed.
 ### `promotion`
 
 - Owner service: `project.research.services.promotion_service`
-- Stage patterns: `evaluate_naive_entry`, `promote_candidates`, `update_edge_registry`, `update_campaign_memory`, `export_edge_candidates`
-- Script patterns: `pipelines/research/evaluate_naive_entry.py`, `pipelines/research/promote_candidates.py`, `pipelines/research/update_edge_registry.py`, `pipelines/research/update_campaign_memory.py`, `pipelines/research/export_edge_candidates.py`
+- Stage patterns: `evaluate_naive_entry`, `generate_negative_control_summary`, `promote_candidates`, `update_edge_registry`, `update_campaign_memory`, `export_edge_candidates`
+- Script patterns: `pipelines/research/evaluate_naive_entry.py`, `pipelines/research/generate_negative_control_summary.py`, `pipelines/research/promote_candidates.py`, `pipelines/research/update_edge_registry.py`, `pipelines/research/update_campaign_memory.py`, `pipelines/research/export_edge_candidates.py`
 
 ### `research_quality`
 
@@ -291,12 +291,19 @@ Legacy wrapper surfaces have been removed.
 - Outputs: `edge_candidates.normalized`
 - External inputs: `phase2.candidates.*`, `phase2.bridge_metrics.*`
 
-### `promote_candidates`
+### `generate_negative_control_summary`
 
 - Inputs: `edge_candidates.normalized`
+- Optional inputs: _none_
+- Outputs: `research.negative_control_summary`
+- External inputs: `edge_candidates.normalized`
+
+### `promote_candidates`
+
+- Inputs: `edge_candidates.normalized`, `research.negative_control_summary`
 - Optional inputs: `phase2.bridge_metrics.*`, `phase2.naive_entry_eval`
 - Outputs: `promotion.audit`, `promotion.promoted_candidates`
-- External inputs: `edge_candidates.normalized`, `phase2.bridge_metrics.*`, `phase2.naive_entry_eval`
+- External inputs: `edge_candidates.normalized`, `research.negative_control_summary`, `phase2.bridge_metrics.*`, `phase2.naive_entry_eval`
 
 ### `update_edge_registry`
 

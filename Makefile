@@ -60,8 +60,8 @@ benchmark-maintenance:
 
 minimum-green-gate:
 	@echo "Running minimum green gate checks..."
-	PYTHONPATH=. $(PYTHON) -m compileall -q project tests
-	PYTHONPATH=. $(PYTHON) -m pytest tests/architecture
+	PYTHONPATH=. $(PYTHON) -m compileall -q project project/tests
+	PYTHONPATH=. $(PYTHON) -m pytest project/tests/architecture
 	PYTHONPATH=. $(PYTHON) project/scripts/spec_qa_linter.py
 	PYTHONPATH=. $(PYTHON) project/scripts/detector_coverage_audit.py --md-out docs/generated/detector_coverage.md --json-out docs/generated/detector_coverage.json --check
 	PYTHONPATH=. $(PYTHON) project/scripts/ontology_consistency_audit.py --output docs/generated/ontology_audit.json --check

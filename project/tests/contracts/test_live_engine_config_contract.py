@@ -8,7 +8,7 @@ from project.scripts.run_live_engine import load_live_engine_config
 def test_golden_certification_config_declares_live_engine_persistence_contract() -> None:
     config = load_live_engine_config(Path("project/configs/golden_certification.yaml"))
 
-    assert config["live_state_snapshot_path"] == "artifacts/live_state.json"
+    assert config["live_state_snapshot_path"] == "reliability/live_state.json"
     assert int(config["microstructure_recovery_streak"]) >= 1
     assert float(config["account_sync_interval_seconds"]) >= 1.0
     assert int(config["account_sync_failure_threshold"]) >= 1

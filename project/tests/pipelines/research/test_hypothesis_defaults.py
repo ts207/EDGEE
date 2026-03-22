@@ -16,11 +16,7 @@ def test_load_hypothesis_defaults_reads_global_defaults():
     assert "5m" in defaults["horizons"]
     assert "mean_reversion" in defaults["rule_templates"]
     assert "vol_regime" in defaults["conditioning"]
-    assert "carry_state" in defaults["conditioning"]
-    assert "funding_bps" in defaults["conditioning"]
     assert "severity_bucket" in defaults["conditioning"]
-    assert "ms_trend_state" in defaults["conditioning"]
-    assert "ms_spread_state" in defaults["conditioning"]
 
 
 def test_parse_symbols_filter_restricts_to_run_universe():

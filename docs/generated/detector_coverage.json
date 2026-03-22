@@ -949,90 +949,6 @@
   ],
   "issues": [
     {
-      "check_id": "detector_untracked",
-      "message": "Registered detector has no active event spec: BASIS_SNAPBACK",
-      "path": "project/events/detectors/extended_detectors.py",
-      "severity": "warning"
-    },
-    {
-      "check_id": "detector_untracked",
-      "message": "Registered detector has no active event spec: CROSS_VENUE_CATCHUP",
-      "path": "project/events/detectors/extended_detectors.py",
-      "severity": "warning"
-    },
-    {
-      "check_id": "detector_untracked",
-      "message": "Registered detector has no active event spec: DEPTH_RECOVERY_EVENT",
-      "path": "project/events/detectors/extended_detectors.py",
-      "severity": "warning"
-    },
-    {
-      "check_id": "detector_untracked",
-      "message": "Registered detector has no active event spec: FUNDING_EXTREME_BREAKOUT",
-      "path": "project/events/detectors/extended_detectors.py",
-      "severity": "warning"
-    },
-    {
-      "check_id": "detector_untracked",
-      "message": "Registered detector has no active event spec: FUNDING_EXTREME_STAGNATION",
-      "path": "project/events/detectors/extended_detectors.py",
-      "severity": "warning"
-    },
-    {
-      "check_id": "detector_untracked",
-      "message": "Registered detector has no active event spec: IMBALANCE_ABSORPTION_REVERSAL",
-      "path": "project/events/detectors/extended_detectors.py",
-      "severity": "warning"
-    },
-    {
-      "check_id": "detector_untracked",
-      "message": "Registered detector has no active event spec: OI_VOL_COMPRESSION_BUILDUP",
-      "path": "project/events/detectors/extended_detectors.py",
-      "severity": "warning"
-    },
-    {
-      "check_id": "detector_untracked",
-      "message": "Registered detector has no active event spec: OI_VOL_DIVERGENCE",
-      "path": "project/events/detectors/extended_detectors.py",
-      "severity": "warning"
-    },
-    {
-      "check_id": "detector_untracked",
-      "message": "Registered detector has no active event spec: SEQ_FND_EXTREME_THEN_BREAKOUT",
-      "path": "project/events/detectors/extended_detectors.py",
-      "severity": "warning"
-    },
-    {
-      "check_id": "detector_untracked",
-      "message": "Registered detector has no active event spec: SEQ_LIQ_CASCADE_THEN_EXHAUST",
-      "path": "project/events/detectors/extended_detectors.py",
-      "severity": "warning"
-    },
-    {
-      "check_id": "detector_untracked",
-      "message": "Registered detector has no active event spec: SEQ_LIQ_VACUUM_THEN_DEPTH_RECOVERY",
-      "path": "project/events/detectors/extended_detectors.py",
-      "severity": "warning"
-    },
-    {
-      "check_id": "detector_untracked",
-      "message": "Registered detector has no active event spec: SEQ_OI_SPIKEPOS_THEN_VOL_SPIKE",
-      "path": "project/events/detectors/extended_detectors.py",
-      "severity": "warning"
-    },
-    {
-      "check_id": "detector_untracked",
-      "message": "Registered detector has no active event spec: SEQ_VOL_COMP_THEN_BREAKOUT",
-      "path": "project/events/detectors/extended_detectors.py",
-      "severity": "warning"
-    },
-    {
-      "check_id": "detector_untracked",
-      "message": "Registered detector has no active event spec: VOL_COMPRESSION_BREAKOUT",
-      "path": "project/events/detectors/extended_detectors.py",
-      "severity": "warning"
-    },
-    {
       "check_id": "detector_hardcoded_params",
       "message": "Detector implementation has hardcoded numerical thresholds: CROSS_VENUE_DESYNC",
       "path": "project/events/families/basis.py",
@@ -1054,17 +970,17 @@
   "summary": {
     "active_event_count": 66,
     "error_count": 0,
-    "issue_count": 17,
+    "issue_count": 3,
     "maturity_counts": {
       "production": 6,
       "proxy": 11,
       "specialized": 3,
       "standard": 46
     },
-    "registered_detector_entry_count": 81,
+    "registered_detector_entry_count": 67,
     "registered_event_count": 66,
     "schema_version": "detector_coverage_audit_v2",
     "status": "passed",
-    "warning_count": 17
+    "warning_count": 3
   }
 }

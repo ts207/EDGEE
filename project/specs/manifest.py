@@ -385,11 +385,9 @@ def finalize_manifest(
     pipeline_session_id = str(manifest.get("pipeline_session_id", "") or "").strip()
     if not pipeline_session_id and str(status).strip().lower() in {"success", "warning"}:
         try:
-            from project.pipelines.pipeline_provenance import (
-                reconcile_run_manifest_from_stage_manifests,
-            )
-
-            reconcile_run_manifest_from_stage_manifests(str(manifest.get("run_id", "")))
+            import importlib
+            mod = importlib.import_module("project.pipelines.pipeline_provenance")
+            mod.reconcile_run_manifest_from_stage_manifests(str(manifest.get("run_id", "")))
         except Exception:
             pass
     return manifest

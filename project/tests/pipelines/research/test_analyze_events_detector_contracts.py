@@ -29,6 +29,11 @@ def test_analyze_events_uses_registry_event_stream_for_sequence_detectors(
         load_calls["features"] += 1
         raise AssertionError("sequence detectors should not load feature bars")
 
+    class FakeSeqDetector(analyze_events.EventSequenceDetector):
+        def __init__(self): pass
+        def detect(self, df, **kwargs): return df.copy()
+
+    monkeypatch.setattr(analyze_events, "get_detector", lambda ev: FakeSeqDetector())
     monkeypatch.setattr(analyze_events, "load_registry_events", _registry_events)
     monkeypatch.setattr(analyze_events, "load_features", _features)
     monkeypatch.setattr(analyze_events, "get_data_root", lambda: tmp_path)

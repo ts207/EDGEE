@@ -14,6 +14,8 @@ ALLOWED = {
 def test_project_code_uses_shared_storage_abstraction_for_artifact_writes() -> None:
     offenders: list[str] = []
     for path in (REPO_ROOT / "project").rglob("*.py"):
+        if path.is_relative_to(REPO_ROOT / "project" / "tests"):
+            continue
         rel = path.relative_to(REPO_ROOT)
         if rel in ALLOWED:
             continue
