@@ -702,11 +702,17 @@ def test_run_all_wires_candidate_promotion_into_compiler(monkeypatch, tmp_path):
 
     stage_names = [stage for stage, _ in captured]
     assert "export_edge_candidates" in stage_names
+    assert "generate_negative_control_summary" in stage_names
     assert "promote_candidates" in stage_names
     assert "update_edge_registry" in stage_names
     assert "generate_recommendations_checklist" in stage_names
     assert "compile_strategy_blueprints" not in stage_names
-    assert stage_names.index("export_edge_candidates") < stage_names.index("promote_candidates")
+    assert stage_names.index("export_edge_candidates") < stage_names.index(
+        "generate_negative_control_summary"
+    )
+    assert stage_names.index("generate_negative_control_summary") < stage_names.index(
+        "promote_candidates"
+    )
     assert stage_names.index("promote_candidates") < stage_names.index("update_edge_registry")
     assert stage_names.index("update_edge_registry") < stage_names.index(
         "generate_recommendations_checklist"
@@ -770,8 +776,14 @@ def test_run_all_wires_export_edge_candidates_before_promotion(monkeypatch, tmp_
 
     stage_names = [stage for stage, _ in captured]
     assert "export_edge_candidates" in stage_names
+    assert "generate_negative_control_summary" in stage_names
     assert "promote_candidates" in stage_names
-    assert stage_names.index("export_edge_candidates") < stage_names.index("promote_candidates")
+    assert stage_names.index("export_edge_candidates") < stage_names.index(
+        "generate_negative_control_summary"
+    )
+    assert stage_names.index("generate_negative_control_summary") < stage_names.index(
+        "promote_candidates"
+    )
 
 
 def test_run_all_production_gate_profile_wiring(monkeypatch, tmp_path):

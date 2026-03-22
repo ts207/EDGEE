@@ -31,6 +31,7 @@ def certify_benchmark_review(
     current_review: Dict[str, Any],
     prior_review: Optional[Dict[str, Any] | List[Dict[str, Any]]] = None,
     acceptance_thresholds: Optional[Dict[str, Any]] = None,
+    execution_manifest: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
     Certify a new benchmark review against absolute thresholds and one or more prior baselines.
@@ -62,6 +63,34 @@ def certify_benchmark_review(
         "authoritative",
     ]
     foundation_order = ["blocked", "warn", "ready"]
+
+    # 0. Execution Certification
+    manifest = execution_manifest if isinstance(execution_manifest, dict) else {}
+    manifest_failures = int(manifest.get("failures", 0) or 0)
+    manifest_results = manifest.get("results", [])
+    if manifest_failures > 0:
+        failed_runs: List[str] = []
+        if isinstance(manifest_results, list):
+            for row in manifest_results:
+                if not isinstance(row, dict):
+                    continue
+                if str(row.get("status", "")).strip() != "failed":
+                    continue
+                run_id = str(row.get("run_id", "")).strip()
+                if run_id:
+                    failed_runs.append(run_id)
+        issues.append(
+            {
+                "benchmark_id": "__matrix__",
+                "severity": "fail",
+                "type": "execution_failures",
+                "message": (
+                    f"Benchmark matrix recorded {manifest_failures} failed run(s): "
+                    f"{', '.join(failed_runs) if failed_runs else 'unknown runs'}"
+                ),
+                "failed_run_ids": failed_runs,
+            }
+        )
 
     # 1. Absolute Certification
     for bid, s in current_slices.items():

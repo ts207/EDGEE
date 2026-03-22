@@ -124,6 +124,34 @@ def test_evaluate_row_characterization_nan_oos_sample_counts_fail_closed():
     assert "gate_promo_oos_validation" in str(result["promotion_fail_gate_primary"])
 
 
+def test_evaluate_row_characterization_uses_bridge_validation_trades_when_sample_columns_missing():
+    row = _passing_row()
+    row["validation_samples"] = math.nan
+    row["test_samples"] = math.nan
+    row["bridge_validation_trades"] = 25
+    kwargs = _base_kwargs()
+    kwargs["promotion_confirmatory_gates"] = {"shadow": {"min_oos_event_count": 20}}
+
+    result = evaluate_row(row=row, **kwargs)
+
+    assert result["gate_promo_oos_validation"] == "pass"
+    assert result["validation_samples_raw"] is None
+    assert result["validation_samples"] == 25
+    assert result["oos_sample_source"] == "row.bridge_validation_trades"
+    assert "gate_promo_oos_validation" not in str(result["promotion_fail_gate_primary"])
+
+
+def test_evaluate_row_characterization_does_not_fail_closed_on_missing_baseline():
+    row = _passing_row()
+    row.pop("baseline_expectancy_bps", None)
+
+    result = evaluate_row(row=row, **_base_kwargs())
+
+    assert result["promotion_decision"] == "promoted"
+    assert result["gate_promo_baseline_beats_complexity"] is True
+    assert "failed_baseline_comparison" not in result["reject_reason"]
+
+
 def test_evaluate_row_characterization_flags_continuation_quality_fragility():
     row = _passing_row()
     row["template_verb"] = "continuation"

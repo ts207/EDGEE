@@ -5,7 +5,13 @@ import argparse
 import json
 from pathlib import Path
 
-from project.artifacts import kpi_scorecard_path, promotion_summary_path, run_manifest_path
+from project.artifacts import (
+    checklist_path,
+    kpi_scorecard_path,
+    promotion_summary_path,
+    release_signoff_path,
+    run_manifest_path,
+)
 from typing import Any, Dict, List
 
 import numpy as np
@@ -13,6 +19,7 @@ import pandas as pd
 
 from project.core.coercion import as_bool, safe_float
 from project.research.recommendations.checklist import build_checklist_payload
+from project.specs.manifest import finalize_manifest, start_manifest
 
 
 CHECKLIST_GATE_PROFILES: Dict[str, Dict[str, int]] = {
@@ -100,29 +107,28 @@ def _edge_candidate_metrics(
     edge_parquet_path: Path,
     edge_csv_path: Path,
     edge_json_path: Path,
+    promoted_candidates_parquet_path: Path,
+    promoted_candidates_csv_path: Path,
     promotion_audit_parquet_path: Path,
     promotion_audit_csv_path: Path,
     promotion_summary_path: Path,
 ) -> Dict[str, Any]:
     edge_df = _read_table(edge_parquet_path, edge_csv_path)
-    if not edge_df.empty:
-        status = edge_df.get("status", pd.Series("", index=edge_df.index)).astype(str).str.upper()
-        promoted = status.isin({"PROMOTED", "PROMOTED_RESEARCH"})
-        bridge = edge_df.get("gate_bridge_tradable", pd.Series(False, index=edge_df.index)).map(
-            as_bool
-        )
-        return {
-            "source": "edge_candidates_parquet"
-            if edge_parquet_path.exists()
-            else "edge_candidates_csv",
-            "rows": int(len(edge_df)),
-            "promoted": int(promoted.sum()),
-            "bridge_tradable": int(bridge.sum()),
-            "bridge_tradable_promoted": int((bridge & promoted).sum()),
-        }
-
+    promoted_df = _read_table(promoted_candidates_parquet_path, promoted_candidates_csv_path)
     promo_df = _read_table(promotion_audit_parquet_path, promotion_audit_csv_path)
-    if not promo_df.empty:
+    promoted_count = 0
+    bridge_tradable_promoted = 0
+    if not promoted_df.empty:
+        promoted_count = int(len(promoted_df))
+        if "gate_bridge_tradable" in promoted_df.columns:
+            bridge_tradable_promoted = int(
+                promoted_df.get("gate_bridge_tradable", pd.Series(False, index=promoted_df.index)).map(
+                    as_bool
+                ).sum()
+            )
+        else:
+            bridge_tradable_promoted = promoted_count
+    elif not promo_df.empty:
         decision = (
             promo_df.get("promotion_decision", pd.Series("", index=promo_df.index))
             .astype(str)
@@ -132,14 +138,38 @@ def _edge_candidate_metrics(
         bridge = promo_df.get("gate_bridge_tradable", pd.Series(False, index=promo_df.index)).map(
             as_bool
         )
+        promoted_count = int(promoted.sum())
+        bridge_tradable_promoted = int((bridge & promoted).sum())
+    if not edge_df.empty:
+        status = edge_df.get("status", pd.Series("", index=edge_df.index)).astype(str).str.upper()
+        promoted = status.eq("PROMOTED")
+        bridge = edge_df.get("gate_bridge_tradable", pd.Series(False, index=edge_df.index)).map(
+            as_bool
+        )
+        return {
+            "source": "edge_candidates_parquet"
+            if edge_parquet_path.exists()
+            else "edge_candidates_csv",
+            "rows": int(len(edge_df)),
+            "promoted": int(promoted_count or promoted.sum()),
+            "bridge_tradable": int(bridge.sum()),
+            "bridge_tradable_promoted": int(
+                bridge_tradable_promoted or int((bridge & promoted).sum())
+            ),
+        }
+
+    if not promo_df.empty:
+        bridge = promo_df.get("gate_bridge_tradable", pd.Series(False, index=promo_df.index)).map(
+            as_bool
+        )
         return {
             "source": "promotion_audit_parquet"
             if promotion_audit_parquet_path.exists()
             else "promotion_audit_csv",
             "rows": int(len(promo_df)),
-            "promoted": int(promoted.sum()),
+            "promoted": int(promoted_count),
             "bridge_tradable": int(bridge.sum()),
-            "bridge_tradable_promoted": int((bridge & promoted).sum()),
+            "bridge_tradable_promoted": int(bridge_tradable_promoted),
         }
 
     return {
@@ -359,43 +389,94 @@ def main() -> int:
 
     edge_dir = reports_root / "edge_candidates" / args.run_id
     promo_dir = reports_root / "promotions" / args.run_id
-    edge_metrics = _edge_candidate_metrics(
-        edge_parquet_path=edge_dir / "edge_candidates_normalized.parquet",
-        edge_csv_path=edge_dir / "edge_candidates_normalized.csv",
-        edge_json_path=edge_dir / "edge_candidates_normalized.json",
-        promotion_audit_parquet_path=promo_dir / "promotion_audit.parquet",
-        promotion_audit_csv_path=promo_dir / "promotion_audit.csv",
-        promotion_summary_path=promotion_summary_path(args.run_id, reports_root.parent),
-    )
-    payload = _build_payload(
-        run_id=args.run_id,
-        args=args,
-        edge_metrics=edge_metrics,
-        expectancy_payload=_load_json(expectancy_path),
-        robustness_payload=_load_json(robustness_path),
-        capital_footprint_payload={},
-        paths={"expectancy": str(expectancy_path), "robustness": str(robustness_path)},
-    )
-
-    kpi_payload = _hydrate_kpi_payload_with_promotion_fallback(
-        kpi_payload=_load_json(kpi_path),
-        promotion_audit_parquet_path=promo_dir / "promotion_audit.parquet",
-        promotion_audit_csv_path=promo_dir / "promotion_audit.csv",
-    )
-    payload["release_signoff"] = _build_release_signoff(
-        run_id=args.run_id,
-        checklist_payload=payload,
-        run_manifest_payload=_load_json(manifest_path),
-        kpi_payload=kpi_payload,
-    )
-
     out_dir = Path(args.out_dir) if args.out_dir else runs_root / args.run_id / "research_checklist"
-    out_dir.mkdir(parents=True, exist_ok=True)
-    (out_dir / "checklist.json").write_text(
-        json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8"
+    checklist_out_path = out_dir / "checklist.json"
+    release_signoff_out_path = out_dir / "release_signoff.json"
+    inputs = [
+        {"path": str(expectancy_path)},
+        {"path": str(robustness_path)},
+        {"path": str(manifest_path)},
+        {"path": str(kpi_path)},
+        {"path": str(edge_dir / "edge_candidates_normalized.parquet")},
+        {"path": str(promo_dir / "promoted_candidates.parquet")},
+        {"path": str(promo_dir / "promotion_statistical_audit.parquet")},
+    ]
+    outputs = [
+        {"path": str(checklist_out_path if args.out_dir else checklist_path(args.run_id, runs_root.parent))},
+        {
+            "path": str(
+                release_signoff_out_path
+                if args.out_dir
+                else release_signoff_path(args.run_id, runs_root.parent)
+            )
+        },
+    ]
+    manifest = start_manifest(
+        "generate_recommendations_checklist", args.run_id, vars(args), inputs, outputs
     )
-    print(json.dumps({"decision": payload["decision"], "out_dir": str(out_dir)}, indent=2))
-    return 0 if payload["decision"] == "PROMOTE" else 1
+    try:
+        edge_metrics = _edge_candidate_metrics(
+            edge_parquet_path=edge_dir / "edge_candidates_normalized.parquet",
+            edge_csv_path=edge_dir / "edge_candidates_normalized.csv",
+            edge_json_path=edge_dir / "edge_candidates_normalized.json",
+            promoted_candidates_parquet_path=promo_dir / "promoted_candidates.parquet",
+            promoted_candidates_csv_path=promo_dir / "promoted_candidates.csv",
+            promotion_audit_parquet_path=promo_dir / "promotion_audit.parquet",
+            promotion_audit_csv_path=promo_dir / "promotion_audit.csv",
+            promotion_summary_path=promotion_summary_path(args.run_id, reports_root.parent),
+        )
+        payload = _build_payload(
+            run_id=args.run_id,
+            args=args,
+            edge_metrics=edge_metrics,
+            expectancy_payload=_load_json(expectancy_path),
+            robustness_payload=_load_json(robustness_path),
+            capital_footprint_payload={},
+            paths={"expectancy": str(expectancy_path), "robustness": str(robustness_path)},
+        )
+
+        kpi_payload = _hydrate_kpi_payload_with_promotion_fallback(
+            kpi_payload=_load_json(kpi_path),
+            promotion_audit_parquet_path=promo_dir / "promotion_audit.parquet",
+            promotion_audit_csv_path=promo_dir / "promotion_audit.csv",
+        )
+        payload["release_signoff"] = _build_release_signoff(
+            run_id=args.run_id,
+            checklist_payload=payload,
+            run_manifest_payload=_load_json(manifest_path),
+            kpi_payload=kpi_payload,
+        )
+
+        out_dir.mkdir(parents=True, exist_ok=True)
+        checklist_out_path.write_text(
+            json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8"
+        )
+        release_signoff_out_path.write_text(
+            json.dumps(payload["release_signoff"], indent=2, sort_keys=True), encoding="utf-8"
+        )
+        print(json.dumps({"decision": payload["decision"], "out_dir": str(out_dir)}, indent=2))
+        finalize_manifest(
+            manifest,
+            "success" if payload["decision"] == "PROMOTE" else "warning",
+            stats={
+                "decision": payload["decision"],
+                "gate_count": len(payload.get("gates", [])),
+                "failed_gate_count": int(sum(not bool(g.get("passed")) for g in payload["gates"])),
+                "promoted_edge_candidates": int(
+                    payload.get("metrics", {}).get("edge_candidate_promoted", 0)
+                ),
+                "bridge_tradable_candidates": int(
+                    payload.get("metrics", {}).get("bridge_tradable_candidates", 0)
+                ),
+                "robust_survivor_count": int(
+                    payload.get("metrics", {}).get("robust_survivor_count", 0)
+                ),
+            },
+        )
+        return 0
+    except Exception as exc:
+        finalize_manifest(manifest, "failed", error=str(exc), stats={})
+        return 1
 
 
 if __name__ == "__main__":

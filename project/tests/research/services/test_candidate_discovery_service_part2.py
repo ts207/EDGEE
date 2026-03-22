@@ -406,6 +406,107 @@ def test_split_and_score_candidates_expectancy_uses_train_rows_only(monkeypatch)
     assert int(row["n_obs"]) == 2
 
 
+def test_split_and_score_candidates_emits_confirmatory_evidence(monkeypatch):
+    candidates = pd.DataFrame(
+        [
+            {
+                "candidate_id": "cand_confirmatory",
+                "event_type": "VOL_SHOCK",
+                "symbol": "BTCUSDT",
+                "direction": 1.0,
+                "rule_template": "continuation",
+                "family_id": "fam_confirmatory",
+                "horizon": "5m",
+                "horizon_bars": 1,
+            },
+        ]
+    )
+    events = pd.DataFrame(
+        {
+            "enter_ts": pd.date_range("2024-01-01", periods=6, freq="5min", tz="UTC"),
+            "timestamp": pd.date_range("2024-01-01", periods=6, freq="5min", tz="UTC"),
+            "symbol": ["BTCUSDT"] * 6,
+            "event_type": ["VOL_SHOCK"] * 6,
+            "split_label": ["train", "train", "validation", "validation", "test", "test"],
+            "split_plan_id": ["TVT_60_20_20"] * 6,
+            "vol_regime": ["low", "low", "high", "high", "low", "high"],
+        }
+    )
+    features = pd.DataFrame(
+        {"timestamp": pd.date_range("2024-01-01", periods=32, freq="5min", tz="UTC")}
+    )
+
+    def _fake_return_frame(sym_events, _features, *, direction_override=None, entry_lag_bars=1, **kwargs):
+        if sym_events.empty:
+            return pd.DataFrame(
+                columns=[
+                    "forward_return",
+                    "forward_return_raw",
+                    "cost_return",
+                    "cluster_day",
+                    "split_label",
+                    "event_ts",
+                    "vol_regime",
+                ]
+            )
+        sign = float(direction_override) if pd.notna(direction_override) else 1.0
+        lag_penalty = 0.003 if int(entry_lag_bars) > 1 else 0.0
+        base = np.linspace(0.01, 0.06, len(sym_events)) * sign - lag_penalty
+        ts = pd.to_datetime(sym_events["timestamp"], utc=True)
+        return pd.DataFrame(
+            {
+                "forward_return": base,
+                "forward_return_raw": base + 0.001,
+                "cost_return": [0.0005] * len(sym_events),
+                "cluster_day": ts.dt.strftime("%Y-%m-%d"),
+                "split_label": sym_events["split_label"].tolist(),
+                "event_ts": ts,
+                "vol_regime": sym_events.get("vol_regime", pd.Series(["unknown"] * len(sym_events))),
+            }
+        )
+
+    monkeypatch.setattr(svc, "build_event_return_frame", _fake_return_frame)
+    monkeypatch.setattr(
+        svc,
+        "estimate_effect_from_frame",
+        lambda frame, **kwargs: SimpleNamespace(
+            estimate=float(frame["forward_return"].mean()) if not frame.empty else 0.0,
+            stderr=0.01,
+            ci_low=0.0,
+            ci_high=0.0,
+            p_value_raw=0.05,
+            n_obs=len(frame),
+            n_clusters=len(frame),
+            method="mock",
+            cluster_col="cluster_day",
+        ),
+    )
+
+    out = svc._split_and_score_candidates(
+        candidates,
+        events,
+        horizon_bars=1,
+        split_scheme_id="WF_60_20_20",
+        purge_bars=0,
+        embargo_bars=0,
+        bar_duration_minutes=5,
+        features_df=features,
+        entry_lag_bars=1,
+        shift_labels_k=0,
+        cost_estimate=None,
+    )
+
+    row = out.iloc[0]
+    assert len(json.loads(row["returns_oos_combined"])) == 4
+    assert len(json.loads(row["pnl_series"])) == 4
+    assert len(json.loads(row["timestamps"])) == 4
+    assert len(json.loads(row["fold_scores"])) == 3
+    assert json.loads(row["regime_counts"]) == {"high": 3, "low": 1}
+    assert 0.0 <= float(row["control_pass_rate"]) <= 1.0
+    assert isinstance(bool(row["gate_delay_robustness"]), bool)
+    assert isinstance(bool(row["gate_regime_stability"]), bool)
+
+
 def test_standard_sample_quality_floors_are_defensible():
     """Regression: standard sample quality floors must be >= 10 for credible split evidence.
     Floors of 2 are not statistically defensible.

@@ -176,3 +176,52 @@ def test_ensure_feature_contract_columns_materializes_schema_columns():
         "revision_lag_minutes",
     }
     assert required.issubset(set(out.columns))
+
+
+def test_merge_optional_microstructure_inputs_derives_proxy_columns_without_tob():
+    frame = pd.DataFrame(
+        {
+            "timestamp": pd.to_datetime(
+                [
+                    "2026-01-01T00:00:00Z",
+                    "2026-01-01T00:05:00Z",
+                    "2026-01-01T00:10:00Z",
+                    "2026-01-01T00:15:00Z",
+                ],
+                utc=True,
+            ),
+            "open": [100.0, 101.0, 102.0, 103.0],
+            "high": [101.0, 102.0, 103.0, 104.0],
+            "low": [99.0, 100.0, 101.0, 102.0],
+            "close": [100.5, 101.5, 102.5, 103.5],
+            "volume": [10.0, 12.0, 11.0, 13.0],
+            "taker_base_volume": [6.0, 7.0, 6.5, 8.0],
+            "ms_imbalance_24": [0.0, 0.1, -0.2, 0.3],
+        }
+    )
+
+    out = build_features._merge_optional_microstructure_inputs(
+        frame,
+        symbol="BTCUSDT",
+        market="perp",
+        run_id="unit_test",
+        data_root=build_features.Path("/tmp"),
+        timeframe="5m",
+    )
+
+    required = {
+        "spread_bps",
+        "depth_usd",
+        "bid_depth_usd",
+        "ask_depth_usd",
+        "imbalance",
+        "micro_depth_depletion",
+    }
+    assert required.issubset(out.columns)
+    assert out["imbalance"].round(6).tolist() == [0.0, 0.1, -0.2, 0.3]
+    assert out["spread_bps"].notna().sum() >= 2
+    assert out["depth_usd"].notna().sum() >= 2
+
+
+def test_blank_feature_schema_version_defaults_to_canonical():
+    assert build_features.normalize_feature_schema_version("") == "feature_schema_v2"

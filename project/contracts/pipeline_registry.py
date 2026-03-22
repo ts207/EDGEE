@@ -217,6 +217,7 @@ STAGE_FAMILY_REGISTRY: tuple[StageFamilyContract, ...] = (
         family="promotion",
         stage_patterns=(
             "evaluate_naive_entry",
+            "generate_negative_control_summary",
             "promote_candidates",
             "update_edge_registry",
             "update_campaign_memory",
@@ -224,6 +225,7 @@ STAGE_FAMILY_REGISTRY: tuple[StageFamilyContract, ...] = (
         ),
         script_patterns=(
             "pipelines/research/evaluate_naive_entry.py",
+            "pipelines/research/generate_negative_control_summary.py",
             "pipelines/research/promote_candidates.py",
             "pipelines/research/update_edge_registry.py",
             "pipelines/research/update_campaign_memory.py",
@@ -437,12 +439,19 @@ STAGE_ARTIFACT_REGISTRY: tuple[StageArtifactContract, ...] = (
         external_inputs=("phase2.candidates.*", "phase2.bridge_metrics.*"),
     ),
     StageArtifactContract(
-        stage_patterns=("promote_candidates",),
+        stage_patterns=("generate_negative_control_summary",),
         inputs=("edge_candidates.normalized",),
+        outputs=("research.negative_control_summary",),
+        external_inputs=("edge_candidates.normalized",),
+    ),
+    StageArtifactContract(
+        stage_patterns=("promote_candidates",),
+        inputs=("edge_candidates.normalized", "research.negative_control_summary"),
         optional_inputs=("phase2.bridge_metrics.*", "phase2.naive_entry_eval"),
         outputs=("promotion.audit", "promotion.promoted_candidates"),
         external_inputs=(
             "edge_candidates.normalized",
+            "research.negative_control_summary",
             "phase2.bridge_metrics.*",
             "phase2.naive_entry_eval",
         ),

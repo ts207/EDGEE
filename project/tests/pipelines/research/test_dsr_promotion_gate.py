@@ -115,3 +115,11 @@ class TestDSRGate:
         result = evaluate_row(row=row, min_dsr=0.95, **_base_eval_kwargs())
         assert result["dsr_value"] == 0.0
         assert result["gate_promo_dsr"] is False
+
+    def test_json_encoded_returns_oos_combined_is_accepted(self):
+        """Persisted pipeline artifacts store OOS returns as JSON text."""
+        row = _make_row()
+        row["returns_oos_combined"] = str(row["returns_oos_combined"]).replace("'", "")
+        result = evaluate_row(row=row, min_dsr=0.50, **_base_eval_kwargs())
+        assert result["gate_promo_dsr"] is True
+        assert result["dsr_value"] > 0.0

@@ -280,6 +280,112 @@ def _merge_funding_rates(
         return bars_out
 
 
+def _merge_optional_microstructure_inputs(
+    bars: pd.DataFrame,
+    *,
+    symbol: str,
+    market: str,
+    run_id: str,
+    data_root: Path,
+    timeframe: str = "5m",
+) -> pd.DataFrame:
+    out = bars.copy()
+    out["timestamp"] = ts_ns_utc(pd.to_datetime(out["timestamp"], utc=True, errors="coerce"))
+
+    tob = pd.DataFrame()
+    if market == "perp":
+        tob_paths = [
+            run_scoped_lake_path(data_root, run_id, "cleaned", "perp", symbol, "tob_5m_agg"),
+            data_root / "lake" / "cleaned" / "perp" / symbol / "tob_5m_agg",
+        ]
+        tob_dir = choose_partition_dir(tob_paths)
+        tob = read_parquet(list_parquet_files(tob_dir)) if tob_dir else pd.DataFrame()
+
+    if not tob.empty and "timestamp" in tob.columns:
+        tob = tob.copy()
+        tob["timestamp"] = ts_ns_utc(pd.to_datetime(tob["timestamp"], utc=True, errors="coerce"))
+        tob = tob.sort_values("timestamp").drop_duplicates(subset=["timestamp"], keep="last")
+        rename_map = {
+            "spread_bps_mean": "spread_bps",
+            "bid_depth_usd_mean": "bid_depth_usd",
+            "ask_depth_usd_mean": "ask_depth_usd",
+            "imbalance_mean": "imbalance",
+            "valid_snapshot_mean": "tob_coverage",
+        }
+        available_cols = ["timestamp"] + [c for c in rename_map if c in tob.columns]
+        tob_view = tob[available_cols].rename(columns=rename_map)
+        out = pd.merge_asof(
+            out.sort_values("timestamp"),
+            tob_view.sort_values("timestamp"),
+            on="timestamp",
+            direction="backward",
+        )
+
+    volume = pd.to_numeric(out.get("volume", pd.Series(np.nan, index=out.index)), errors="coerce")
+    close = pd.to_numeric(out.get("close", pd.Series(np.nan, index=out.index)), errors="coerce")
+    high = pd.to_numeric(out.get("high", pd.Series(np.nan, index=out.index)), errors="coerce")
+    low = pd.to_numeric(out.get("low", pd.Series(np.nan, index=out.index)), errors="coerce")
+
+    quote_volume = pd.to_numeric(
+        out.get("quote_volume", pd.Series(np.nan, index=out.index)), errors="coerce"
+    )
+    quote_volume = quote_volume.where(quote_volume.notna(), volume * close)
+    out["quote_volume"] = quote_volume
+
+    if "spread_bps" not in out.columns or pd.to_numeric(
+        out["spread_bps"], errors="coerce"
+    ).isna().all():
+        spread_proxy = ((high - low) / close.replace(0.0, np.nan)).abs() * 10_000.0
+        out["spread_bps"] = spread_proxy.shift(1)
+    else:
+        out["spread_bps"] = pd.to_numeric(out["spread_bps"], errors="coerce")
+
+    if "imbalance" not in out.columns or pd.to_numeric(
+        out["imbalance"], errors="coerce"
+    ).isna().all():
+        if "ms_imbalance_24" in out.columns:
+            out["imbalance"] = pd.to_numeric(out["ms_imbalance_24"], errors="coerce").fillna(0.0)
+        else:
+            out["imbalance"] = 0.0
+    else:
+        out["imbalance"] = pd.to_numeric(out["imbalance"], errors="coerce").fillna(0.0)
+
+    if "depth_usd" not in out.columns or pd.to_numeric(
+        out["depth_usd"], errors="coerce"
+    ).isna().all():
+        out["depth_usd"] = quote_volume.shift(1)
+    else:
+        out["depth_usd"] = pd.to_numeric(out["depth_usd"], errors="coerce")
+
+    if "bid_depth_usd" not in out.columns or "ask_depth_usd" not in out.columns:
+        depth = pd.to_numeric(out["depth_usd"], errors="coerce")
+        imbalance = pd.to_numeric(out["imbalance"], errors="coerce").clip(-1.0, 1.0)
+        bid_share = ((imbalance + 1.0) / 2.0).fillna(0.5)
+        out["bid_depth_usd"] = depth * bid_share
+        out["ask_depth_usd"] = depth * (1.0 - bid_share)
+    else:
+        out["bid_depth_usd"] = pd.to_numeric(out["bid_depth_usd"], errors="coerce")
+        out["ask_depth_usd"] = pd.to_numeric(out["ask_depth_usd"], errors="coerce")
+
+    if "micro_depth_depletion" not in out.columns or pd.to_numeric(
+        out["micro_depth_depletion"], errors="coerce"
+    ).isna().all():
+        depth = pd.to_numeric(out["depth_usd"], errors="coerce")
+        depth_baseline = depth.rolling(24, min_periods=1).mean().shift(1)
+        out["micro_depth_depletion"] = (
+            1.0 - (depth / depth_baseline.replace(0.0, np.nan))
+        ).fillna(0.0)
+    else:
+        out["micro_depth_depletion"] = pd.to_numeric(
+            out["micro_depth_depletion"], errors="coerce"
+        ).fillna(0.0)
+
+    if "tob_coverage" in out.columns:
+        out["tob_coverage"] = pd.to_numeric(out["tob_coverage"], errors="coerce").fillna(0.0)
+
+    return out
+
+
 def _merge_optional_oi_liquidation(
     bars: pd.DataFrame,
     symbol: str,
@@ -473,6 +579,8 @@ def _ensure_feature_contract_columns(frame: pd.DataFrame, *, timeframe: str) -> 
     )
 
     out["ms_imbalance_24"] = calculate_imbalance(buy_volume, sell_volume, window=24).shift(1)
+    if "imbalance" not in out.columns:
+        out["imbalance"] = out["ms_imbalance_24"]
 
     # PIT safety verification: ensure key indicators that should be lagged are indeed shifted.
     # This is a defensive check to prevent look-ahead bias during feature evolution.
@@ -508,6 +616,7 @@ def build_features(
     symbol: str,
     run_id: str = "",
     data_root: Optional[Path] = None,
+    market: str = "perp",
     timeframe: str = "5m",
 ) -> pd.DataFrame:
     """Build the canonical feature set: merge funding, add basis/spread/OI/liquidation features."""
@@ -520,18 +629,26 @@ def build_features(
     tf = normalize_timeframe(timeframe)
 
     out = _merge_funding_rates(bars, funding, symbol, timeframe=tf)
+    out = _merge_optional_microstructure_inputs(
+        out,
+        symbol=symbol,
+        market=market,
+        run_id=run_id,
+        data_root=data_root,
+        timeframe=tf,
+    )
     out = _add_basis_features(
         out,
         symbol=symbol,
         run_id=run_id,
-        market="perp",
+        market=market,
         data_root=data_root,
         timeframe=tf,
     )
     out = _merge_optional_oi_liquidation(
         out,
         symbol=symbol,
-        market="perp",
+        market=market,
         run_id=run_id,
         data_root=data_root,
         timeframe=tf,
@@ -719,6 +836,7 @@ def main() -> int:
                 symbol,
                 run_id=run_id,
                 data_root=data_root,
+                market=market,
                 timeframe=tf,
             )
 

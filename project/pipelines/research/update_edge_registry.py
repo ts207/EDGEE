@@ -307,6 +307,61 @@ def _aggregate_registry(observations: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
+def _empty_observations_frame() -> pd.DataFrame:
+    return pd.DataFrame(
+        columns=[
+            "run_id",
+            "candidate_id",
+            "event_type",
+            "edge_id",
+            "template_id",
+            "template_family",
+            "direction_rule",
+            "signal_polarity_logic",
+            "promotion_decision",
+            "promotion_score",
+            "effect_value",
+            "stability_score",
+            "estimated_position_notional_usd",
+            "slot_pressure_fraction",
+            "leverage_usage_fraction",
+            "gate_capital_slot_within_limit",
+            "gate_capital_leverage_within_budget",
+            "observed_at_utc",
+            "ontology_spec_hash",
+        ]
+    )
+
+
+def _empty_registry_frame() -> pd.DataFrame:
+    return pd.DataFrame(
+        columns=[
+            "edge_id",
+            "candidate_id",
+            "promotion_score",
+            "promotion_decision",
+            "event_type",
+            "template_id",
+            "template_family",
+            "direction_rule",
+            "signal_polarity_logic",
+            "first_seen_run",
+            "last_seen_run",
+            "times_promoted",
+            "times_tested",
+            "median_effect",
+            "effect_decay_rate",
+            "stability_median",
+            "capital_slot_pressure_median",
+            "capital_slot_pressure_max",
+            "capital_leverage_usage_median",
+            "capital_leverage_usage_max",
+            "capital_slot_limit_breaches",
+            "capital_leverage_budget_breaches",
+        ]
+    )
+
+
 def main(argv: List[str] | None = None) -> int:
     DATA_ROOT = get_data_root()
     parser = argparse.ArgumentParser(
@@ -411,11 +466,6 @@ def main(argv: List[str] | None = None) -> int:
         promoted_df = _load_table(promoted_path)
         audit_df = _load_table(audit_path)
         capital_footprint_df = _load_capital_footprint(capital_footprint_path)
-        if promoted_df.empty and audit_df.empty:
-            raise ValueError(
-                f"No promotion artifacts found for run_id={args.run_id}: {promoted_path} and {audit_path}"
-            )
-
         observations_new = _build_observations(
             run_id=args.run_id,
             promoted_df=promoted_df,
@@ -423,31 +473,41 @@ def main(argv: List[str] | None = None) -> int:
             capital_footprint_df=capital_footprint_df,
             ontology_spec_hash=ontology_spec_hash,
         )
-        if observations_new.empty:
-            raise ValueError(f"No valid promotion observations for run_id={args.run_id}")
-
-        if ontology_spec_hash and "ontology_spec_hash" in observations_new.columns:
-            mismatch = observations_new[
-                observations_new["ontology_spec_hash"].astype(str).str.strip() != ontology_spec_hash
-            ]
-            if not mismatch.empty:
-                raise ValueError(
-                    "Ontology hash mismatch inside promotion artifacts for edge registry update."
-                )
 
         history_existing = _load_history(baseline_observations_path)
-        if history_existing.empty:
-            history_all = observations_new
-        else:
-            history_all = pd.concat([history_existing, observations_new], ignore_index=True)
-            history_all = history_all.drop_duplicates(
-                subset=["run_id", "candidate_id", "event_type"],
-                keep="last",
+        no_promotion_observations = False
+        if observations_new.empty:
+            no_promotion_observations = True
+            history_all = history_existing.copy() if not history_existing.empty else _empty_observations_frame()
+            registry_df = (
+                _aggregate_registry(history_all)
+                if not history_all.empty
+                else _empty_registry_frame()
             )
+            if registry_df.empty:
+                registry_df = _empty_registry_frame()
+        else:
+            if ontology_spec_hash and "ontology_spec_hash" in observations_new.columns:
+                mismatch = observations_new[
+                    observations_new["ontology_spec_hash"].astype(str).str.strip() != ontology_spec_hash
+                ]
+                if not mismatch.empty:
+                    raise ValueError(
+                        "Ontology hash mismatch inside promotion artifacts for edge registry update."
+                    )
 
-        registry_df = _aggregate_registry(history_all)
-        if registry_df.empty:
-            raise ValueError("Edge registry aggregation produced no rows.")
+            if history_existing.empty:
+                history_all = observations_new
+            else:
+                history_all = pd.concat([history_existing, observations_new], ignore_index=True)
+                history_all = history_all.drop_duplicates(
+                    subset=["run_id", "candidate_id", "event_type"],
+                    keep="last",
+                )
+
+            registry_df = _aggregate_registry(history_all)
+            if registry_df.empty:
+                raise ValueError("Edge registry aggregation produced no rows.")
 
         write_parquet(history_all, candidate_observations_path)
         write_parquet(registry_df, candidate_registry_path)
@@ -475,6 +535,7 @@ def main(argv: List[str] | None = None) -> int:
             "run_id": args.run_id,
             "baseline_id": baseline_id,
             "new_observations": int(len(observations_new)),
+            "no_promotion_observations": bool(no_promotion_observations),
             "history_observations_total": int(len(history_all)),
             "edge_count_total": int(len(registry_df)),
             "paths": {
@@ -501,6 +562,7 @@ def main(argv: List[str] | None = None) -> int:
             "success",
             stats={
                 "new_observations": int(len(observations_new)),
+                "no_promotion_observations": bool(no_promotion_observations),
                 "history_observations_total": int(len(history_all)),
                 "edge_count_total": int(len(registry_df)),
                 "capital_footprint_rows": int(len(capital_footprint_df)),

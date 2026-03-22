@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -80,25 +81,26 @@ def test_run_stage_retries_once_then_succeeds(monkeypatch, tmp_path):
     calls = {"count": 0}
 
     class _FakeProc:
-        def __init__(self, returncode: int, stdout_text: str = ""):
+        def __init__(self, returncode: int, stdout_handle, stdout_text: str = ""):
             self.returncode = int(returncode)
+            self._stdout_handle = stdout_handle
             self._stdout_text = str(stdout_text)
             self.pid = 12345
 
-        def communicate(self):
-            return self._stdout_text, None
-
         def wait(self, timeout=None):
+            if self._stdout_text:
+                self._stdout_handle.write(self._stdout_text.encode("utf-8"))
+                self._stdout_handle.flush()
             return self.returncode
 
         def poll(self):
             return self.returncode
 
-    def _fake_popen(*_args, **_kwargs):
+    def _fake_popen(*_args, **kwargs):
         calls["count"] += 1
         if calls["count"] == 1:
-            return _FakeProc(2, "attempt1")
-        return _FakeProc(0, "attempt2")
+            return _FakeProc(2, kwargs["stdout"], "attempt1")
+        return _FakeProc(0, kwargs["stdout"], "attempt2")
 
     monkeypatch.setattr(engine.subprocess, "Popen", _fake_popen)
     stage_cache_meta: dict[str, dict[str, object]] = {}
@@ -127,20 +129,22 @@ def test_run_stage_buffers_output_with_stage_prefix(monkeypatch, tmp_path, capsy
     script_path.write_text("print('ok')\n", encoding="utf-8")
 
     class _FakeProc:
-        def __init__(self):
+        def __init__(self, stdout_handle):
             self.returncode = 0
+            self._stdout_handle = stdout_handle
             self.pid = 9001
 
-        def communicate(self):
-            return "line_a\nline_b\n", None
-
         def wait(self, timeout=None):
+            self._stdout_handle.write(b"line_a\nline_b\n")
+            self._stdout_handle.flush()
             return self.returncode
 
         def poll(self):
             return self.returncode
 
-    monkeypatch.setattr(engine.subprocess, "Popen", lambda *_a, **_k: _FakeProc())
+    monkeypatch.setattr(
+        engine.subprocess, "Popen", lambda *_a, **kwargs: _FakeProc(kwargs["stdout"])
+    )
     stage_cache_meta: dict[str, dict[str, object]] = {}
     ok = engine.run_stage(
         "build_features",
@@ -170,14 +174,14 @@ def test_run_stage_sets_stage_identity_in_subprocess_env(monkeypatch, tmp_path):
     captured_env: dict[str, str] = {}
 
     class _FakeProc:
-        def __init__(self):
+        def __init__(self, stdout_handle):
             self.returncode = 0
+            self._stdout_handle = stdout_handle
             self.pid = 999
 
-        def communicate(self):
-            return "ok\n", None
-
         def wait(self, timeout=None):
+            self._stdout_handle.write(b"ok\n")
+            self._stdout_handle.flush()
             return self.returncode
 
         def poll(self):
@@ -185,7 +189,7 @@ def test_run_stage_sets_stage_identity_in_subprocess_env(monkeypatch, tmp_path):
 
     def _fake_popen(*_args, **kwargs):
         captured_env.update(kwargs["env"])
-        return _FakeProc()
+        return _FakeProc(kwargs["stdout"])
 
     monkeypatch.setattr(engine.subprocess, "Popen", _fake_popen)
     stage_cache_meta: dict[str, dict[str, object]] = {}
@@ -402,21 +406,23 @@ def test_run_stage_requires_manifest_when_enabled(monkeypatch, tmp_path):
     script_path.write_text("print('ok')\n", encoding="utf-8")
 
     class _FakeProc:
-        def __init__(self):
+        def __init__(self, stdout_handle):
             self.returncode = 0
+            self._stdout_handle = stdout_handle
             self.pid = 777
 
-        def communicate(self):
-            return "ok\n", None
-
         def wait(self, timeout=None):
+            self._stdout_handle.write(b"ok\n")
+            self._stdout_handle.flush()
             return self.returncode
 
         def poll(self):
             return self.returncode
 
     monkeypatch.setenv("BACKTEST_REQUIRE_STAGE_MANIFEST", "1")
-    monkeypatch.setattr(engine.subprocess, "Popen", lambda *_a, **_k: _FakeProc())
+    monkeypatch.setattr(
+        engine.subprocess, "Popen", lambda *_a, **kwargs: _FakeProc(kwargs["stdout"])
+    )
     stage_cache_meta: dict[str, dict[str, object]] = {}
     ok = engine.run_stage(
         "build_features",
@@ -487,20 +493,20 @@ def test_run_stage_cache_hit_rejected_when_declared_output_missing(monkeypatch, 
         popen_called.append(True)
 
         class _FakeProc:
-            def __init__(self):
+            def __init__(self, stdout_handle):
                 self.returncode = 0
+                self._stdout_handle = stdout_handle
                 self.pid = 123
 
-            def communicate(self):
-                return "ok", None
-
             def wait(self, timeout=None):
+                self._stdout_handle.write(b"ok")
+                self._stdout_handle.flush()
                 return 0
 
             def poll(self):
                 return 0
 
-        return _FakeProc()
+        return _FakeProc(_kwargs["stdout"])
 
     monkeypatch.setattr(engine.subprocess, "Popen", _fake_popen)
     stage_cache_meta: dict[str, dict[str, object]] = {}
@@ -522,6 +528,50 @@ def test_run_stage_cache_hit_rejected_when_declared_output_missing(monkeypatch, 
     assert len(popen_called) == 1
     assert stage_cache_meta[stage_instance]["cache_hit"] is False
     assert stage_cache_meta[stage_instance]["cache_reason"] == "miss_or_invalid_manifest_or_outputs"
+
+
+def test_run_stage_does_not_block_on_descendant_inheriting_stdout(tmp_path):
+    run_id = "descendant_stdout_run"
+    data_root = tmp_path / "data"
+    script_path = tmp_path / "stage_script.py"
+    script_path.write_text(
+        "\n".join(
+            [
+                "from __future__ import annotations",
+                "import subprocess",
+                "import sys",
+                "",
+                "subprocess.Popen(",
+                "    [sys.executable, '-c', 'import time; print(\"child-alive\"); time.sleep(2)']",
+                ")",
+                "print('parent-finished')",
+                "sys.exit(0)",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    stage_cache_meta: dict[str, dict[str, object]] = {}
+    started = time.perf_counter()
+    ok = engine.run_stage(
+        "build_features",
+        script_path,
+        ["--symbols", "BTCUSDT"],
+        run_id,
+        data_root=data_root,
+        strict_recommendations_checklist=False,
+        feature_schema_version="v2",
+        current_pipeline_session_id=None,
+        current_stage_instance_id="build_features_descendant_stdout",
+        stage_cache_meta=stage_cache_meta,
+    )
+    elapsed = time.perf_counter() - started
+
+    assert ok is True
+    assert elapsed < 1.5
+    log_path = data_root / "runs" / run_id / "build_features_descendant_stdout.log"
+    assert "parent-finished" in log_path.read_text(encoding="utf-8")
 
 
 def test_validate_stage_manifest_on_disk_propagates_unexpected_runtime_errors(

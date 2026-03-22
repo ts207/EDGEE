@@ -229,11 +229,23 @@ def _extract_event_returns(
         )
         event_returns.append(float(fwd_ret) * d_sign)
         event_ts_list.append(pd.to_datetime(row.get("event_ts"), utc=True))
-        event_vol_list.append(row.get("evt_vol_regime", ""))
+        event_vol_list.append(row.get("evt_vol_regime", row.get("vol_regime", "")))
         event_liq_list.append(
             row.get(
                 "evt_liquidity_state",
-                row.get("evt_market_liquidity_state", row.get("evt_depth_state", "")),
+                row.get(
+                    "evt_market_liquidity_state",
+                    row.get(
+                        "evt_depth_state",
+                        row.get(
+                            "liquidity_state",
+                            row.get(
+                                "market_liquidity_state",
+                                row.get("depth_state", ""),
+                            ),
+                        ),
+                    ),
+                ),
             )
         )
         event_dir_list.append(event_direction)
@@ -401,6 +413,23 @@ def build_event_return_frame(
                 "event_ts": event_ts,
                 "cluster_day": event_ts.strftime("%Y-%m-%d"),
                 "split_label": str(row.get("evt_split_label", "train")).strip().lower(),
+                "vol_regime": row.get("evt_vol_regime", row.get("vol_regime", "")),
+                "liquidity_state": row.get(
+                    "evt_liquidity_state",
+                    row.get(
+                        "evt_market_liquidity_state",
+                        row.get(
+                            "evt_depth_state",
+                            row.get(
+                                "liquidity_state",
+                                row.get(
+                                    "market_liquidity_state",
+                                    row.get("depth_state", ""),
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
                 "event_direction": int(event_direction),
                 "direction_sign": float(direction_sign),
                 "forward_return_raw": float(raw_return),

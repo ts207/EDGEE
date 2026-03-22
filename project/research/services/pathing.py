@@ -27,3 +27,11 @@ def bridge_event_out_dir(
     event_name = str(event_type or "ALL").strip().upper() or "ALL"
     tf = normalize_timeframe(timeframe or "5m")
     return Path(data_root) / "reports" / "bridge_eval" / str(run_id) / event_name / tf
+
+
+def negative_control_out_dir(
+    *,
+    data_root: Path,
+    run_id: str,
+) -> Path:
+    return Path(data_root) / "reports" / "negative_control" / str(run_id)

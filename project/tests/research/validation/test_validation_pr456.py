@@ -102,6 +102,10 @@ def test_evidence_bundle_policy_and_serialization(tmp_path: Path):
     assert decision["promotion_track"] == "standard"
     flat = bundle_to_flat_record(bundle)
     assert flat["promotion_decision"] == "promoted"
+    assert "plan_row_id" in flat
+    assert "bridge_certified" in flat
+    assert "q_value_by" in flat
+    assert "q_value_cluster" in flat
     out = tmp_path / "bundles.jsonl"
     serialize_evidence_bundles([bundle], out)
     lines = out.read_text(encoding="utf-8").strip().splitlines()
@@ -127,6 +131,9 @@ def test_build_promotion_statistical_audit_retains_bundle_reporting_fields():
                 "reject_reason": "",
                 "bundle_rejection_reasons": "",
                 "q_value": 0.02,
+                "q_value_by": 0.03,
+                "q_value_cluster": 0.04,
+                "q_value_program": 0.05,
                 "n_events": 250,
                 "promotion_min_events_threshold": 100,
                 "stability_score": 2.0,
@@ -135,13 +142,32 @@ def test_build_promotion_statistical_audit_retains_bundle_reporting_fields():
                 "control_pass_rate": 0.0,
                 "control_rate_source": "candidate_row",
                 "tob_coverage": 0.95,
+                "validation_samples_raw": 120.0,
+                "test_samples_raw": 80.0,
                 "validation_samples": 120,
+                "test_samples": 80,
+                "oos_sample_source": "row.validation_samples",
+                "oos_direction_match": True,
+                "promotion_oos_min_validation_events": 50,
+                "promotion_oos_min_test_events": 50,
+                "bridge_validation_trades": 120,
+                "baseline_expectancy_bps": 4.0,
                 "net_expectancy_bps": 16.0,
                 "effective_cost_bps": 3.0,
                 "turnover_proxy_mean": 1.5,
+                "plan_row_id": "plan_1",
+                "bridge_certified": True,
+                "has_realized_oos_path": True,
+                "repeated_fold_consistency": 0.8,
+                "structural_robustness_score": 0.9,
+                "robustness_panel_complete": True,
+                "gate_regime_stability": True,
+                "gate_structural_break": True,
+                "num_regimes_supported": 3,
                 "promotion_score": 1.0,
                 "gate_promo_statistical": True,
                 "gate_promo_multiplicity_diagnostics": True,
+                "gate_promo_multiplicity_confirmatory": True,
                 "gate_promo_stability": True,
                 "gate_promo_cost_survival": True,
                 "gate_promo_negative_control": True,
@@ -152,8 +178,12 @@ def test_build_promotion_statistical_audit_retains_bundle_reporting_fields():
                 "gate_promo_microstructure": True,
                 "gate_promo_retail_viability": True,
                 "gate_promo_low_capital_viability": True,
+                "gate_promo_baseline_beats_complexity": True,
                 "gate_promo_timeframe_consensus": True,
                 "gate_promo_event_discipline": True,
+                "gate_promo_dsr": True,
+                "gate_promo_robustness": True,
+                "gate_promo_regime": True,
                 "regime_flip_flag": False,
                 "cross_symbol_sign_consistency": 1.0,
                 "rolling_instability_score": 0.1,
@@ -183,4 +213,26 @@ def test_build_promotion_statistical_audit_retains_bundle_reporting_fields():
     assert "policy_version" in out.columns
     assert "evidence_bundle_json" in out.columns
     assert "gate_promo_falsification" in out.columns
+    assert "plan_row_id" in out.columns
+    assert "bridge_certified" in out.columns
+    assert "q_value_by" in out.columns
+    assert "q_value_cluster" in out.columns
+    assert "baseline_expectancy_bps" in out.columns
+    assert "gate_promo_baseline_beats_complexity" in out.columns
+    assert "gate_promo_multiplicity_confirmatory" in out.columns
+    assert "validation_samples_raw" in out.columns
+    assert "test_samples_raw" in out.columns
+    assert "test_samples" in out.columns
+    assert "oos_sample_source" in out.columns
+    assert "oos_direction_match" in out.columns
+    assert "promotion_gate_evidence_json" in out.columns
     assert out.iloc[0]["promotion_decision"] == "promoted"
+    trace = json.loads(out.iloc[0]["promotion_gate_evidence_json"])
+    assert trace["oos_validation"]["observed"]["validation_samples_raw"] == 120.0
+    assert trace["oos_validation"]["observed"]["validation_samples"] == 120
+    assert trace["oos_validation"]["observed"]["test_samples_raw"] == 80.0
+    assert trace["oos_validation"]["observed"]["test_samples"] == 80
+    assert trace["oos_validation"]["observed"]["oos_sample_source"] == "row.validation_samples"
+    assert trace["oos_validation"]["observed"]["oos_direction_match"] is True
+    assert trace["oos_validation"]["thresholds"]["min_validation_samples"] == 50
+    assert trace["oos_validation"]["thresholds"]["min_test_samples"] == 50

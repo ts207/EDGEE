@@ -624,6 +624,7 @@ def test_build_promotion_statistical_audit_populates_primary_fail_gate_and_trace
     assert trace["statistical"]["thresholds"]["max_q_value"] == 0.10
     assert trace["negative_control"]["thresholds"]["allow_missing_negative_controls"] is False
     assert trace["retail"]["thresholds"]["min_tob_coverage"] == 0.8
+    assert "promotion_gate_evidence_json" in out.columns
 
 
 def test_build_promotion_statistical_audit_avoids_warning_spam_for_missing_optional_fields(caplog):

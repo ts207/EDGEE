@@ -56,5 +56,39 @@ def test_governance_catches_regressions():
     print("Certification successfully caught all regressions.")
 
 
+def test_governance_fails_on_execution_failures():
+    current_review = {
+        "matrix_id": "test_matrix",
+        "slices": [
+            {
+                "benchmark_id": "slice_1",
+                "benchmark_status": "informative",
+                "live_foundation_readiness": "ready",
+                "hard_evaluated_rows": 10,
+                "confidence_evaluated_rows": 10,
+            }
+        ],
+    }
+
+    execution_manifest = {
+        "matrix_id": "test_matrix",
+        "failures": 2,
+        "results": [
+            {"run_id": "run_a", "status": "failed"},
+            {"run_id": "run_b", "status": "failed"},
+        ],
+    }
+
+    cert = certify_benchmark_review(
+        current_review=current_review,
+        execution_manifest=execution_manifest,
+    )
+
+    assert cert["passed"] is False
+    issue = next(i for i in cert["issues"] if i["type"] == "execution_failures")
+    assert issue["benchmark_id"] == "__matrix__"
+    assert issue["failed_run_ids"] == ["run_a", "run_b"]
+
+
 if __name__ == "__main__":
     test_governance_catches_regressions()

@@ -141,6 +141,11 @@ def apply_program_multiplicity_control(
     if not existing_path.exists():
         return compute_multiplicity_metrics(candidates, alpha)
 
+    preserved_candidate_metrics = {}
+    for col in ("q_value", "q_value_family", "q_value_cluster", "q_value_by"):
+        if col in candidates.columns:
+            preserved_candidate_metrics[col] = pd.to_numeric(candidates[col], errors="coerce")
+
     full_universe = read_parquet(existing_path)
     # We need p-values for all hypotheses in the universe to do global program-level control.
     # If some runs didn't produce p-values for all hypotheses, we assume 1.0 (conservative).
@@ -153,7 +158,15 @@ def apply_program_multiplicity_control(
     q_map = full_universe.set_index("hypothesis_id")["q_value_program"].to_dict()
     candidates["q_value_program"] = candidates["hypothesis_id"].map(q_map).fillna(1.0)
 
-    return compute_multiplicity_metrics(candidates, alpha)
+    out = compute_multiplicity_metrics(candidates, alpha)
+    for col, preserved in preserved_candidate_metrics.items():
+        if col not in out.columns:
+            out[col] = preserved
+            continue
+        out[col] = pd.to_numeric(out[col], errors="coerce")
+        keep_mask = preserved.notna()
+        out.loc[keep_mask, col] = preserved.loc[keep_mask]
+    return out
 
 
 def formalize_ids(df: pd.DataFrame) -> pd.DataFrame:

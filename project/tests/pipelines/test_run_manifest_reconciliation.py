@@ -158,6 +158,46 @@ def test_reconcile_run_manifest_from_stage_manifests_treats_warning_as_terminal(
     assert reconciled["failed_stage"] is None
 
 
+def test_reconcile_run_manifest_from_stage_manifests_loads_checklist_decision(
+    tmp_path, monkeypatch
+):
+    data_root = tmp_path / "data"
+    monkeypatch.setattr(provenance, "_get_data_root", lambda: data_root)
+
+    run_id = "warning_checklist_run"
+    _write_json(
+        data_root / "runs" / run_id / "run_manifest.json",
+        {
+            "run_id": run_id,
+            "status": "failed",
+            "failed_stage": "generate_recommendations_checklist",
+            "failed_stage_instance": "generate_recommendations_checklist",
+            "planned_stage_instances": ["generate_recommendations_checklist"],
+            "stage_timings_sec": {},
+            "stage_instance_timings_sec": {},
+            "checklist_decision": None,
+        },
+    )
+    _write_json(
+        data_root / "runs" / run_id / "generate_recommendations_checklist.json",
+        {
+            "stage": "generate_recommendations_checklist",
+            "status": "warning",
+            "started_at": "2026-03-11T03:00:00+00:00",
+            "finished_at": "2026-03-11T03:00:05+00:00",
+        },
+    )
+    _write_json(
+        data_root / "runs" / run_id / "research_checklist" / "checklist.json",
+        {"decision": "KEEP_RESEARCH"},
+    )
+
+    reconciled = provenance.reconcile_run_manifest_from_stage_manifests(run_id)
+
+    assert reconciled["status"] == "success"
+    assert reconciled["checklist_decision"] == "KEEP_RESEARCH"
+
+
 def test_reconcile_run_manifest_respects_explicit_data_root(tmp_path, monkeypatch):
     monkeypatch.setattr(provenance, "_get_data_root", lambda: tmp_path / "wrong_data")
     data_root = tmp_path / "data"

@@ -120,6 +120,40 @@ def _write_promotions_statistical_audit_only(data_root: Path, run_id: str, effec
     footprint.to_parquet(promo_dir / "promotion_capital_footprint.parquet", index=False)
 
 
+def _write_empty_promotions(data_root: Path, run_id: str) -> None:
+    promo_dir = data_root / "reports" / "promotions" / run_id
+    promo_dir.mkdir(parents=True, exist_ok=True)
+    promoted = pd.DataFrame(
+        columns=[
+            "candidate_id",
+            "status",
+            "event_type",
+            "template_id",
+            "direction_rule",
+            "signal_polarity_logic",
+            "promotion_score",
+            "promotion_decision",
+            "effect_shrunk_state",
+            "stability_score",
+        ]
+    )
+    audit = pd.DataFrame(
+        columns=[
+            "candidate_id",
+            "event_type",
+            "template_id",
+            "direction_rule",
+            "signal_polarity_logic",
+            "promotion_score",
+            "promotion_decision",
+            "effect_shrunk_state",
+            "stability_score",
+        ]
+    )
+    promoted.to_parquet(promo_dir / "promoted_candidates.parquet", index=False)
+    audit.to_parquet(promo_dir / "promotion_statistical_audit.parquet", index=False)
+
+
 def test_update_edge_registry_appends_and_aggregates(monkeypatch, tmp_path):
     data_root = tmp_path / "data"
     monkeypatch.setattr(update_edge_registry, "get_data_root", lambda: data_root)
@@ -227,3 +261,31 @@ def test_update_edge_registry_falls_back_to_promotion_statistical_audit(monkeypa
     assert rc == 0
     latest_snapshot = data_root / "runs" / "r_stat" / "research" / "edge_registry.parquet"
     assert latest_snapshot.exists()
+
+
+def test_update_edge_registry_noops_on_empty_promotion_artifacts(monkeypatch, tmp_path):
+    data_root = tmp_path / "data"
+    monkeypatch.setattr(update_edge_registry, "get_data_root", lambda: data_root)
+
+    _write_run_manifest(data_root, "r_empty")
+    _write_empty_promotions(data_root, "r_empty")
+
+    rc = update_edge_registry.main(["--run_id", "r_empty"])
+
+    assert rc == 0
+
+    latest_snapshot = data_root / "runs" / "r_empty" / "research" / "edge_registry.parquet"
+    observations_path = data_root / "runs" / "history_candidates" / "r_empty" / "edge_observations.parquet"
+    summary_path = data_root / "runs" / "r_empty" / "research" / "edge_registry_summary.json"
+    assert latest_snapshot.exists()
+    assert observations_path.exists()
+    assert summary_path.exists()
+
+    registry_df = pd.read_parquet(latest_snapshot)
+    observations_df = pd.read_parquet(observations_path)
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    assert registry_df.empty
+    assert observations_df.empty
+    assert summary["no_promotion_observations"] is True
+    assert summary["edge_count_total"] == 0
+    assert summary["new_observations"] == 0

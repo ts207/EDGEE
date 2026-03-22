@@ -259,3 +259,69 @@ def test_select_profitable_strategies_enforces_oos_consistency_for_strategy_cand
     )
     selected = pd.read_parquet(out_path)
     assert selected["candidate_id"].tolist() == ["good_strategy"]
+
+
+def test_select_profitable_strategies_writes_empty_outputs_for_empty_strategy_candidates(
+    monkeypatch, tmp_path
+):
+    data_root = tmp_path / "data"
+    run_id = "select_strategy_candidates_empty"
+    strategy_dir = data_root / "reports" / "strategy_builder" / run_id
+    strategy_dir.mkdir(parents=True, exist_ok=True)
+
+    pd.DataFrame(
+        columns=[
+            "strategy_candidate_id",
+            "candidate_id",
+            "status",
+            "event_type",
+            "selection_score",
+            "expectancy_after_multiplicity",
+            "oos_sign_consistency",
+            "n_events",
+            "executable_condition",
+            "executable_action",
+            "allocation_policy",
+        ]
+    ).to_parquet(strategy_dir / "strategy_candidates.parquet", index=False)
+
+    monkeypatch.setenv("BACKTEST_DATA_ROOT", str(data_root))
+    monkeypatch.setattr(stage, "get_data_root", lambda: data_root)
+    monkeypatch.setattr(
+        stage,
+        "resolve_objective_profile_contract",
+        lambda **kwargs: SimpleNamespace(
+            min_net_expectancy_bps=5.0,
+            min_trade_count=100,
+            min_oos_sign_consistency=0.75,
+            require_retail_viability=False,
+            require_low_capital_contract=False,
+            objective_name="test_objective",
+            retail_profile_name="test_profile",
+        ),
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "select_profitable_strategies.py",
+            "--run_id",
+            run_id,
+            "--symbols",
+            "BTCUSDT",
+        ],
+    )
+
+    rc = stage.main()
+    assert rc == 0
+
+    out_dir = data_root / "reports" / "strategy_selection" / run_id
+    out_path = out_dir / "profitable_strategies.parquet"
+    summary_path = out_dir / "profitability_summary.json"
+
+    selected = pd.read_parquet(out_path)
+    assert selected.empty
+
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    assert summary["selected_count"] == 0
+    assert summary["no_candidates_found"] is True

@@ -196,10 +196,11 @@ def effective_cost_bps(row: pd.Series) -> float:
 
 
 def bridge_metrics_for_row(row: pd.Series, stressed_cost_multiplier: float) -> Dict[str, Any]:
+    fallback_expectancy = _row_float(row, "expectancy", 0.0)
     eff_aft = _row_float(
         row,
         "after_cost_expectancy_per_trade",
-        _row_float(row, "expectancy_per_trade", 0.0),
+        _row_float(row, "expectancy_per_trade", fallback_expectancy),
     )
     str_aft = _row_float(row, "stressed_after_cost_expectancy_per_trade", eff_aft)
     eff_cost = effective_cost_bps(row)
@@ -326,14 +327,23 @@ def evaluate_bridge_performance(
         edge_ratio_gate = metrics["bridge_gross_edge_bps_per_trade"] >= (
             edge_cost_k * metrics["bridge_effective_cost_bps_per_trade"]
         )
-        turnover_proxy = max(0.0, _row_float(row, "turnover_proxy_mean", 0.0))
+        turnover_proxy = max(0.0, _row_float(row, "turnover_proxy_mean", 0.5))
         gate_turnover = (
             (np.isnan(base_turnover) or turnover_proxy <= (base_turnover + 1e-9))
             and turnover_proxy <= 1.0
             and str_pos
         )
+        retail_row = row.copy()
+        retail_row["bridge_validation_after_cost_bps"] = metrics[
+            "bridge_validation_after_cost_bps"
+        ]
+        retail_row["bridge_effective_cost_bps_per_trade"] = metrics[
+            "bridge_effective_cost_bps_per_trade"
+        ]
+        retail_row["turnover_proxy_mean"] = turnover_proxy
+        retail_row["tob_coverage"] = _row_float(row, "tob_coverage", np.nan)
         retail_eval = evaluate_retail_constraints(
-            row,
+            retail_row,
             min_tob_coverage=0.0,
             min_net_expectancy_bps=min_net_expectancy_bps,
             max_fee_plus_slippage_bps=max_fee_plus_slippage_bps,
@@ -411,6 +421,8 @@ def evaluate_bridge_performance(
                 "gate_bridge_edge_cost_ratio": edge_ratio_gate,
                 "gate_bridge_turnover_controls": gate_turnover,
                 "gate_bridge_retail_viability": gate_retail,
+                "tob_coverage": safe_float(retail_eval.get("tob_coverage"), np.nan),
+                "turnover_proxy_mean": float(turnover_proxy),
                 "gate_bridge_retail_net_expectancy": bool(
                     retail_eval.get("gate_net_expectancy", True)
                 ),

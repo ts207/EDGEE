@@ -123,6 +123,21 @@ def build_evidence_bundle(
     gate_bridge_microstructure = _optional_bool_gate(
         row, "gate_bridge_microstructure", "microstructure_pass"
     )
+    gate_regime_stability = _optional_bool_gate(
+        row, "gate_regime_stability", "regime_stability_pass"
+    )
+    gate_structural_break = _optional_bool_gate(
+        row, "gate_structural_break", "structural_break_pass"
+    )
+    returns_oos_combined = row.get("returns_oos_combined")
+    has_realized_oos_path = False
+    if isinstance(returns_oos_combined, str):
+        try:
+            returns_oos_combined = json.loads(returns_oos_combined)
+        except Exception:
+            returns_oos_combined = []
+    if isinstance(returns_oos_combined, (list, tuple, np.ndarray, pd.Series)):
+        has_realized_oos_path = bool(len(returns_oos_combined) >= 10)
     bundle = EvidenceBundle(
         candidate_id=candidate_id,
         event_family=_event_family(event_type),
@@ -212,6 +227,16 @@ def build_evidence_bundle(
             "event_is_descriptive": bool(as_bool(row.get("event_is_descriptive", False))),
             "event_is_trade_trigger": bool(as_bool(row.get("event_is_trade_trigger", True))),
             "is_reduced_evidence": bool(as_bool(row.get("is_reduced_evidence", False))),
+            "bridge_certified": bool(as_bool(row.get("bridge_certified", False))),
+            "has_realized_oos_path": bool(has_realized_oos_path),
+            "repeated_fold_consistency": safe_float(
+                row.get("repeated_fold_consistency", np.nan), np.nan
+            ),
+            "structural_robustness_score": safe_float(
+                row.get("structural_robustness_score", np.nan), np.nan
+            ),
+            "robustness_panel_complete": bool(as_bool(row.get("robustness_panel_complete", False))),
+            "num_regimes_supported": int(safe_int(row.get("num_regimes", 0), 0)),
             "gate_stability": _bool_gate_value(row, "gate_stability", True),
             "gate_after_cost_stressed_positive": _bool_gate_value(
                 row, "gate_after_cost_stressed_positive", True
@@ -277,6 +302,14 @@ def build_evidence_bundle(
         bundle.metadata["gate_bridge_microstructure"] = gate_bridge_microstructure
     else:
         bundle.metadata.pop("gate_bridge_microstructure", None)
+    if gate_regime_stability is not None:
+        bundle.metadata["gate_regime_stability"] = gate_regime_stability
+    else:
+        bundle.metadata.pop("gate_regime_stability", None)
+    if gate_structural_break is not None:
+        bundle.metadata["gate_structural_break"] = gate_structural_break
+    else:
+        bundle.metadata.pop("gate_structural_break", None)
     return bundle.to_dict()
 
 
@@ -523,6 +556,7 @@ def bundle_to_flat_record(bundle: Dict[str, Any]) -> Dict[str, Any]:
     cost = bundle.get("cost_robustness", {})
     uncertainty = bundle.get("uncertainty_estimates", {})
     decision = bundle.get("promotion_decision", {})
+    meta = bundle.get("metadata", {})
     return {
         "candidate_id": bundle.get("candidate_id", ""),
         "event_type": bundle.get("event_type", ""),
@@ -534,6 +568,9 @@ def bundle_to_flat_record(bundle: Dict[str, Any]) -> Dict[str, Any]:
         "q_value": safe_float(uncertainty.get("q_value", np.nan), np.nan),
         "q_value_by": safe_float(uncertainty.get("q_value_by", np.nan), np.nan),
         "q_value_cluster": safe_float(uncertainty.get("q_value_cluster", np.nan), np.nan),
+        "q_value_program": safe_float(
+            bundle.get("multiplicity_adjustment", {}).get("q_value_program", np.nan), np.nan
+        ),
         "stability_score": safe_float(stability.get("stability_score", np.nan), np.nan),
         "sign_consistency": safe_float(stability.get("sign_consistency", np.nan), np.nan),
         "regime_flip_flag": bool(as_bool(stability.get("regime_flip_flag", False))),
@@ -545,7 +582,23 @@ def bundle_to_flat_record(bundle: Dict[str, Any]) -> Dict[str, Any]:
         ),
         "passes_control": bool(as_bool(falsification.get("passes_control", False))),
         "control_pass_rate": safe_float(falsification.get("control_pass_rate", np.nan), np.nan),
+        "negative_control_pass_rate": safe_float(
+            falsification.get("control_pass_rate", np.nan), np.nan
+        ),
         "cost_survival_ratio": safe_float(cost.get("cost_survival_ratio", np.nan), np.nan),
+        "plan_row_id": str(meta.get("plan_row_id", "")).strip(),
+        "bridge_certified": bool(as_bool(meta.get("bridge_certified", False))),
+        "has_realized_oos_path": bool(as_bool(meta.get("has_realized_oos_path", False))),
+        "repeated_fold_consistency": safe_float(
+            meta.get("repeated_fold_consistency", np.nan), np.nan
+        ),
+        "structural_robustness_score": safe_float(
+            meta.get("structural_robustness_score", np.nan), np.nan
+        ),
+        "robustness_panel_complete": bool(as_bool(meta.get("robustness_panel_complete", False))),
+        "gate_regime_stability": _bool_gate_value(meta, "gate_regime_stability", False),
+        "gate_structural_break": _bool_gate_value(meta, "gate_structural_break", False),
+        "num_regimes_supported": safe_int(meta.get("num_regimes_supported", 0), 0),
         "promotion_decision": decision.get("promotion_status", ""),
         "promotion_track": decision.get("promotion_track", ""),
         "rank_score": safe_float(decision.get("rank_score", np.nan), np.nan),

@@ -109,3 +109,19 @@ def test_bridge_metrics_for_row_skips_missing_optional_value_warning_spam(caplog
     assert out["bridge_validation_after_cost_bps"] == -1.0
     assert "safe_float: failed to convert None" not in caplog.text
     assert "safe_int: failed to convert None" not in caplog.text
+
+
+def test_bridge_metrics_for_row_falls_back_to_expectancy_when_per_trade_field_missing():
+    row = pd.Series(
+        {
+            "expectancy": 0.00125,
+            "avg_dynamic_cost_bps": 0.5,
+            "turnover_proxy_mean": 0.5,
+            "sample_size": 40,
+        }
+    )
+
+    out = bridge_metrics_for_row(row, stressed_cost_multiplier=2.0)
+
+    assert out["bridge_validation_after_cost_bps"] > 0.0
+    assert out["bridge_validation_trades"] == 40

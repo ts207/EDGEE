@@ -61,7 +61,8 @@ DEPENDENCY_PATTERNS: List[Tuple[str, List[str]]] = [
     # Global Stages
     ("phase1_correlation_clustering", ["@REGISTRY_STAGES"]),
     ("export_edge_candidates", ["@PHASE2_DISCOVERY_STAGES"]),
-    ("promote_candidates", ["export_edge_candidates"]),
+    ("generate_negative_control_summary", ["export_edge_candidates"]),
+    ("promote_candidates", ["generate_negative_control_summary"]),
     ("update_edge_registry", ["promote_candidates"]),
     ("update_campaign_memory", ["update_edge_registry", "export_edge_candidates"]),
     ("analyze_conditional_expectancy", ["update_edge_registry"]),

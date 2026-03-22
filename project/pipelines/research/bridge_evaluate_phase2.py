@@ -18,6 +18,7 @@ from project.core.coercion import safe_float, safe_int, as_bool
 from project.core.timeframes import normalize_timeframe
 from project.io.utils import ensure_dir, write_parquet
 from project.specs.manifest import finalize_manifest, start_manifest
+from project.specs.objective import resolve_objective_profile_contract
 from project.research.bridge_evaluation import (
     bridge_metrics_for_row,
     evaluate_bridge_performance,
@@ -595,6 +596,31 @@ def _make_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _resolve_bridge_policy(args: argparse.Namespace, data_root: Path) -> Dict[str, Any]:
+    project_root = Path(__file__).resolve().parents[3]
+    contract = resolve_objective_profile_contract(
+        project_root=project_root,
+        data_root=data_root,
+        run_id=str(args.run_id),
+        objective_name=(str(args.objective_name).strip() or None),
+        objective_spec_path=(str(args.objective_spec).strip() or None),
+        retail_profile_name=(str(args.retail_profile).strip() or None),
+        retail_profiles_spec_path=(str(args.retail_profiles_spec).strip() or None),
+    )
+    return {
+        "min_net_expectancy_bps": float(getattr(contract, "min_net_expectancy_bps", 0.0) or 0.0),
+        "max_fee_plus_slippage_bps": getattr(contract, "max_fee_plus_slippage_bps", None),
+        "max_daily_turnover_multiple": getattr(contract, "max_daily_turnover_multiple", None),
+        "require_retail_viability": bool(
+            getattr(contract, "require_retail_viability", False)
+        ),
+        "low_capital_contract": dict(getattr(contract, "low_capital_contract", {}) or {}),
+        "enforce_low_capital_viability": bool(
+            getattr(contract, "require_low_capital_contract", False)
+        ),
+    }
+
+
 def main() -> int:
     DATA_ROOT = get_data_root()
     parser = _make_parser()
@@ -621,6 +647,7 @@ def main() -> int:
     try:
         symbols = [s.strip().upper() for s in args.symbols.split(",") if s.strip()]
         event_type = str(args.event_type).strip().upper()
+        bridge_policy = _resolve_bridge_policy(args, DATA_ROOT)
 
         any_candidates = False
         for symbol in symbols:
@@ -675,10 +702,10 @@ def main() -> int:
                 edge_cost_k=args.edge_cost_k,
                 min_validation_trades=args.min_validation_trades,
                 stressed_cost_multiplier=args.stressed_cost_multiplier,
-                min_net_expectancy_bps=5.0,
-                max_fee_plus_slippage_bps=2.0,
-                max_daily_turnover_multiple=None,
-                require_retail_viability=False,
+                min_net_expectancy_bps=bridge_policy["min_net_expectancy_bps"],
+                max_fee_plus_slippage_bps=bridge_policy["max_fee_plus_slippage_bps"],
+                max_daily_turnover_multiple=bridge_policy["max_daily_turnover_multiple"],
+                require_retail_viability=bridge_policy["require_retail_viability"],
                 micro_thresholds={
                     "max_spread_stress": args.micro_max_spread_stress,
                     "max_depth_depletion": args.micro_max_depth_depletion,
@@ -686,6 +713,8 @@ def main() -> int:
                     "max_abs_imbalance": args.micro_max_abs_imbalance,
                     "min_feature_coverage": args.micro_min_feature_coverage,
                 },
+                low_capital_contract=bridge_policy["low_capital_contract"],
+                enforce_low_capital_viability=bridge_policy["enforce_low_capital_viability"],
             )
 
             if metrics_rows:

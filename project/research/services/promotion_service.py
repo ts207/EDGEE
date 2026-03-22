@@ -155,16 +155,18 @@ def _classify_rejection(row: Dict[str, Any], failed_stages: List[str]) -> str:
     primary_gate = str(row.get("promotion_fail_gate_primary", "")).strip().lower()
     primary_reason = _primary_reject_reason(row).strip().lower()
     reject_reason = str(row.get("reject_reason", "")).strip().lower()
-    combined = " ".join([primary_gate, primary_reason, reject_reason, " ".join(failed_stages)])
+    weakest_fail_stage = str(row.get("weakest_fail_stage", "")).strip().lower()
+    combined = " ".join(
+        [primary_gate, primary_reason, reject_reason, weakest_fail_stage, " ".join(failed_stages)]
+    )
 
     if any(
         token in combined
         for token in [
             "spec hash mismatch",
-            "missing",
-            "audit",
             "bridge_evaluation_failed",
             "unlocked candidates",
+            "schema",
             "contract",
         ]
     ):
@@ -172,6 +174,11 @@ def _classify_rejection(row: Dict[str, Any], failed_stages: List[str]) -> str:
     if any(
         token in combined
         for token in [
+            "negative_control_missing",
+            "failed_placebo_controls",
+            "hypothesis_audit",
+            "missing_realized_oos_path",
+            "oos_insufficient_samples",
             "oos_validation",
             "confirmatory",
             "validation",
@@ -266,6 +273,7 @@ def _build_promotion_decision_diagnostics(audit_df: pd.DataFrame) -> Dict[str, A
             "rejection_classification_counts": {},
             "recommended_next_action_counts": {},
             "mean_failed_gate_count_rejected": 0.0,
+            "confirmatory_field_availability": {},
         }
 
     decision_counts = (
@@ -298,6 +306,37 @@ def _build_promotion_decision_diagnostics(audit_df: pd.DataFrame) -> Dict[str, A
             if token:
                 stage_counter[token] += 1
 
+    availability: Dict[str, Dict[str, int]] = {}
+    field_names = [
+        "plan_row_id",
+        "has_realized_oos_path",
+        "bridge_certified",
+        "q_value_by",
+        "q_value_cluster",
+        "repeated_fold_consistency",
+        "structural_robustness_score",
+        "robustness_panel_complete",
+        "gate_regime_stability",
+        "gate_structural_break",
+        "num_regimes_supported",
+    ]
+    for field in field_names:
+        if field not in audit_df.columns:
+            availability[field] = {"present": 0, "missing": int(len(audit_df))}
+            continue
+        series = audit_df[field]
+        if series.dtype == bool:
+            present_mask = pd.Series(True, index=series.index)
+        elif pd.api.types.is_numeric_dtype(series):
+            present_mask = pd.to_numeric(series, errors="coerce").notna()
+        else:
+            normalized = series.astype(str).str.strip().str.lower()
+            present_mask = ~(series.isna() | normalized.isin({"", "nan", "none", "null"}))
+        availability[field] = {
+            "present": int(present_mask.sum()),
+            "missing": int((~present_mask).sum()),
+        }
+
     return {
         "candidates_total": int(len(audit_df)),
         "promoted_count": int(decision_counts.get("promoted", 0)),
@@ -323,6 +362,7 @@ def _build_promotion_decision_diagnostics(audit_df: pd.DataFrame) -> Dict[str, A
         else float(
             pd.to_numeric(rejected.get("failed_gate_count", 0), errors="coerce").fillna(0).mean()
         ),
+        "confirmatory_field_availability": availability,
     }
 
 
@@ -342,6 +382,84 @@ def _read_bridge_table(path: Path) -> pd.DataFrame:
     if path.suffix.lower() == ".parquet":
         return pd.read_parquet(path)
     return pd.read_csv(path)
+
+
+def _normalize_statuses(value: Any) -> List[str]:
+    if isinstance(value, list):
+        return [str(item).strip() for item in value if str(item).strip()]
+    if isinstance(value, tuple):
+        return [str(item).strip() for item in value if str(item).strip()]
+    if isinstance(value, str):
+        raw = value.strip()
+        if not raw:
+            return []
+        try:
+            parsed = json.loads(raw)
+        except json.JSONDecodeError:
+            parsed = None
+        if isinstance(parsed, list):
+            return [str(item).strip() for item in parsed if str(item).strip()]
+        return [token.strip() for token in raw.split(",") if token.strip()]
+    return []
+
+
+def _canonicalize_candidate_audit_keys(candidates_df: pd.DataFrame) -> pd.DataFrame:
+    if candidates_df.empty:
+        return candidates_df.copy()
+    out = candidates_df.copy()
+    if "plan_row_id" not in out.columns:
+        out["plan_row_id"] = ""
+    if "hypothesis_id" not in out.columns:
+        out["hypothesis_id"] = ""
+
+    plan_row_ids = out["plan_row_id"].astype(str).str.strip()
+    hypothesis_ids = out["hypothesis_id"].astype(str).str.strip()
+    out["plan_row_id"] = plan_row_ids.where(plan_row_ids != "", hypothesis_ids)
+    return out
+
+
+def _load_hypothesis_index(*, run_id: str, data_root: Path) -> Dict[str, Dict[str, Any]]:
+    phase2_root = data_root / "reports" / "phase2" / run_id
+    if not phase2_root.exists():
+        return {}
+
+    candidate_paths: List[Path] = []
+    for direct_name in ("hypothesis_registry.parquet", "hypothesis_registry.csv"):
+        direct_path = phase2_root / direct_name
+        if direct_path.exists():
+            candidate_paths.append(direct_path)
+    for pattern in ("*/*/hypothesis_registry.parquet", "*/*/hypothesis_registry.csv"):
+        candidate_paths.extend(sorted(phase2_root.glob(pattern)))
+
+    index: Dict[str, Dict[str, Any]] = {}
+    seen_paths: set[Path] = set()
+    for registry_path in candidate_paths:
+        if registry_path in seen_paths or not registry_path.exists():
+            continue
+        seen_paths.add(registry_path)
+        try:
+            registry_df = _read_csv_or_parquet(registry_path)
+        except Exception:
+            logging.warning("Failed loading hypothesis registry: %s", registry_path)
+            continue
+        if registry_df.empty:
+            continue
+
+        for _, row in registry_df.iterrows():
+            record = row.to_dict()
+            hypothesis_id = str(record.get("hypothesis_id", "")).strip()
+            if not hypothesis_id:
+                continue
+            plan_row_id = str(record.get("plan_row_id", "")).strip() or hypothesis_id
+            statuses = _normalize_statuses(record.get("statuses"))
+            normalized = dict(record)
+            normalized["hypothesis_id"] = hypothesis_id
+            normalized["plan_row_id"] = plan_row_id
+            normalized["statuses"] = statuses or ["candidate_discovery"]
+            normalized["executed"] = bool(record.get("executed", True))
+            index.setdefault(hypothesis_id, normalized)
+            index.setdefault(plan_row_id, normalized)
+    return index
 
 
 def _load_bridge_metrics(bridge_root: Path, symbol: str | None = None) -> pd.DataFrame:
@@ -608,6 +726,7 @@ def execute_promotion(config: PromotionConfig) -> PromotionServiceResult:
             )
             if candidates_df.empty:
                 raise FileNotFoundError(f"Missing required candidates file: {candidates_path}")
+        candidates_df = _canonicalize_candidate_audit_keys(candidates_df)
 
         if is_confirmatory and not candidates_df.empty:
             if "confirmatory_locked" in candidates_df.columns:
@@ -626,15 +745,7 @@ def execute_promotion(config: PromotionConfig) -> PromotionServiceResult:
         ontology_hash = ontology_spec_hash(PROJECT_ROOT.parent)
         gate_spec = _load_gates_spec(PROJECT_ROOT.parent)
         promotion_confirmatory_gates = gate_spec.get("promotion_confirmatory_gates", {})
-        hyp_registry_path = (
-            data_root / "reports" / "phase2" / config.run_id / "hypothesis_registry.parquet"
-        )
-        hypothesis_index = {}
-        if not hyp_registry_path.exists():
-            hyp_registry_path = hyp_registry_path.with_suffix(".csv")
-        if hyp_registry_path.exists():
-            hyp_df = _read_csv_or_parquet(hyp_registry_path)
-            hypothesis_index = {row["hypothesis_id"]: row.to_dict() for _, row in hyp_df.iterrows()}
+        hypothesis_index = _load_hypothesis_index(run_id=config.run_id, data_root=data_root)
         promotion_spec = {
             "ontology_spec_hash": ontology_hash,
             "source_run_mode": source_run_mode,

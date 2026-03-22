@@ -4,6 +4,7 @@ import hashlib
 import json
 
 from project.apps.pipeline import manifest as run_manifest
+import project.specs.manifest as manifest_spec
 
 
 def test_start_manifest_includes_git_and_spec_hashes():
@@ -35,7 +36,7 @@ def test_finalize_manifest_hashes_input_parquets(monkeypatch, tmp_path):
 
     out_manifest = tmp_path / "unit_stage.json"
     monkeypatch.setattr(
-        run_manifest, "_manifest_path", lambda run_id, stage, stage_instance_id=None: out_manifest
+        manifest_spec, "_manifest_path", lambda run_id, stage, stage_instance_id=None: out_manifest
     )
 
     manifest = run_manifest.start_manifest(
@@ -62,7 +63,7 @@ def test_finalize_manifest_uses_manifest_stage_instance_id(monkeypatch, tmp_path
     def _manifest_path(run_id, stage, stage_instance_id=None):
         return manifest_dir / f"{stage_instance_id or stage}.json"
 
-    monkeypatch.setattr(run_manifest, "_manifest_path", _manifest_path)
+    monkeypatch.setattr(manifest_spec, "_manifest_path", _manifest_path)
 
     manifest = run_manifest.start_manifest(
         stage_name="unit_stage",
@@ -78,3 +79,33 @@ def test_finalize_manifest_uses_manifest_stage_instance_id(monkeypatch, tmp_path
 
     assert (manifest_dir / "unit_stage__worker_a.json").exists()
     assert not (manifest_dir / "unit_stage__worker_b.json").exists()
+
+
+def test_finalize_manifest_reconciles_run_manifest_for_standalone_stage_reruns(monkeypatch, tmp_path):
+    out_manifest = tmp_path / "unit_stage.json"
+    calls: list[str] = []
+
+    monkeypatch.setattr(
+        manifest_spec, "_manifest_path", lambda run_id, stage, stage_instance_id=None: out_manifest
+    )
+    monkeypatch.delenv("BACKTEST_PIPELINE_SESSION_ID", raising=False)
+
+    def _fake_reconcile(run_id: str):
+        calls.append(run_id)
+
+    monkeypatch.setattr(
+        "project.pipelines.pipeline_provenance.reconcile_run_manifest_from_stage_manifests",
+        _fake_reconcile,
+    )
+
+    manifest = run_manifest.start_manifest(
+        stage_name="unit_stage",
+        run_id="r_manifest",
+        params={},
+        inputs=[],
+        outputs=[],
+    )
+
+    run_manifest.finalize_manifest(manifest, status="success", stats={})
+
+    assert calls == ["r_manifest"]

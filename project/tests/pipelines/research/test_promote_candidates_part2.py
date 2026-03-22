@@ -32,6 +32,26 @@ _LEGACY_PASS_FAIL_GATES = {
 }
 
 
+def _legacy_gate_value(value):
+    if isinstance(value, bool):
+        return "pass" if value else "fail"
+    return value
+
+
+def _evaluate_row(*args, **kwargs):
+    result = _evaluate_row_impl(*args, **kwargs)
+    for key in _LEGACY_PASS_FAIL_GATES:
+        if key in result:
+            result[key] = _legacy_gate_value(result[key])
+    audit = result.get("promotion_audit")
+    if isinstance(audit, dict):
+        result["promotion_audit"] = {
+            key: (_legacy_gate_value(value) if key in _LEGACY_PASS_FAIL_GATES else value)
+            for key, value in audit.items()
+        }
+    return result
+
+
 def test_promote_candidate_rejects_retail_viability_when_required():
     out = _evaluate_row(
         row={
@@ -289,6 +309,7 @@ def test_build_promotion_statistical_audit_populates_primary_fail_gate_and_trace
     assert trace["statistical"]["thresholds"]["max_q_value"] == 0.10
     assert trace["negative_control"]["thresholds"]["allow_missing_negative_controls"] is False
     assert trace["retail"]["thresholds"]["min_tob_coverage"] == 0.8
+    assert "promotion_gate_evidence_json" in out.columns
 
 
 def test_build_promotion_statistical_audit_avoids_warning_spam_for_missing_optional_fields(caplog):

@@ -89,6 +89,18 @@ def test_benchmark_matrix_execute_records_success(tmp_path, monkeypatch):
     fake_run_all.write_text("raise SystemExit(0)\n", encoding="utf-8")
 
     monkeypatch.setattr(module, "DATA_ROOT", data_root)
+
+    def fake_matrix_report(**kwargs):
+        out_path = Path(kwargs["out_dir"]) / "research_run_matrix_summary.json"
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_text(json.dumps({"baseline_run_id": kwargs["baseline_run_id"]}), encoding="utf-8")
+        (out_path.parent / "research_run_matrix_summary.md").write_text(
+            "# Research Run Matrix Summary\n",
+            encoding="utf-8",
+        )
+        return out_path
+
+    monkeypatch.setattr(module, "write_run_matrix_summary_report", fake_matrix_report)
     monkeypatch.setattr(
         sys,
         "argv",
@@ -118,6 +130,11 @@ def test_benchmark_matrix_execute_records_success(tmp_path, monkeypatch):
     review = json.loads((out_dir / "benchmark_review.json").read_text(encoding="utf-8"))
     assert review["schema_version"] == "benchmark_review_v1"
     assert review["slices"][0]["benchmark_status"] == "coverage_limited"
+    assert payload["research_run_matrix_summary_json"].endswith(
+        "research_run_matrix_summary.json"
+    )
+    assert (out_dir / "research_run_matrix_summary.json").exists()
+    assert (out_dir / "research_run_matrix_summary.md").exists()
 
 
 def test_benchmark_matrix_execute_emits_post_run_reports(tmp_path, monkeypatch):
@@ -148,6 +165,16 @@ def test_benchmark_matrix_execute_emits_post_run_reports(tmp_path, monkeypatch):
     fake_run_all.write_text("raise SystemExit(0)\n", encoding="utf-8")
 
     monkeypatch.setattr(module, "DATA_ROOT", data_root)
+
+    def fake_matrix_report(**kwargs):
+        out_path = Path(kwargs["out_dir"]) / "research_run_matrix_summary.json"
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_text(json.dumps({"baseline_run_id": kwargs["baseline_run_id"]}), encoding="utf-8")
+        (out_path.parent / "research_run_matrix_summary.md").write_text(
+            "# Research Run Matrix Summary\n",
+            encoding="utf-8",
+        )
+        return out_path
 
     def fake_live_report(**kwargs):
         path = (
@@ -190,6 +217,7 @@ def test_benchmark_matrix_execute_emits_post_run_reports(tmp_path, monkeypatch):
     monkeypatch.setattr(module, "write_live_data_foundation_report", fake_live_report)
     monkeypatch.setattr(module, "build_context_mode_comparison_payload", fake_context_payload)
     monkeypatch.setattr(module, "write_context_mode_comparison_report", fake_context_report)
+    monkeypatch.setattr(module, "write_run_matrix_summary_report", fake_matrix_report)
     monkeypatch.setattr(
         sys,
         "argv",
@@ -222,3 +250,72 @@ def test_benchmark_matrix_execute_emits_post_run_reports(tmp_path, monkeypatch):
     review = json.loads((out_dir / "benchmark_review.json").read_text(encoding="utf-8"))
     assert review["slices"][0]["benchmark_status"] == "informative"
     assert review["slices"][0]["context_comparison_present"] is True
+    assert payload["research_run_matrix_summary_json"].endswith(
+        "research_run_matrix_summary.json"
+    )
+
+
+def test_benchmark_matrix_execute_failed_runs_still_emit_matrix_summary(tmp_path, monkeypatch):
+    module = _load_runner_module()
+    data_root = tmp_path / "data"
+    out_dir = data_root / "reports" / "perf_matrix_failed"
+    matrix_path = tmp_path / "matrix_failed.yaml"
+    matrix_path.write_text(
+        "version: 1\n"
+        "matrix_id: failed_matrix\n"
+        "runs:\n"
+        "  - run_id: failed_run_1\n"
+        "    symbols: BTCUSDT\n"
+        "    start: 2024-01-01\n"
+        "    end: 2024-01-02\n",
+        encoding="utf-8",
+    )
+
+    fake_run_all = tmp_path / "fake_run_all_failed.py"
+    fake_run_all.write_text("raise SystemExit(1)\n", encoding="utf-8")
+
+    monkeypatch.setattr(module, "DATA_ROOT", data_root)
+
+    def fake_matrix_report(**kwargs):
+        out_path = Path(kwargs["out_dir"]) / "research_run_matrix_summary.json"
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_text(json.dumps({"baseline_run_id": kwargs["baseline_run_id"]}), encoding="utf-8")
+        (out_path.parent / "research_run_matrix_summary.md").write_text(
+            "# Research Run Matrix Summary\n",
+            encoding="utf-8",
+        )
+        return out_path
+
+    monkeypatch.setattr(module, "write_run_matrix_summary_report", fake_matrix_report)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_benchmark_matrix.py",
+            "--matrix",
+            str(matrix_path),
+            "--run_all",
+            str(fake_run_all),
+            "--python",
+            sys.executable,
+            "--execute",
+            "1",
+            "--fail_fast",
+            "0",
+            "--out_dir",
+            str(out_dir),
+        ],
+    )
+    rc = module.main()
+    assert rc == 1
+
+    payload = json.loads((out_dir / "matrix_manifest.json").read_text(encoding="utf-8"))
+    assert payload["results"][0]["status"] == "failed"
+    assert payload["research_run_matrix_summary_json"].endswith(
+        "research_run_matrix_summary.json"
+    )
+    assert payload["certification_passed"] is False
+
+    cert = json.loads((out_dir / "benchmark_certification.json").read_text(encoding="utf-8"))
+    assert cert["passed"] is False
+    assert any(issue["type"] == "execution_failures" for issue in cert["issues"])

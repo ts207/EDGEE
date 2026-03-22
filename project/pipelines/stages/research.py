@@ -561,6 +561,24 @@ def build_research_stages(
 
     if not experiment_plan:
         if int(args.run_candidate_promotion) and int(args.run_phase2_conditional):
+            stages.append(
+                (
+                    "generate_negative_control_summary",
+                    project_root
+                    / "pipelines"
+                    / "research"
+                    / "generate_negative_control_summary.py",
+                    [
+                        "--run_id",
+                        run_id,
+                        "--symbols",
+                        symbols,
+                    ],
+                )
+            )
+
+    if not experiment_plan:
+        if int(args.run_candidate_promotion) and int(args.run_phase2_conditional):
             promotion_profile = _resolve_candidate_promotion_profile(args)
             promotion_thresholds = _resolve_candidate_promotion_thresholds(args)
             promote_args = [

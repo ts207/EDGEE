@@ -369,6 +369,48 @@ def resolve_pipeline_artifact_contracts(
     return resolved, issues
 
 
+def _negative_control_summary_path(*, data_root: Path, run_id: str) -> Path:
+    return data_root / "reports" / "negative_control" / run_id / "negative_control_summary.json"
+
+
+def _strict_promotion_requires_negative_controls(args: argparse.Namespace) -> bool:
+    if not int(getattr(args, "run_candidate_promotion", 0) or 0):
+        return False
+    if not int(getattr(args, "run_phase2_conditional", 0) or 0):
+        return False
+    if bool(int(getattr(args, "candidate_promotion_allow_missing_negative_controls", 0) or 0)):
+        return False
+
+    mode = str(getattr(args, "mode", "research") or "research").strip().lower()
+    profile = str(getattr(args, "candidate_promotion_profile", "auto") or "auto").strip().lower()
+    return mode in {"production", "certification"} or profile == "deploy"
+
+
+def _validate_negative_control_contract(
+    *,
+    args: argparse.Namespace,
+    run_id: str,
+    stages: Mapping[str, Any],
+    data_root: Path,
+) -> List[str]:
+    if not _strict_promotion_requires_negative_controls(args):
+        return []
+
+    if any("negative_control" in str(stage_name) for stage_name in stages.keys()):
+        return []
+
+    summary_path = _negative_control_summary_path(data_root=data_root, run_id=run_id)
+    if summary_path.exists():
+        return []
+
+    return [
+        "Strict candidate promotion requires negative-control evidence, but no "
+        f"negative-control-producing stage is planned and {summary_path} does not exist. "
+        "Either add negative-control production upstream or rerun with "
+        "--candidate_promotion_allow_missing_negative_controls 1."
+    ]
+
+
 def compute_stage_instance_ids(
     stages: List[Tuple[str, Path, List[str]]] | Mapping[str, Any],
 ) -> List[str]:
@@ -564,6 +606,14 @@ def prepare_run_preflight(
         retail_profile_name=retail_profile_name,
     )
     artifact_contracts, artifact_contract_issues = resolve_pipeline_artifact_contracts(stages)
+    artifact_contract_issues.extend(
+        _validate_negative_control_contract(
+            args=args,
+            run_id=run_id,
+            stages=stages,
+            data_root=data_root,
+        )
+    )
 
     return {
         "exit_code": None,

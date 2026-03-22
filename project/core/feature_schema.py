@@ -12,6 +12,8 @@ def normalize_feature_schema_version(version: str | None = None) -> str:
     if version is None:
         version = os.getenv("BACKTEST_FEATURE_SCHEMA_VERSION", _CANONICAL_FEATURE_SCHEMA_VERSION)
     token = str(version).strip().lower()
+    if token == "":
+        token = _CANONICAL_FEATURE_SCHEMA_VERSION
     # Support both "v2" and "feature_schema_v2"
     if token == "v2":
         token = _CANONICAL_FEATURE_SCHEMA_VERSION

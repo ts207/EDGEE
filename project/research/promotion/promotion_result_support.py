@@ -65,6 +65,14 @@ def _assemble_promotion_result(
     num_regimes: int,
     regime_stability_pass: bool,
     structural_break_pass: bool,
+    validation_samples_raw: float,
+    test_samples_raw: float,
+    validation_samples_effective: int,
+    test_samples_effective: int,
+    oos_sample_source: str,
+    oos_direction_match: bool,
+    min_validation_events_required: int,
+    min_test_events_required: int,
     low_capital_viability_score: float,
     low_capital_reject_codes: List[str],
     run_mode_normalized: str,
@@ -145,6 +153,16 @@ def _assemble_promotion_result(
         "control_pass_rate": None if control_rate is None else float(control_rate),
         "control_rate_source": control_rate_source,
         "tob_coverage": float(tob_coverage),
+        "validation_samples_raw": None
+        if not np.isfinite(validation_samples_raw)
+        else float(validation_samples_raw),
+        "test_samples_raw": None if not np.isfinite(test_samples_raw) else float(test_samples_raw),
+        "validation_samples": int(validation_samples_effective),
+        "test_samples": int(test_samples_effective),
+        "oos_sample_source": str(oos_sample_source),
+        "oos_direction_match": bool(oos_direction_match),
+        "promotion_oos_min_validation_events": int(min_validation_events_required),
+        "promotion_oos_min_test_events": int(min_test_events_required),
         "net_expectancy_bps": float(net_expectancy_bps),
         "effective_cost_bps": None
         if not np.isfinite(effective_cost_bps)

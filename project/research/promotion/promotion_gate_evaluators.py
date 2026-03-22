@@ -40,6 +40,25 @@ def _quiet_int(value: Any, default: int) -> int:
     return int(default if coerced is None else coerced)
 
 
+def _parse_returns_oos(values: Any) -> pd.Series:
+    if isinstance(values, pd.Series):
+        return pd.to_numeric(values, errors="coerce").dropna()
+    if isinstance(values, np.ndarray):
+        return pd.to_numeric(pd.Series(values.tolist()), errors="coerce").dropna()
+    if isinstance(values, (list, tuple)):
+        return pd.to_numeric(pd.Series(list(values)), errors="coerce").dropna()
+    if isinstance(values, str):
+        raw = values.strip()
+        if not raw:
+            return pd.Series(dtype=float)
+        try:
+            parsed = json.loads(raw)
+        except Exception:
+            return pd.Series(dtype=float)
+        return _parse_returns_oos(parsed)
+    return pd.Series(dtype=float)
+
+
 def _confirmatory_shadow_gates(
     promotion_confirmatory_gates: Dict[str, Any] | None,
 ) -> Dict[str, Any]:
@@ -175,12 +194,13 @@ def _evaluate_market_execution_and_stability(
         )
 
     baseline_expectancy = coerce_numeric_nan(row.get("baseline_expectancy_bps"))
+    baseline_available = bool(np.isfinite(baseline_expectancy))
     beats_baseline = bool(
-        np.isfinite(net_expectancy_bps)
-        and np.isfinite(baseline_expectancy)
-        and (net_expectancy_bps > baseline_expectancy * 1.1)
+        True
+        if not baseline_available
+        else (np.isfinite(net_expectancy_bps) and (net_expectancy_bps > baseline_expectancy * 1.1))
     )
-    if bool(enforce_baseline_beats_complexity) and not beats_baseline:
+    if bool(enforce_baseline_beats_complexity) and baseline_available and not beats_baseline:
         reasons.add_pair(
             reject_reason="failed_baseline_comparison",
             promo_fail_reason="gate_promo_baseline_beats_complexity",
@@ -376,9 +396,9 @@ def _evaluate_control_audit_and_dsr(
     dsr_value = 0.0
     dsr_pass = True
     if float(min_dsr) > 0.0:
-        returns_oos = row.get("returns_oos_combined")
+        returns_oos = _parse_returns_oos(row.get("returns_oos_combined"))
         n_trials = max(1, _quiet_int(row.get("num_tests_event_family", 1), 1))
-        if isinstance(returns_oos, (list, np.ndarray, pd.Series)) and len(returns_oos) >= 10:
+        if len(returns_oos) >= 10:
             dsr_value = float(_deflated_sharpe_ratio(pd.Series(returns_oos), n_trials=n_trials))
         else:
             dsr_pass = False
@@ -506,9 +526,24 @@ def _evaluate_deploy_oos_and_low_capital(
             )
             robustness_pass = False
 
-    validation_samples = safe_int(row.get("validation_samples", 0), 0)
-    test_samples = safe_int(row.get("test_samples", 0), 0)
+    bridge_validation_trades = safe_int(row.get("bridge_validation_trades", 0), 0)
+    validation_samples_raw = coerce_numeric_nan(row.get("validation_samples"))
+    test_samples_raw = coerce_numeric_nan(row.get("test_samples"))
+    validation_samples = (
+        int(validation_samples_raw)
+        if np.isfinite(validation_samples_raw)
+        else int(bridge_validation_trades)
+    )
+    test_samples = int(test_samples_raw) if np.isfinite(test_samples_raw) else 0
+    oos_sample_source = (
+        "row.validation_samples"
+        if np.isfinite(validation_samples_raw)
+        else ("row.bridge_validation_trades" if bridge_validation_trades > 0 else "missing")
+    )
     oos_pass = True
+    direction_match = True
+    min_val_events = 0
+    min_test_events = 0
     if _has_explicit_oos_samples(row):
         shadow_gates = _confirmatory_shadow_gates(promotion_confirmatory_gates)
         min_val_events = int(shadow_gates.get("min_oos_event_count", 20))
@@ -516,18 +551,19 @@ def _evaluate_deploy_oos_and_low_capital(
         train_effect = coerce_numeric_nan(row.get("mean_train_return", row.get("effect_raw")))
         val_effect = coerce_numeric_nan(row.get("mean_validation_return"))
         test_effect = coerce_numeric_nan(row.get("mean_test_return"))
-        direction_match = True
         if abs(train_effect) > 1e-9:
             if abs(val_effect) > 1e-9 and np.sign(val_effect) != np.sign(train_effect):
                 direction_match = False
             if abs(test_effect) > 1e-9 and np.sign(test_effect) != np.sign(train_effect):
                 direction_match = False
         oos_pass = validation_samples >= min_val_events
-        if "test_samples" in row:
+        if np.isfinite(test_samples_raw):
             oos_pass = oos_pass and (test_samples >= min_test_events)
         oos_pass = oos_pass and direction_match
         if not oos_pass:
-            if validation_samples < min_val_events or test_samples < min_test_events:
+            if validation_samples < min_val_events or (
+                np.isfinite(test_samples_raw) and test_samples < min_test_events
+            ):
                 reasons.add_reject(
                     f"oos_insufficient_samples (val={validation_samples}, test={test_samples})",
                     category="oos_validation",
@@ -570,6 +606,14 @@ def _evaluate_deploy_oos_and_low_capital(
         "multiplicity_pass": multiplicity_pass,
         "robustness_pass": robustness_pass,
         "regime_pass": regime_pass,
+        "validation_samples_raw": validation_samples_raw,
+        "test_samples_raw": test_samples_raw,
+        "validation_samples_effective": validation_samples,
+        "test_samples_effective": test_samples,
+        "oos_sample_source": oos_sample_source,
+        "oos_direction_match": direction_match,
+        "min_validation_events_required": int(min_val_events),
+        "min_test_events_required": int(min_test_events),
         "oos_pass": oos_pass,
         "low_capital_viability_pass": low_capital_viability_pass,
         "low_capital_viability_score": low_capital_viability_score,

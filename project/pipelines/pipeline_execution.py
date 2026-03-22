@@ -184,6 +184,10 @@ def execute_pipeline_stages(
             "status": "failed",
             "failed_stage": failed_info["name"],
             "failed_stage_instance": failed_info["instance"],
+            "checklist_decision": load_checklist_decision(run_id),
         }
 
-    return {"status": "ok"}
+    return {
+        "status": "ok",
+        "checklist_decision": load_checklist_decision(run_id),
+    }

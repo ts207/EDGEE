@@ -155,6 +155,64 @@ def _normalize_candidate_frame(df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
+def _write_empty_selection_outputs(
+    *,
+    run_id: str,
+    out_path: Path,
+    out_csv_path: Path,
+    summary_path: Path,
+    outputs: List[Dict[str, object]],
+    manifest: Dict[str, Any],
+    min_expectancy_bps: float,
+    min_events: int,
+    min_oos_consistency: float,
+    contract: Any,
+    source_path: Path,
+) -> int:
+    empty = _normalize_candidate_frame(pd.DataFrame()).iloc[0:0].copy()
+    empty["expectancy_bps"] = pd.Series(dtype=float)
+    empty["sample_size"] = pd.Series(dtype=float)
+    empty["selection_score"] = pd.Series(dtype=float)
+    empty["profitability_score"] = pd.Series(dtype=float)
+    empty["selection_reason"] = pd.Series(dtype="object")
+
+    ensure_dir(out_path.parent)
+    write_parquet(empty, out_path)
+    empty.to_csv(out_csv_path, index=False)
+
+    summary = {
+        "run_id": run_id,
+        "input_count": 0,
+        "selected_count": 0,
+        "selection_rate": 0.0,
+        "min_expectancy_bps": float(min_expectancy_bps),
+        "min_events": int(min_events),
+        "min_oos_sign_consistency": float(min_oos_consistency),
+        "expectancy_column_used": "",
+        "sample_column_used": "",
+        "selection_score_column_used": "",
+        "oos_consistency_column_used": "",
+        "require_retail_viability": bool(contract.require_retail_viability),
+        "require_low_capital_contract": bool(contract.require_low_capital_contract),
+        "objective_name": contract.objective_name,
+        "retail_profile_name": contract.retail_profile_name,
+        "no_candidates_found": True,
+        "source_path": str(source_path),
+    }
+    summary_path.write_text(json.dumps(summary, indent=2, sort_keys=True), encoding="utf-8")
+
+    outputs.extend(
+        [
+            {"path": str(out_path), "rows": 0},
+            {"path": str(out_csv_path), "rows": 0},
+            {"path": str(summary_path), "rows": 1},
+        ]
+    )
+    finalize_manifest(manifest, "success", stats=summary)
+    logging.info("No strategy candidates available for %s; wrote empty selection outputs.", run_id)
+    return 0
+
+
 def main() -> int:
     DATA_ROOT = get_data_root()
     parser = argparse.ArgumentParser(
@@ -238,9 +296,18 @@ def main() -> int:
         inputs.append({"path": str(source_path), "rows": int(len(raw_df))})
 
         if raw_df.empty:
-            raise ValueError(
-                f"Required promoted candidates table is missing or empty for run_id={run_id}. "
-                f"Checked: {source_path}"
+            return _write_empty_selection_outputs(
+                run_id=run_id,
+                out_path=out_path,
+                out_csv_path=out_csv_path,
+                summary_path=summary_path,
+                outputs=outputs,
+                manifest=manifest,
+                min_expectancy_bps=min_expectancy_bps,
+                min_events=min_events,
+                min_oos_consistency=min_oos_consistency,
+                contract=contract,
+                source_path=source_path,
             )
 
         df = _normalize_candidate_frame(raw_df)

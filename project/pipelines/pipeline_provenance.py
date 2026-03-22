@@ -241,6 +241,7 @@ def reconcile_run_manifest_from_stage_manifests(
     stage_instance_timings_sec = dict(run_manifest.get("stage_instance_timings_sec", {}))
     stage_finished_times: List[str] = []
     all_completed = True
+    checklist_path = root / "runs" / run_id / "research_checklist" / "checklist.json"
 
     for stage_instance in planned_stage_instances:
         stage_manifest_path = root / "runs" / run_id / f"{stage_instance}.json"
@@ -281,6 +282,15 @@ def reconcile_run_manifest_from_stage_manifests(
 
     run_manifest["stage_timings_sec"] = stage_timings_sec
     run_manifest["stage_instance_timings_sec"] = stage_instance_timings_sec
+    if checklist_path.exists():
+        try:
+            checklist_payload = json.loads(checklist_path.read_text(encoding="utf-8"))
+            if isinstance(checklist_payload, dict):
+                decision = str(checklist_payload.get("decision", "")).strip()
+                if decision:
+                    run_manifest["checklist_decision"] = decision
+        except Exception:
+            pass
     if all_completed:
         run_manifest["status"] = "success"
         run_manifest["failed_stage"] = None

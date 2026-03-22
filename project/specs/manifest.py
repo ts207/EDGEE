@@ -382,6 +382,16 @@ def finalize_manifest(
     with temp_path.open("w", encoding="utf-8") as f:
         json.dump(manifest, f, indent=2, sort_keys=True)
     temp_path.replace(out_path)
+    pipeline_session_id = str(manifest.get("pipeline_session_id", "") or "").strip()
+    if not pipeline_session_id and str(status).strip().lower() in {"success", "warning"}:
+        try:
+            from project.pipelines.pipeline_provenance import (
+                reconcile_run_manifest_from_stage_manifests,
+            )
+
+            reconcile_run_manifest_from_stage_manifests(str(manifest.get("run_id", "")))
+        except Exception:
+            pass
     return manifest
 
 

@@ -103,8 +103,26 @@ def _is_deploy_mode(row: Mapping[str, Any]) -> bool:
     return _normalized_run_mode(row) in _DEPLOY_RUN_MODES
 
 
+def _has_finite_numeric(row: Mapping[str, Any], key: str) -> bool:
+    if key not in row:
+        return False
+    value = row.get(key)
+    if value is None:
+        return False
+    if isinstance(value, bool):
+        return True
+    if isinstance(value, (int, float, np.integer, np.floating)):
+        return bool(np.isfinite(value))
+    coerced = safe_float(value, np.nan)
+    return bool(np.isfinite(coerced))
+
+
 def _has_explicit_oos_samples(row: Mapping[str, Any]) -> bool:
-    return ("validation_samples" in row) or ("test_samples" in row)
+    if _has_finite_numeric(row, "validation_samples") or _has_finite_numeric(row, "test_samples"):
+        return True
+    if _has_finite_numeric(row, "bridge_validation_trades"):
+        return True
+    return ("mean_validation_return" in row) or ("mean_test_return" in row)
 
 
 def sign_consistency(row: Dict[str, Any]) -> float:

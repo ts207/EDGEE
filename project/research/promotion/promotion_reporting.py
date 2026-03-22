@@ -141,6 +141,9 @@ def build_promotion_statistical_audit(
         "reject_reason",
         "bundle_rejection_reasons",
         "q_value",
+        "q_value_by",
+        "q_value_cluster",
+        "q_value_program",
         "n_events",
         "promotion_min_events_threshold",
         "stability_score",
@@ -149,16 +152,35 @@ def build_promotion_statistical_audit(
         "control_pass_rate",
         "control_rate_source",
         "tob_coverage",
+        "validation_samples_raw",
+        "test_samples_raw",
         "validation_samples",
+        "test_samples",
+        "oos_sample_source",
+        "oos_direction_match",
+        "promotion_oos_min_validation_events",
+        "promotion_oos_min_test_events",
+        "bridge_validation_trades",
+        "baseline_expectancy_bps",
         "net_expectancy_bps",
         "effective_cost_bps",
         "turnover_proxy_mean",
+        "plan_row_id",
+        "bridge_certified",
+        "has_realized_oos_path",
+        "repeated_fold_consistency",
+        "structural_robustness_score",
+        "robustness_panel_complete",
+        "gate_regime_stability",
+        "gate_structural_break",
+        "num_regimes_supported",
         "low_capital_viability_score",
         "low_capital_reject_reason_codes",
         "promotion_score",
         "gate_bridge_tradable",
         "gate_promo_statistical",
         "gate_promo_multiplicity_diagnostics",
+        "gate_promo_multiplicity_confirmatory",
         "gate_promo_stability",
         "gate_promo_cost_survival",
         "gate_promo_negative_control",
@@ -169,15 +191,20 @@ def build_promotion_statistical_audit(
         "gate_promo_microstructure",
         "gate_promo_retail_viability",
         "gate_promo_low_capital_viability",
+        "gate_promo_baseline_beats_complexity",
         "gate_promo_timeframe_consensus",
         "gate_promo_event_discipline",
         "gate_promo_continuation_quality",
+        "gate_promo_dsr",
+        "gate_promo_robustness",
+        "gate_promo_regime",
         "regime_flip_flag",
         "cross_symbol_sign_consistency",
         "rolling_instability_score",
         "bundle_version",
         "policy_version",
         "evidence_bundle_json",
+        "promotion_gate_evidence_json",
         "promotion_metrics_trace",
     ]
     if audit_df.empty:
@@ -242,8 +269,28 @@ def build_promotion_statistical_audit(
             },
             "oos_validation": {
                 "passed": bool(row.get("gate_promo_oos_validation") == "pass"),
-                "observed": {"validation_samples": _quiet_int(row.get("validation_samples"), 0)},
-                "thresholds": {"min_validation_samples": 1},
+                "observed": {
+                    "validation_samples_raw": _quiet_float(
+                        row.get("validation_samples_raw"), np.nan
+                    ),
+                    "test_samples_raw": _quiet_float(row.get("test_samples_raw"), np.nan),
+                    "validation_samples": _quiet_int(row.get("validation_samples"), 0),
+                    "test_samples": _quiet_int(row.get("test_samples"), 0),
+                    "bridge_validation_trades": _quiet_int(
+                        row.get("bridge_validation_trades"), 0
+                    ),
+                    "oos_sample_source": str(row.get("oos_sample_source", "")),
+                    "oos_direction_match": bool(as_bool(row.get("oos_direction_match", False))),
+                    "has_realized_oos_path": bool(as_bool(row.get("has_realized_oos_path", False))),
+                },
+                "thresholds": {
+                    "min_validation_samples": _quiet_int(
+                        row.get("promotion_oos_min_validation_events"), 1
+                    ),
+                    "min_test_samples": _quiet_int(
+                        row.get("promotion_oos_min_test_events"), 0
+                    ),
+                },
             },
             "continuation_quality": {
                 "passed": bool(row.get("gate_promo_continuation_quality") == "pass"),
@@ -293,7 +340,32 @@ def build_promotion_statistical_audit(
             },
             "hypothesis_audit": {
                 "passed": bool(bool_gate(row.get("gate_promo_hypothesis_audit"))),
+                "observed": {"plan_row_id": str(row.get("plan_row_id", "")).strip()},
                 "thresholds": {"require_hypothesis_audit": bool(require_hypothesis_audit)},
+            },
+            "deploy_confirmatory": {
+                "passed": bool(
+                    bool(as_bool(row.get("bridge_certified", False)))
+                    and bool(as_bool(row.get("robustness_panel_complete", False)))
+                    and bool(as_bool(row.get("gate_regime_stability", False)))
+                    and bool(as_bool(row.get("gate_structural_break", False)))
+                ),
+                "observed": {
+                    "bridge_certified": bool(as_bool(row.get("bridge_certified", False))),
+                    "robustness_panel_complete": bool(
+                        as_bool(row.get("robustness_panel_complete", False))
+                    ),
+                    "repeated_fold_consistency": _quiet_float(
+                        row.get("repeated_fold_consistency"), np.nan
+                    ),
+                    "structural_robustness_score": _quiet_float(
+                        row.get("structural_robustness_score"), np.nan
+                    ),
+                    "gate_regime_stability": bool(as_bool(row.get("gate_regime_stability", False))),
+                    "gate_structural_break": bool(as_bool(row.get("gate_structural_break", False))),
+                    "num_regimes_supported": _quiet_int(row.get("num_regimes_supported"), 0),
+                },
+                "thresholds": {},
             },
             "bundle_policy": {
                 "passed": bool(str(row.get("promotion_decision", "")).strip() == "promoted"),
@@ -330,6 +402,9 @@ def build_promotion_statistical_audit(
                 "promotion_fail_reason_primary": primary_fail_reason,
                 "reject_reason": reason,
                 "q_value": _quiet_float(row.get("q_value"), np.nan),
+                "q_value_by": _quiet_float(row.get("q_value_by"), np.nan),
+                "q_value_cluster": _quiet_float(row.get("q_value_cluster"), np.nan),
+                "q_value_program": _quiet_float(row.get("q_value_program"), np.nan),
                 "n_events": _quiet_int(row.get("n_events"), 0),
                 "promotion_min_events_threshold": int(min_events_threshold),
                 "stability_score": _quiet_float(row.get("stability_score"), np.nan),
@@ -338,10 +413,40 @@ def build_promotion_statistical_audit(
                 "control_pass_rate": _quiet_float(row.get("control_pass_rate"), np.nan),
                 "control_rate_source": str(row.get("control_rate_source", "")),
                 "tob_coverage": _quiet_float(row.get("tob_coverage"), np.nan),
+                "validation_samples_raw": _quiet_float(row.get("validation_samples_raw"), np.nan),
+                "test_samples_raw": _quiet_float(row.get("test_samples_raw"), np.nan),
                 "validation_samples": _quiet_int(row.get("validation_samples"), 0),
+                "test_samples": _quiet_int(row.get("test_samples"), 0),
+                "oos_sample_source": str(row.get("oos_sample_source", "")),
+                "oos_direction_match": bool(as_bool(row.get("oos_direction_match", False))),
+                "promotion_oos_min_validation_events": _quiet_int(
+                    row.get("promotion_oos_min_validation_events"), 0
+                ),
+                "promotion_oos_min_test_events": _quiet_int(
+                    row.get("promotion_oos_min_test_events"), 0
+                ),
+                "bridge_validation_trades": _quiet_int(row.get("bridge_validation_trades"), 0),
+                "baseline_expectancy_bps": _quiet_float(
+                    row.get("baseline_expectancy_bps"), np.nan
+                ),
                 "net_expectancy_bps": _quiet_float(row.get("net_expectancy_bps"), np.nan),
                 "effective_cost_bps": _quiet_float(row.get("effective_cost_bps"), np.nan),
                 "turnover_proxy_mean": _quiet_float(row.get("turnover_proxy_mean"), np.nan),
+                "plan_row_id": str(row.get("plan_row_id", "")).strip(),
+                "bridge_certified": bool(as_bool(row.get("bridge_certified", False))),
+                "has_realized_oos_path": bool(as_bool(row.get("has_realized_oos_path", False))),
+                "repeated_fold_consistency": _quiet_float(
+                    row.get("repeated_fold_consistency"), np.nan
+                ),
+                "structural_robustness_score": _quiet_float(
+                    row.get("structural_robustness_score"), np.nan
+                ),
+                "robustness_panel_complete": bool(
+                    as_bool(row.get("robustness_panel_complete", False))
+                ),
+                "gate_regime_stability": bool(as_bool(row.get("gate_regime_stability", False))),
+                "gate_structural_break": bool(as_bool(row.get("gate_structural_break", False))),
+                "num_regimes_supported": _quiet_int(row.get("num_regimes_supported"), 0),
                 "low_capital_viability_score": _quiet_float(
                     row.get("low_capital_viability_score"), np.nan
                 ),
@@ -354,6 +459,9 @@ def build_promotion_statistical_audit(
                 "gate_promo_multiplicity_diagnostics": str(
                     row.get("gate_promo_multiplicity_diagnostics", "fail")
                 ),
+                "gate_promo_multiplicity_confirmatory": str(
+                    row.get("gate_promo_multiplicity_confirmatory", "fail")
+                ),
                 "gate_promo_stability": str(row.get("gate_promo_stability", "fail")),
                 "gate_promo_cost_survival": str(row.get("gate_promo_cost_survival", "fail")),
                 "gate_promo_negative_control": str(row.get("gate_promo_negative_control", "fail")),
@@ -365,6 +473,9 @@ def build_promotion_statistical_audit(
                 "gate_promo_low_capital_viability": str(
                     row.get("gate_promo_low_capital_viability", "fail")
                 ),
+                "gate_promo_baseline_beats_complexity": str(
+                    row.get("gate_promo_baseline_beats_complexity", "fail")
+                ),
                 "gate_promo_timeframe_consensus": str(
                     row.get("gate_promo_timeframe_consensus", "fail")
                 ),
@@ -372,6 +483,9 @@ def build_promotion_statistical_audit(
                 "gate_promo_continuation_quality": str(
                     row.get("gate_promo_continuation_quality", "fail")
                 ),
+                "gate_promo_dsr": str(row.get("gate_promo_dsr", "fail")),
+                "gate_promo_robustness": str(row.get("gate_promo_robustness", "fail")),
+                "gate_promo_regime": str(row.get("gate_promo_regime", "fail")),
                 "gate_promo_falsification": str(
                     row.get(
                         "gate_promo_falsification", row.get("gate_promo_negative_control", "fail")
@@ -388,6 +502,7 @@ def build_promotion_statistical_audit(
                 "bundle_version": str(row.get("bundle_version", "")).strip(),
                 "policy_version": str(row.get("policy_version", "")).strip(),
                 "evidence_bundle_json": str(row.get("evidence_bundle_json", "")),
+                "promotion_gate_evidence_json": json.dumps(trace, sort_keys=True),
                 "promotion_metrics_trace": json.dumps(trace, sort_keys=True),
             }
         )

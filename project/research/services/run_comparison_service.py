@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Mapping
+from typing import Any, Dict, Mapping, Sequence
 
 import pandas as pd
 
@@ -91,6 +91,20 @@ def _count_pass_like(df: pd.DataFrame, column: str) -> int:
     return int(normalized.isin({"1", "true", "pass", "passed", "ok"}).sum())
 
 
+def _run_manifest_path(*, data_root: Path, run_id: str) -> Path:
+    return data_root / "runs" / run_id / "run_manifest.json"
+
+
+def _checklist_path(*, data_root: Path, run_id: str) -> Path:
+    return data_root / "runs" / run_id / "research_checklist" / "checklist.json"
+
+
+def _as_string_list(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [str(item) for item in value if str(item).strip()]
+
+
 def summarize_phase2_distribution(diagnostics: Mapping[str, Any]) -> Dict[str, Any]:
     false_diag = diagnostics.get("false_discovery_diagnostics", {})
     global_diag = false_diag.get("global", {})
@@ -159,6 +173,45 @@ def summarize_edge_candidate_distribution(frame: pd.DataFrame) -> Dict[str, Any]
         "median_bridge_validation_after_cost_bps": _series_median(
             frame, "bridge_validation_after_cost_bps", 0.0
         ),
+    }
+
+
+def summarize_run_research_status(
+    *,
+    data_root: Path,
+    run_id: str,
+) -> Dict[str, Any]:
+    manifest = _read_json(_run_manifest_path(data_root=data_root, run_id=run_id))
+    checklist = _read_json(_checklist_path(data_root=data_root, run_id=run_id))
+    diag_paths = research_diagnostics_paths(data_root=data_root, run_id=run_id)
+    phase2 = summarize_phase2_distribution(_read_json(diag_paths["phase2"]))
+    promotion = summarize_promotion_distribution(_read_json(diag_paths["promotion"]))
+    edge_candidates = summarize_edge_candidate_distribution(_read_parquet(diag_paths["edge_candidates"]))
+    manifest_status = str(manifest.get("status", "") or "").strip().lower()
+    checklist_decision = str(
+        checklist.get("decision", manifest.get("checklist_decision", "")) or ""
+    ).strip()
+    failed_stage = str(manifest.get("failed_stage", "") or "").strip()
+    if manifest_status != "success":
+        trust_classification = "infrastructure_suspect"
+    elif checklist_decision == "KEEP_RESEARCH":
+        trust_classification = "research_reject"
+    elif checklist_decision:
+        trust_classification = "research_pass"
+    else:
+        trust_classification = "needs_review"
+    return {
+        "run_id": run_id,
+        "manifest_status": manifest_status or "missing",
+        "failed_stage": failed_stage,
+        "finished_at": str(manifest.get("finished_at", "") or ""),
+        "checklist_decision": checklist_decision,
+        "checklist_failure_reasons": _as_string_list(checklist.get("failure_reasons", [])),
+        "trust_classification": trust_classification,
+        "phase2": phase2,
+        "promotion": promotion,
+        "edge_candidates": edge_candidates,
+        "artifact_paths": {key: str(value) for key, value in diag_paths.items()},
     }
 
 
@@ -511,6 +564,139 @@ def render_run_comparison_summary(payload: Mapping[str, Any]) -> str:
         lines.extend(["", "## Notes"])
         lines.extend([f"- {message}" for message in notes])
     return "\n".join(lines) + "\n"
+
+
+def build_run_matrix_summary(
+    *,
+    data_root: Path,
+    baseline_run_id: str,
+    candidate_run_ids: Sequence[str],
+    thresholds: Mapping[str, Any] | None = None,
+    drift_mode: str = "warn",
+) -> Dict[str, Any]:
+    ordered_run_ids: list[str] = []
+    for run_id in [baseline_run_id, *candidate_run_ids]:
+        token = str(run_id or "").strip()
+        if token and token not in ordered_run_ids:
+            ordered_run_ids.append(token)
+    baseline_summary = summarize_run_research_status(data_root=data_root, run_id=baseline_run_id)
+    run_summaries = {
+        run_id: summarize_run_research_status(data_root=data_root, run_id=run_id)
+        for run_id in ordered_run_ids
+    }
+    comparisons = []
+    for run_id in ordered_run_ids:
+        if run_id == baseline_run_id:
+            continue
+        comparison = compare_run_ids(
+            data_root=data_root,
+            baseline_run_id=baseline_run_id,
+            candidate_run_id=run_id,
+        )
+        assessment = assess_run_comparison(
+            comparison,
+            thresholds=thresholds,
+            mode=drift_mode,
+        )
+        comparisons.append(
+            {
+                "baseline_run_id": baseline_run_id,
+                "candidate_run_id": run_id,
+                "comparison": comparison,
+                "assessment": assessment,
+            }
+        )
+    return {
+        "created_at_utc": datetime.now(timezone.utc).isoformat(),
+        "baseline_run_id": baseline_run_id,
+        "drift_mode": str(drift_mode or "warn"),
+        "thresholds": resolve_drift_thresholds(thresholds),
+        "baseline_summary": baseline_summary,
+        "run_summaries": run_summaries,
+        "comparisons": comparisons,
+    }
+
+
+def render_run_matrix_summary(payload: Mapping[str, Any]) -> str:
+    baseline_summary = dict(payload.get("baseline_summary", {}))
+    run_summaries = dict(payload.get("run_summaries", {}))
+    comparisons = list(payload.get("comparisons", []))
+    lines = [
+        "# Research Run Matrix Summary",
+        "",
+        f"Baseline run: {payload.get('baseline_run_id', '')}",
+        f"Drift mode: {payload.get('drift_mode', 'warn')}",
+        "",
+        "## Runs",
+    ]
+    for run_id, summary in run_summaries.items():
+        phase2 = dict(summary.get("phase2", {}))
+        promotion = dict(summary.get("promotion", {}))
+        edge = dict(summary.get("edge_candidates", {}))
+        failures = list(summary.get("checklist_failure_reasons", []))
+        lines.append(
+            f"- `{run_id}`: {summary.get('trust_classification', 'unknown')} | "
+            f"manifest={summary.get('manifest_status', 'missing')} | "
+            f"checklist={summary.get('checklist_decision', '') or 'none'} | "
+            f"phase2_candidates={phase2.get('candidate_count', 0)} | "
+            f"promoted={promotion.get('promoted_count', 0)} | "
+            f"tradable={edge.get('tradable_count', 0)}"
+        )
+        if failures:
+            lines.append(f"  failures: {', '.join(failures)}")
+    lines.extend(["", "## Baseline Drift"])
+    if not comparisons:
+        lines.append("- none")
+    else:
+        for item in comparisons:
+            assessment = dict(item.get("assessment", {}))
+            candidate = str(item.get("candidate_run_id", "") or "")
+            lines.append(
+                f"- `{candidate}`: {assessment.get('status', 'unknown')} "
+                f"(violations={assessment.get('violation_count', 0)})"
+            )
+            for violation in list(assessment.get("violations", []))[:5]:
+                lines.append(f"  violation: {violation}")
+            for note in list(assessment.get("notes", []))[:3]:
+                lines.append(f"  note: {note}")
+    lines.extend(
+        [
+            "",
+            "## Baseline Snapshot",
+            f"- manifest={baseline_summary.get('manifest_status', 'missing')}",
+            f"- checklist={baseline_summary.get('checklist_decision', '') or 'none'}",
+            f"- phase2_candidates={baseline_summary.get('phase2', {}).get('candidate_count', 0)}",
+            f"- promoted={baseline_summary.get('promotion', {}).get('promoted_count', 0)}",
+            f"- tradable={baseline_summary.get('edge_candidates', {}).get('tradable_count', 0)}",
+        ]
+    )
+    return "\n".join(lines) + "\n"
+
+
+def write_run_matrix_summary_report(
+    *,
+    data_root: Path,
+    baseline_run_id: str,
+    candidate_run_ids: Sequence[str],
+    out_dir: Path,
+    thresholds: Mapping[str, Any] | None = None,
+    drift_mode: str = "warn",
+) -> Path:
+    out_dir.mkdir(parents=True, exist_ok=True)
+    payload = build_run_matrix_summary(
+        data_root=data_root,
+        baseline_run_id=baseline_run_id,
+        candidate_run_ids=candidate_run_ids,
+        thresholds=thresholds,
+        drift_mode=drift_mode,
+    )
+    out_path = out_dir / "research_run_matrix_summary.json"
+    out_path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+    (out_dir / "research_run_matrix_summary.md").write_text(
+        render_run_matrix_summary(payload),
+        encoding="utf-8",
+    )
+    return out_path
 
 
 def write_run_comparison_report(

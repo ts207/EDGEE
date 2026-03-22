@@ -32,6 +32,7 @@ from project.research.services.context_mode_comparison_service import (
     write_context_mode_comparison_report,
 )
 from project.research.services.live_data_foundation_service import write_live_data_foundation_report
+from project.research.services.run_comparison_service import write_run_matrix_summary_report
 
 REPO_ROOT = PROJECT_ROOT.parent
 DATA_ROOT = get_data_root()
@@ -164,6 +165,18 @@ def _generate_post_run_reports(
         generated["context_mode_comparison"] = str(out_path)
 
     return generated
+
+
+def _completed_run_ids(rows: List[Dict[str, Any]]) -> List[str]:
+    run_ids: List[str] = []
+    for row in rows:
+        status = str(row.get("status", "")).strip()
+        if status not in {"success", "failed"}:
+            continue
+        run_id = str(row.get("run_id", "")).strip()
+        if run_id and run_id not in run_ids:
+            run_ids.append(run_id)
+    return run_ids
 
 
 def main() -> int:
@@ -317,8 +330,22 @@ def main() -> int:
         current_review=review,
         prior_review=prior_review,
         acceptance_thresholds=thresholds,
+        execution_manifest=manifest,
     )
     cert_paths = write_certification_report(out_dir=out_dir, cert=cert)
+
+    matrix_summary_json = None
+    matrix_summary_markdown = None
+    completed_run_ids = _completed_run_ids(command_rows)
+    if execute and completed_run_ids:
+        matrix_summary_json = write_run_matrix_summary_report(
+            data_root=DATA_ROOT,
+            baseline_run_id=completed_run_ids[0],
+            candidate_run_ids=completed_run_ids[1:],
+            out_dir=out_dir,
+            drift_mode="warn",
+        )
+        matrix_summary_markdown = out_dir / "research_run_matrix_summary.md"
 
     manifest["benchmark_summary_json"] = str(summary_paths["json"])
     manifest["benchmark_summary_markdown"] = str(summary_paths["markdown"])
@@ -327,6 +354,10 @@ def main() -> int:
     manifest["benchmark_certification_json"] = str(cert_paths["json"])
     manifest["benchmark_certification_markdown"] = str(cert_paths["markdown"])
     manifest["certification_passed"] = bool(cert["passed"])
+    if matrix_summary_json is not None:
+        manifest["research_run_matrix_summary_json"] = str(matrix_summary_json)
+    if matrix_summary_markdown is not None:
+        manifest["research_run_matrix_summary_markdown"] = str(matrix_summary_markdown)
 
     manifest_path = out_dir / "matrix_manifest.json"
     manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8")
@@ -334,6 +365,8 @@ def main() -> int:
     print(f"[matrix] wrote summary: {summary_paths['json']}")
     print(f"[matrix] wrote review: {review_paths['json']}")
     print(f"[matrix] wrote certification: {cert_paths['json']}")
+    if matrix_summary_json is not None:
+        print(f"[matrix] wrote research matrix summary: {matrix_summary_json}")
 
     if not cert["passed"]:
         print(

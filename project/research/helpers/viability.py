@@ -176,25 +176,31 @@ def evaluate_low_capital_viability(
     gate_cost_3x = bool(np.isfinite(stress_3x_bps) and stress_3x_bps > 0.0)
     gate_latency = bool(np.isfinite(latency_stress_bps) and latency_stress_bps > 0.0)
 
-    max_turnover_day = safe_float(contract.get("max_turnover_per_day"))
+    max_turnover_day = safe_float(contract.get("max_turnover_per_day"), np.nan)
     gate_turnover = bool(
         np.isfinite(turnover) and np.isfinite(max_turnover_day) and turnover <= max_turnover_day
     )
 
-    min_tob_coverage = safe_float(contract.get("require_top_book_coverage"))
-    tob_coverage = safe_float(row.get("tob_coverage"))
-    micro_feature_coverage = safe_float(row.get("micro_feature_coverage"))
+    min_tob_coverage = safe_float(contract.get("require_top_book_coverage"), np.nan)
+    tob_coverage = safe_float(row.get("tob_coverage"), np.nan)
+    micro_feature_coverage = safe_float(row.get("micro_feature_coverage"), np.nan)
     observed_coverage = tob_coverage if np.isfinite(tob_coverage) else micro_feature_coverage
-    spread_ceiling_bps = safe_float(contract.get("spread_ceiling_bps"))
-    spread_stress = safe_float(row.get("micro_spread_stress"))
-    coverage_ok = bool(
-        np.isfinite(min_tob_coverage)
-        and np.isfinite(observed_coverage)
-        and observed_coverage >= min_tob_coverage
-    )
+    spread_ceiling_bps = safe_float(contract.get("spread_ceiling_bps"), np.nan)
+    spread_stress = safe_float(row.get("micro_spread_stress"), np.nan)
+    # L2/top-of-book coverage is optional in non-TOB research runs. If no direct coverage
+    # evidence exists, do not fail liquidity sanity on missing TOB alone; rely on spread and
+    # the remaining low-capital gates instead.
+    if not np.isfinite(min_tob_coverage):
+        coverage_ok = True
+    elif np.isfinite(observed_coverage):
+        coverage_ok = bool(observed_coverage >= min_tob_coverage)
+    else:
+        coverage_ok = True
+    # Spread sanity should only bind when direct spread evidence exists. In no-L2 runs,
+    # missing spread telemetry is not a reason to fail liquidity sanity by itself.
     spread_ok = True
-    if np.isfinite(spread_ceiling_bps):
-        spread_ok = bool(np.isfinite(spread_stress) and spread_stress <= spread_ceiling_bps)
+    if np.isfinite(spread_ceiling_bps) and np.isfinite(spread_stress):
+        spread_ok = bool(spread_stress <= spread_ceiling_bps)
     gate_liquidity = bool(coverage_ok and spread_ok)
 
     gate_map = {

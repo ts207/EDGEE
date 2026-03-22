@@ -8,7 +8,11 @@ import pytest
 from project import PROJECT_ROOT
 from project.core.exceptions import ContractViolationError
 from project.pipelines.pipeline_defaults import DATA_ROOT, run_id_default, script_supports_flag
-from project.pipelines.pipeline_planning import build_parser, prepare_run_preflight
+from project.pipelines.pipeline_planning import (
+    _validate_negative_control_contract,
+    build_parser,
+    prepare_run_preflight,
+)
 from project.pipelines.stages.core import build_core_stages
 from project.pipelines.stage_definitions import ResolvedStageArtifactContract
 from project.pipelines.stage_definitions import build_stage_timeframe_artifact_mappings
@@ -140,6 +144,64 @@ def test_combined_timeframe_preflight_resolves_stage_contracts_without_5m_leakag
 def test_preflight_rejects_unsupported_timeframe() -> None:
     with pytest.raises(ContractViolationError, match="Unsupported timeframe"):
         _build_preflight("2m")
+
+
+def test_negative_control_contract_helper_flags_missing_stage_for_strict_production_promotion() -> None:
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "--mode",
+            "production",
+            "--run_phase2_conditional",
+            "1",
+            "--run_candidate_promotion",
+            "1",
+            "--candidate_promotion_allow_missing_negative_controls",
+            "0",
+        ]
+    )
+
+    issues = _validate_negative_control_contract(
+        args=args,
+        run_id="r1",
+        stages={},
+        data_root=DATA_ROOT,
+    )
+    assert any("negative-control evidence" in issue for issue in issues)
+
+
+def test_preflight_plans_negative_control_stage_for_strict_production_promotion() -> None:
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "--start",
+            "2024-01-01",
+            "--end",
+            "2024-01-02",
+            "--mode",
+            "production",
+            "--run_phase2_conditional",
+            "1",
+            "--run_candidate_promotion",
+            "1",
+            "--candidate_promotion_allow_missing_negative_controls",
+            "0",
+        ]
+    )
+
+    preflight = prepare_run_preflight(
+        args=args,
+        project_root=PROJECT_ROOT,
+        data_root=DATA_ROOT,
+        cli_flag_present=lambda _flag: False,
+        run_id_default=run_id_default,
+        script_supports_flag=script_supports_flag,
+    )
+
+    stage_names = list(cast(dict[str, object], preflight["stages"]).keys())
+    assert "generate_negative_control_summary" in stage_names
+    issues = cast(list[str], preflight["artifact_contract_issues"])
+    assert not any("negative-control evidence" in issue for issue in issues)
 
 
 def test_stage_timeframe_mapping_exposes_stage_script_timeframe_and_outputs() -> None:

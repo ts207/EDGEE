@@ -103,6 +103,14 @@ def _emit_buffered_stage_output(stage_instance_id: str, stage: str, text: str) -
             print(f"{prefix} {line}")
 
 
+def _read_log_delta(log_path: Path, start_offset: int) -> str:
+    if not log_path.exists():
+        return ""
+    with log_path.open("r", encoding="utf-8", errors="replace") as handle:
+        handle.seek(max(0, int(start_offset)))
+        return handle.read()
+
+
 def run_stage(
     stage: str,
     script_path: Path,
@@ -213,14 +221,10 @@ def run_stage(
     # This keeps parallel logs readable and emits each stage block atomically.
     result_returncode: int | None = None
     for attempt in range(1, attempts + 1):
+        log_start_offset = log_path.stat().st_size if log_path.exists() else 0
         popen_kwargs: Dict[str, object] = {
             "env": env,
-            "stdout": subprocess.PIPE,
             "stderr": subprocess.STDOUT,
-            "text": True,
-            "encoding": "utf-8",
-            "errors": "replace",
-            "bufsize": 1,
         }
         if os.name == "posix":
             # New process-group allows fail-fast cancellation to terminate
@@ -228,23 +232,18 @@ def run_stage(
             popen_kwargs["start_new_session"] = True
         elif os.name == "nt" and hasattr(subprocess, "CREATE_NEW_PROCESS_GROUP"):
             popen_kwargs["creationflags"] = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP")
-        proc = subprocess.Popen(cmd, **popen_kwargs)  # type: ignore[arg-type]
-        _register_running_stage_proc(run_id, stage_instance_id, proc)
-        stage_output = ""
-        try:
-            stdout_text, _ = proc.communicate()
-            stage_output = str(stdout_text or "")
-            if proc.returncode is not None:
-                result_returncode = int(proc.returncode)
-            else:
+        with log_path.open("ab") as stage_log:
+            popen_kwargs["stdout"] = stage_log
+            proc = subprocess.Popen(cmd, **popen_kwargs)  # type: ignore[arg-type]
+            _register_running_stage_proc(run_id, stage_instance_id, proc)
+            try:
                 result_returncode = int(proc.wait())
-        finally:
-            _unregister_running_stage_proc(run_id, stage_instance_id)
+                stage_log.flush()
+            finally:
+                _unregister_running_stage_proc(run_id, stage_instance_id)
+
+        stage_output = _read_log_delta(log_path, log_start_offset)
         if stage_output:
-            with log_path.open("a", encoding="utf-8") as handle:
-                handle.write(stage_output)
-                if not stage_output.endswith("\n"):
-                    handle.write("\n")
             _emit_buffered_stage_output(stage_instance_id, stage, stage_output)
 
         if result_returncode not in accepted_codes:

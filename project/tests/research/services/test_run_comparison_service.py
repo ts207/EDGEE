@@ -6,6 +6,11 @@ from pathlib import Path
 from project.research.services import run_comparison_service as svc
 
 
+def _write_json(path: Path, payload: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+
 def test_compare_phase2_run_diagnostics_reports_candidate_and_survivor_shifts():
     baseline = {
         "combined_candidate_rows": 10,
@@ -366,6 +371,151 @@ def test_assess_run_comparison_warns_on_edge_cost_and_expectancy_shift():
     assert assessed["status"] == "warn"
     assert any("median_resolved_cost_bps" in message for message in assessed["violations"])
     assert any("median_expectancy_bps" in message for message in assessed["violations"])
+
+
+def test_summarize_run_research_status_classifies_keep_research_success(tmp_path: Path):
+    data_root = tmp_path / "data"
+    run_id = "candidate_run"
+    _write_json(
+        data_root / "runs" / run_id / "run_manifest.json",
+        {
+            "run_id": run_id,
+            "status": "success",
+            "failed_stage": None,
+            "finished_at": "2026-03-20T00:00:00+00:00",
+            "checklist_decision": "KEEP_RESEARCH",
+        },
+    )
+    _write_json(
+        data_root / "runs" / run_id / "research_checklist" / "checklist.json",
+        {
+            "decision": "KEEP_RESEARCH",
+            "failure_reasons": ["robust survivors below threshold (0 < 1)"],
+        },
+    )
+    _write_json(
+        data_root / "reports" / "phase2" / run_id / "search_engine" / "phase2_diagnostics.json",
+        {
+            "combined_candidate_rows": 4,
+            "multiplicity_discoveries": 1,
+            "discovery_profile": "standard",
+            "search_spec": "spec/search_space.yaml",
+        },
+    )
+    _write_json(
+        data_root / "reports" / "promotions" / run_id / "promotion_diagnostics.json",
+        {
+            "decision_summary": {
+                "candidates_total": 4,
+                "promoted_count": 0,
+                "rejected_count": 4,
+            }
+        },
+    )
+    import pandas as pd
+
+    edge_path = (
+        data_root / "reports" / "edge_candidates" / run_id / "edge_candidates_normalized.parquet"
+    )
+    edge_path.parent.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(
+        [
+            {
+                "gate_bridge_tradable": "pass",
+                "bridge_validation_after_cost_bps": 2.0,
+                "resolved_cost_bps": 0.5,
+                "expectancy_bps": 1.0,
+                "avg_dynamic_cost_bps": 0.5,
+            }
+        ]
+    ).to_parquet(edge_path)
+
+    out = svc.summarize_run_research_status(data_root=data_root, run_id=run_id)
+
+    assert out["manifest_status"] == "success"
+    assert out["checklist_decision"] == "KEEP_RESEARCH"
+    assert out["trust_classification"] == "research_reject"
+    assert out["promotion"]["promoted_count"] == 0
+    assert out["edge_candidates"]["tradable_count"] == 1
+
+
+def test_write_run_matrix_summary_report_emits_run_classifications_and_comparisons(tmp_path: Path):
+    data_root = tmp_path / "data"
+    import pandas as pd
+
+    for run_id, candidate_count, promoted_count, tradable_count, manifest_status, checklist in [
+        ("baseline_run", 4, 0, 1, "success", "KEEP_RESEARCH"),
+        ("candidate_run", 7, 1, 3, "success", "APPROVE_RELEASE"),
+    ]:
+        _write_json(
+            data_root / "runs" / run_id / "run_manifest.json",
+            {
+                "run_id": run_id,
+                "status": manifest_status,
+                "failed_stage": None,
+                "finished_at": "2026-03-20T00:00:00+00:00",
+                "checklist_decision": checklist,
+            },
+        )
+        _write_json(
+            data_root / "runs" / run_id / "research_checklist" / "checklist.json",
+            {
+                "decision": checklist,
+                "failure_reasons": [] if checklist != "KEEP_RESEARCH" else ["research reject"],
+            },
+        )
+        _write_json(
+            data_root / "reports" / "phase2" / run_id / "search_engine" / "phase2_diagnostics.json",
+            {
+                "combined_candidate_rows": candidate_count,
+                "multiplicity_discoveries": max(candidate_count - 3, 0),
+                "discovery_profile": "standard",
+                "search_spec": "spec/search_space.yaml",
+            },
+        )
+        _write_json(
+            data_root / "reports" / "promotions" / run_id / "promotion_diagnostics.json",
+            {
+                "decision_summary": {
+                    "candidates_total": candidate_count,
+                    "promoted_count": promoted_count,
+                    "rejected_count": candidate_count - promoted_count,
+                    "primary_reject_reason_counts": {"negative_control_fail": candidate_count - promoted_count},
+                    "primary_fail_gate_counts": {"gate_promo_negative_control": candidate_count - promoted_count},
+                }
+            },
+        )
+        edge_path = (
+            data_root / "reports" / "edge_candidates" / run_id / "edge_candidates_normalized.parquet"
+        )
+        edge_path.parent.mkdir(parents=True, exist_ok=True)
+        pd.DataFrame(
+            [
+                {
+                    "gate_bridge_tradable": "pass" if idx < tradable_count else "fail",
+                    "resolved_cost_bps": 0.5,
+                    "expectancy_bps": 1.0 + idx,
+                    "avg_dynamic_cost_bps": 0.5,
+                    "bridge_validation_after_cost_bps": 1.0,
+                }
+                for idx in range(candidate_count)
+            ]
+        ).to_parquet(edge_path)
+
+    out_path = svc.write_run_matrix_summary_report(
+        data_root=data_root,
+        baseline_run_id="baseline_run",
+        candidate_run_ids=["candidate_run"],
+        out_dir=tmp_path / "out",
+        drift_mode="warn",
+    )
+
+    payload = json.loads(out_path.read_text(encoding="utf-8"))
+    assert payload["baseline_summary"]["trust_classification"] == "research_reject"
+    assert payload["run_summaries"]["candidate_run"]["trust_classification"] == "research_pass"
+    assert len(payload["comparisons"]) == 1
+    assert payload["comparisons"][0]["candidate_run_id"] == "candidate_run"
+    assert (tmp_path / "out" / "research_run_matrix_summary.md").exists()
 
 
 def test_assess_run_comparison_warns_on_edge_candidate_count_shift():
