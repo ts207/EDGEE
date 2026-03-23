@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, Dict
 
 import pandas as pd
+import numpy as np
 
 from project.core.config import get_data_root
 from project.pipelines.research.search_intelligence import update_search_intelligence
@@ -99,7 +100,16 @@ def mark_failures_superseded(
 
 
 def _write_json(path: Path, payload: Dict[str, Any]) -> None:
-    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True, default=_json_default) + "\n",
+        encoding="utf-8",
+    )
+
+
+def _json_default(value: Any) -> Any:
+    if isinstance(value, np.generic):
+        return value.item()
+    raise TypeError(f"Object of type {value.__class__.__name__} is not JSON serializable")
 
 
 def _gate_rank(val: Any) -> int:
@@ -140,6 +150,23 @@ def _build_belief_state(
                 if c in ranked.columns
             ]
         ].to_dict(orient="records")
+        for idx, region in enumerate(promising_regions):
+            source = ranked.iloc[idx]
+            for key in [
+                "trigger_type",
+                "trigger_key",
+                "trigger_payload_json",
+                "entry_lag",
+                "context_json",
+                "state_id",
+                "from_state",
+                "to_state",
+                "feature",
+                "operator",
+                "threshold",
+            ]:
+                if key in ranked.columns:
+                    region[key] = source.get(key)
 
     avoid_regions = []
     if not tested_regions.empty:
@@ -218,7 +245,24 @@ def _build_next_actions(
             .head(int(exploit_top_k))[
                 [
                     c
-                    for c in ["event_type", "template_id", "direction", "horizon", "region_key"]
+                    for c in [
+                        "event_type",
+                        "trigger_type",
+                        "trigger_key",
+                        "trigger_payload_json",
+                        "template_id",
+                        "direction",
+                        "horizon",
+                        "entry_lag",
+                        "context_json",
+                        "state_id",
+                        "region_key",
+                        "feature",
+                        "operator",
+                        "threshold",
+                        "from_state",
+                        "to_state",
+                    ]
                     if c in tested_regions.columns
                 ]
             ]

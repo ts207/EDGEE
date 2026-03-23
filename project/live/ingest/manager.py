@@ -38,6 +38,19 @@ class LiveDataManager:
             streams.append(f"{symbol}@bookTicker")
         return streams
 
+    def health_monitor_keys(self) -> List[tuple[str, str]]:
+        keys: List[tuple[str, str]] = []
+        for stream in self.streams:
+            if "@" not in stream:
+                continue
+            symbol, channel = stream.split("@", 1)
+            if channel == "bookTicker":
+                keys.append((symbol.upper(), "ticker"))
+            elif channel.startswith("kline_"):
+                timeframe = channel.split("_", 1)[1]
+                keys.append((symbol.upper(), f"kline:{timeframe}"))
+        return keys
+
     async def start(self):
         _LOG.info("Starting Live Data Manager...")
         self._loop = asyncio.get_running_loop()

@@ -22,6 +22,7 @@ from project.research.knowledge.schemas import (
     region_key,
     stable_hash,
 )
+from project.research.search.bridge_adapter import canonical_bridge_event_type
 
 # Phase 1.3 — gate names that indicate each failure cause class.
 # Used by classify_failure_cause() to populate failure_cause_class on tested regions.
@@ -281,6 +282,87 @@ def _read_best_available(path: Path) -> pd.DataFrame:
     return pd.DataFrame()
 
 
+def _parse_json_payload(raw: Any) -> Dict[str, Any]:
+    if isinstance(raw, dict):
+        return raw
+    text = str(raw or "").strip()
+    if not text:
+        return {}
+    try:
+        payload = json.loads(text)
+    except json.JSONDecodeError:
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def _label_from_trigger_payload(trigger_payload: Dict[str, Any]) -> str:
+    trigger_type = str(trigger_payload.get("trigger_type", "")).strip().lower()
+    if trigger_type == "event":
+        event_id = str(trigger_payload.get("event_id", "")).strip().upper()
+        return f"event:{event_id}" if event_id else ""
+    if trigger_type == "state":
+        state_id = str(trigger_payload.get("state_id", "")).strip().upper()
+        return f"state:{state_id}" if state_id else ""
+    if trigger_type == "transition":
+        from_state = str(trigger_payload.get("from_state", "")).strip().upper()
+        to_state = str(trigger_payload.get("to_state", "")).strip().upper()
+        if from_state and to_state:
+            return f"transition:{from_state}→{to_state}"
+    if trigger_type == "feature_predicate":
+        feature = str(trigger_payload.get("feature", "")).strip()
+        operator = str(trigger_payload.get("operator", "")).strip()
+        threshold = trigger_payload.get("threshold")
+        if feature and operator and threshold not in (None, ""):
+            return f"pred:{feature}{operator}{threshold}"
+    if trigger_type == "sequence":
+        sequence_id = str(trigger_payload.get("sequence_id", "")).strip().upper()
+        return f"seq:{sequence_id}" if sequence_id else ""
+    if trigger_type == "interaction":
+        interaction_id = str(trigger_payload.get("interaction_id", "")).strip().upper()
+        op = str(trigger_payload.get("op", "")).strip().lower()
+        if interaction_id:
+            return f"int:{interaction_id}({op})" if op else f"int:{interaction_id}"
+    return ""
+
+
+def _canonical_event_type_from_trigger(
+    *,
+    trigger_type: str,
+    trigger_key: str,
+    trigger_payload: Dict[str, Any],
+    existing_event_type: str,
+) -> str:
+    if existing_event_type:
+        return existing_event_type
+    normalized_type = str(trigger_type or "").strip().lower()
+    if normalized_type == "event":
+        return str(trigger_payload.get("event_id", "") or "").strip().upper()
+    if normalized_type == "state":
+        state_id = str(trigger_payload.get("state_id", "") or "").strip().upper()
+        if state_id:
+            return canonical_bridge_event_type("state", f"state:{state_id}")
+    if normalized_type == "transition":
+        from_state = str(trigger_payload.get("from_state", "") or "").strip().upper()
+        to_state = str(trigger_payload.get("to_state", "") or "").strip().upper()
+        if from_state and to_state:
+            return canonical_bridge_event_type(
+                "transition",
+                f"transition:{from_state}→{to_state}",
+            )
+    if normalized_type == "feature_predicate":
+        feature = str(trigger_payload.get("feature", "") or "").strip()
+        operator = str(trigger_payload.get("operator", "") or "").strip()
+        threshold = trigger_payload.get("threshold")
+        if feature and operator and threshold not in (None, ""):
+            return canonical_bridge_event_type(
+                "feature_predicate",
+                f"pred:{feature}{operator}{threshold}",
+            )
+    if normalized_type in {"sequence", "interaction"} and trigger_key:
+        return canonical_bridge_event_type(normalized_type, trigger_key)
+    return str(trigger_key or "").strip()
+
+
 def build_tested_regions_snapshot(
     *,
     run_id: str,
@@ -332,17 +414,62 @@ def build_tested_regions_snapshot(
     if df.empty:
         return pd.DataFrame(columns=TESTED_REGION_COLUMNS)
 
+    expanded_hypotheses_path = (
+        resolved_data_root
+        / "artifacts"
+        / "experiments"
+        / program_id
+        / run_id
+        / "expanded_hypotheses.parquet"
+    )
+    trigger_payload_by_hypothesis: Dict[str, Dict[str, Any]] = {}
+    if expanded_hypotheses_path.exists():
+        try:
+            expanded_hypotheses = pd.read_parquet(expanded_hypotheses_path)
+            for row in expanded_hypotheses.to_dict(orient="records"):
+                hypothesis_id = str(row.get("hypothesis_id", "")).strip()
+                if not hypothesis_id:
+                    continue
+                trigger_payload = _parse_json_payload(row.get("trigger_payload"))
+                if trigger_payload:
+                    trigger_payload_by_hypothesis[hypothesis_id] = trigger_payload
+        except Exception:
+            trigger_payload_by_hypothesis = {}
+
     records: List[Dict[str, Any]] = []
     for row in df.to_dict(orient="records"):
+        hypothesis_id = str(row.get("hypothesis_id", row.get("plan_row_id", ""))).strip()
+        trigger_payload = _parse_json_payload(row.get("trigger_payload"))
+        if not trigger_payload and hypothesis_id:
+            trigger_payload = trigger_payload_by_hypothesis.get(hypothesis_id, {})
+        trigger_key = str(row.get("trigger_key", "")).strip()
+        if not trigger_key and trigger_payload:
+            trigger_key = _label_from_trigger_payload(trigger_payload)
+        trigger_type = (
+            str(row.get("trigger_type", trigger_payload.get("trigger_type", "EVENT"))).strip().upper()
+            or "EVENT"
+        )
         context_raw = row.get("context_json", row.get("contexts", row.get("context", {})))
         if context_raw is None or context_raw == "":
             context_raw = {}
         context_blob = canonical_json(context_raw)
+        state_id = str(trigger_payload.get("state_id", row.get("state_id", ""))).strip()
+        from_state = str(trigger_payload.get("from_state", row.get("from_state", ""))).strip()
+        to_state = str(trigger_payload.get("to_state", row.get("to_state", ""))).strip()
+        feature = str(trigger_payload.get("feature", row.get("feature", ""))).strip()
+        operator = str(trigger_payload.get("operator", row.get("operator", ""))).strip()
+        threshold = trigger_payload.get("threshold", row.get("threshold"))
+        event_type = _canonical_event_type_from_trigger(
+            trigger_type=trigger_type,
+            trigger_key=trigger_key,
+            trigger_payload=trigger_payload,
+            existing_event_type=str(row.get("event_type", row.get("event", ""))).strip(),
+        )
         payload = {
             "program_id": program_id,
             "symbol_scope": str(row.get("symbol", row.get("symbols", ""))).strip(),
-            "event_type": str(row.get("event_type", row.get("event", ""))).strip(),
-            "trigger_type": str(row.get("trigger_type", "EVENT")).strip().upper() or "EVENT",
+            "event_type": event_type,
+            "trigger_type": trigger_type,
             "template_id": str(row.get("template_id", row.get("template", ""))).strip(),
             "direction": str(row.get("direction", "")).strip(),
             "horizon": str(row.get("horizon", row.get("timeframe", ""))).strip(),
@@ -355,11 +482,21 @@ def build_tested_regions_snapshot(
                 "region_key": region_key(payload),
                 "program_id": program_id,
                 "run_id": run_id,
-                "hypothesis_id": str(row.get("hypothesis_id", row.get("plan_row_id", ""))).strip(),
+                "hypothesis_id": hypothesis_id,
                 "candidate_id": str(row.get("candidate_id", "")).strip(),
                 "symbol_scope": payload["symbol_scope"],
                 "event_type": payload["event_type"],
                 "trigger_type": payload["trigger_type"],
+                "trigger_key": trigger_key,
+                "trigger_payload_json": canonical_json(trigger_payload) if trigger_payload else "{}",
+                "state_id": state_id,
+                "from_state": from_state,
+                "to_state": to_state,
+                "feature": feature,
+                "operator": operator,
+                "threshold": pd.to_numeric(threshold, errors="coerce")
+                if threshold not in (None, "")
+                else None,
                 "template_id": payload["template_id"],
                 "direction": payload["direction"],
                 "horizon": payload["horizon"],

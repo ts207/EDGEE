@@ -16,6 +16,7 @@ from project.live.oms import (
     OrderSide,
     OrderType,
     OrderSubmissionBlocked,
+    OrderSubmissionFailed,
     build_live_order_from_strategy_result,
 )
 from project.live.state import LiveStateStore
@@ -158,6 +159,49 @@ def test_submit_order_accepts_safe_microstructure():
     assert result["accepted"] is True
     assert "order3" in mgr.active_orders
     assert kill_switch.status.is_active is False
+
+
+def test_submit_order_fails_closed_when_exchange_client_present():
+    class _DummyExchangeClient:
+        async def create_market_order(self, **kwargs):
+            return {"orderId": "123"}
+
+    mgr = OrderManager(exchange_client=_DummyExchangeClient())
+    order = LiveOrder("order3b", "BTCUSDT", OrderSide.BUY, OrderType.MARKET, 1.0)
+
+    with pytest.raises(OrderSubmissionFailed, match="submit_order_async"):
+        mgr.submit_order(order)
+
+
+def test_submit_order_async_submits_to_venue():
+    class _DummyExchangeClient:
+        def __init__(self) -> None:
+            self.calls = []
+
+        async def create_market_order(self, **kwargs):
+            self.calls.append(kwargs)
+            return {"orderId": "venue-1"}
+
+    exchange_client = _DummyExchangeClient()
+    mgr = OrderManager(exchange_client=exchange_client)
+    kill_switch = KillSwitchManager(LiveStateStore())
+    order = LiveOrder("order3c", "BTCUSDT", OrderSide.BUY, OrderType.MARKET, 1.0)
+
+    result = __import__("asyncio").run(
+        mgr.submit_order_async(
+            order,
+            kill_switch_manager=kill_switch,
+            market_state={"spread_bps": 2.0, "depth_usd": 100000.0, "tob_coverage": 0.95},
+        )
+    )
+
+    assert result["accepted"] is True
+    assert result["venue_submitted"] is True
+    assert exchange_client.calls == [
+        {"symbol": "BTCUSDT", "side": "BUY", "quantity": 1.0, "reduce_only": False}
+    ]
+    assert mgr.active_orders["order3c"].exchange_order_id == "venue-1"
+    assert mgr.active_orders["order3c"].status == OrderStatus.NEW
 
 
 def test_build_live_order_from_strategy_result_attaches_execution_metadata(

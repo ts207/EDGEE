@@ -187,3 +187,69 @@ def test_update_campaign_memory_uses_explicit_data_root_for_manifest(monkeypatch
     )
 
     assert rc == 0
+
+
+def test_update_campaign_memory_preserves_non_event_trigger_payload(tmp_path):
+    data_root = tmp_path / "data"
+    run_id = "r_sequence_scope"
+    program_id = "btc_campaign"
+    _write_run_manifest(data_root, run_id, program_id=program_id)
+
+    exp_dir = data_root / "artifacts" / "experiments" / program_id / run_id
+    exp_dir.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(
+        [
+            {
+                "hypothesis_id": "hyp_seq",
+                "trigger_type": "sequence",
+                "trigger_payload": json.dumps(
+                    {
+                        "trigger_type": "sequence",
+                        "sequence_id": "SEQ_ABC",
+                        "events": ["VOL_SPIKE", "OI_FLUSH"],
+                        "max_gap": [6],
+                    }
+                ),
+            }
+        ]
+    ).to_parquet(exp_dir / "expanded_hypotheses.parquet", index=False)
+
+    phase2_dir = data_root / "reports" / "phase2" / run_id / "search_engine"
+    phase2_dir.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(
+        [
+            {
+                "candidate_id": "c_seq",
+                "hypothesis_id": "hyp_seq",
+                "trigger_type": "SEQUENCE",
+                "trigger_key": "seq:SEQ_ABC",
+                "template_id": "continuation",
+                "direction": "long",
+                "horizon": "12b",
+                "entry_lag": 0,
+                "symbol": "BTCUSDT",
+                "q_value": 0.04,
+                "train_n_obs": 50,
+                "mean_return_bps": 2.0,
+                "after_cost_expectancy_per_trade": 1.0,
+                "robustness_score": 0.7,
+                "gate_bridge_tradable": "pass",
+                "gate_promo_statistical": "pass",
+                "promotion_decision": "rejected",
+            }
+        ]
+    ).to_parquet(phase2_dir / "phase2_candidates.parquet", index=False)
+
+    rc = update_campaign_memory.main(
+        ["--run_id", run_id, "--program_id", program_id, "--data_root", str(data_root)]
+    )
+    assert rc == 0
+
+    tested_regions = pd.read_parquet(
+        data_root / "artifacts" / "experiments" / program_id / "memory" / "tested_regions.parquet"
+    )
+    row = tested_regions.iloc[0]
+    assert row["trigger_type"] == "SEQUENCE"
+    assert row["event_type"] == "SEQUENCE_SEQ_ABC"
+    payload = json.loads(row["trigger_payload_json"])
+    assert payload["events"] == ["VOL_SPIKE", "OI_FLUSH"]

@@ -24,6 +24,7 @@ import pytest
 from project.pipelines.research.campaign_controller import (
     CampaignConfig,
     CampaignController,
+    CampaignSummary,
     _load_event_quality_weights,
     _DEFAULT_QUALITY,
     _QUALITY_SCORES,
@@ -310,6 +311,53 @@ class TestStep3ExploreAdjacent:
         result = ctrl._step_explore_adjacent(mem)
         assert result is None
 
+    def test_explore_reconstructs_state_trigger_from_memory_scope(self, tmp_path):
+        ctrl = _make_controller(tmp_path)
+        mem = _empty_memory()
+        mem["next_actions"]["explore_adjacent"] = [
+            {
+                "proposed_scope": {
+                    "event_type": "STATE_HIGH_VOL_STATE",
+                    "trigger_type": "STATE",
+                }
+            }
+        ]
+
+        result = ctrl._step_explore_adjacent(mem)
+
+        assert result is not None
+        assert result["trigger_space"]["allowed_trigger_types"] == ["STATE"]
+        assert result["trigger_space"]["states"]["include"] == ["HIGH_VOL_STATE"]
+
+    def test_explore_reconstructs_sequence_trigger_from_memory_payload(self, tmp_path):
+        ctrl = _make_controller(tmp_path)
+        mem = _empty_memory()
+        mem["next_actions"]["explore_adjacent"] = [
+            {
+                "proposed_scope": {
+                    "event_type": "SEQUENCE_SEQ_ABC",
+                    "trigger_type": "SEQUENCE",
+                    "trigger_payload_json": json.dumps(
+                        {
+                            "trigger_type": "sequence",
+                            "sequence_id": "SEQ_ABC",
+                            "events": ["VOL_SHOCK", "LIQUIDATION_CASCADE"],
+                            "max_gap": [6],
+                        }
+                    ),
+                }
+            }
+        ]
+
+        result = ctrl._step_explore_adjacent(mem)
+
+        assert result is not None
+        assert result["trigger_space"]["allowed_trigger_types"] == ["SEQUENCE"]
+        assert result["trigger_space"]["sequences"]["include"] == [
+            ["VOL_SHOCK", "LIQUIDATION_CASCADE"]
+        ]
+        assert result["trigger_space"]["sequences"]["max_gaps_bars"] == [6]
+
 
 # ---------------------------------------------------------------------------
 # Step 4 — Frontier scan
@@ -490,6 +538,109 @@ class TestExploitMode:
         with patch.object(ctrl, "_read_memory", return_value=mem):
             result = ctrl._propose_next_request()
         assert result is None
+
+    def test_exploit_mode_reconstructs_state_trigger_from_promising_region(self, tmp_path):
+        ctrl = _make_controller(tmp_path, research_mode="exploit")
+        mem = _empty_memory()
+        mem["promising_regions"] = [
+            {
+                "event_type": "STATE_HIGH_VOL_STATE",
+                "trigger_type": "STATE",
+                "template_id": "mean_reversion",
+            }
+        ]
+
+        with patch.object(ctrl, "_read_memory", return_value=mem):
+            result = ctrl._propose_next_request()
+
+        assert result is not None
+        assert result["trigger_space"]["allowed_trigger_types"] == ["STATE"]
+        assert result["trigger_space"]["states"]["include"] == ["HIGH_VOL_STATE"]
+
+    def test_exploit_mode_reconstructs_interaction_trigger_from_promising_region(self, tmp_path):
+        ctrl = _make_controller(tmp_path, research_mode="exploit")
+        mem = _empty_memory()
+        mem["promising_regions"] = [
+            {
+                "event_type": "INTERACTION_INT_ABC_AND_",
+                "trigger_type": "INTERACTION",
+                "template_id": "mean_reversion",
+                "trigger_payload_json": json.dumps(
+                    {
+                        "trigger_type": "interaction",
+                        "interaction_id": "INT_ABC",
+                        "left": "VOL_SHOCK",
+                        "right": "HIGH_VOL_STATE",
+                        "op": "and",
+                        "lag": 6,
+                    }
+                ),
+            }
+        ]
+
+        with patch.object(ctrl, "_read_memory", return_value=mem):
+            result = ctrl._propose_next_request()
+
+        assert result is not None
+        assert result["trigger_space"]["allowed_trigger_types"] == ["INTERACTION"]
+        assert result["trigger_space"]["interactions"]["include"] == [
+            {
+                "left": "VOL_SHOCK",
+                "right": "HIGH_VOL_STATE",
+                "op": "AND",
+                "lag": 6,
+            }
+        ]
+
+
+def test_run_campaign_continues_after_pipeline_failure(tmp_path):
+    ctrl = _make_controller(tmp_path)
+    proposals = iter(
+        [
+            {
+                "program_id": ctrl.config.program_id,
+                "run_mode": "research",
+                "instrument_scope": {
+                    "instrument_classes": ["crypto"],
+                    "symbols": ["BTCUSDT"],
+                    "timeframe": "5m",
+                    "start": "2024-01-01",
+                    "end": "2024-01-31",
+                },
+                "trigger_space": {
+                    "allowed_trigger_types": ["EVENT"],
+                    "events": {"include": ["ZSCORE_STRETCH"]},
+                },
+                "templates": {"include": ["mean_reversion"]},
+                "evaluation": {
+                    "horizons_bars": [12],
+                    "directions": ["long"],
+                    "entry_lags": [1],
+                },
+                "contexts": {"include": {}},
+                "search_control": {
+                    "max_hypotheses_total": 10,
+                    "max_hypotheses_per_template": 10,
+                    "max_hypotheses_per_event_family": 10,
+                },
+                "promotion": {"enabled": False},
+            },
+            None,
+        ]
+    )
+    counts = {"updated": 0}
+    ctrl._propose_next_request = lambda: next(proposals)
+    ctrl._execute_pipeline = lambda config_path, run_id: (_ for _ in ()).throw(RuntimeError("boom"))
+    ctrl._update_campaign_stats = (
+        lambda: counts.__setitem__("updated", counts["updated"] + 1)
+        or CampaignSummary(ctrl.config.program_id)
+    )
+    ctrl._should_halt = lambda summary: False
+
+    with patch("project.pipelines.research.campaign_controller.build_experiment_plan", return_value=None):
+        ctrl.run_campaign()
+
+    assert counts["updated"] == 1
 
 
 # ---------------------------------------------------------------------------

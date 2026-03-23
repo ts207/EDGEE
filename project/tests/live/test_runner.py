@@ -289,6 +289,117 @@ def test_live_runner_submit_strategy_result_routes_order_through_oms(monkeypatch
     assert order.metadata["execution_degradation_action"] == "allow"
 
 
+def test_live_runner_sync_submit_fails_closed_for_exchange_backed_oms(
+    monkeypatch, tmp_path
+) -> None:
+    class _DummyExchangeClient:
+        async def create_market_order(self, **kwargs):
+            return {"orderId": "venue-2"}
+
+    monkeypatch.setattr("project.engine.strategy_executor.get_strategy", lambda _: _DummyStrategy())
+    monkeypatch.setattr(
+        "project.engine.strategy_executor.load_symbol_constraints",
+        lambda symbol, meta_dir: SymbolConstraints(
+            tick_size=None, step_size=None, min_notional=None
+        ),
+    )
+    result = calculate_strategy_returns(
+        "BTCUSDT",
+        _bars(),
+        _features(),
+        "dummy_strategy",
+        {
+            "position_scale": 1000.0,
+            "execution_lag_bars": 0,
+            "expected_return_bps": 25.0,
+            "expected_adverse_bps": 5.0,
+            "execution_model": {
+                "cost_model": "static",
+                "base_fee_bps": 2.0,
+                "base_slippage_bps": 1.0,
+            },
+        },
+        0.0,
+        tmp_path,
+    )
+    runner = LiveEngineRunner(
+        ["btcusdt"],
+        order_manager=OrderManager(exchange_client=_DummyExchangeClient()),
+        data_manager=_DummyDataManager(),
+    )
+
+    with pytest.raises(Exception, match="submit_strategy_result_async"):
+        runner.submit_strategy_result(
+            result,
+            client_order_id="runner-order-sync-venue",
+            order_type=OrderType.MARKET,
+            realized_fee_bps=1.5,
+            market_state={"spread_bps": 2.0, "depth_usd": 100000.0, "tob_coverage": 0.95},
+        )
+
+
+def test_live_runner_submit_strategy_result_async_hits_venue(monkeypatch, tmp_path) -> None:
+    class _DummyExchangeClient:
+        def __init__(self) -> None:
+            self.calls = []
+
+        async def create_market_order(self, **kwargs):
+            self.calls.append(kwargs)
+            return {"orderId": "venue-3"}
+
+    monkeypatch.setattr("project.engine.strategy_executor.get_strategy", lambda _: _DummyStrategy())
+    monkeypatch.setattr(
+        "project.engine.strategy_executor.load_symbol_constraints",
+        lambda symbol, meta_dir: SymbolConstraints(
+            tick_size=None, step_size=None, min_notional=None
+        ),
+    )
+    result = calculate_strategy_returns(
+        "BTCUSDT",
+        _bars(),
+        _features(),
+        "dummy_strategy",
+        {
+            "position_scale": 1000.0,
+            "execution_lag_bars": 0,
+            "expected_return_bps": 25.0,
+            "expected_adverse_bps": 5.0,
+            "execution_model": {
+                "cost_model": "static",
+                "base_fee_bps": 2.0,
+                "base_slippage_bps": 1.0,
+            },
+        },
+        0.0,
+        tmp_path,
+    )
+    exchange_client = _DummyExchangeClient()
+    runner = LiveEngineRunner(
+        ["btcusdt"],
+        order_manager=OrderManager(exchange_client=exchange_client),
+        data_manager=_DummyDataManager(),
+    )
+
+    accepted = asyncio.run(
+        runner.submit_strategy_result_async(
+            result,
+            client_order_id="runner-order-async-venue",
+            order_type=OrderType.MARKET,
+            realized_fee_bps=1.5,
+            market_state={"spread_bps": 2.0, "depth_usd": 100000.0, "tob_coverage": 0.95},
+        )
+    )
+
+    assert accepted is not None
+    assert accepted["accepted"] is True
+    assert accepted["venue_submitted"] is True
+    assert exchange_client.calls == [
+        {"symbol": "BTCUSDT", "side": "BUY", "quantity": 10.0, "reduce_only": False}
+    ]
+    order = runner.order_manager.active_orders["runner-order-async-venue"]
+    assert order.exchange_order_id == "venue-3"
+
+
 def test_live_runner_submit_strategy_result_returns_none_for_flat_result() -> None:
     result = StrategyResult(
         name="dummy",

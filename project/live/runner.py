@@ -11,6 +11,7 @@ from project.live.oms import (
     OrderManager,
     OrderType,
     OrderStatus,
+    OrderSubmissionFailed,
     build_live_order_from_strategy_result,
 )
 from project.live.state import LiveStateStore
@@ -71,6 +72,8 @@ class LiveEngineRunner:
             1.0, max(0.0, float(execution_degradation_throttle_scale))
         )
         self.health_monitor = DataHealthMonitor(stale_threshold_sec=stale_threshold_sec)
+        if hasattr(self.data_manager, "health_monitor_keys"):
+            self.health_monitor.register_streams(self.data_manager.health_monitor_keys())
         self.health_check_interval_seconds = max(1.0, float(health_check_interval_seconds))
         self.reconcile_at_startup = bool(reconcile_at_startup)
         self.account_snapshot_fetcher = account_snapshot_fetcher
@@ -159,6 +162,74 @@ class LiveEngineRunner:
         min_depth_usd: float = 25_000.0,
         min_tob_coverage: float = 0.80,
     ) -> Dict[str, Any] | None:
+        prepared = self._prepare_strategy_order(
+            result,
+            client_order_id=client_order_id,
+            timestamp=timestamp,
+            order_type=order_type,
+            realized_fee_bps=realized_fee_bps,
+        )
+        if prepared is None:
+            return None
+        order, blocked = prepared
+        if blocked is not None:
+            return blocked
+        if getattr(self.order_manager, "exchange_client", None) is not None:
+            raise OrderSubmissionFailed(
+                "exchange-backed live submission requires await submit_strategy_result_async(...)"
+            )
+        return self.order_manager.submit_order(
+            order,
+            kill_switch_manager=self.kill_switch,
+            market_state=market_state,
+            max_spread_bps=max_spread_bps,
+            min_depth_usd=min_depth_usd,
+            min_tob_coverage=min_tob_coverage,
+        )
+
+    async def submit_strategy_result_async(
+        self,
+        result: Any,
+        *,
+        client_order_id: str,
+        timestamp: Any | None = None,
+        order_type: OrderType = OrderType.MARKET,
+        realized_fee_bps: float = 0.0,
+        market_state: Dict[str, float] | None = None,
+        max_spread_bps: float = 5.0,
+        min_depth_usd: float = 25_000.0,
+        min_tob_coverage: float = 0.80,
+    ) -> Dict[str, Any] | None:
+        prepared = self._prepare_strategy_order(
+            result,
+            client_order_id=client_order_id,
+            timestamp=timestamp,
+            order_type=order_type,
+            realized_fee_bps=realized_fee_bps,
+        )
+        if prepared is None:
+            return None
+        order, blocked = prepared
+        if blocked is not None:
+            return blocked
+        return await self.order_manager.submit_order_async(
+            order,
+            kill_switch_manager=self.kill_switch,
+            market_state=market_state,
+            max_spread_bps=max_spread_bps,
+            min_depth_usd=min_depth_usd,
+            min_tob_coverage=min_tob_coverage,
+        )
+
+    def _prepare_strategy_order(
+        self,
+        result: Any,
+        *,
+        client_order_id: str,
+        timestamp: Any | None,
+        order_type: OrderType,
+        realized_fee_bps: float,
+    ) -> tuple[Any, Dict[str, Any] | None] | None:
         order = build_live_order_from_strategy_result(
             result,
             client_order_id=client_order_id,
@@ -177,7 +248,7 @@ class LiveEngineRunner:
         if degradation["action"] == "block":
             order.update_status(OrderStatus.REJECTED)
             self.order_manager.order_history.append(order)
-            return {
+            return order, {
                 "accepted": False,
                 "client_order_id": order.client_order_id,
                 "blocked_by": "execution_degradation",
@@ -191,14 +262,7 @@ class LiveEngineRunner:
             order.metadata["execution_degradation_applied_scale"] = float(
                 self.execution_degradation_throttle_scale
             )
-        return self.order_manager.submit_order(
-            order,
-            kill_switch_manager=self.kill_switch,
-            market_state=market_state,
-            max_spread_bps=max_spread_bps,
-            min_depth_usd=min_depth_usd,
-            min_tob_coverage=min_tob_coverage,
-        )
+        return order, None
 
     def on_order_fill(self, client_order_id: str, fill_qty: float, fill_price: float) -> None:
         self.order_manager.on_fill(client_order_id, fill_qty=fill_qty, fill_price=fill_price)
@@ -302,6 +366,11 @@ class LiveEngineRunner:
             except Exception as exc:
                 _LOG.error("Background task shutdown failed: %s", exc)
         self._tasks = []
+        if hasattr(self.order_manager, "close"):
+            try:
+                await self.order_manager.close()
+            except Exception as exc:
+                _LOG.error("Failed to close order manager during shutdown: %s", exc)
 
     def _on_kill_switch_triggered(self, reason: KillSwitchReason, message: str) -> None:
         self._running = False

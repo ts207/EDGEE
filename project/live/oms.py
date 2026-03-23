@@ -6,6 +6,7 @@ Tracks the lifecycle of an order from submission to terminal state (FILLED, CANC
 
 from __future__ import annotations
 
+import inspect
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -26,6 +27,10 @@ LOGGER = logging.getLogger(__name__)
 
 class OrderSubmissionBlocked(RuntimeError):
     """Raised when a pre-trade guard rejects an order before OMS activation."""
+
+
+class OrderSubmissionFailed(RuntimeError):
+    """Raised when a live order cannot be truthfully submitted."""
 
 
 class OrderStatus(Enum):
@@ -146,11 +151,95 @@ class OrderManager:
                     f"{','.join(gate['reasons'])}"
                 )
 
+        if self.exchange_client is not None:
+            raise OrderSubmissionFailed(
+                "exchange-backed order managers require await submit_order_async(...) "
+                "before reporting acceptance"
+            )
+
         self.add_order(order)
         return {
             "accepted": True,
             "client_order_id": order.client_order_id,
             "gate": gate,
+            "venue_submitted": False,
+        }
+
+    async def submit_order_async(
+        self,
+        order: LiveOrder,
+        *,
+        kill_switch_manager: Any | None = None,
+        market_state: Optional[Dict[str, float]] = None,
+        max_spread_bps: float = 5.0,
+        min_depth_usd: float = 25_000.0,
+        min_tob_coverage: float = 0.80,
+    ) -> Dict[str, Any]:
+        gate = None
+        if kill_switch_manager is not None:
+            snapshot = dict(market_state or {})
+            gate = kill_switch_manager.check_microstructure(
+                spread_bps=snapshot.get("spread_bps"),
+                depth_usd=snapshot.get("depth_usd", snapshot.get("liquidity_available")),
+                tob_coverage=snapshot.get("tob_coverage"),
+                max_spread_bps=max_spread_bps,
+                min_depth_usd=min_depth_usd,
+                min_tob_coverage=min_tob_coverage,
+            )
+            if not gate["is_tradable"]:
+                order.update_status(OrderStatus.REJECTED)
+                self.order_history.append(order)
+                raise OrderSubmissionBlocked(
+                    f"order {order.client_order_id} blocked by microstructure gate: "
+                    f"{','.join(gate['reasons'])}"
+                )
+
+        if self.exchange_client is None:
+            self.add_order(order)
+            return {
+                "accepted": True,
+                "client_order_id": order.client_order_id,
+                "gate": gate,
+                "venue_submitted": False,
+            }
+
+        if order.order_type != OrderType.MARKET:
+            order.update_status(OrderStatus.REJECTED)
+            self.order_history.append(order)
+            raise OrderSubmissionFailed(
+                f"exchange-backed OMS does not support {order.order_type.name} orders yet"
+            )
+
+        try:
+            venue_response = await self.exchange_client.create_market_order(
+                symbol=order.symbol,
+                side=order.side.name,
+                quantity=order.quantity,
+                reduce_only=False,
+            )
+        except Exception as exc:
+            order.update_status(OrderStatus.REJECTED)
+            self.order_history.append(order)
+            raise OrderSubmissionFailed(
+                f"venue rejected order {order.client_order_id}: {exc}"
+            ) from exc
+
+        exchange_order_id = None
+        if isinstance(venue_response, dict):
+            exchange_order_id = str(
+                venue_response.get("orderId")
+                or venue_response.get("clientOrderId")
+                or venue_response.get("origClientOrderId")
+                or ""
+            ).strip() or None
+        self.add_order(order)
+        order.update_status(OrderStatus.NEW, exchange_id=exchange_order_id)
+        return {
+            "accepted": True,
+            "client_order_id": order.client_order_id,
+            "gate": gate,
+            "venue_submitted": True,
+            "venue_response": venue_response,
         }
 
     async def cancel_all_orders(self, symbol: Optional[str] = None):
@@ -248,6 +337,14 @@ class OrderManager:
 
     def summarize_execution_quality(self) -> Dict[str, float]:
         return summarize_execution_attribution(self.execution_attribution)
+
+    async def close(self) -> None:
+        closer = getattr(self.exchange_client, "close", None)
+        if closer is None:
+            return
+        result = closer()
+        if inspect.isawaitable(result):
+            await result
 
 
 def build_live_order_from_strategy_result(

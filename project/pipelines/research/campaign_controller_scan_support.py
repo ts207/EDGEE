@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 from pathlib import Path
@@ -7,6 +8,7 @@ from typing import Any, Dict, List, Optional, Set
 
 import pandas as pd
 import yaml
+from project.research.search.bridge_adapter import canonical_bridge_event_type
 from project.spec_registry.search_space import DEFAULT_EVENT_PRIORITY_WEIGHT as _DEFAULT_QUALITY
 
 _LOG = logging.getLogger(__name__)
@@ -16,6 +18,157 @@ def _read_memory_table(*args: Any, **kwargs: Any) -> pd.DataFrame:
     from project.pipelines.research import campaign_controller as _controller
 
     return _controller.read_memory_table(*args, **kwargs)
+
+
+def _memory_state_key(state_id: str) -> str:
+    return canonical_bridge_event_type("state", f"state:{state_id}")
+
+
+def _memory_transition_key(from_state: str, to_state: str) -> str:
+    return canonical_bridge_event_type("transition", f"transition:{from_state}→{to_state}")
+
+
+def _memory_feature_predicate_key(feature: str, operator: str, threshold: Any) -> str:
+    return canonical_bridge_event_type("feature_predicate", f"pred:{feature}{operator}{threshold}")
+
+
+def _memory_sequence_key(events: List[str], gap: int) -> str:
+    payload = "|".join(events) + f"|gap={gap}"
+    seq_id = "SEQ_" + hashlib.sha256(payload.encode()).hexdigest()[:12].upper()
+    return canonical_bridge_event_type("sequence", f"seq:{seq_id}")
+
+
+def _memory_interaction_key(left: str, right: str, op: str, lag: int) -> str:
+    payload = f"{left}|{op}|{right}|lag={lag}"
+    int_id = "INT_" + hashlib.sha256(payload.encode()).hexdigest()[:12].upper()
+    return canonical_bridge_event_type("interaction", f"int:{int_id}({op})")
+
+
+def _parse_transition_event_type(event_type: str) -> tuple[str, str] | None:
+    text = str(event_type or "").strip()
+    prefix = "TRANSITION_"
+    if not text.startswith(prefix):
+        return None
+    rest = text[len(prefix) :]
+    parts = rest.split("_STATE_", 1)
+    if len(parts) != 2:
+        return None
+    from_state = f"{parts[0]}_STATE"
+    to_state = parts[1] if parts[1].endswith("_STATE") else f"{parts[1]}_STATE"
+    if not from_state or not to_state:
+        return None
+    return from_state, to_state
+
+
+def build_proposal_from_memory_scope(
+    ctrl: Any,
+    scope: Dict[str, Any],
+    *,
+    description: str,
+    promotion_enabled: bool,
+    date_scope: tuple[str, str],
+    default_horizons: List[int],
+) -> Optional[Dict[str, Any]]:
+    trigger_payload = {}
+    raw_trigger_payload = scope.get("trigger_payload_json", scope.get("trigger_payload", "{}"))
+    if isinstance(raw_trigger_payload, dict):
+        trigger_payload = raw_trigger_payload
+    else:
+        try:
+            trigger_payload = json.loads(str(raw_trigger_payload or "{}"))
+        except Exception:
+            trigger_payload = {}
+    if not isinstance(trigger_payload, dict):
+        trigger_payload = {}
+
+    trigger_type = str(scope.get("trigger_type", "EVENT")).strip().upper() or "EVENT"
+    event_type = str(scope.get("event_type", "")).strip()
+    template_id = str(scope.get("template_id", "")).strip()
+    raw_contexts = scope.get("contexts", {})
+    contexts = raw_contexts if isinstance(raw_contexts, dict) else {}
+    templates = [template_id] if template_id else (
+        ctrl._templates_for_event(event_type)
+        if trigger_type == "EVENT" and event_type
+        else ["mean_reversion", "continuation"]
+    )
+
+    horizon_token = str(scope.get("horizon", "")).strip().lower()
+    parsed_horizon = (
+        int(horizon_token[:-1])
+        if horizon_token.endswith("b") and horizon_token[:-1].isdigit()
+        else int(horizon_token)
+        if horizon_token.isdigit()
+        else None
+    )
+    horizons = [parsed_horizon] if parsed_horizon is not None else list(default_horizons)
+
+    kwargs: Dict[str, Any] = {
+        "events": [],
+        "templates": templates,
+        "horizons": horizons,
+        "description": description,
+        "promotion_enabled": promotion_enabled,
+        "date_scope": date_scope,
+        "trigger_type": trigger_type,
+        "contexts": contexts,
+    }
+    if trigger_type == "EVENT":
+        if not event_type:
+            return None
+        kwargs["events"] = [event_type]
+    elif trigger_type == "STATE":
+        state_id = str(scope.get("state_id", trigger_payload.get("state_id", ""))).strip()
+        if not state_id and event_type.startswith("STATE_"):
+            state_id = event_type[len("STATE_") :]
+        if not state_id:
+            return None
+        kwargs["states"] = [state_id]
+    elif trigger_type == "TRANSITION":
+        from_state = str(scope.get("from_state", trigger_payload.get("from_state", ""))).strip()
+        to_state = str(scope.get("to_state", trigger_payload.get("to_state", ""))).strip()
+        if (not from_state or not to_state) and event_type:
+            parsed = _parse_transition_event_type(event_type)
+            if parsed is not None:
+                from_state, to_state = parsed
+        if not from_state or not to_state:
+            return None
+        kwargs["transitions"] = [{"from_state": from_state, "to_state": to_state}]
+    elif trigger_type == "FEATURE_PREDICATE":
+        feature = str(scope.get("feature", trigger_payload.get("feature", ""))).strip()
+        operator = str(scope.get("operator", trigger_payload.get("operator", ""))).strip()
+        threshold = scope.get("threshold", trigger_payload.get("threshold"))
+        if not feature or not operator or threshold in (None, ""):
+            return None
+        kwargs["feature_predicates"] = [
+            {"feature": feature, "operator": operator, "threshold": threshold}
+        ]
+    elif trigger_type == "SEQUENCE":
+        sequences = scope.get("sequences")
+        if not isinstance(sequences, dict):
+            events = trigger_payload.get("events")
+            max_gap = trigger_payload.get("max_gap")
+            if not isinstance(events, list) or not events:
+                return None
+            sequences = {
+                "include": [events],
+                "max_gaps_bars": max_gap if isinstance(max_gap, list) and max_gap else [6, 12],
+            }
+        kwargs["sequences"] = sequences
+    elif trigger_type == "INTERACTION":
+        interactions = scope.get("interactions")
+        if not isinstance(interactions, list) or not interactions:
+            left = str(trigger_payload.get("left", "")).strip()
+            right = str(trigger_payload.get("right", "")).strip()
+            op = str(trigger_payload.get("op", "")).strip().upper()
+            lag = int(trigger_payload.get("lag", 6) or 6)
+            if not left or not right or not op:
+                return None
+            interactions = [{"left": left, "right": right, "op": op, "lag": lag}]
+        kwargs["interactions"] = interactions
+    else:
+        return None
+
+    return ctrl._build_proposal(**kwargs)
 
 
 def step_scan_frontier(ctrl: Any, mem: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -131,7 +284,10 @@ def step_scan_states(ctrl: Any, mem: Dict[str, Any]) -> Optional[Dict[str, Any]]
         if not tested_df.empty and "event_type" in tested_df.columns and "trigger_type" in tested_df.columns:
             state_rows = tested_df[tested_df["trigger_type"].astype(str) == "STATE"]
             if not state_rows.empty:
-                tested_states = set(state_rows["event_type"].astype(str).unique())
+                tested_states = {
+                    str(value)[len("STATE_") :] if str(value).startswith("STATE_") else str(value)
+                    for value in state_rows["event_type"].astype(str).unique()
+                }
     except Exception:
         _LOG.warning("Failed to read superseded stages from memory", exc_info=True)
 
@@ -174,7 +330,8 @@ def step_scan_transitions(ctrl: Any, mem: Dict[str, Any]) -> Optional[Dict[str, 
     candidates = [
         transition
         for transition in ss_transitions
-        if f"{transition['from_state']}→{transition['to_state']}" not in tested_keys
+        if _memory_transition_key(transition["from_state"], transition["to_state"])
+        not in tested_keys
     ]
     if not candidates:
         _LOG.info("STEP 4 SCAN [TRANSITION]: frontier exhausted.")
@@ -232,7 +389,14 @@ def step_scan_feature_predicates(ctrl: Any, mem: Dict[str, Any]) -> Optional[Dic
     except Exception:
         _LOG.warning("Failed to read superseded stages from memory", exc_info=True)
 
-    candidates = [pred for pred in merged if _pred_key(pred) not in tested_keys]
+    candidates = [
+        pred
+        for pred in merged
+        if _memory_feature_predicate_key(
+            pred["feature"], pred["operator"], pred["threshold"]
+        )
+        not in tested_keys
+    ]
     if not candidates:
         _LOG.info("STEP 4 SCAN [FEATURE_PREDICATE]: frontier exhausted.")
         return None
@@ -265,7 +429,29 @@ def step_scan_sequences(ctrl: Any, mem: Dict[str, Any]) -> Optional[Dict[str, An
         _LOG.info("STEP 4 SCAN [SEQUENCE]: no weak-signal pairs found.")
         return None
 
-    sequences = [list(pair) for pair in pairs[:5]]
+    tested_keys: set[str] = set()
+    try:
+        tested_df = _read_memory_table(ctrl.config.program_id, "tested_regions", data_root=ctrl.data_root)
+        if not tested_df.empty and "trigger_type" in tested_df.columns:
+            seq_rows = tested_df[tested_df["trigger_type"].astype(str) == "SEQUENCE"]
+            if not seq_rows.empty and "event_type" in seq_rows.columns:
+                tested_keys = set(seq_rows["event_type"].astype(str).unique())
+    except Exception:
+        _LOG.warning("Failed to read superseded stages from memory", exc_info=True)
+
+    sequences: List[List[str]] = []
+    for pair in pairs:
+        sequence = list(pair)
+        candidate_keys = {_memory_sequence_key(sequence, gap) for gap in [6, 12]}
+        if candidate_keys.intersection(tested_keys):
+            continue
+        sequences.append(sequence)
+        if len(sequences) >= 5:
+            break
+    if not sequences:
+        _LOG.info("STEP 4 SCAN [SEQUENCE]: frontier exhausted.")
+        return None
+
     labels = [f"{left}→{right}" for left, right in sequences]
     _LOG.info("STEP 4 SCAN [SEQUENCE]: pairs=%s", labels)
     return ctrl._build_proposal(
@@ -301,7 +487,14 @@ def step_scan_interactions(ctrl: Any, mem: Dict[str, Any]) -> Optional[Dict[str,
     def _motif_key(motif: Dict[str, Any]) -> str:
         return f"{motif['left']}|{motif['op']}|{motif['right']}"
 
-    candidates = [motif for motif in motifs if _motif_key(motif) not in tested_keys]
+    candidates = [
+        motif
+        for motif in motifs
+        if _memory_interaction_key(
+            motif["left"], motif["right"], motif["op"].upper(), int(motif.get("lag", 6))
+        )
+        not in tested_keys
+    ]
     if not candidates:
         _LOG.info("STEP 4 SCAN [INTERACTION]: frontier exhausted.")
         return None

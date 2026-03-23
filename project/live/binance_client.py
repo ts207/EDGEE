@@ -48,9 +48,10 @@ class BinanceFuturesClient:
 
     BASE_URL = "https://fapi.binance.com"
 
-    def __init__(self, api_key: str, api_secret: str):
+    def __init__(self, api_key: str, api_secret: str, *, base_url: str | None = None):
         self.api_key = api_key
         self.api_secret = api_secret
+        self.BASE_URL = str(base_url or self.BASE_URL).rstrip("/")
         self._session: Optional[aiohttp.ClientSession] = None
         self._session_lock = asyncio.Lock()
         # Binance weights vary by endpoint; this conservative default keeps unwind bursts bounded.

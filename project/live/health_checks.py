@@ -23,12 +23,24 @@ class DataHealthMonitor:
         self.stale_threshold_sec = stale_threshold_sec
         self._now_fn = now_fn or (lambda: datetime.now(timezone.utc))
         self.last_update_times: Dict[str, datetime] = {}
+        self.registered_stream_times: Dict[str, datetime] = {}
         self.status: Dict[str, str] = {}  # "HEALTHY" | "STALE" | "DISCONNECTED"
+
+    def register_stream(self, symbol: str, stream: str) -> None:
+        key = f"{str(symbol).upper()}:{stream}"
+        if key not in self.registered_stream_times:
+            self.registered_stream_times[key] = self._now_fn()
+            self.status.setdefault(key, "HEALTHY")
+
+    def register_streams(self, streams: List[tuple[str, str]]) -> None:
+        for symbol, stream in streams:
+            self.register_stream(symbol, stream)
 
     def on_event(self, symbol: str, stream: str):
         """Record the arrival of a new data event."""
         now = self._now_fn()
-        key = f"{symbol}:{stream}"
+        key = f"{str(symbol).upper()}:{stream}"
+        self.registered_stream_times.setdefault(key, now)
         self.last_update_times[key] = now
         self.status[key] = "HEALTHY"
 
@@ -39,10 +51,15 @@ class DataHealthMonitor:
         now = self._now_fn()
         stale_streams = []
 
-        for key, last_time in self.last_update_times.items():
-            diff = (now - last_time).total_seconds()
+        monitored_keys = set(self.registered_stream_times) | set(self.last_update_times)
+        for key in monitored_keys:
+            last_time = self.last_update_times.get(key)
+            baseline = last_time or self.registered_stream_times.get(key)
+            if baseline is None:
+                continue
+            diff = (now - baseline).total_seconds()
             if diff > self.stale_threshold_sec:
-                self.status[key] = "STALE"
+                self.status[key] = "STALE" if last_time is not None else "DISCONNECTED"
                 stale_streams.append(
                     {
                         "stream": key,

@@ -19,9 +19,9 @@ from project.spec_validation import get_event_family, resolve_execution_template
 log = logging.getLogger(__name__)
 
 
-def _sanitize_event_type(row: pd.Series) -> str:
-    trigger_type = str(row.get("trigger_type", "event")).lower()
-    key = str(row.get("trigger_key", "UNKNOWN")).upper()
+def canonical_bridge_event_type(trigger_type: str, trigger_key: str) -> str:
+    trigger_type = str(trigger_type or "event").lower()
+    key = str(trigger_key or "UNKNOWN").upper()
     # Strip "type:" prefix from trigger_key (e.g. "event:VOL_SPIKE" -> "VOL_SPIKE")
     if ":" in key:
         key = key.split(":", 1)[1]
@@ -32,7 +32,18 @@ def _sanitize_event_type(row: pd.Series) -> str:
         return f"STATE_{clean_key}"
     if trigger_type == "transition":
         return f"TRANSITION_{clean_key}"
+    if trigger_type == "sequence":
+        return f"SEQUENCE_{clean_key}"
+    if trigger_type == "interaction":
+        return f"INTERACTION_{clean_key}"
     return f"FEATURE_{clean_key}"
+
+
+def _sanitize_event_type(row: pd.Series) -> str:
+    return canonical_bridge_event_type(
+        str(row.get("trigger_type", "event")),
+        str(row.get("trigger_key", "UNKNOWN")),
+    )
 
 
 def hypotheses_to_bridge_candidates(

@@ -163,9 +163,16 @@ class CampaignController:
                 _LOG.error("Failed to build plan for %s: %s", run_id, exc)
                 continue
 
-            self._execute_pipeline(config_path, run_id)
+            pipeline_failed = False
+            try:
+                self._execute_pipeline(config_path, run_id)
+            except Exception as exc:
+                pipeline_failed = True
+                _LOG.error("Pipeline execution failed for %s: %s", run_id, exc)
 
             summary = self._update_campaign_stats()
+            if pipeline_failed:
+                continue
             if self._should_halt(summary):
                 _LOG.warning("Halt criteria met. Ending campaign.")
                 break
@@ -408,16 +415,28 @@ class CampaignController:
             event_type = str(region.get("event_type", "")).strip()
             if not event_type:
                 continue
-            _LOG.info("STEP 2 EXPLOIT (promising): event=%s", event_type)
-            templates = self._templates_for_event(event_type)
-            return self._build_proposal(
-                events=[event_type],
-                templates=templates,
-                horizons=[12, 24, 48],
+            _LOG.info(
+                "STEP 2 EXPLOIT (promising): trigger_type=%s event=%s",
+                str(region.get("trigger_type", "EVENT")).strip().upper() or "EVENT",
+                event_type,
+            )
+            scope = dict(region)
+            if "context_json" in scope and "contexts" not in scope:
+                try:
+                    parsed_contexts = json.loads(str(scope.get("context_json", "{}")))
+                except Exception:
+                    parsed_contexts = {}
+                scope["contexts"] = parsed_contexts if isinstance(parsed_contexts, dict) else {}
+            proposal = _scan_support.build_proposal_from_memory_scope(
+                self,
+                scope,
                 description=f"Exploit promising region — {event_type}",
                 promotion_enabled=True,
                 date_scope=self.config.exploit_date_scope,
+                default_horizons=[12, 24, 48],
             )
+            if proposal is not None:
+                return proposal
         return None
 
     # ------------------------------------------------------------------
@@ -457,17 +476,18 @@ class CampaignController:
         if self.config.enable_context_conditioning and not contexts:
             contexts = self._context_for_proposal()
 
-        # Use all templates for the family — the adjacent exploration tests template sensitivity
-        templates = self._templates_for_event(event_type)
-        return self._build_proposal(
-            events=[event_type],
-            templates=templates,
-            horizons=[6, 12, 24, 48],
+        scope["contexts"] = contexts
+        proposal = _scan_support.build_proposal_from_memory_scope(
+            self,
+            scope,
             description=f"Explore adjacent — {event_type}",
             promotion_enabled=False,
             date_scope=self.config.explore_date_scope,
-            contexts=contexts,
+            default_horizons=[6, 12, 24, 48],
         )
+        if proposal is not None:
+            return proposal
+        return None
 
     # ------------------------------------------------------------------
     # Step 4 — Quality-weighted frontier scan

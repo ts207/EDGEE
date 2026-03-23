@@ -3,6 +3,7 @@ from __future__ import annotations
 import pandas as pd
 
 from project.research.search.bridge_adapter import (
+    canonical_bridge_event_type,
     hypotheses_to_bridge_candidates,
     split_bridge_candidates,
 )
@@ -94,6 +95,14 @@ def test_hypotheses_to_bridge_candidates_state_trigger_prefixed():
     state_row = candidates[candidates["candidate_id"] == "def456"]
     assert len(state_row) == 1
     assert state_row.iloc[0]["event_type"].startswith("STATE_")
+
+
+def test_canonical_bridge_event_type_preserves_sequence_and_interaction_prefixes():
+    assert canonical_bridge_event_type("sequence", "seq:SEQ_ABC") == "SEQUENCE_SEQ_ABC"
+    assert (
+        canonical_bridge_event_type("interaction", "int:INT_ABC(and)")
+        == "INTERACTION_INT_ABC_AND_"
+    )
 
 
 def test_hypotheses_to_bridge_candidates_empty_input():

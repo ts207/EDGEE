@@ -39,6 +39,8 @@ def test_build_live_runner_uses_snapshot_path_and_config_defaults(tmp_path: Path
             execution_degradation_warn_edge_bps,
             execution_degradation_block_edge_bps,
             execution_degradation_throttle_scale,
+            stale_threshold_sec,
+            order_manager,
         ):
             self.session_metadata = {
                 "symbols": list(symbols),
@@ -50,7 +52,9 @@ def test_build_live_runner_uses_snapshot_path_and_config_defaults(tmp_path: Path
                 "execution_degradation_warn_edge_bps": float(execution_degradation_warn_edge_bps),
                 "execution_degradation_block_edge_bps": float(execution_degradation_block_edge_bps),
                 "execution_degradation_throttle_scale": float(execution_degradation_throttle_scale),
+                "stale_threshold_sec": float(stale_threshold_sec),
             }
+            self.order_manager = order_manager
 
     original = live_runner.LiveEngineRunner
     live_runner.LiveEngineRunner = _DummyRunner
@@ -68,6 +72,7 @@ def test_build_live_runner_uses_snapshot_path_and_config_defaults(tmp_path: Path
     assert runner.session_metadata["execution_degradation_warn_edge_bps"] == 0.0
     assert runner.session_metadata["execution_degradation_block_edge_bps"] == -5.0
     assert runner.session_metadata["execution_degradation_throttle_scale"] == 0.5
+    assert runner.session_metadata["stale_threshold_sec"] == 60.0
 
 
 def test_run_live_engine_print_session_metadata(capsys, tmp_path: Path) -> None:
@@ -97,6 +102,7 @@ def test_run_live_engine_print_session_metadata(capsys, tmp_path: Path) -> None:
     assert out["execution_degradation_warn_edge_bps"] == 0.0
     assert out["execution_degradation_block_edge_bps"] == -5.0
     assert out["execution_degradation_throttle_scale"] == 0.5
+    assert out["stale_threshold_sec"] == 60.0
 
 
 def test_validate_live_runtime_environment_accepts_paper_contract() -> None:
@@ -185,8 +191,16 @@ def test_run_live_engine_start_validates_runtime_environment_before_start(monkey
     monkeypatch.setattr(
         run_live_engine,
         "preflight_binance_venue_connectivity",
-        lambda **kwargs: _async_return({"environment": "paper", "venue": "binance"}),
+        lambda **kwargs: _async_return(
+            {
+                "environment": "paper",
+                "venue": "binance",
+                "account_can_trade": True,
+                "account_type": "USDT_FUTURE",
+            }
+        ),
     )
+    monkeypatch.setattr(run_live_engine, "validate_binance_account_preflight", lambda payload: payload)
     monkeypatch.setattr(
         run_live_engine,
         "fetch_binance_futures_account_snapshot",
@@ -249,7 +263,7 @@ def test_preflight_binance_venue_connectivity_accepts_paper_endpoint(monkeypatch
     session = _FakeSession(
         [
             _FakeResponse(200, payload={}),
-            _FakeResponse(200, payload={"canTrade": True, "accountType": "SPOT"}),
+            _FakeResponse(200, payload={"canTrade": True, "accountType": "USDT_FUTURE"}),
         ]
     )
     monkeypatch.setenv("EDGE_BINANCE_PAPER_API_BASE", "https://testnet.binancefuture.com")
@@ -265,8 +279,35 @@ def test_preflight_binance_venue_connectivity_accepts_paper_endpoint(monkeypatch
 
     assert out["environment"] == "paper"
     assert out["account_can_trade"] is True
+    assert out["account_type"] == "USDT_FUTURE"
     assert session.calls[0][0] == "https://testnet.binancefuture.com/fapi/v1/ping"
     assert session.calls[1][1]["X-MBX-APIKEY"] == "paper-key"
+
+
+def test_validate_binance_account_preflight_rejects_non_tradable_account() -> None:
+    try:
+        run_live_engine.validate_binance_account_preflight(
+            {"account_can_trade": False, "account_type": "USDT_FUTURE"}
+        )
+    except run_live_engine.VenueConnectivityError as exc:
+        message = str(exc)
+    else:
+        raise AssertionError("expected VenueConnectivityError")
+
+    assert "cannot trade" in message
+
+
+def test_validate_binance_account_preflight_rejects_wrong_account_type() -> None:
+    try:
+        run_live_engine.validate_binance_account_preflight(
+            {"account_can_trade": True, "account_type": "SPOT"}
+        )
+    except run_live_engine.VenueConnectivityError as exc:
+        message = str(exc)
+    else:
+        raise AssertionError("expected VenueConnectivityError")
+
+    assert "unexpected account type" in message
 
 
 def test_preflight_binance_venue_connectivity_rejects_wrong_host(monkeypatch) -> None:
@@ -428,8 +469,16 @@ def test_run_live_engine_start_hydrates_initial_account_snapshot_before_start(mo
     monkeypatch.setattr(
         run_live_engine,
         "preflight_binance_venue_connectivity",
-        lambda **kwargs: _async_return({"environment": "paper", "venue": "binance"}),
+        lambda **kwargs: _async_return(
+            {
+                "environment": "paper",
+                "venue": "binance",
+                "account_can_trade": True,
+                "account_type": "USDT_FUTURE",
+            }
+        ),
     )
+    monkeypatch.setattr(run_live_engine, "validate_binance_account_preflight", lambda payload: payload)
     monkeypatch.setattr(
         run_live_engine,
         "fetch_binance_futures_account_snapshot",

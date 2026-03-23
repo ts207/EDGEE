@@ -51,6 +51,20 @@ def test_stale_data_with_frozen_time():
     assert health["stale_streams"][0]["last_seen_sec_ago"] >= 600.0
 
 
+def test_registered_but_never_seen_stream_becomes_disconnected() -> None:
+    current_time = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    monitor = DataHealthMonitor(stale_threshold_sec=1.0, now_fn=lambda: current_time)
+    monitor.register_stream("BTCUSDT", "ticker")
+
+    current_time += timedelta(seconds=2)
+    health = monitor.check_health()
+
+    assert health["is_healthy"] is False
+    assert health["stale_count"] == 1
+    assert health["stale_streams"][0]["stream"] == "BTCUSDT:ticker"
+    assert monitor.status["BTCUSDT:ticker"] == "DISCONNECTED"
+
+
 def test_build_runtime_certification_manifest() -> None:
     manifest = build_runtime_certification_manifest(
         postflight_audit={

@@ -68,6 +68,7 @@ def resolve_live_engine_session_metadata(
     execution_degradation_throttle_scale = float(
         config.get("execution_degradation_throttle_scale", 0.5) or 0.5
     )
+    stale_threshold_sec = float(config.get("stale_threshold_sec", 60.0) or 60.0)
     return {
         "symbols": list(resolved_symbols),
         "live_state_snapshot_path": str(resolved_snapshot_path),
@@ -79,6 +80,7 @@ def resolve_live_engine_session_metadata(
         "execution_degradation_warn_edge_bps": execution_degradation_warn_edge_bps,
         "execution_degradation_block_edge_bps": execution_degradation_block_edge_bps,
         "execution_degradation_throttle_scale": execution_degradation_throttle_scale,
+        "stale_threshold_sec": stale_threshold_sec,
     }
 
 
@@ -282,6 +284,18 @@ async def preflight_binance_venue_connectivity(
     }
 
 
+def validate_binance_account_preflight(preflight: Dict[str, Any]) -> Dict[str, Any]:
+    if not bool(preflight.get("account_can_trade", False)):
+        raise VenueConnectivityError("Binance account preflight failed: account cannot trade")
+
+    account_type = str(preflight.get("account_type", "")).strip().upper()
+    if account_type and "FUTURE" not in account_type:
+        raise VenueConnectivityError(
+            f"Binance account preflight failed: unexpected account type '{account_type}'"
+        )
+    return preflight
+
+
 async def fetch_binance_futures_account_snapshot(
     *,
     environment: Dict[str, str],
@@ -332,7 +346,11 @@ def _default_aiohttp_session_factory(*, timeout_seconds: float):
 
 
 def build_live_runner(
-    *, config_path: Path, symbols: list[str] | None = None, snapshot_path: str | None = None
+    *,
+    config_path: Path,
+    symbols: list[str] | None = None,
+    snapshot_path: str | None = None,
+    environment: Dict[str, str] | None = None,
 ):
     from project.live.runner import LiveEngineRunner
 
@@ -341,6 +359,20 @@ def build_live_runner(
         symbols=symbols,
         snapshot_path=snapshot_path,
     )
+    order_manager = None
+    if environment is not None:
+        from project.live.binance_client import BinanceFuturesClient
+        from project.live.oms import OrderManager
+
+        credentials = _resolve_binance_api_credentials(environment)
+        if credentials["base_url"] and credentials["api_key"] and credentials["api_secret"]:
+            order_manager = OrderManager(
+                exchange_client=BinanceFuturesClient(
+                    credentials["api_key"],
+                    credentials["api_secret"],
+                    base_url=credentials["base_url"],
+                )
+            )
     return LiveEngineRunner(
         session_metadata["symbols"],
         snapshot_path=session_metadata["live_state_snapshot_path"],
@@ -355,6 +387,8 @@ def build_live_runner(
         execution_degradation_throttle_scale=session_metadata[
             "execution_degradation_throttle_scale"
         ],
+        stale_threshold_sec=session_metadata["stale_threshold_sec"],
+        order_manager=order_manager,
     )
 
 
@@ -404,6 +438,7 @@ def main(argv: list[str] | None = None) -> int:
         config_path=resolved_config_path,
         symbols=symbols or None,
         snapshot_path=resolved_snapshot_path,
+        environment=runtime_environment,
     )
     runner.account_snapshot_fetcher = lambda: fetch_binance_futures_account_snapshot(
         environment=runtime_environment
@@ -411,7 +446,8 @@ def main(argv: list[str] | None = None) -> int:
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
     try:
-        asyncio.run(preflight_binance_venue_connectivity(environment=runtime_environment))
+        preflight = asyncio.run(preflight_binance_venue_connectivity(environment=runtime_environment))
+        validate_binance_account_preflight(preflight)
         initial_account_snapshot = asyncio.run(
             fetch_binance_futures_account_snapshot(environment=runtime_environment)
         )

@@ -166,6 +166,20 @@ class TestScanTriggerTypeSequencing:
         if result is not None:
             assert len(result["trigger_space"]["states"]["include"]) <= 4
 
+    def test_state_scan_treats_prefixed_memory_event_type_as_already_tested(self, tmp_path):
+        ctrl = _make_ctrl(tmp_path, scan_trigger_types=["STATE"])
+        mem = _empty_mem()
+        tested = pd.DataFrame(
+            [{"event_type": "STATE_HIGH_VOL_REGIME", "trigger_type": "STATE"}]
+        )
+        with patch(
+            "project.pipelines.research.campaign_controller.read_memory_table",
+            return_value=tested,
+        ):
+            result = ctrl._step_scan_states(mem)
+        if result is not None:
+            assert "HIGH_VOL_REGIME" not in result["trigger_space"]["states"]["include"]
+
     def test_transition_batch_capped_at_three(self, tmp_path):
         ctrl = _make_ctrl(tmp_path)
         mem = _empty_mem()
@@ -176,6 +190,26 @@ class TestScanTriggerTypeSequencing:
             result = ctrl._step_scan_transitions(mem)
         if result is not None:
             assert len(result["trigger_space"]["transitions"]["include"]) <= 3
+
+    def test_transition_scan_treats_prefixed_memory_event_type_as_already_tested(self, tmp_path):
+        ctrl = _make_ctrl(tmp_path, scan_trigger_types=["TRANSITION"])
+        mem = _empty_mem()
+        tested = pd.DataFrame(
+            [
+                {
+                    "event_type": "TRANSITION_LOW_VOL_REGIME_HIGH_VOL_REGIME",
+                    "trigger_type": "TRANSITION",
+                }
+            ]
+        )
+        with patch(
+            "project.pipelines.research.campaign_controller.read_memory_table",
+            return_value=tested,
+        ):
+            result = ctrl._step_scan_transitions(mem)
+        if result is not None:
+            transitions = result["trigger_space"]["transitions"]["include"]
+            assert {"from_state": "LOW_VOL_REGIME", "to_state": "HIGH_VOL_REGIME"} not in transitions
 
     def test_state_no_zero_entry_lags(self, tmp_path):
         ctrl = _make_ctrl(tmp_path)
@@ -547,6 +581,26 @@ class TestFeaturePredicateActivation:
             result = ctrl._step_scan_feature_predicates(mem)
         if result is not None:
             assert 0 not in result["evaluation"]["entry_lags"]
+
+    def test_feature_predicate_scan_treats_memory_key_as_already_tested(self, tmp_path):
+        ctrl = _make_ctrl(tmp_path, scan_trigger_types=["FEATURE_PREDICATE"])
+        mem = _empty_mem()
+        tested = pd.DataFrame(
+            [
+                {
+                    "event_type": "FEATURE_IMBALANCE_ZSCORE_2_0",
+                    "trigger_type": "FEATURE_PREDICATE",
+                }
+            ]
+        )
+        with patch(
+            "project.pipelines.research.campaign_controller.read_memory_table",
+            return_value=tested,
+        ):
+            result = ctrl._step_scan_feature_predicates(mem)
+        if result is not None:
+            preds = result["trigger_space"]["feature_predicates"]["include"]
+            assert {"feature": "imbalance_zscore", "operator": ">", "threshold": 2.0} not in preds
 
     def test_scan_trigger_types_includes_feature_predicate(self, tmp_path):
         ctrl = _make_ctrl(
