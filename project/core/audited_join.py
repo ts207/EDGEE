@@ -33,6 +33,10 @@ def audited_merge_asof(
         LOGGER.warning(
             f"DANGEROUS: Forward as-of join used for feature {feature_name}. Ensure this is for label construction only."
         )
+    elif direction == "nearest":
+        LOGGER.warning(
+            f"DANGEROUS: Nearest as-of join used for feature {feature_name}. This is not strictly causal and may look ahead."
+        )
 
     # 2. Perform Join
     # Ensure sorted timestamps

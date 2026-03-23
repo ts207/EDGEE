@@ -1,5 +1,6 @@
 from __future__ import annotations
 import logging
+from typing import Literal
 import pandas as pd
 import numpy as np
 
@@ -77,7 +78,12 @@ def align_funding_to_bars(
     return aligned
 
 
-def assert_complete_funding_series(df: pd.DataFrame, symbol: str = "unknown") -> pd.Series:
+def assert_complete_funding_series(
+    df: pd.DataFrame, 
+    symbol: str = "unknown",
+    on_missing: Literal["raise", "warn"] = "raise",
+    fill_value: float = 0.0
+) -> pd.Series:
     """
     Validate that funding alignment has no major gaps and return the funding series.
     """
@@ -87,11 +93,20 @@ def assert_complete_funding_series(df: pd.DataFrame, symbol: str = "unknown") ->
     if "funding_rate_scaled" not in df.columns:
         raise ValueError(f"Required funding_rate_scaled column missing for {symbol}")
 
-    if df["funding_rate_scaled"].isna().any():
-        raise ValueError(f"Funding alignment gaps found for {symbol}")
+    series = pd.to_numeric(df["funding_rate_scaled"], errors="coerce").astype(float)
+    has_gaps = series.isna().any()
 
+    # Also check explicit "funding_missing" flag if present
     if "funding_missing" in df.columns:
         if df["funding_missing"].astype(bool).any():
-            raise ValueError(f"Funding coverage gaps flagged for {symbol}")
+            has_gaps = True
 
-    return pd.to_numeric(df["funding_rate_scaled"], errors="coerce").astype(float)
+    if has_gaps:
+        msg = f"Funding alignment gaps found for {symbol}"
+        if on_missing == "raise":
+            raise ValueError(msg)
+        elif on_missing == "warn":
+            LOGGER.warning(f"{msg} - filling with {fill_value}")
+            series = series.fillna(fill_value)
+    
+    return series

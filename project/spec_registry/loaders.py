@@ -37,10 +37,19 @@ def spec_root() -> Path:
     return SPEC_ROOT
 
 
-def _read_yaml(path: Path) -> Dict[str, Any]:
+def _read_yaml(path: Path, required: bool = True) -> Dict[str, Any]:
     if not path.exists():
+        if required:
+            raise FileNotFoundError(f"Spec file missing: {path}")
         return {}
-    payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+    try:
+        payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        raise ValueError(f"Failed to parse YAML spec {path}: {exc}") from exc
+    if not isinstance(payload, dict) and payload is not None:
+         # Some YAML files might be empty or just a list, but our loaders expect dicts
+         if required:
+             raise ValueError(f"Spec file {path} must be a dictionary, got {type(payload)}")
     return payload if isinstance(payload, dict) else {}
 
 

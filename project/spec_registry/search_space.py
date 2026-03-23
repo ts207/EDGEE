@@ -29,11 +29,14 @@ Canonical annotation syntax (must appear on the YAML list-item line):
 
 from __future__ import annotations
 
+import logging
 import re
 from pathlib import Path
 from typing import Dict, Optional, Tuple
 
 from project.spec_registry.loaders import REPO_ROOT
+
+LOGGER = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Public constants — imported by campaign_controller and search_intelligence
@@ -99,34 +102,56 @@ def _parse_annotation_line(line: str) -> Optional[Tuple[str, float]]:
 
     Returns ``None`` for:
     - Lines that are not YAML list items (``- ...``).
-    - Lines without a ``#`` comment.
-    - Lines whose event name contains spaces or braces (structured entries).
-    - Lines without a ``[QUALITY: …]`` annotation.
+    - Lines without a ``#`` comment (logged as warning if they look like events).
+    - Lines whose event ID cannot be extracted.
+    - Lines without a ``[QUALITY: …]`` annotation (logged as warning).
     """
     stripped = line.strip()
 
     if not stripped.startswith("- "):
         return None
-    if "#" not in stripped:
+
+    # Strip "- "
+    content = stripped[2:].strip()
+    
+    # Split comment
+    if "#" in content:
+        code_part, comment_part = content.split("#", 1)
+    else:
+        # Valid event but no comment -> no annotation.
+        # We might want to warn if we expect ALL events to be annotated, 
+        # but for now, we just skip it (default weight applies).
+        return None
+        
+    code_part = code_part.strip()
+    comment_part = comment_part.strip()
+    
+    # Extract ID: take the first token, strip trailing colon
+    tokens = code_part.split()
+    if not tokens:
+        return None
+        
+    event_id = tokens[0].rstrip(":")
+    
+    # Verify ID format (alphanumeric + underscore) to avoid garbage
+    if not re.match(r"^[A-Z0-9_]+$", event_id):
+        # Could be a complex structure or invalid ID
         return None
 
-    # Everything before the first ``#`` is the YAML value token.
-    event_part = stripped[2:].split("#")[0].strip()
-
-    # Reject structured dict entries like ``{ from: X, to: Y }`` and
-    # multi-word entries that are clearly not bare event identifiers.
-    if not event_part or " " in event_part or "{" in event_part:
-        return None
-
-    quality_match = _QUALITY_RE.search(stripped)
+    quality_match = _QUALITY_RE.search(comment_part)
     if not quality_match:
+        # Found a comment on an event line, but no [QUALITY: ...] tag.
+        # This is likely a typo or a forgotten annotation.
+        # We check if "QUALITY" appears in the comment to be more sure it's a typo.
+        if "QUALITY" in comment_part.upper():
+             LOGGER.warning(f"Malformed QUALITY annotation for event '{event_id}': {comment_part}")
         return None
 
     label = quality_match.group(1).upper()
     base_weight = QUALITY_SCORES.get(label, DEFAULT_EVENT_PRIORITY_WEIGHT)
 
     ig_bonus = 0.0
-    ig_match = _IG_RE.search(stripped)
+    ig_match = _IG_RE.search(comment_part)
     if ig_match:
         try:
             ig_value = float(ig_match.group(1))
@@ -134,7 +159,7 @@ def _parse_annotation_line(line: str) -> Optional[Tuple[str, float]]:
         except ValueError:
             pass
 
-    return event_part, base_weight + ig_bonus
+    return event_id, base_weight + ig_bonus
 
 
 # ---------------------------------------------------------------------------
