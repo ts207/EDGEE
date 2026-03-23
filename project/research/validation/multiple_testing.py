@@ -4,7 +4,17 @@ from typing import Iterable, Sequence
 
 import numpy as np
 import pandas as pd
-from statsmodels.stats.multitest import multipletests
+
+# The canonical BH implementation lives in project.core.stats.  We route the
+# "bh" method through it so there is exactly one implementation of
+# Benjamini-Hochberg FDR correction in the codebase.  BY and Holm are not
+# present in core/stats, so they continue to use statsmodels.
+from project.core.stats import bh_adjust as _canonical_bh_adjust
+try:
+    from statsmodels.stats.multitest import multipletests as _multipletests
+    _HAS_STATSMODELS = True
+except ImportError:  # pragma: no cover
+    _HAS_STATSMODELS = False
 
 
 def assign_test_families(
@@ -31,11 +41,18 @@ def _adjust(p_values: Iterable[float], method: str) -> np.ndarray:
         return arr
     arr = np.where(np.isfinite(arr), np.clip(arr, 0.0, 1.0), 1.0)
     if method == "bh":
-        return multipletests(arr, method="fdr_bh")[1]
+        # Use the single canonical BH implementation from core.stats to avoid
+        # divergence between the two previously-parallel implementations.
+        return _canonical_bh_adjust(arr)
+    if not _HAS_STATSMODELS:
+        raise ImportError(
+            f"statsmodels is required for correction method {method!r}. "
+            "Install it or use method='bh'."
+        )
     if method == "by":
-        return multipletests(arr, method="fdr_by")[1]
+        return _multipletests(arr, method="fdr_by")[1]
     if method == "holm":
-        return multipletests(arr, method="holm")[1]
+        return _multipletests(arr, method="holm")[1]
     raise ValueError(f"Unsupported correction method: {method}")
 
 

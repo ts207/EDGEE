@@ -137,8 +137,12 @@ def robust_z(series: pd.Series, window: int, eps: float = 1e-12) -> pd.Series:
         mad = np.median(np.abs(history_c - med))
         return float((target - med) / (1.4826 * mad + eps))
 
-    # We increase window by 1 to include the target + history
-    return series.rolling(window=window + 1, min_periods=window + 1).apply(_rz, raw=True)
+    # We increase window by 1 to include the target + history.
+    # _winsorized_median_mad uses x[-1] as the current value and x[:-1] as the
+    # lookback window, giving a PIT-correct MAD z-score with no self-contamination.
+    return series.rolling(window=window + 1, min_periods=window + 1).apply(
+        _winsorized_median_mad, raw=True
+    )
 
 
 def _safe_log_ratio(a: pd.Series, b: pd.Series, eps: float = 1e-12) -> pd.Series:

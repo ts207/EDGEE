@@ -49,15 +49,20 @@ def sequential_residualize(Xz: np.ndarray) -> tuple[np.ndarray, list[list[float]
         
         # Let's use a dynamic rcond based on machine precision
         b, residuals, rank, s = np.linalg.lstsq(Xprev, y, rcond=1e-5)
-        
-        # If rank < j, we have collinearity.
+
+        # If rank < j, the preceding columns are collinear; the minimum-norm
+        # lstsq solution is numerically unstable. Preserve the original signal
+        # rather than residualizing against a near-singular basis.
         if rank < j:
-            # Collinearity detected.
-            # We should probably not residualize this column or warn.
-            # Fallback: standardize only?
-            # Or just accept the minimum norm solution provided by lstsq.
-            # But the residual might be noise.
-            pass
+            import logging
+            logging.getLogger(__name__).warning(
+                "sequential_residualize: collinearity detected at signal column %d "
+                "(effective rank %d < %d). Skipping residualization for this column; "
+                "original signal preserved. Consider deduplicating correlated signals.",
+                j, rank, j,
+            )
+            betas.append(None)
+            continue
 
         Xo[:, j] = y - Xprev @ b
         betas.append(b.astype(float).tolist())

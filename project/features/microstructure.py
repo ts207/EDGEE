@@ -75,7 +75,11 @@ def calculate_kyle_lambda(
     num = exy - (ex * ey)
     denom = ex2 - (ex**2)
 
-    lambdas = num / denom.replace(0.0, np.nan)
+    # Use a variance floor to avoid near-zero denominators blowing up lambda.
+    # Values within machine-noise of zero are treated as missing rather than
+    # producing astronomically large estimates that corrupt event detectors.
+    safe_denom = denom.where(denom.abs() > 1e-8, np.nan)
+    lambdas = (num / safe_denom).clip(-1e6, 1e6)
     return lambdas.reindex(close.index)
 
 

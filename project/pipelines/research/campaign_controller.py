@@ -598,11 +598,7 @@ class CampaignController:
                     )
                     tested_events |= extra
             except Exception:
-                pass
-
-        avoid_events: Set[str] = mem["avoid_event_types"]
-
-        # Build per-family buckets (untested, non-avoided)
+                _LOG.warning("Failed to extract tested events from campaign ledger; skipping.", exc_info=True)
         family_candidates: Dict[str, List[str]] = {}
         for eid, meta in events_registry.items():
             if not meta.get("enabled", True):
@@ -972,7 +968,7 @@ class CampaignController:
                     extra = set(ledger["trigger_payload"].apply(_eid2).dropna().astype(str))
                     tested_events |= extra
             except Exception:
-                pass
+                _LOG.warning("Failed to extract tested events from campaign ledger (step 4); skipping.", exc_info=True)
 
         avoid_events: Set[str] = mem["avoid_event_types"]
         candidates = [e for e in enabled_events if e not in tested_events and e not in avoid_events]

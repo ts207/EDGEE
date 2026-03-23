@@ -58,15 +58,18 @@ def evaluate_walkforward_stability(
     # Expectancy Stability: Standard deviation of expectancy / mean expectancy
     avg_exp = np.mean(test_expectancies)
     std_exp = np.std(test_expectancies)
-    
-    # Improved Stability Metric:
-    # Instead of raw CV (which blows up near 0), use a bounded stability score.
-    # 1.0 - (MAE from Mean / (AbsMean + Std + Epsilon))
-    # Or simply weight the CV by the magnitude.
-    # Here we switch to: 1 - (std / (abs(mean) + std + 10.0)) 
-    # The +10.0 (bps) adds a "significance floor" - variation within 10bps is considered stable noise.
-    
-    expectancy_stability = 0.0 if avg_exp <= 0 else 1.0 - (std_exp / (abs(avg_exp) + std_exp + 10.0))
+
+    # Stability: low variation relative to the absolute mean, zeroed for negative-mean strategies.
+    # Using a signal-to-noise ratio formulation:
+    #   stability = |mean| / (|mean| + std + eps)
+    # This correctly returns 0 for avg_exp <= 0 (no edge) and approaches 1 as noise → 0.
+    # A consistent loser (avg=-5, std=1) gets ≈ 5/16 ≈ 0.31, not the artificially-high
+    # score that the previous +10 floor produced.
+    _eps = 1.0  # 1 bps noise floor; small enough to not inflate losers
+    if avg_exp <= 0.0:
+        expectancy_stability = 0.0
+    else:
+        expectancy_stability = abs(avg_exp) / (abs(avg_exp) + std_exp + _eps)
 
     # Sign Consistency: Percentage of windows with positive expectancy
     sign_consistency = np.mean([1.0 if e > 0 else 0.0 for e in test_expectancies])

@@ -18,7 +18,7 @@ except ModuleNotFoundError:
     from project.core.stats import stats
 
 from project.core.coercion import safe_float, safe_int, as_bool
-from project.core.stats import subsample_non_overlapping_timestamps
+from project.core.stats import subsample_non_overlapping_positions as subsample_non_overlapping_timestamps
 from project.research.gating import two_sided_p_from_t
 
 NUMERIC_CONDITION_PATTERN = re.compile(
@@ -29,14 +29,32 @@ NUMERIC_CONDITION_PATTERN = re.compile(
 def gate_redundancy_correlation(
     candidates_df: pd.DataFrame, redundancy_threshold: float = 0.85
 ) -> pd.DataFrame:
-    """Marks candidates as redundant based on return profile correlation."""
+    """Marks candidates as redundant based on return profile similarity.
+
+    Uses cosine similarity on the delay-expectancy profile vectors rather than
+    Kendall's tau, which is unreliable on n=5 points (the number of delay
+    checkpoints).  Cosine similarity measures the alignment of the return
+    profile *shape* regardless of magnitude, which is the correct criterion
+    for identifying strategies that would contribute overlapping alpha.
+
+    Two candidates are redundant when their delay profiles point in essentially
+    the same direction (cosine similarity >= ``redundancy_threshold``).
+    """
     if candidates_df.empty or "expectancy_after_multiplicity" not in candidates_df.columns:
         return candidates_df
 
     df = candidates_df.copy()
     df = df.sort_values(by="expectancy_after_multiplicity", ascending=False).reset_index(drop=True)
     is_redundant = np.zeros(len(df), dtype=bool)
-    accepted_profiles = []
+    accepted_profiles: list[np.ndarray] = []
+
+    def _cosine_sim(a: np.ndarray, b: np.ndarray) -> float:
+        """Cosine similarity; returns 0.0 when either vector is zero."""
+        na = np.linalg.norm(a)
+        nb = np.linalg.norm(b)
+        if na < 1e-10 or nb < 1e-10:
+            return 0.0
+        return float(np.dot(a, b) / (na * nb))
 
     for i, row in df.iterrows():
         try:
@@ -48,11 +66,9 @@ def gate_redundancy_correlation(
         redundant = False
         if np.any(profile_vec):
             for acc_vec in accepted_profiles:
-                if np.std(profile_vec) > 1e-8 and np.std(acc_vec) > 1e-8:
-                    tau, _ = stats.kendalltau(profile_vec, acc_vec)
-                    if tau is not np.nan and tau >= redundancy_threshold:
-                        redundant = True
-                        break
+                if _cosine_sim(profile_vec, acc_vec) >= redundancy_threshold:
+                    redundant = True
+                    break
         is_redundant[i] = redundant
         if not redundant:
             accepted_profiles.append(profile_vec)

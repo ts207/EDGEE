@@ -73,23 +73,43 @@ def label_regimes(features: pd.DataFrame) -> pd.Series:
     pd.Series of string labels, same index as features.
     Format: "high_vol.funding_pos.trend.tight" (dot-separated).
     """
+    import logging
+    _log = logging.getLogger(__name__)
+
     n = len(features)
     dimension_labels: list[pd.Series] = []
+    unknown_dims: list[str] = []
 
     for dim_name, cfg in REGIME_DIMENSIONS.items():
         default_label = cfg["default_label"]
         dim_series = pd.Series(default_label, index=features.index)
 
+        resolved_any = False
         for state_id, label in cfg["states"].items():
             col = _resolve_state_col(state_id, features)
             if col is None:
                 continue
+            resolved_any = True
             active = pd.to_numeric(features[col], errors="coerce").fillna(0) == 1
             # Set label where this state is active (earlier states take priority)
             currently_unknown = dim_series == default_label
             dim_series = dim_series.where(~(active & currently_unknown), other=label)
 
+        if not resolved_any:
+            unknown_dims.append(dim_name)
+
         dimension_labels.append(dim_series)
+
+    if unknown_dims:
+        _log.warning(
+            "label_regimes: no state columns found for dimensions %s — "
+            "those dimensions will be labelled 'unknown_<dim>' for all %d bars. "
+            "Regime-gated strategies will receive uniform labels for these dimensions. "
+            "Expected state columns: %s",
+            unknown_dims,
+            len(features),
+            {d: list(REGIME_DIMENSIONS[d]["states"].keys()) for d in unknown_dims},
+        )
 
     if not dimension_labels:
         return pd.Series("unknown.unknown.unknown.unknown", index=features.index)

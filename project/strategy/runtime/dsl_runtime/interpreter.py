@@ -333,7 +333,7 @@ class DslInterpreterV1:
             0,
             np.zeros(len(frame)),
             invalidation_arr,
-            bool(params.get("priority_randomisation", False)),
+            bool(params.get("priority_randomisation", True)),
             random_rolls,
         )
         out = pd.Series(pos_arr, index=frame["timestamp"], name="position", dtype=int)

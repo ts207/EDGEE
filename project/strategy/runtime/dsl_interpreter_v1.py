@@ -58,7 +58,7 @@ def generate_positions_numba(
     trailing_stop_type=0,
     trailing_offsets=None,
     invalidation_mask=None,
-    priority_randomisation=False,
+    priority_randomisation=True,
     random_rolls=None,
 ):
     """Keyword-argument wrapper around the core numba state machine."""

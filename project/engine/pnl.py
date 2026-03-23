@@ -317,10 +317,22 @@ def compute_pnl_components(
     """
     Legacy per-bar PnL component calculation.
 
-    This compatibility path remains for existing tests and older callers that
-    supply a pre-computed return stream. New engine code should use
-    :func:`compute_pnl_ledger` instead.
+    .. deprecated::
+        Use :func:`compute_pnl_ledger` instead.  This function operates on a
+        pre-computed return stream and cannot correctly decompose flip trades
+        (long→short in a single bar) when ``execution_mode="next_open"``
+        because it lacks per-bar open prices.  ``compute_pnl_ledger`` models
+        fills and holding periods explicitly.
+
+    This compatibility path is retained only for existing tests.
     """
+    import warnings
+    warnings.warn(
+        "compute_pnl_components is deprecated and will be removed in a future release. "
+        "Use compute_pnl_ledger() which correctly handles flip trades and next-open fills.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     aligned_pos = pos.reindex(ret.index).fillna(0.0).astype(float)
     prior_pos = aligned_pos.shift(1).fillna(0.0)
 
