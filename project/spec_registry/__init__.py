@@ -1,6 +1,12 @@
 from __future__ import annotations
 
 from project.spec_registry.policy import _DEFAULT_BLUEPRINT_POLICY
+from project.spec_registry.search_space import (
+    load_event_priority_weights,
+    QUALITY_SCORES,
+    DEFAULT_EVENT_PRIORITY_WEIGHT,
+    IG_SCALE_FACTOR,
+)
 from project.spec_registry.loaders import (
     REPO_ROOT,
     SPEC_ROOT,
@@ -37,6 +43,12 @@ from project.spec_registry.loaders import (
 )
 
 __all__ = [
+    # Phase 2.2 — search_space quality weights
+    "load_event_priority_weights",
+    "QUALITY_SCORES",
+    "DEFAULT_EVENT_PRIORITY_WEIGHT",
+    "IG_SCALE_FACTOR",
+    # Core loaders
     "_DEFAULT_BLUEPRINT_POLICY",
     "REPO_ROOT",
     "SPEC_ROOT",

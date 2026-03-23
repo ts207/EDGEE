@@ -82,6 +82,10 @@ TESTED_REGION_COLUMNS = [
     "primary_fail_gate",
     "warning_count",
     "updated_at",
+    # Phase 1.3 additions — failure metadata for probabilistic avoidance
+    "failure_confidence",       # float 0.0-1.0: confidence in this failure conclusion
+    "failure_cause_class",      # str: mechanical | insufficient_sample | cost | market | overfitting
+    "failure_sample_size",      # int: train_n_obs at time of failure (0 means unknown)
 ]
 
 FAILURE_COLUMNS = [

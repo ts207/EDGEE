@@ -25,7 +25,7 @@ def _assemble_promotion_result(
     placebo_pass: bool,
     stability_pass: bool,
     timeframe_consensus_pass: bool,
-    oos_pass: bool,
+    oos_pass: bool | None,
     microstructure_pass: bool,
     stressed_cost_pass: bool,
     delayed_entry_pass: bool,
@@ -84,6 +84,9 @@ def _assemble_promotion_result(
     is_reduced_evidence: bool = False,
     benchmark_pass: bool = True,
 ) -> Dict[str, Any]:
+    # Phase 1.4: oos_pass is now bool | None. None means "not evaluated" — treat as
+    # False for the promotion decision so candidates without OOS evidence cannot promote.
+    oos_pass_for_gate: bool = bool(oos_pass) if oos_pass is not None else False
     promoted = bool(
         statistical_pass
         and cost_pass
@@ -91,7 +94,7 @@ def _assemble_promotion_result(
         and (placebo_pass or not bool(enforce_placebo_controls))
         and stability_pass
         and (timeframe_consensus_pass or not bool(enforce_timeframe_consensus))
-        and oos_pass
+        and oos_pass_for_gate
         and microstructure_pass
         and stressed_cost_pass
         and delayed_entry_pass
@@ -114,7 +117,7 @@ def _assemble_promotion_result(
         stability_pass=stability_pass,
         cost_pass=cost_pass,
         tob_pass=tob_pass,
-        oos_pass=oos_pass,
+        oos_pass=oos_pass_for_gate,
         multiplicity_pass=multiplicity_pass,
         placebo_pass=placebo_pass,
         timeframe_consensus_pass=timeframe_consensus_pass,
@@ -161,6 +164,13 @@ def _assemble_promotion_result(
         "test_samples": int(test_samples_effective),
         "oos_sample_source": str(oos_sample_source),
         "oos_direction_match": bool(oos_direction_match),
+        # Phase 1.4: expose oos_evaluated so audit output distinguishes
+        # "passed OOS" from "OOS not checked" — previously both showed as "pass".
+        "oos_evaluated": bool(oos_pass is not None),
+        "oos_pass_state": (
+            "not_evaluated" if oos_pass is None
+            else ("pass" if oos_pass else "fail")
+        ),
         "promotion_oos_min_validation_events": int(min_validation_events_required),
         "promotion_oos_min_test_events": int(min_test_events_required),
         "net_expectancy_bps": float(net_expectancy_bps),
@@ -183,7 +193,7 @@ def _assemble_promotion_result(
         "gate_promo_falsification": "pass" if (control_pass and placebo_pass) else "fail",
         "gate_promo_hypothesis_audit": "pass" if audit_pass else "fail",
         "gate_promo_tob_coverage": "pass" if tob_pass else "fail",
-        "gate_promo_oos_validation": "pass" if oos_pass else "fail",
+        "gate_promo_oos_validation": "pass" if oos_pass_for_gate else "fail",
         "gate_promo_microstructure": "pass" if microstructure_pass else "fail",
         "gate_promo_retail_net_expectancy": bool(net_expectancy_pass),
         "gate_promo_retail_cost_budget": bool(cost_budget_pass),

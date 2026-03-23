@@ -41,6 +41,63 @@ def _merge_by_keys(existing: pd.DataFrame, incoming: pd.DataFrame, keys: list[st
     return out
 
 
+def mark_failures_superseded(
+    failures: pd.DataFrame,
+    *,
+    current_run_id: str,
+    stage: str,
+    program_id: str,
+) -> pd.DataFrame:
+    """Mark open failures for *stage* and *program_id* as superseded.
+
+    Phase 2.4: When a repair run completes successfully for a previously
+    failing stage, existing failure records for that stage are marked with
+    the current run ID so the controller's repair-check logic skips them.
+
+    Only rows where ``superseded_by_run_id`` is empty (not already resolved)
+    are updated.  Rows for other stages or programs are left untouched.
+
+    Parameters
+    ----------
+    failures:
+        The merged failures DataFrame (all programs).
+    current_run_id:
+        The run that resolved the failure (written into superseded_by_run_id).
+    stage:
+        The pipeline stage that previously failed and has now recovered.
+    program_id:
+        Scope the update to this program only.
+
+    Returns
+    -------
+    pd.DataFrame
+        Updated failures DataFrame with superseded_by_run_id populated for
+        matching rows.
+    """
+    if failures.empty:
+        return failures
+    if "superseded_by_run_id" not in failures.columns:
+        failures = failures.copy()
+        failures["superseded_by_run_id"] = ""
+
+    mask = (
+        (failures["stage"].astype(str) == stage)
+        & (failures["program_id"].astype(str) == program_id)
+        & (failures["superseded_by_run_id"].astype(str).str.strip() == "")
+    )
+    if mask.any():
+        failures = failures.copy()
+        failures.loc[mask, "superseded_by_run_id"] = current_run_id
+        _LOG.info(
+            "Superseded %d failure record(s) for stage=%s program=%s with run_id=%s",
+            int(mask.sum()),
+            stage,
+            program_id,
+            current_run_id,
+        )
+    return failures
+
+
 def _write_json(path: Path, payload: Dict[str, Any]) -> None:
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
@@ -86,13 +143,27 @@ def _build_belief_state(
 
     avoid_regions = []
     if not tested_regions.empty:
-        rejected = tested_regions[tested_regions["primary_fail_gate"].astype(str) != ""].head(
-            int(avoid_top_k)
-        )
+        # Phase 1.3 — probabilistic avoidance: only block on high-confidence,
+        # non-mechanical failures with adequate sample size.
+        # A low-confidence or mechanical failure should route to repair, not closure.
+        avoid_candidates = tested_regions[
+            tested_regions["primary_fail_gate"].astype(str) != ""
+        ].copy()
+        if "failure_confidence" in avoid_candidates.columns:
+            avoid_candidates = avoid_candidates[
+                (avoid_candidates["failure_confidence"].fillna(0.0) > 0.7)
+                & (avoid_candidates["failure_cause_class"].isin(
+                    ["market", "cost", "overfitting"]
+                ) if "failure_cause_class" in avoid_candidates.columns else True)
+                & (avoid_candidates["failure_sample_size"].fillna(0).astype(int) >= 30
+                   if "failure_sample_size" in avoid_candidates.columns else True)
+            ]
+        rejected = avoid_candidates.head(int(avoid_top_k))
         avoid_regions = rejected[
             [
                 c
-                for c in ["event_type", "template_id", "primary_fail_gate", "region_key"]
+                for c in ["event_type", "template_id", "primary_fail_gate", "region_key",
+                          "failure_confidence", "failure_cause_class", "failure_sample_size"]
                 if c in rejected.columns
             ]
         ].to_dict(orient="records")
@@ -218,6 +289,14 @@ def update_campaign_memory(
     reflection_row = build_run_reflection(run_id=run_id, program_id=program_id, data_root=data_root)
     reflection_df = pd.DataFrame([reflection_row])
 
+    # Phase 1.3 — propagate reflection confidence into tested_regions so the
+    # campaign controller can use confidence-weighted avoidance instead of
+    # binary region-key blocking.
+    if not incoming_tested.empty and "confidence" in reflection_row:
+        run_confidence = float(reflection_row.get("confidence") or 0.0)
+        incoming_tested = incoming_tested.copy()
+        incoming_tested["failure_confidence"] = run_confidence
+
     tested_regions = _merge_by_keys(
         read_memory_table(program_id, "tested_regions", data_root=data_root),
         incoming_tested,
@@ -228,6 +307,27 @@ def update_campaign_memory(
         incoming_failures,
         ["run_id", "stage", "failure_class", "artifact_path"],
     )
+
+    # Phase 2.4 — Supersession tracking.
+    # If the current run produced no failures for stages that were previously
+    # failing, mark those old failure records as superseded so the controller's
+    # repair queue no longer proposes them.
+    existing_failures = read_memory_table(program_id, "failures", data_root=data_root)
+    if not existing_failures.empty and "stage" in existing_failures.columns:
+        stages_that_failed_before = set(
+            existing_failures[
+                existing_failures["superseded_by_run_id"].astype(str).str.strip() == ""
+            ]["stage"].astype(str).unique()
+        )
+        new_failure_stages = set(incoming_failures["stage"].astype(str).unique()) if not incoming_failures.empty else set()
+        recovered_stages = stages_that_failed_before - new_failure_stages
+        for recovered_stage in sorted(recovered_stages):
+            failures = mark_failures_superseded(
+                failures,
+                current_run_id=run_id,
+                stage=recovered_stage,
+                program_id=program_id,
+            )
     reflections = _merge_by_keys(
         read_memory_table(program_id, "reflections", data_root=data_root),
         reflection_df,

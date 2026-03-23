@@ -19,17 +19,20 @@ def calculate_promotion_score(
     stability_pass: bool,
     cost_pass: bool,
     tob_pass: bool,
-    oos_pass: bool,
+    oos_pass: bool | None,
     multiplicity_pass: bool,
     placebo_pass: bool,
     timeframe_consensus_pass: bool,
 ) -> float:
+    # Phase 1.4: oos_pass may be None (not evaluated). Treat None as 0.0 so that
+    # candidates without OOS evidence do not receive credit toward the score.
+    oos_score = 0.0 if oos_pass is None else float(oos_pass)
     score = (
         float(statistical_pass)
         + float(stability_pass)
         + float(cost_pass)
         + float(tob_pass)
-        + float(oos_pass)
+        + oos_score
         + float(multiplicity_pass)
         + float(placebo_pass)
         + float(timeframe_consensus_pass)

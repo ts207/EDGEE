@@ -23,6 +23,81 @@ from project.research.knowledge.schemas import (
     stable_hash,
 )
 
+# Phase 1.3 — gate names that indicate each failure cause class.
+# Used by classify_failure_cause() to populate failure_cause_class on tested regions.
+_MECHANICAL_GATE_PREFIXES = (
+    "stage_failed",
+    "run_failed_stage",
+    "artifact_contract",
+    "missing_event_column",
+    "missing_state_column",
+    "missing_feature_column",
+    "missing_context_state_column",
+    "missing_sequence_column",
+    "unsupported_trigger",
+)
+_COST_GATES = frozenset(
+    [
+        "gate_promo_cost_survival",
+        "gate_promo_retail_cost_budget",
+        "gate_promo_retail_net_expectancy",
+        "gate_promo_retail_turnover",
+        "gate_promo_stressed_cost_survival",
+        "gate_promo_delayed_entry_stress",
+    ]
+)
+_MARKET_GATES = frozenset(
+    [
+        "gate_promo_stability_gate",
+        "gate_promo_stability_score",
+        "gate_promo_stability_sign_consistency",
+        "gate_promo_microstructure",
+        "gate_promo_oos_validation",
+        "gate_promo_dsr",
+        "gate_promo_placebo_controls",
+        "gate_promo_negative_control_fail",
+        "gate_promo_baseline_beats_complexity",
+        "gate_promo_timeframe_consensus",
+    ]
+)
+_OVERFIT_GATES = frozenset(
+    [
+        "gate_promo_multiplicity_diagnostics",
+        "gate_promo_negative_control_missing",
+        "gate_promo_hypothesis_not_executed",
+        "gate_promo_hypothesis_missing_audit",
+    ]
+)
+
+
+def classify_failure_cause(primary_fail_gate: str, train_n_obs: int) -> str:
+    """Return a failure cause class string for a candidate row.
+
+    Classes:
+        mechanical        — pipeline or artifact failure; evidence is unreliable
+        insufficient_sample — gate fired but sample was too small to trust conclusion
+        cost              — strategy unprofitable net of execution costs
+        market            — statistically clean rejection; no edge in this region
+        overfitting       — multiplicity / audit / control failure
+    """
+    gate = str(primary_fail_gate or "").strip().lower()
+    if not gate:
+        return "mechanical" if int(train_n_obs or 0) == 0 else "market"
+    for prefix in _MECHANICAL_GATE_PREFIXES:
+        if gate.startswith(prefix):
+            return "mechanical"
+    # Insufficient sample: any gate fired on very small sample
+    if int(train_n_obs or 0) < 30:
+        return "insufficient_sample"
+    if gate in _COST_GATES:
+        return "cost"
+    if gate in _MARKET_GATES:
+        return "market"
+    if gate in _OVERFIT_GATES:
+        return "overfitting"
+    # Default: treat unknown gates with adequate sample as market
+    return "market"
+
 _TABLES = {
     "tested_regions": TESTED_REGION_COLUMNS,
     "region_statistics": [
@@ -341,6 +416,15 @@ def build_tested_regions_snapshot(
                 ).strip(),
                 "warning_count": int(row.get("warning_count", 0) or 0),
                 "updated_at": str(row.get("updated_at", "")),
+                # Phase 1.3 — failure metadata for probabilistic avoidance
+                "failure_confidence": None,   # populated by update_campaign_memory after reflection join
+                "failure_cause_class": classify_failure_cause(
+                    primary_fail_gate=str(
+                        row.get("promotion_fail_gate_primary", row.get("primary_fail_gate", ""))
+                    ).strip(),
+                    train_n_obs=int(row.get("train_n_obs", row.get("sample_size", 0)) or 0),
+                ),
+                "failure_sample_size": int(row.get("train_n_obs", row.get("sample_size", 0)) or 0),
             }
         )
     return pd.DataFrame(records).reindex(columns=TESTED_REGION_COLUMNS)

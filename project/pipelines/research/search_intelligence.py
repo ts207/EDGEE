@@ -14,6 +14,10 @@ from project.research.knowledge.memory import (
     ensure_memory_store,
     read_memory_table,
 )
+from project.spec_registry.search_space import (
+    load_event_priority_weights,
+    DEFAULT_EVENT_PRIORITY_WEIGHT,
+)
 
 _LOG = logging.getLogger(__name__)
 
@@ -117,13 +121,33 @@ def _build_frontier(
     untested_top_k: int,
     repair_top_k: int,
     exhausted_failure_threshold: int,
+    quality_weights: Dict[str, float] | None = None,
 ) -> Dict[str, Any]:
+    """Build the search frontier artefact for a campaign program.
+
+    Phase 2.2: ``untested_registry_events`` is now sorted by descending
+    quality weight (sourced from ``spec_registry.search_space``) rather than
+    alphabetically.  Events with an explicit ``[QUALITY: HIGH/MODERATE/LOW]``
+    annotation — plus an optional raw IG bonus — are surfaced first.
+    Unannotated events receive ``DEFAULT_EVENT_PRIORITY_WEIGHT`` (1.5) and
+    are ordered deterministically after annotated ones.
+    """
+    if quality_weights is None:
+        quality_weights = {}
+
     events = registries.events.get("events", {})
     enabled_events = [eid for eid, meta in events.items() if meta.get("enabled", True)]
     tested_events = set(
         tested_regions.get("event_type", pd.Series(dtype="object")).astype(str).unique()
     )
-    untested_events = sorted(list(set(enabled_events) - tested_events))
+    untested_events_raw = list(set(enabled_events) - tested_events)
+
+    # Phase 2.2: sort by descending quality weight; stable within a tier
+    # (preserves registry insertion order for equal weights → deterministic).
+    untested_events_raw.sort(
+        key=lambda e: quality_weights.get(e, DEFAULT_EVENT_PRIORITY_WEIGHT),
+        reverse=True,
+    )
 
     exhausted_events: list[str] = []
     if not tested_regions.empty and "event_type" in tested_regions.columns:
@@ -156,14 +180,16 @@ def _build_frontier(
             repair_candidates.append(f"repair repeated failure in stage: {stage} ({int(count)})")
 
     next_moves = []
-    if untested_events:
-        next_moves.append(f"explore untested events: {untested_events[: int(untested_top_k)]}")
+    if untested_events_raw:
+        next_moves.append(
+            f"explore untested events: {untested_events_raw[: int(untested_top_k)]}"
+        )
     if partial_families:
         next_moves.append(f"complete coverage for family: {next(iter(partial_families))}")
     next_moves.extend(repair_candidates[: int(repair_top_k)])
 
     return {
-        "untested_registry_events": untested_events[: int(untested_top_k)],
+        "untested_registry_events": untested_events_raw[: int(untested_top_k)],
         "exhausted_events_to_avoid": exhausted_events,
         "partially_explored_families": partial_families,
         "candidate_next_moves": next_moves,
@@ -179,7 +205,17 @@ def update_search_intelligence(
     frontier_untested_top_k: int = 3,
     frontier_repair_top_k: int = 2,
     exhausted_failure_threshold: int = 3,
+    search_space_path: Path | None = None,
 ) -> Dict[str, Any]:
+    """Update campaign summary and search frontier artefacts.
+
+    Phase 2.2: accepts an optional *search_space_path* so callers can pin a
+    specific YAML file (useful in tests).  When *None*, resolves the
+    canonical ``spec/search_space.yaml`` via ``load_event_priority_weights``.
+    Quality weights are passed into ``_build_frontier`` so that
+    ``untested_registry_events`` is ordered by descending quality rather than
+    alphabetically.
+    """
     campaign_dir = data_root / "artifacts" / "experiments" / program_id
     campaign_dir.mkdir(parents=True, exist_ok=True)
     summary_path = campaign_dir / "campaign_summary.json"
@@ -212,6 +248,9 @@ def update_search_intelligence(
                 }
             )
 
+    # Phase 2.2: load quality weights from the centralised spec_registry loader
+    quality_weights = load_event_priority_weights(search_space_path)
+
     summary = _build_summary(program_id, tested_regions, top_k=summary_top_k)
     frontier = _build_frontier(
         registries,
@@ -220,6 +259,7 @@ def update_search_intelligence(
         untested_top_k=frontier_untested_top_k,
         repair_top_k=frontier_repair_top_k,
         exhausted_failure_threshold=exhausted_failure_threshold,
+        quality_weights=quality_weights,
     )
     summary_path.write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     frontier_path.write_text(

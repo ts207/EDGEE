@@ -93,7 +93,7 @@ def _evaluate_continuation_quality(
     *,
     row: Dict[str, Any],
     stability_pass: bool,
-    oos_pass: bool,
+    oos_pass: bool | None,
     microstructure_pass: bool,
     dsr_pass: bool,
     reasons: _ReasonRecorder,
@@ -102,15 +102,18 @@ def _evaluate_continuation_quality(
     bridge_tradable = bool_gate(row.get("gate_bridge_tradable"))
     continuation_quality_pass = True
     if is_continuation_template_family and bridge_tradable:
+        # Phase 1.4: treat oos_pass=None as False for continuation quality gate —
+        # continuation strategies require confirmed OOS support.
+        oos_pass_resolved: bool = bool(oos_pass) if oos_pass is not None else False
         continuation_quality_pass = bool(
-            stability_pass and oos_pass and microstructure_pass and dsr_pass
+            stability_pass and oos_pass_resolved and microstructure_pass and dsr_pass
         )
         if not continuation_quality_pass:
             if not stability_pass:
                 reasons.add_reject(
                     "continuation_quality_stability", category="continuation_quality"
                 )
-            if not oos_pass:
+            if not oos_pass_resolved:
                 reasons.add_reject(
                     "continuation_quality_oos_validation", category="continuation_quality"
                 )
@@ -540,11 +543,17 @@ def _evaluate_deploy_oos_and_low_capital(
         if np.isfinite(validation_samples_raw)
         else ("row.bridge_validation_trades" if bridge_validation_trades > 0 else "missing")
     )
-    oos_pass = True
+    # Phase 1.4 FIX: oos_pass must be None (not evaluated) rather than True when
+    # no explicit OOS samples are present. Candidates without out-of-sample evidence
+    # must NOT receive a passing OOS mark — this was silently allowing promotions
+    # without any OOS validation. In deploy mode, oos_not_evaluated is a hard block.
+    oos_pass: bool | None = None   # None = not evaluated; True = pass; False = fail
+    oos_evaluated: bool = False
     direction_match = True
     min_val_events = 0
     min_test_events = 0
     if _has_explicit_oos_samples(row):
+        oos_evaluated = True
         shadow_gates = _confirmatory_shadow_gates(promotion_confirmatory_gates)
         min_val_events = int(shadow_gates.get("min_oos_event_count", 20))
         min_test_events = int(shadow_gates.get("min_oos_event_count", 20))
@@ -571,6 +580,14 @@ def _evaluate_deploy_oos_and_low_capital(
             if not direction_match:
                 reasons.add_reject("oos_direction_flip", category="oos_validation")
             reasons.add_promo_fail("gate_promo_oos_validation", category="oos_validation")
+    elif is_deploy:
+        # In deploy mode, absence of OOS evidence is a hard block — not a pass.
+        oos_pass = False
+        reasons.add_reject("oos_not_evaluated", category="oos_validation")
+        reasons.add_promo_fail("gate_promo_oos_not_evaluated", category="oos_validation")
+    # In research (non-deploy) mode with no OOS samples: oos_pass stays None.
+    # Downstream _assemble_promotion_result treats None as "not checked" — it will
+    # not block research-mode promotion but will be visible in the audit output.
 
     low_capital_viability_pass = bool_gate(row.get("gate_bridge_low_capital_viability"))
     low_capital_viability_score = _quiet_float(
@@ -615,6 +632,7 @@ def _evaluate_deploy_oos_and_low_capital(
         "min_validation_events_required": int(min_val_events),
         "min_test_events_required": int(min_test_events),
         "oos_pass": oos_pass,
+        "oos_evaluated": oos_evaluated,
         "low_capital_viability_pass": low_capital_viability_pass,
         "low_capital_viability_score": low_capital_viability_score,
         "low_capital_reject_codes": low_capital_reject_codes,

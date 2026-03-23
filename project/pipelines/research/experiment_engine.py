@@ -832,10 +832,91 @@ def export_experiment_artifacts(
     write_parquet(df, out_dir / "expanded_hypotheses.parquet")
 
 
+def validate_registry_consistency(registries: RegistryBundle) -> None:
+    """Phase 1.1 fix: assert family_registry.yaml and template_registry.yaml agree.
+
+    The two files independently define allowed_templates per family. They have
+    historically diverged silently. This function raises ValueError with a detailed
+    diff if they disagree, so the error is caught at plan-build time rather than
+    producing incorrect template pairings at evaluation time.
+    """
+    family_reg = registries.events  # Note: family registry is loaded via registries
+    # Load the two files directly from the registry bundle paths
+    # family_registry defines event_families; template_registry defines families
+    # We compare the allowed_templates lists for each shared family name.
+    template_families: Dict[str, Any] = {}
+    family_families: Dict[str, Any] = {}
+
+    # Access via the raw dicts on the bundle
+    # template_registry.yaml -> registries.templates["families"]
+    template_families = registries.templates.get("families", {})
+    # family_registry.yaml -> registries.events is not the right key
+    # The family registry is loaded separately — read it via the registry_root path
+    # which is stored on the RegistryBundle. Since RegistryBundle doesn't expose the
+    # path, we load via the config registries path that was used to build it.
+    # The family_registry is under spec/grammar/family_registry.yaml, not the
+    # runtime registry root. We load from the spec path instead.
+    import os
+    # Try to find family_registry relative to project root
+    project_root_candidates = [
+        Path("spec/grammar/family_registry.yaml"),
+        Path("EDGEE-main/spec/grammar/family_registry.yaml"),
+        Path(__file__).parent.parent.parent.parent / "spec" / "grammar" / "family_registry.yaml",
+    ]
+    family_reg_path: Optional[Path] = None
+    for candidate in project_root_candidates:
+        if candidate.exists():
+            family_reg_path = candidate
+            break
+
+    if family_reg_path is None:
+        # Cannot locate family_registry — skip check rather than hard-fail
+        _LOG.warning(
+            "validate_registry_consistency: could not locate spec/grammar/family_registry.yaml; "
+            "skipping consistency check."
+        )
+        return
+
+    raw = yaml.safe_load(family_reg_path.read_text(encoding="utf-8")) or {}
+    family_families = raw.get("event_families", {})
+
+    mismatches: List[str] = []
+    all_families = set(template_families.keys()) | set(family_families.keys())
+    for family_name in sorted(all_families):
+        t_templates = sorted(
+            template_families.get(family_name, {}).get("allowed_templates", [])
+        )
+        f_templates = sorted(
+            family_families.get(family_name, {}).get("allowed_templates", [])
+        )
+        if t_templates != f_templates:
+            only_in_template = set(t_templates) - set(f_templates)
+            only_in_family = set(f_templates) - set(t_templates)
+            detail_parts = []
+            if only_in_template:
+                detail_parts.append(f"only in template_registry: {sorted(only_in_template)}")
+            if only_in_family:
+                detail_parts.append(f"only in family_registry: {sorted(only_in_family)}")
+            mismatches.append(f"  {family_name}: {'; '.join(detail_parts)}")
+
+    if mismatches:
+        raise ValueError(
+            "Registry consistency check failed — family_registry.yaml and "
+            "template_registry.yaml disagree on allowed_templates for the following "
+            f"families:\n" + "\n".join(mismatches) + "\n\n"
+            "Fix: update spec/grammar/family_registry.yaml to match "
+            "spec/ontology/templates/template_registry.yaml (the authoritative source). "
+            "Run validate_registry_consistency() to confirm the fix."
+        )
+    _LOG.debug("validate_registry_consistency: all families consistent.")
+
+
 def build_experiment_plan(
     config_path: Path, registry_root: Path, out_dir: Optional[Path] = None
 ) -> ValidatedExperimentPlan:
     registries = RegistryBundle(registry_root)
+    # Phase 1.1: validate registry consistency before any plan is built
+    validate_registry_consistency(registries)
     request = load_agent_experiment_config(config_path)
     validate_agent_request(request, registries)
     hypotheses = expand_hypotheses(request, registries)

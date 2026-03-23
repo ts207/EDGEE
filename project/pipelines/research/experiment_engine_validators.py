@@ -81,6 +81,17 @@ def _validate_campaign_status(request: AgentExperimentRequest, registries: Regis
 
 
 def _validate_proposal_quality(request: AgentExperimentRequest, registries: RegistryBundle) -> None:
+    # --- 1.2 FIX: Reject entry_lag=0 at plan time, not at evaluation time ---
+    # entry_lag_bars must be >= 1 to prevent same-bar lookahead leakage.
+    # gating.py raises ValueError at runtime for lag=0; catch it here instead.
+    bad_lags = [lag for lag in request.evaluation.entry_lags if int(lag) < 1]
+    if bad_lags:
+        raise ValueError(
+            f"Proposal rejected: entry_lags contains invalid value(s) {bad_lags}. "
+            f"entry_lag_bars must be >= 1 to prevent same-bar entry lookahead leakage. "
+            f"Use entry_lags: [1, 2] or higher."
+        )
+
     # Penalize redundancy and low-diversity
     from project.core.config import get_data_root
 
@@ -123,7 +134,7 @@ def _validate_proposal_quality(request: AgentExperimentRequest, registries: Regi
         last_run = df[df["run_id"] == runs[-1]]
         last_events = set(last_run["eid"].unique())
         if requested_events == last_events:
-            _LOG.warning(
+            log.warning(
                 "Proposal quality warning: Requested events are identical to the previous run."
             )
 
@@ -339,7 +350,7 @@ def expand_hypotheses(
     # Apply search budget
     max_total = request.search_control.max_hypotheses_total
     if len(hypotheses) > max_total:
-        _LOG.warning(f"Truncating hypotheses expansion from {len(hypotheses)} to {max_total}")
+        log.warning(f"Truncating hypotheses expansion from {len(hypotheses)} to {max_total}")
         # TODO: Better selection strategy (e.g. balanced across templates)
         hypotheses = hypotheses[:max_total]
 

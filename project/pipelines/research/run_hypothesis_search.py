@@ -5,8 +5,10 @@ Sequence:
   1. generate_hypotheses() from the configured search space.
   2. Load feature table for each symbol.
   3. run_distributed_search(hypotheses, features).
-  4. Write hypothesis_metrics.parquet and hypothesis_search_summary.json.
-  5. Optionally write bridge_candidates.parquet (--run_bridge_adapter flag).
+  4. [Phase 3.3] cluster_hypotheses() deduplication — mark non-representatives
+     as redundant before BH adjustment to improve statistical power.
+  5. Write hypothesis_metrics.parquet and hypothesis_search_summary.json.
+  6. Optionally write bridge_candidates.parquet (--run_bridge_adapter flag).
 """
 
 from __future__ import annotations
@@ -17,6 +19,7 @@ import logging
 from pathlib import Path
 from typing import List
 
+import numpy as np
 import pandas as pd
 
 from project.core.config import get_data_root
@@ -32,6 +35,98 @@ from project.io.utils import write_parquet
 
 
 LOG = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Phase 3.3 — within-run alpha clustering deduplication
+# ---------------------------------------------------------------------------
+
+
+def _cluster_deduplicate(
+    metrics: pd.DataFrame,
+    *,
+    eps: float = 0.3,
+    min_samples: int = 1,
+) -> pd.DataFrame:
+    """Mark redundant hypotheses within a run before BH adjustment.
+
+    Phase 3.3: Runs DBSCAN on pairwise metric-vector distances to identify
+    clusters of correlated hypotheses.  For each cluster, only the
+    representative (highest Sharpe) is kept; non-representatives are marked
+    with ``is_cluster_redundant = True``.
+
+    Since per-bar PnL streams are not available at this pipeline stage, the
+    distance metric is computed from a normalised vector of aggregate metrics:
+    (mean_return_bps, t_stat, sharpe, hit_rate).  Hypotheses whose aggregate
+    profiles are nearly identical — which will generate correlated outcomes —
+    are grouped together and deduplicated.
+
+    The ``is_cluster_redundant`` column is written to the metrics parquet so
+    downstream stages can filter it before FDR correction.  The full set of
+    hypotheses is retained in the file to preserve audit traceability.
+    """
+    if metrics.empty:
+        return metrics
+
+    metrics = metrics.copy()
+    metrics["is_cluster_redundant"] = False
+
+    # Metric columns used for similarity proxy
+    proxy_cols = [c for c in ["mean_return_bps", "t_stat", "sharpe", "hit_rate"] if c in metrics.columns]
+    if not proxy_cols or "hypothesis_id" not in metrics.columns:
+        return metrics
+
+    valid = metrics.dropna(subset=proxy_cols)
+    if len(valid) < 2:
+        return metrics
+
+    # Build normalised feature matrix — each row is one hypothesis
+    X = valid[proxy_cols].values.astype(float)
+    # Normalise column-wise (z-score); handle zero-std columns
+    col_std = X.std(axis=0)
+    col_std[col_std == 0] = 1.0
+    X_norm = (X - X.mean(axis=0)) / col_std
+
+    # Pairwise Euclidean distance in normalised metric space
+    from sklearn.cluster import DBSCAN
+    from sklearn.metrics import pairwise_distances
+
+    dist = pairwise_distances(X_norm, metric="euclidean")
+
+    clustering = DBSCAN(eps=eps, min_samples=min_samples, metric="precomputed")
+    labels = clustering.fit_predict(dist)
+
+    # Build cluster → hypothesis_id mapping
+    h_ids = valid["hypothesis_id"].tolist()
+    sharpe_col = "sharpe" if "sharpe" in valid.columns else proxy_cols[0]
+    sharpes = valid[sharpe_col].fillna(0.0).tolist()
+
+    cluster_map: dict[int, list[tuple[str, float]]] = {}
+    for i, label in enumerate(labels):
+        cluster_map.setdefault(int(label), []).append((h_ids[i], sharpes[i]))
+
+    redundant_ids: set[str] = set()
+    for label, members in cluster_map.items():
+        if label == -1 or len(members) == 1:
+            # Noise points or singletons — not redundant
+            continue
+        # Representative = highest Sharpe in cluster
+        best_id = max(members, key=lambda m: m[1])[0]
+        for hid, _ in members:
+            if hid != best_id:
+                redundant_ids.add(hid)
+
+    if redundant_ids:
+        mask = metrics["hypothesis_id"].isin(redundant_ids)
+        metrics.loc[mask, "is_cluster_redundant"] = True
+        LOG.info(
+            "Phase 3.3 clustering: %d hypotheses → %d clusters → %d marked redundant",
+            len(valid),
+            len(cluster_map),
+            len(redundant_ids),
+        )
+
+    return metrics
 
 
 def _normalize_audit_frame(rows: list[dict]) -> pd.DataFrame:
@@ -128,9 +223,16 @@ def _make_parser() -> argparse.ArgumentParser:
         help="Optional override for search-space YAML path",
     )
     parser.add_argument(
-        "--out_dir",
-        default=None,
-        help="Optional explicit output directory (for tests/local runs)",
+        "--cluster_deduplication",
+        type=int,
+        default=1,
+        help="1 (default) to run within-run alpha clustering before writing output",
+    )
+    parser.add_argument(
+        "--cluster_eps",
+        type=float,
+        default=0.3,
+        help="DBSCAN eps (Euclidean distance in normalised metric space, default 0.3)",
     )
     parser.add_argument(
         "--data_root",
@@ -189,6 +291,12 @@ def main() -> int:
             LOG.error("Distributed search failed: %s", exc)
             return 1
 
+    # Phase 3.3 — within-run alpha clustering deduplication
+    # Mark near-duplicate hypotheses before writing metrics so downstream
+    # BH adjustment operates on a deduplicated family.
+    if not metrics.empty and int(args.cluster_deduplication):
+        metrics = _cluster_deduplicate(metrics, eps=float(args.cluster_eps))
+
     metrics_path = out_dir / "hypothesis_metrics.parquet"
     if not metrics.empty:
         write_parquet(metrics, metrics_path)
@@ -207,6 +315,11 @@ def main() -> int:
         if (not metrics.empty and "t_stat" in metrics.columns)
         else 0
     )
+    redundant_count = (
+        int(metrics["is_cluster_redundant"].sum())
+        if (not metrics.empty and "is_cluster_redundant" in metrics.columns)
+        else 0
+    )
     summary = {
         "run_id": args.run_id,
         "symbols": symbols,
@@ -221,6 +334,7 @@ def main() -> int:
         "rejection_reason_counts": dict(generation_audit.get("rejection_reason_counts", {})),
         "evaluated": int(len(metrics)) if not metrics.empty else 0,
         "passing_filter": passing,
+        "cluster_redundant": redundant_count,
         "use_context_quality": bool(int(args.use_context_quality)),
     }
     (out_dir / "hypothesis_search_summary.json").write_text(
