@@ -96,9 +96,9 @@ class ExitSpec(BaseModel):
     time_stop_bars: int = Field(ge=0)
     invalidation: Dict[str, Any]
     stop_type: Literal["atr", "range_pct", "percent"]
-    stop_value: float = Field(ge=0)
+    stop_value: float = Field(gt=0)
     target_type: Literal["atr", "range_pct", "percent"]
-    target_value: float = Field(ge=0)
+    target_value: float = Field(gt=0)
     trailing_stop_type: Literal["none", "atr", "range_pct", "percent"] = "none"
     trailing_stop_value: float = Field(default=0.0, ge=0)
     break_even_r: float = Field(default=0.0, ge=0)

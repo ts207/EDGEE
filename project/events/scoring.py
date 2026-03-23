@@ -42,39 +42,40 @@ def _minmax_normalize(series: pd.Series) -> pd.Series:
 
 
 def _severity_score(df: pd.DataFrame) -> pd.Series:
-    # Use non-linear scaling for severity (e.g. squaring the percentile) to reward extreme signals
+    # PIT-safe expanding percentile based on observed history only.
     intensity = df["evt_signal_intensity"].astype(float).fillna(0.0)
-    percentile = intensity.rank(pct=True).clip(0.0, 1.0)
-    return np.power(percentile, 1.5)  # Non-linear reward
+    out = pd.Series(0.5, index=df.index, dtype=float)
+    seen: list[float] = []
+    for idx, val in intensity.items():
+        seen.append(float(val))
+        hist = np.asarray(seen, dtype=float)
+        rank = float((hist <= val).mean())
+        out.loc[idx] = np.power(np.clip(rank, 0.0, 1.0), 1.5)
+    return out
 
 
 def _cleanliness_score(df: pd.DataFrame) -> pd.Series:
-    result = pd.Series(1.0, index=df.index)
+    result = pd.Series(1.0, index=df.index, dtype=float)
     if "enter_ts" not in df.columns:
         return result
-        
-    for sym, grp in df.groupby("symbol", sort=False):
-        # Ensure we have datetime objects
-        times = pd.to_datetime(grp["enter_ts"], utc=True).sort_values()
+
+    for _, grp in df.groupby("symbol", sort=False):
+        times = pd.to_datetime(grp["enter_ts"], utc=True)
         if times.empty:
             continue
-            
-        # Use a 50-minute window (approx 10 bars * 5 min) centered
-        # effectively [t - 25m, t + 25m] to match _CLEANLINESS_LOOKBACK=5 (5 bars each side)
-        time_values = times.values
-        window = np.timedelta64(25, 'm')
-        
-        # Count neighbors within window
-        left_idx = np.searchsorted(time_values, time_values - window, side='left')
-        right_idx = np.searchsorted(time_values, time_values + window, side='right')
-        
-        counts = (right_idx - left_idx).astype(float) - 1.0  # Exclude self
-        counts = np.maximum(counts, 0.0) # Safety
-        
-        max_neighbors = max(counts.max(), 1.0)
-        # Map back to original index
-        result.loc[times.index] = 1.0 - (counts / max_neighbors)
-        
+        order = np.argsort(times.values)
+        sorted_times = times.iloc[order]
+        values = sorted_times.values
+        window = np.timedelta64(25, "m")
+        counts = np.zeros(len(values), dtype=float)
+        for i, t in enumerate(values):
+            left = np.searchsorted(values, t - window, side="left")
+            right = np.searchsorted(values, t, side="right")
+            counts[i] = max(0.0, float(right - left - 1))
+        max_neighbors = max(float(np.max(counts)), 1.0)
+        score = 1.0 - (counts / max_neighbors)
+        result.loc[sorted_times.index] = score
+
     return result.clip(0.0, 1.0)
 
 
@@ -137,17 +138,17 @@ def _novelty_score(df: pd.DataFrame) -> pd.Series:
 
         for k in range(n):
             val = vals[k]
-            diff = val - mu
+            mu_prev = mu
+            diff = val - mu_prev
             inc = alpha * diff
-            mu += inc
+            mu = mu_prev + inc
             var = (1 - alpha) * (var + diff * inc)
-            sigma = np.sqrt(var)
+            sigma = np.sqrt(max(var, 0.0))
 
             if sigma < 1e-10:
                 scores[k] = 0.5
             else:
-                z = (val - mu) / sigma
-                # Sigmoid non-linear mapping
+                z = (val - mu_prev) / sigma
                 scores[k] = float(1.0 / (1.0 + np.exp(-z)))
         result.loc[idx] = scores
     return result.clip(0.0, 1.0)

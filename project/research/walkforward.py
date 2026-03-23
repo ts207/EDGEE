@@ -23,6 +23,7 @@ def generate_walkforward_windows(
     train_size_bars: int,
     test_size_bars: int,
     step_size_bars: int,
+    embargo_bars: int = 0,
 ) -> List[Tuple[pd.DatetimeIndex, pd.DatetimeIndex]]:
     """
     Generate training and testing window indices.
@@ -31,9 +32,11 @@ def generate_walkforward_windows(
     total_len = len(index)
 
     start = 0
-    while start + train_size_bars + test_size_bars <= total_len:
+    embargo_bars = int(max(0, embargo_bars))
+    while start + train_size_bars + embargo_bars + test_size_bars <= total_len:
         train_idx = index[start : start + train_size_bars]
-        test_idx = index[start + train_size_bars : start + train_size_bars + test_size_bars]
+        test_start = start + train_size_bars + embargo_bars
+        test_idx = index[test_start : test_start + test_size_bars]
         windows.append((train_idx, test_idx))
         start += step_size_bars
 
@@ -63,7 +66,7 @@ def evaluate_walkforward_stability(
     # Here we switch to: 1 - (std / (abs(mean) + std + 10.0)) 
     # The +10.0 (bps) adds a "significance floor" - variation within 10bps is considered stable noise.
     
-    expectancy_stability = 1.0 - (std_exp / (abs(avg_exp) + std_exp + 10.0))
+    expectancy_stability = 0.0 if avg_exp <= 0 else 1.0 - (std_exp / (abs(avg_exp) + std_exp + 10.0))
 
     # Sign Consistency: Percentage of windows with positive expectancy
     sign_consistency = np.mean([1.0 if e > 0 else 0.0 for e in test_expectancies])

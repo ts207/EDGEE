@@ -15,6 +15,17 @@ ALLOCATION_CONTRACT_SCHEMA_VERSION = "allocation_contract_v1"
 ALLOCATION_DIAGNOSTICS_SCHEMA_VERSION = "allocation_diagnostics_v1"
 
 
+# Convert a PnL path into an equity curve for drawdown calculations.
+def _equity_curve_from_pnl(pnl: pd.Series) -> pd.Series:
+    clean = pd.to_numeric(pnl, errors="coerce").fillna(0.0).astype(float)
+    if clean.empty:
+        return pd.Series(dtype=float)
+    # Heuristic: values much larger than 1.0 are dollar PnL, not per-bar returns.
+    if clean.abs().median() > 1.0 or clean.abs().max() > 2.0:
+        return 1.0 + clean.cumsum()
+    return (1.0 + clean).cumprod()
+
+
 # Provide an optimised implementation for the per-bar clamping loop used
 # when enforcing ``max_new_exposure_per_bar``.  If Numba is installed the
 # helper will be JIT‑compiled for performance; otherwise a pure Python
@@ -495,7 +506,10 @@ def allocate_position_details(
     if limits.max_pairwise_correlation is not None and len(allocated) > 1:
         try:
             df_alloc = pd.DataFrame({k: v for k, v in allocated.items()})
-            corr_mat = df_alloc.corr().abs().fillna(0.0)
+            if df_alloc.empty or len(df_alloc) < 2:
+                raise ValueError("insufficient history for correlation estimate")
+            corr_window = min(len(df_alloc), max(20, min(576, len(df_alloc))))
+            corr_mat = df_alloc.tail(corr_window).corr().abs().fillna(0.0)
             np.fill_diagonal(corr_mat.values, 0.0)
             max_corr = float(corr_mat.values.max())
 
@@ -568,13 +582,13 @@ def allocate_position_details(
             .replace([np.inf, -np.inf], np.nan)
             .fillna(1.0)
         )
-        vol_scale_series = vol_scale.clip(lower=0.0, upper=2.0)
+        vol_scale_series = vol_scale.clip(lower=0.0, upper=1.0)
         _flag("target_annual_vol", vol_scale_series < 0.999999)
 
     dd_scale_series = pd.Series(1.0, index=aligned_index)
     if limits.max_drawdown_limit is not None and portfolio_pnl_series is not None:
         pnl = portfolio_pnl_series.reindex(aligned_index).fillna(0.0)
-        equity = (1.0 + pnl).cumprod()
+        equity = _equity_curve_from_pnl(pnl)
         peak = equity.cummax().replace(0.0, np.nan)
         drawdown = ((peak - equity) / peak).replace([np.inf, -np.inf], np.nan).fillna(0.0)
         dd_factor = (limits.max_drawdown_limit - drawdown) / limits.max_drawdown_limit
@@ -587,7 +601,7 @@ def allocate_position_details(
 
     if limits.portfolio_max_drawdown is not None and portfolio_pnl_series is not None:
         pnl = portfolio_pnl_series.reindex(aligned_index).fillna(0.0)
-        equity = (1.0 + pnl).cumprod()
+        equity = _equity_curve_from_pnl(pnl)
         peak = equity.cummax().replace(0.0, np.nan)
         drawdown = ((peak - equity) / peak).replace([np.inf, -np.inf], np.nan).fillna(0.0)
         reject_mask = drawdown > limits.portfolio_max_drawdown

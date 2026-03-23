@@ -33,15 +33,20 @@ log = logging.getLogger(__name__)
 
 
 def distribution_stats(returns: np.ndarray) -> Dict[str, float]:
-    """Compute mean, std, t-stat, p-value for a return distribution."""
-    if len(returns) < 2:
+    """Compute mean, std, HAC t-stat, p-value for a return distribution."""
+    clean = np.asarray(returns, dtype=float)
+    clean = clean[np.isfinite(clean)]
+    if len(clean) < 2:
         return {"mean": 0.0, "std": 0.0, "t_stat": 0.0, "p_value": 1.0}
-    mean = np.mean(returns)
-    std = np.std(returns, ddof=1)
+    mean = float(np.mean(clean))
+    std = float(np.std(clean, ddof=1))
     if std == 0:
         return {"mean": mean, "std": 0.0, "t_stat": 0.0, "p_value": 1.0}
-    t_stat = mean / (std / np.sqrt(len(returns)))
-    p_value = 2 * (1 - stats.t.cdf(np.abs(t_stat), df=len(returns) - 1))
+    from project.core.stats import newey_west_t_stat_for_mean
+
+    nw = newey_west_t_stat_for_mean(clean)
+    t_stat = float(nw.t_stat) if np.isfinite(nw.t_stat) else mean / (std / np.sqrt(len(clean)))
+    p_value = two_sided_p_from_t(t_stat, df=max(len(clean) - 1, 1))
     return {"mean": mean, "std": std, "t_stat": t_stat, "p_value": p_value}
 
 

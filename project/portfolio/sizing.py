@@ -12,6 +12,11 @@ from project.portfolio.risk_budget import (
     get_asset_correlation_adjustment,
 )
 
+
+def _to_decimal_return(value: float) -> float:
+    v = float(value)
+    return v / 10_000.0 if abs(v) > 1.0 else v
+
 _LOG = logging.getLogger(__name__)
 
 

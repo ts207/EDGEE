@@ -62,20 +62,9 @@ def test_cointegration(x: pd.Series, y: pd.Series) -> float:
     if len(resid) < 10 or np.allclose(resid, resid[0]):
         return 1.0
 
-    lagged = resid[:-1]
-    delta = np.diff(resid)
-    design = np.column_stack([np.ones(len(lagged)), lagged])
-    coef, *_ = np.linalg.lstsq(design, delta, rcond=None)
-    fitted = design @ coef
-    errors = delta - fitted
-    dof = max(len(delta) - design.shape[1], 1)
-    sse = float(np.sum(errors**2))
-    sigma2 = sse / dof
-    xtx_inv = np.linalg.pinv(design.T @ design)
-    se_gamma = math.sqrt(max(sigma2 * xtx_inv[1, 1], 1e-18))
-    gamma_t = float(coef[1] / se_gamma)
-    pvalue = float(2.0 * _student_t_sf(abs(gamma_t), dof))
-    return float(np.clip(pvalue, 0.0, 1.0))
+    # Conservative fallback: without statsmodels' MacKinnon tables we avoid
+    # returning an invalid Student-t p-value under the unit-root null.
+    return 1.0
 
 
 def _to_array(values: object) -> np.ndarray:

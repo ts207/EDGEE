@@ -20,8 +20,9 @@ def condition_mask_node(merged: pd.DataFrame, node: ConditionNodeSpec) -> pd.Ser
         expr = str(node.expression).strip()
         # Strictly allow only column names, math operators, numbers, and basic boolean operators
         # \s includes newlines, so we replace it with [ \t] to prevent multiline injection
-        if not re.match(r"^[\w \t\.\+\-\*/<>=&\|~()]+$", expr) or re.search(
-            r"\b(import|eval|exec|open|__)\b", expr
+        dangerous_tokens = ("import", "eval", "exec", "open", "getattr", "setattr")
+        if not re.match(r"^[\w \t\.\+\-\*/<>=&\|~()]+$", expr) or "__" in expr or any(
+            token in expr for token in dangerous_tokens
         ):
             LOGGER.error(f"Blocked unsafe or complex expression: '{expr}'")
             return pd.Series(False, index=merged.index)

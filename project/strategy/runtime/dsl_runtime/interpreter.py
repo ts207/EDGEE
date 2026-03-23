@@ -308,7 +308,10 @@ class DslInterpreterV1:
         )
 
         # Deterministic random rolls based on blueprint ID length for reproducible priority randomisation
-        rng = np.random.RandomState(len(blueprint.id))
+        import hashlib
+
+        seed = int(hashlib.sha256(blueprint.id.encode("utf-8")).hexdigest()[:8], 16) % (2**31)
+        rng = np.random.RandomState(seed)
         random_rolls = rng.rand(len(frame))
 
         pos_arr, ev_idxs, ev_codes = generate_positions_numba(
