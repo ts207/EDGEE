@@ -1,14 +1,16 @@
 """Schema types for experiment engine: request, plan, and registry dataclasses."""
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 import yaml
 
+from project.domain.hypotheses import HypothesisSpec
 
-
+_LOG = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class InstrumentScope:
@@ -76,10 +78,6 @@ class AgentExperimentRequest:
     promotion: PromotionConfig
     artifacts: Dict[str, bool] = field(default_factory=dict)
 
-
-from project.domain.hypotheses import HypothesisSpec, TriggerSpec
-
-
 @dataclass(frozen=True)
 class ValidatedExperimentPlan:
     program_id: str
@@ -105,4 +103,3 @@ class RegistryBundle:
             _LOG.warning(f"Registry file not found: {path}")
             return {}
         return yaml.safe_load(path.read_text())
-

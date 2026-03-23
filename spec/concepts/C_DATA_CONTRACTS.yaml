@@ -30,6 +30,6 @@ artifacts:
   - type: schema
     path: project/schemas/feature_schema_v2.json
   - type: logic
-    path: project/core/sanity.py
+    path: project/schemas/data_contracts.py
   - type: contract_registry
     path: project/contracts/pipeline_registry.py

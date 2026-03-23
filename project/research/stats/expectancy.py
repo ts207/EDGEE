@@ -196,14 +196,11 @@ def apply_robust_survivor_gates(
         & (out["event_t"] >= float(legacy_tstat_threshold))
     )
     
-    # Issue 6: Bootstrap is two-sided, gate is one-sided.
-    # We halve the bootstrap p-value to approximate a one-sided test (assuming mean > 0 is checked)
-    # or strictly check p/2 <= alpha.
     out["gate_robust_survivor"] = (
         (out["event_samples"] >= int(min_samples))
         & (out["event_mean"] > 0.0)
         & (out["hac_t"] >= float(robust_hac_t_threshold))
-        & ((out["bootstrap_p"] / 2.0) <= float(bootstrap_alpha))
+        & (out["bootstrap_p"] <= float(bootstrap_alpha))
         & (out["fdr_q_value"] <= float(fdr_q))
         & (out["oos_samples"] >= int(oos_min_samples))
         & ((not int(require_oos_positive)) | out["oos_positive"])

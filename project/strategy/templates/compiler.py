@@ -2,11 +2,23 @@ import pandas as pd
 from project.strategy.templates.spec import StrategySpec
 from project.strategy.templates.data_bundle import DataBundle
 
-import numba
 import numpy as np
 
+try:
+    from numba import njit  # type: ignore
+except ImportError:
 
-@numba.njit
+    def njit(*args, **kwargs):
+        if args and callable(args[0]) and not kwargs:
+            return args[0]
+
+        def _decorator(fn):
+            return fn
+
+        return _decorator
+
+
+@njit
 def _compile_loop(
     ent_arr: np.ndarray, ext_arr: np.ndarray, cap: float, cooldown_bars: int
 ) -> np.ndarray:

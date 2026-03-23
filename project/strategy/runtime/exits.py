@@ -52,9 +52,10 @@ def check_exit_conditions(
             else position_entry_price * (1.0 - target_value)
         )
 
-    # Check against open (gap) and close
-    bar_open = float(bar["open"])
+    # Check against open (gap) and close. Some callers only provide ``close``
+    # and ``atr``; in that case treat the bar as gap-free.
     bar_close = float(bar["close"])
+    bar_open = float(bar.get("open", bar_close))
     
     if is_long:
         # For long, hit target if high >= target. But here we only have open/close.

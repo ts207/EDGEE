@@ -1,8 +1,9 @@
-import os
-import yaml
+import argparse
 import sys
 from pathlib import Path
-from typing import Dict, List, Set
+from typing import Dict
+
+import yaml
 
 KNOWN_DATASETS = {
     "perp_ohlcv_1m",
@@ -96,26 +97,87 @@ def check_tests(specs: Dict[str, dict]):
         sys.exit(1)
 
 
-def check_artifacts(specs: Dict[str, dict], project_root: Path):
+def _is_runtime_artifact_path(path_str: str) -> bool:
+    normalized = path_str.strip()
+    return normalized.startswith("data/") or "<" in normalized or ">" in normalized
+
+
+def _resolve_artifact_path(
+    path_str: str,
+    *,
+    project_root: Path,
+    placeholder_values: Dict[str, str] | None = None,
+) -> Path:
+    resolved = path_str.replace("{symbol}", "BTCUSDT")
+    for key, value in (placeholder_values or {}).items():
+        resolved = resolved.replace(f"<{key}>", value)
+        resolved = resolved.replace(f"{{{key}}}", value)
+    return project_root / resolved
+
+
+def _parse_placeholder_args(raw_values: list[str] | None) -> Dict[str, str]:
+    parsed: Dict[str, str] = {}
+    for item in raw_values or []:
+        if "=" not in item:
+            raise ValueError(f"Invalid runtime placeholder override {item!r}; expected KEY=VALUE")
+        key, value = item.split("=", 1)
+        parsed[key.strip()] = value.strip()
+    return parsed
+
+
+def check_artifacts(
+    specs: Dict[str, dict],
+    project_root: Path,
+    *,
+    strict_runtime_artifacts: bool = False,
+    runtime_placeholder_values: Dict[str, str] | None = None,
+):
     missing = []
+    runtime_artifacts = []
+    missing_runtime = []
     for cid, spec in specs.items():
         for art in spec.get("artifacts", []):
             path_str = art.get("path")
             if not path_str:
                 continue
+            if _is_runtime_artifact_path(path_str):
+                runtime_artifacts.append(f"{cid}: {path_str}")
+                resolved_runtime_path = _resolve_artifact_path(
+                    path_str,
+                    project_root=project_root,
+                    placeholder_values=runtime_placeholder_values,
+                )
+                if strict_runtime_artifacts and not resolved_runtime_path.exists():
+                    missing_runtime.append(f"{cid}: {path_str} -> {resolved_runtime_path}")
+                continue
 
-            # Handle {symbol} placeholders
-            path_str = path_str.replace("{symbol}", "BTCUSDT")
-            path = project_root / path_str
+            path = _resolve_artifact_path(
+                path_str,
+                project_root=project_root,
+                placeholder_values=runtime_placeholder_values,
+            )
             if not path.exists():
                 missing.append(f"{cid}: {path_str}")
 
     if missing:
-        print("REPORT: Missing artifacts:")
+        print("REPORT: Missing authored artifacts:")
         for m in missing:
             print(f"  - {m}")
     else:
-        print("SUCCESS: All referenced artifacts exist.")
+        print("SUCCESS: All authored artifacts exist.")
+
+    if runtime_artifacts:
+        if strict_runtime_artifacts:
+            if missing_runtime:
+                print("ERROR: Missing runtime artifacts under strict enforcement:")
+                for artifact in missing_runtime:
+                    print(f"  - {artifact}")
+                sys.exit(1)
+            print("SUCCESS: All runtime artifacts resolved under strict enforcement.")
+        else:
+            print("REPORT: Runtime artifacts not statically checked:")
+            for artifact in runtime_artifacts:
+                print(f"  - {artifact}")
 
 
 def _check_detector_contract_completeness(data: dict, fname: str, errors: list) -> None:
@@ -141,23 +203,41 @@ def check_detector_contracts(specs: Dict[str, dict]):
         print("SUCCESS: All detector_contract specs have required sections.")
 
 
-def main():
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Lint concept/spec governance surfaces.")
+    parser.add_argument("--spec-dir", default="spec/concepts")
+    parser.add_argument("--strict-runtime-artifacts", action="store_true")
+    parser.add_argument(
+        "--runtime-placeholder",
+        action="append",
+        default=[],
+        help="Placeholder override for runtime artifacts, e.g. run_id=my_run",
+    )
+    args = parser.parse_args(argv)
+
     project_root = Path(".").resolve()
-    spec_dir = project_root / "spec" / "concepts"
+    spec_dir = project_root / str(args.spec_dir)
 
     if not spec_dir.exists():
         print(f"ERROR: Spec directory {spec_dir} not found.")
         sys.exit(1)
 
+    placeholder_values = _parse_placeholder_args(list(args.runtime_placeholder or []))
     specs = load_specs(spec_dir)
     print(f"Loaded {len(specs)} concepts.")
 
     check_cycles(specs)
     check_datasets(specs)
     check_tests(specs)
-    check_artifacts(specs, project_root)
+    check_artifacts(
+        specs,
+        project_root,
+        strict_runtime_artifacts=bool(args.strict_runtime_artifacts),
+        runtime_placeholder_values=placeholder_values,
+    )
     check_detector_contracts(specs)
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

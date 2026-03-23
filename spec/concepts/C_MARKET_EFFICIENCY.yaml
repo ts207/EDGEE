@@ -25,6 +25,8 @@ tests:
     criteria: E[returns | H > 0.6] > baseline
 artifacts:
   - type: script
+    path: project/pipelines/eval/build_market_efficiency_report.py
+  - type: module
     path: project/eval/efficiency_tests.py
   - type: table
     path: data/lake/reports/market_health/efficiency_v1.parquet

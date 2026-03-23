@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 from pathlib import Path
-from typing import Tuple
+from typing import Dict, Tuple
 
 from project.io.utils import (
     choose_partition_dir,

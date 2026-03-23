@@ -4,9 +4,21 @@ import asyncio
 import json
 import logging
 import time
-from typing import Callable, List, Optional
+from types import SimpleNamespace
+from typing import Any, Callable, List, Optional
 
-import websockets
+try:
+    import websockets  # type: ignore[import-not-found]
+except ModuleNotFoundError:
+    def _missing_connect(*_args: Any, **_kwargs: Any) -> Any:
+        raise ModuleNotFoundError(
+            "Optional dependency 'websockets' is required for live WebSocket connectivity."
+        )
+
+    websockets = SimpleNamespace(  # type: ignore[assignment]
+        connect=_missing_connect,
+        WebSocketClientProtocol=object,
+    )
 
 _LOG = logging.getLogger(__name__)
 
@@ -25,7 +37,7 @@ class BinanceWebSocketClient:
         self.streams = streams
         self.on_message = on_message
         self.on_reconnect_exhausted = on_reconnect_exhausted
-        self._connection: websockets.WebSocketClientProtocol | None = None
+        self._connection: Any | None = None
         self._running = False
         self._task: asyncio.Task | None = None
 

@@ -1,27 +1,29 @@
 from __future__ import annotations
-from project.core.config import get_data_root
 
 import hashlib
 import json
 import os
+import platform
 import subprocess
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from project import PROJECT_ROOT
+from project.core.config import get_data_root
 from project.spec_registry import (
     feature_schema_registry_path as registry_feature_schema_registry_path,
 )
 from project.spec_registry import (
     load_feature_schema_registry as registry_load_feature_schema_registry,
 )
-from project.specs.utils import get_spec_hashes
 from project.specs.ontology import (
     ontology_component_hash_fields,
     ontology_component_hashes,
     ontology_spec_hash,
 )
+from project.specs.utils import get_spec_hashes
 
 
 def _utc_now_iso() -> str:
@@ -29,7 +31,6 @@ def _utc_now_iso() -> str:
 
 
 def _manifest_path(run_id: str, stage: str, stage_instance_id: str | None = None) -> Path:
-    project_root = PROJECT_ROOT
     data_root = get_data_root()
     out_dir = data_root / "runs" / run_id
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -41,7 +42,6 @@ def _manifest_path(run_id: str, stage: str, stage_instance_id: str | None = None
 
 
 def _run_manifest_path(run_id: str) -> Path:
-    project_root = PROJECT_ROOT
     data_root = get_data_root()
     return data_root / "runs" / run_id / "run_manifest.json"
 
@@ -384,12 +384,16 @@ def finalize_manifest(
     temp_path.replace(out_path)
     pipeline_session_id = str(manifest.get("pipeline_session_id", "") or "").strip()
     if not pipeline_session_id and str(status).strip().lower() in {"success", "warning"}:
+        import importlib
+
+        run_id = str(manifest.get("run_id", ""))
         try:
-            import importlib
             mod = importlib.import_module("project.pipelines.pipeline_provenance")
-            mod.reconcile_run_manifest_from_stage_manifests(str(manifest.get("run_id", "")))
-        except Exception:
-            pass
+            mod.reconcile_run_manifest_from_stage_manifests(run_id)
+        except Exception as exc:
+            raise RuntimeError(
+                f"Failed to reconcile run manifest for standalone stage rerun {run_id!r}"
+            ) from exc
     return manifest
 
 
@@ -404,8 +408,6 @@ def load_run_manifest(run_id: str) -> Dict[str, Any]:
 
 
 def enrich_manifest_with_env(manifest: dict):
-    import platform, sys, os
-
     manifest["python_version"] = sys.version
     manifest["platform"] = platform.platform()
     manifest["env_snapshot"] = {k: os.environ.get(k) for k in ["BACKTEST_DATA_ROOT"]}

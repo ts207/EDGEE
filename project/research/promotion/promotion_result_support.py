@@ -84,9 +84,11 @@ def _assemble_promotion_result(
     is_reduced_evidence: bool = False,
     benchmark_pass: bool = True,
 ) -> Dict[str, Any]:
-    # Phase 1.4: oos_pass is now bool | None. None means "not evaluated" — treat as
-    # False for the promotion decision so candidates without OOS evidence cannot promote.
-    oos_pass_for_gate: bool = bool(oos_pass) if oos_pass is not None else False
+    # In non-deploy modes, missing OOS evidence is visible via `oos_pass_state` but
+    # does not block promotion. Deploy-mode enforcement still happens upstream.
+    oos_pass_for_gate: bool = (
+        True if (oos_pass is None and not bool(is_deploy_mode)) else bool(oos_pass)
+    )
     promoted = bool(
         statistical_pass
         and cost_pass

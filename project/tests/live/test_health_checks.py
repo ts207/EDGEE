@@ -6,9 +6,8 @@ Verify that DataHealthMonitor correctly identifies stale data streams.
 
 from __future__ import annotations
 
-import time
-import pytest
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
+
 from project.live.health_checks import (
     DataHealthMonitor,
     build_runtime_certification_manifest,
@@ -17,8 +16,8 @@ from project.live.health_checks import (
 
 
 def test_stale_feed_detection():
-    # Set a very tight stale threshold for testing
-    monitor = DataHealthMonitor(stale_threshold_sec=0.1)
+    current_time = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    monitor = DataHealthMonitor(stale_threshold_sec=0.1, now_fn=lambda: current_time)
 
     # 1. Initially healthy
     monitor.on_event("BTCUSDT", "kline_1m")
@@ -26,7 +25,7 @@ def test_stale_feed_detection():
     assert health["is_healthy"]
 
     # 2. Becomes stale
-    time.sleep(0.15)
+    current_time += timedelta(milliseconds=150)
     health = monitor.check_health()
     assert not health["is_healthy"]
     assert health["freshness_status"] == "stale"

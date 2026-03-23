@@ -22,10 +22,10 @@ import csv
 import json
 import re
 import sys
-from pathlib import Path
-from project.domain.compiled_registry import get_domain_registry
-from project.spec_registry import load_yaml_relative, resolve_relative_spec_path
 
+from project import PROJECT_ROOT
+from project.domain.compiled_registry import get_domain_registry
+from project.spec_registry import resolve_relative_spec_path
 
 ATLAS_PATH = PROJECT_ROOT.parent / "knowledge_atlas.json"
 OUTPUT_PATH = PROJECT_ROOT.parent / "research_backlog.csv"
@@ -306,10 +306,42 @@ def truncate(s: str, n: int = 200) -> str:
     return s[:n].replace("\n", " ").strip() if s else ""
 
 
+def _append_template_registry_rows(rows: list[dict]) -> None:
+    registry = get_domain_registry()
+    for event_type in sorted(registry.event_ids):
+        cfg = registry.event_row(event_type)
+        rows.append(
+            {
+                "claim_id": f"EVENT_{event_type}",
+                "source_id": "template_registry",
+                "concept_id": "C_EVENT_DEFINITIONS",
+                "candidate_type": "event",
+                "claim_type": "spec",
+                "operationalizable": "Y",
+                "missing": "",
+                "priority_score": 10,
+                "target_gate": "E-1",
+                "next_artifact": f"spec/events/{event_type}.yaml",
+                "evidence_locator": str(TEMPLATE_REGISTRY_PATH),
+                "assets": "*",
+                "horizon": "|".join([str(x) for x in cfg.get("horizons", [])]),
+                "stage": "phase2_discovery",
+                "features": "",
+                "label": "",
+                "status": "spec_defined",
+                "statement_summary": truncate(
+                    f"{event_type}: templates={cfg.get('templates', [])}",
+                    200,
+                ),
+            }
+        )
+
+
 def main():
     rows = []
     skipped_tool_refs = 0
     skipped_empty = 0
+    used_template_fallback = False
 
     if ATLAS_PATH.exists():
         print(f"Loading atlas from {ATLAS_PATH} ...")
@@ -366,36 +398,14 @@ def main():
                     "statement_summary": truncate(statement, 200),
                 }
             )
+        if not rows:
+            print("  No usable atlas claims found; falling back to template registry.")
+            _append_template_registry_rows(rows)
+            used_template_fallback = True
     else:
         print(f"Atlas not found at {ATLAS_PATH}; generating backlog from template registry.")
-        registry = get_domain_registry()
-        for event_type in sorted(registry.event_ids):
-            cfg = registry.event_row(event_type)
-            rows.append(
-                {
-                    "claim_id": f"EVENT_{event_type}",
-                    "source_id": "template_registry",
-                    "concept_id": "C_EVENT_DEFINITIONS",
-                    "candidate_type": "event",
-                    "claim_type": "spec",
-                    "operationalizable": "Y",
-                    "missing": "",
-                    "priority_score": 10,
-                    "target_gate": "E-1",
-                    "next_artifact": f"spec/events/{event_type}.yaml",
-                    "evidence_locator": str(TEMPLATE_REGISTRY_PATH),
-                    "assets": "*",
-                    "horizon": "|".join([str(x) for x in cfg.get("horizons", [])]),
-                    "stage": "phase2_discovery",
-                    "features": "",
-                    "label": "",
-                    "status": "spec_defined",
-                    "statement_summary": truncate(
-                        f"{event_type}: templates={cfg.get('templates', [])}",
-                        200,
-                    ),
-                }
-            )
+        _append_template_registry_rows(rows)
+        used_template_fallback = True
 
     # Sort: highest priority first, then by operationalizable (Y > PARTIAL > N)
     op_order = {"Y": 0, "PARTIAL": 1, "N": 2}
@@ -427,6 +437,8 @@ def main():
     print("\n  By candidate_type:")
     for t, cnt in sorted(by_type.items(), key=lambda x: -x[1]):
         print(f"    {t:15s}: {cnt}")
+    if used_template_fallback:
+        print("\n  Source mode: template_registry_fallback")
     print(f"\n  Output: {OUTPUT_PATH}")
 
 

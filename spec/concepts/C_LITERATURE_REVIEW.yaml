@@ -18,7 +18,7 @@ tests:
     objective: Claim Traceability
     criteria: has_locator(claim) == True
 artifacts:
-  - type: atlas_md
-    path: knowledge_atlas (3).md
+  - type: atlas_json
+    path: knowledge_atlas.json
   - type: fragments_jsonl
-    path: fragments (1).jsonl
+    path: fragments.jsonl

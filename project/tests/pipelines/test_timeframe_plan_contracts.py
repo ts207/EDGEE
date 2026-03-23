@@ -13,10 +13,12 @@ from project.pipelines.pipeline_planning import (
     build_parser,
     prepare_run_preflight,
 )
-from project.pipelines.stages.core import build_core_stages
-from project.pipelines.stage_definitions import ResolvedStageArtifactContract
-from project.pipelines.stage_definitions import build_stage_timeframe_artifact_mappings
+from project.pipelines.stage_definitions import (
+    ResolvedStageArtifactContract,
+    build_stage_timeframe_artifact_mappings,
+)
 from project.pipelines.stage_dependencies import resolve_stage_artifact_contract
+from project.pipelines.stages.core import build_core_stages
 
 
 def _expected_feature_optional_inputs(timeframe: str) -> tuple[str, ...]:
@@ -146,7 +148,16 @@ def test_preflight_rejects_unsupported_timeframe() -> None:
         _build_preflight("2m")
 
 
-def test_negative_control_contract_helper_flags_missing_stage_for_strict_production_promotion() -> None:
+def test_stage_contract_resolution_rejects_invalid_explicit_timeframe_flag() -> None:
+    with pytest.raises(
+        ContractViolationError,
+        match="received invalid explicit --timeframe value '2m'",
+    ):
+        resolve_stage_artifact_contract("build_cleaned_5m", ["--timeframe", "2m"])
+
+
+def test_negative_control_contract_helper_flags_missing_stage_for_strict_production_promotion(
+) -> None:
     parser = build_parser()
     args = parser.parse_args(
         [

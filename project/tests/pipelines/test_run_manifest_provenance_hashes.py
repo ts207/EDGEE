@@ -3,8 +3,10 @@ from __future__ import annotations
 import hashlib
 import json
 
-from project.apps.pipeline import manifest as run_manifest
+import pytest
+
 import project.specs.manifest as manifest_spec
+from project.apps.pipeline import manifest as run_manifest
 
 
 def test_start_manifest_includes_git_and_spec_hashes():
@@ -81,7 +83,9 @@ def test_finalize_manifest_uses_manifest_stage_instance_id(monkeypatch, tmp_path
     assert not (manifest_dir / "unit_stage__worker_b.json").exists()
 
 
-def test_finalize_manifest_reconciles_run_manifest_for_standalone_stage_reruns(monkeypatch, tmp_path):
+def test_finalize_manifest_reconciles_run_manifest_for_standalone_stage_reruns(
+    monkeypatch, tmp_path
+):
     out_manifest = tmp_path / "unit_stage.json"
     calls: list[str] = []
 
@@ -109,3 +113,35 @@ def test_finalize_manifest_reconciles_run_manifest_for_standalone_stage_reruns(m
     run_manifest.finalize_manifest(manifest, status="success", stats={})
 
     assert calls == ["r_manifest"]
+
+
+def test_finalize_manifest_raises_when_reconciliation_fails_for_standalone_stage_reruns(
+    monkeypatch, tmp_path
+):
+    out_manifest = tmp_path / "unit_stage.json"
+
+    monkeypatch.setattr(
+        manifest_spec, "_manifest_path", lambda run_id, stage, stage_instance_id=None: out_manifest
+    )
+    monkeypatch.delenv("BACKTEST_PIPELINE_SESSION_ID", raising=False)
+
+    def _fail_reconcile(run_id: str):
+        raise RuntimeError(f"boom:{run_id}")
+
+    monkeypatch.setattr(
+        "project.pipelines.pipeline_provenance.reconcile_run_manifest_from_stage_manifests",
+        _fail_reconcile,
+    )
+
+    manifest = run_manifest.start_manifest(
+        stage_name="unit_stage",
+        run_id="r_manifest",
+        params={},
+        inputs=[],
+        outputs=[],
+    )
+
+    with pytest.raises(RuntimeError, match="Failed to reconcile run manifest"):
+        run_manifest.finalize_manifest(manifest, status="success", stats={})
+
+    assert out_manifest.exists()

@@ -23,6 +23,6 @@ tests:
     criteria: mean(pairwise_corr) < 0.4
 artifacts:
   - type: logic
-    path: project/pipelines/report/capital_allocation.py
+    path: project/portfolio/allocation_spec.py
   - type: table
     path: data/lake/reports/portfolio/daily_stats.json

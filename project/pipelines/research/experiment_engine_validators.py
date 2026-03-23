@@ -1,24 +1,14 @@
-"""Validation and expansion helpers for experiment engine (split from experiment_engine.py)."""
+"""Validation and expansion helpers for experiment engine."""
 from __future__ import annotations
 
+import json
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 
-import yaml
-
-from project.core.config import get_data_root
-from project.domain.hypotheses import HypothesisSpec, TriggerSpec, TriggerType
+from project.domain.hypotheses import HypothesisSpec, TriggerSpec
 from project.pipelines.research.experiment_engine_schema import (
     AgentExperimentRequest,
-    ContextSelection,
-    EvaluationConfig,
-    InstrumentScope,
-    PromotionConfig,
     RegistryBundle,
-    SearchControl,
-    TemplateSelection,
-    TriggerSpace,
-    ValidatedExperimentPlan,
 )
 
 log = logging.getLogger(__name__)
@@ -81,17 +71,6 @@ def _validate_campaign_status(request: AgentExperimentRequest, registries: Regis
 
 
 def _validate_proposal_quality(request: AgentExperimentRequest, registries: RegistryBundle) -> None:
-    # --- 1.2 FIX: Reject entry_lag=0 at plan time, not at evaluation time ---
-    # entry_lag_bars must be >= 1 to prevent same-bar lookahead leakage.
-    # gating.py raises ValueError at runtime for lag=0; catch it here instead.
-    bad_lags = [lag for lag in request.evaluation.entry_lags if int(lag) < 1]
-    if bad_lags:
-        raise ValueError(
-            f"Proposal rejected: entry_lags contains invalid value(s) {bad_lags}. "
-            f"entry_lag_bars must be >= 1 to prevent same-bar entry lookahead leakage. "
-            f"Use entry_lags: [1, 2] or higher."
-        )
-
     # Penalize redundancy and low-diversity
     from project.core.config import get_data_root
 

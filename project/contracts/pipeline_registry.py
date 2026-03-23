@@ -5,15 +5,16 @@ from fnmatch import fnmatch
 from pathlib import Path
 from typing import Any, Dict, List, Sequence, Set, Tuple
 
+from project.core.exceptions import ContractViolationError
 from project.core.timeframes import (
     DEFAULT_TIMEFRAME,
     SUPPORTED_TIMEFRAMES,
-    normalize_timeframe,
     make_clean_artifact_token,
     make_feature_artifact_token,
     make_funding_artifact_token,
     make_ohlcv_artifact_token,
     make_spot_ohlcv_artifact_token,
+    normalize_timeframe,
     parse_timeframes,
 )
 
@@ -554,8 +555,10 @@ def _timeframe_from_stage(stage_name: str, base_args: List[str]) -> str:
         if raw:
             try:
                 return normalize_timeframe(raw)
-            except Exception:
-                pass
+            except ContractViolationError as exc:
+                raise ContractViolationError(
+                    f"Stage '{stage_name}' received invalid explicit {flag} value {raw!r}"
+                ) from exc
     raw_multi = _flag_value(base_args, "--timeframes")
     if raw_multi:
         token = str(raw_multi).split(",")[0].strip()
@@ -700,7 +703,8 @@ def validate_stage_dataflow_dag(stages: Sequence[StageSpec]) -> List[str]:
                 continue
             if not any(fnmatch(avail, artifact) or fnmatch(artifact, avail) for avail in available):
                 issues.append(
-                    f"stage '{stage_name}' requires input artifact '{artifact}' which is not produced upstream"
+                    f"stage '{stage_name}' requires input artifact '{artifact}' "
+                    "which is not produced upstream"
                 )
         for artifact in contract.outputs:
             available.add(artifact)

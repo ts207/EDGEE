@@ -1,48 +1,93 @@
 from __future__ import annotations
-from project.core.config import get_data_root
 
-from project.events.event_specs import (
-    EventRegistrySpec,
-    EVENT_REGISTRY_SPECS,
-    SIGNAL_TO_EVENT_TYPE,
-    REGISTRY_BACKED_SIGNALS,
-    REGISTRY_EVENT_COLUMNS,
-    AGGREGATE_EVENT_TYPE_UNIONS,
-    expected_event_types_for_spec,
-    VALID_DIRECTIONS,
-    assert_event_specs_available,
-    _load_event_specs,
+import functools
+import sys
+from pathlib import Path
+
+import pandas as pd
+import yaml
+
+import project.events.event_flags as _event_flags_mod
+from project import PROJECT_ROOT
+from project.core.config import get_data_root
+from project.events.event_aliases import resolve_event_alias
+from project.events.event_diagnostics import (
+    build_event_feature_frame,
+    calibrate_event_thresholds,
+    generate_event_coverage_report,
+    registry_contract_check,
+    verify_index_alignment,
+)
+from project.events.event_flags import (
+    _active_signal_column,
+    _signal_ts_column,
+    load_registry_flags,
+    merge_event_flags_for_selected_event_types,
 )
 from project.events.event_normalizer import (
     filter_phase1_rows_for_event_type,
     normalize_phase1_events,
     normalize_registry_events_frame,
 )
+from project.events.event_prerequisites import check_event_prerequisites
 from project.events.event_repository import (
     collect_registry_events,
+    load_registry_episode_anchors,
+    load_registry_events,
     merge_registry_events,
     write_event_registry_artifacts,
-    load_registry_events,
     write_registry_file,
-    load_registry_episode_anchors,
 )
-import project.events.event_flags as _event_flags_mod
-from project.events.event_flags import (
-    load_registry_flags,
-    merge_event_flags_for_selected_event_types,
-    _signal_ts_column,
-    _active_signal_column,
+from project.events.event_specs import (
+    AGGREGATE_EVENT_TYPE_UNIONS,
+    EVENT_REGISTRY_SPECS,
+    REGISTRY_BACKED_SIGNALS,
+    REGISTRY_EVENT_COLUMNS,
+    SIGNAL_TO_EVENT_TYPE,
+    VALID_DIRECTIONS,
+    EventRegistrySpec,
+    _load_event_specs,
+    assert_event_specs_available,
+    expected_event_types_for_spec,
 )
-from project.events.event_diagnostics import (
-    generate_event_coverage_report,
-    calibrate_event_thresholds,
-    verify_index_alignment,
-    registry_contract_check,
-    build_event_feature_frame,
-)
-import sys
-from pathlib import Path
-import pandas as pd
+
+__all__ = [
+    "AGGREGATE_EVENT_TYPE_UNIONS",
+    "EVENT_REGISTRY_SPECS",
+    "REGISTRY_BACKED_SIGNALS",
+    "REGISTRY_EVENT_COLUMNS",
+    "SIGNAL_TO_EVENT_TYPE",
+    "VALID_DIRECTIONS",
+    "EventRegistrySpec",
+    "_active_signal_column",
+    "_load_event_specs",
+    "_load_symbol_timestamps",
+    "_signal_ts_column",
+    "assert_event_specs_available",
+    "build_event_feature_frame",
+    "build_event_flags",
+    "calibrate_event_thresholds",
+    "check_event_prerequisites",
+    "collect_registry_events",
+    "expected_event_types_for_spec",
+    "filter_phase1_rows_for_event_type",
+    "generate_event_coverage_report",
+    "get_event_definition",
+    "list_events_by_family",
+    "load_milestone_event_registry",
+    "load_registry_episode_anchors",
+    "load_registry_events",
+    "load_registry_flags",
+    "merge_event_flags_for_selected_event_types",
+    "merge_registry_events",
+    "normalize_phase1_events",
+    "normalize_registry_events_frame",
+    "registry_contract_check",
+    "resolve_event_alias",
+    "verify_index_alignment",
+    "write_event_registry_artifacts",
+    "write_registry_file",
+]
 
 
 def build_event_flags(*, events, symbols, data_root, run_id, timeframe="5m"):
@@ -62,7 +107,6 @@ def _load_symbol_timestamps(
     data_root: "Path | None" = None, run_id: str = "", symbol: str = "", timeframe: str = "5m"
 ) -> pd.Series:
     from project.io.utils import read_parquet
-    from project import PROJECT_ROOT
 
     DATA_ROOT = get_data_root()
     path = DATA_ROOT / "lake" / "bars" / symbol / f"{timeframe}.parquet"
@@ -70,18 +114,6 @@ def _load_symbol_timestamps(
         df = read_parquet(path)
         return df["timestamp"]
     return pd.Series(dtype="datetime64[ns, UTC]")
-
-
-from project.events.event_prerequisites import (
-    check_event_prerequisites,
-)
-
-
-import functools
-import yaml
-
-from project import PROJECT_ROOT
-from project.events.event_aliases import resolve_event_alias
 
 
 _MILESTONE_REGISTRY_PATH = PROJECT_ROOT.parent / "spec" / "events" / "registry.yaml"

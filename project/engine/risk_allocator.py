@@ -1,68 +1,22 @@
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import dataclass, field
-from typing import Dict, Mapping, Tuple
+from typing import Dict, Literal, Mapping, Tuple
 
 import numpy as np
 import pandas as pd
 
 from project.core.constants import BARS_PER_YEAR_BY_TIMEFRAME
+from project.engine.risk_allocator_support import (
+    _clamp_positions_py,
+    _equity_curve_from_pnl,
+)
 from project.portfolio import AllocationSpec
-from typing import Any, Dict, List, Mapping, Optional, Literal
-
 
 ALLOCATION_CONTRACT_SCHEMA_VERSION = "allocation_contract_v1"
 ALLOCATION_DIAGNOSTICS_SCHEMA_VERSION = "allocation_diagnostics_v1"
-
-
-# Convert a PnL path into an equity curve for drawdown calculations.
-def _equity_curve_from_pnl(
-    pnl: pd.Series, pnl_mode: Literal["dollar", "return"] = "dollar"
-) -> pd.Series:
-    clean = pd.to_numeric(pnl, errors="coerce").fillna(0.0).astype(float)
-    if clean.empty:
-        return pd.Series(dtype=float)
-    if pnl_mode == "dollar":
-        return 1.0 + clean.cumsum()
-    return (1.0 + clean).cumprod()
-
-
-
-# Provide an optimised implementation for the per-bar clamping loop used
-# when enforcing ``max_new_exposure_per_bar``.  If Numba is installed the
-# helper will be JIT‑compiled for performance; otherwise a pure Python
-# implementation is used.  The function traverses an array of target
-# exposures and ensures that changes between consecutive elements do not
-# exceed the specified ``max_new`` threshold.
-def _clamp_positions_py(raw: np.ndarray, max_new: float) -> np.ndarray:
-    n = raw.size
-    if n == 0:
-        return raw
-    
-    # Path-dependent loop is not vectorizable, but we can early-exit 
-    # if the raw changes are already within limits.
-    # Note: we check diff from 0 for the first element.
-    first_ok = abs(raw[0]) <= max_new
-    if first_ok and n > 1:
-        if np.abs(np.diff(raw)).max() <= max_new:
-            return raw
-    elif first_ok and n == 1:
-        return raw
-
-    out = np.empty_like(raw)
-    prior = 0.0
-    for i in range(n):
-        target = raw[i]
-        delta = target - prior
-        if delta > max_new:
-            delta = max_new
-        elif delta < -max_new:
-            delta = -max_new
-        out[i] = prior + delta
-        prior = out[i]
-    return out
-
 
 try:
     from numba import njit  # type: ignore
@@ -71,9 +25,6 @@ try:
 except Exception:
     _clamp_positions = _clamp_positions_py
 
-
-import logging
-
 _LOG = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
@@ -81,7 +32,8 @@ class RiskLimits:
     max_portfolio_gross: float = 1.0
     max_symbol_gross: float = 1.0
     max_strategy_gross: float = 1.0
-    max_new_exposure_per_bar: float = 1.0
+    # Permit a full 1x short-to-long (or long-to-short) reversal by default.
+    max_new_exposure_per_bar: float = 2.0
     target_annual_vol: float | None = None
     max_drawdown_limit: float | None = None
     max_correlated_gross: float | None = None
@@ -562,9 +514,9 @@ def allocate_position_details(
             if df_alloc.empty or len(df_alloc) < 2:
                 raise ValueError("insufficient history for correlation estimate")
 
-            # Use a rolling window for correlation to capture time-varying risk
-            # Default to 288 bars (1 day at 5m) if not specified, but stay within history
-            corr_window = min(len(df_alloc), 288)
+            # Use a shorter rolling window so the clamp reacts to current
+            # co-movement instead of anchoring on stale historical episodes.
+            corr_window = min(len(df_alloc), 60)
             
             # Calculate rolling pairwise correlation matrices
             # To avoid huge memory/compute for very long series, we only scale where needed

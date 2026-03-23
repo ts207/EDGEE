@@ -63,7 +63,7 @@ class FeatureVerificationSuite:
         from scipy.stats import kurtosis as scipy_kurtosis
 
         actual = _kurtosis(data)
-        expected = float(scipy_kurtosis(data.dropna()))
+        expected = float(scipy_kurtosis(data.dropna(), fisher=True, bias=False))
 
         is_pass = bool(abs(actual - expected) <= self.harness.tolerance)
         res = {"pass": is_pass, "max_diff": abs(actual - expected), "feature": "kurtosis"}

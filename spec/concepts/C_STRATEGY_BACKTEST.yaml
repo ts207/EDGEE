@@ -27,6 +27,6 @@ tests:
     criteria: Sharpe > 0 under 3x spread stress
 artifacts:
   - type: engine
-    path: project/pipelines/backtest/backtest_strategies.py
+    path: project/execution/backtest/__init__.py
   - type: table
     path: data/lake/reports/backtest/equity_curves.parquet

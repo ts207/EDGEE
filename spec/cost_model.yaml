@@ -1,0 +1,18 @@
+version: 1
+description: Canonical execution-cost configuration surface for research and backtest flows.
+parameters:
+  fee_bps_per_side:
+    type: float
+    minimum: 0.0
+    default: 4.0
+    description: Explicit venue fee charged on each entry and exit fill.
+  slippage_bps_per_fill:
+    type: float
+    minimum: 0.0
+    default: 2.0
+    description: Implicit execution slippage applied to each fill.
+derived_metrics:
+  round_trip_cost_bps:
+    formula: 2 * (fee_bps_per_side + slippage_bps_per_fill)
+authoritative_defaults:
+  path: project/configs/fees.yaml

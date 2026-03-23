@@ -624,7 +624,7 @@ def _apply_hierarchical_shrinkage(
     # 3. State layer (cross-symbol)
     out["shrinkage_weight_state_group"] = np.where(
         out["lambda_state_status"] == "insufficient_data",
-        0.0,
+        1.0,
         out["n_state"]
         / (
             out["n_state"]
@@ -634,7 +634,7 @@ def _apply_hierarchical_shrinkage(
     out["shrinkage_weight_state_group"] = (
         out["shrinkage_weight_state_group"]
         .replace([np.inf, -np.inf], np.nan)
-        .fillna(0.0)
+        .fillna(1.0)
         .clip(0.0, 1.0)
     )
 

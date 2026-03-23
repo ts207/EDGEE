@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 from pathlib import Path
-from typing import Sequence
+from typing import List, Sequence
 
 from project.io.utils import (
     choose_partition_dir,

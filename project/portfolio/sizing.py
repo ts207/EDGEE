@@ -69,19 +69,16 @@ def calculate_target_notional(
         expected_return_bps=expected_return_bps,
         expected_cost_bps=expected_cost_bps,
     )
-    # expected_adverse_bps is strictly BPS
-    expected_adverse = abs(float(expected_adverse_bps) / 10_000.0)
+    expected_adverse = abs(_to_decimal_return(expected_adverse_bps))
     
-    # Use actual return variance (or a robust proxy) if available, otherwise fallback
-    # to a conservative estimate. Here we rely on vol_regime (implied/realized vol)
-    # scaled to the trade horizon if possible, or just the variance of the strategy returns.
-    
-    # Let's use max(1e-8, vol_decimal**2) assuming vol_decimal is the relevant volatility.
-    risk_variance = max(1e-8, float(vol_decimal)**2)
+    # Use the trade-level adverse-move estimate as the Kelly denominator.
+    # ``vol_regime`` is already applied separately via ``vol_adj`` and should not
+    # suppress size a second time inside the confidence term.
+    risk_scale = max(1e-8, float(expected_adverse))
     edge = float(event_score) * net_expected_return
 
     # Kelly-like multiplier
-    confidence_multiplier = np.clip(edge / risk_variance, 0.0, max_kelly_multiplier)
+    confidence_multiplier = np.clip(edge / risk_scale, 0.0, max_kelly_multiplier)
 
     # Base position size (e.g. 0.1% of portfolio per unit of confidence)
     portfolio_value = portfolio_state.get("portfolio_value", 1000000.0)

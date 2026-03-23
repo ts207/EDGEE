@@ -1,35 +1,4 @@
-"""
-Campaign Controller: Orchestrates autonomous research sequences.
-
-Phase 2.1 — Intelligence loop implemented.
-Phase 2.2 — Frontier unification and quality-weighted ordering.
-
-_propose_next_request() now reads the memory system on every cycle before
-deciding what to run next. The priority order is:
-
-  Step 1 — REPAIR:  pending mechanical failures in next_actions.json must be
-                    resolved before any new event is proposed.
-  Step 2 — EXPLOIT: if the last reflection recommends exploit_promising_region,
-                    construct a confirmatory run from recommended_next_experiment.
-  Step 3 — EXPLORE: explore_adjacent entries in next_actions.json generate runs
-                    that vary one dimension of a near-miss region.
-  Step 4 — SCAN:    advance the untested event frontier, quality-weighted from
-                    search_space.yaml annotations, filtered against high-confidence
-                    avoid_regions in belief_state.json.
-
-Phase 2.2 changes:
-  - The two legacy frontier systems (_update_frontier + a parallel write from
-    update_campaign_stats) have been removed. _update_campaign_stats now
-    delegates to update_search_intelligence() from search_intelligence.py,
-    unifying under the richer implementation that writes candidate_next_moves.
-  - Quality weights are sourced from the centralised
-    spec_registry.search_space.load_event_priority_weights() loader, which
-    parses both [QUALITY: HIGH/MODERATE/LOW] labels AND raw IG float values
-    from search_space.yaml comment lines. Raw IG values are added as a
-    fractional bonus (× IG_SCALE_FACTOR) enabling within-tier tiebreaking
-    without violating tier ordering.
-  - _load_event_quality_weights() is retained as a backward-compat shim.
-"""
+"""Campaign controller for autonomous research sequencing."""
 
 import argparse
 import hashlib
@@ -45,6 +14,7 @@ import pandas as pd
 import yaml
 
 from project.core.config import get_data_root
+from project.pipelines.research import campaign_controller_scan_support as _scan_support
 from project.pipelines.research.experiment_engine import build_experiment_plan, RegistryBundle
 from project.pipelines.research.search_intelligence import update_search_intelligence
 from project.research.knowledge.memory import memory_paths, read_memory_table
@@ -55,31 +25,11 @@ from project.spec_registry.search_space import (
 )
 _LOG = logging.getLogger(__name__)
 
-# ---------------------------------------------------------------------------
-# Phase 2.2: Quality weights are now sourced from the centralised
-# spec_registry.search_space loader which also parses raw IG values.
-#
-# _QUALITY_SCORES and _DEFAULT_QUALITY are kept as module-level names so
-# that existing test imports continue to work without modification.
-# _load_event_quality_weights is retained as a thin shim over the
-# centralised implementation.
-# ---------------------------------------------------------------------------
 _QUALITY_SCORES: Dict[str, float] = _QUALITY_SCORES_MAP
 
-
 def _load_event_quality_weights(search_space_path: Path) -> Dict[str, float]:
-    """Shim → delegates to ``spec_registry.search_space.load_event_priority_weights``.
-
-    Retained for backward compatibility with existing test imports.
-    Phase 2.2 canonical implementation lives in
-    ``project/spec_registry/search_space.py``.
-    """
+    """Backward-compatible shim for quality weight loading."""
     return load_event_priority_weights(search_space_path)
-
-
-# ---------------------------------------------------------------------------
-# Dataclasses
-# ---------------------------------------------------------------------------
 
 
 @dataclass
@@ -153,6 +103,7 @@ class CampaignController:
         self.campaign_dir.mkdir(parents=True, exist_ok=True)
         self.ledger_path = self.campaign_dir / "tested_ledger.parquet"
         self.summary_path = self.campaign_dir / "campaign_summary.json"
+        self.frontier_path = self.campaign_dir / "search_frontier.json"
         self.registries = RegistryBundle(registry_root)
 
         # Phase 2.2: quality weights now loaded via the centralised
@@ -515,626 +466,74 @@ class CampaignController:
     # ------------------------------------------------------------------
 
     def _step_scan_frontier(self, mem: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """Advance the untested frontier — sequences through scan_trigger_types.
-
-        Phase 3.1: The controller now works through the trigger-type list in
-        order.  EVENT triggers are exhausted first; then STATE, TRANSITION,
-        and FEATURE_PREDICATE are activated in turn.  This preserves the
-        narrow-attribution discipline from the vision doc — each type is only
-        activated after the prior tier is exhausted.
-
-        Phase 3.2: Context conditioning is applied to every Step-4 proposal
-        when config.enable_context_conditioning is True.
-
-        Phase 3.3 (single-family constraint within EVENT tier): All events in
-        a batch come from the highest-quality untested family.
-        """
-        for trigger_type in self.config.scan_trigger_types:
-            result = self._step_scan_for_type(trigger_type, mem)
-            if result is not None:
-                return result
-        _LOG.info("STEP 4 SCAN: all trigger-type tiers exhausted.")
-        return None
+        return _scan_support.step_scan_frontier(self, mem)
 
     def _step_scan_for_type(
         self, trigger_type: str, mem: Dict[str, Any]
     ) -> Optional[Dict[str, Any]]:
-        """Propose the next batch for a specific trigger type.
-
-        Dispatches to the appropriate per-type scan helper.
-        """
-        t = trigger_type.upper()
-        if t == "EVENT":
-            return self._step_scan_events(mem)
-        if t == "STATE":
-            return self._step_scan_states(mem)
-        if t == "TRANSITION":
-            return self._step_scan_transitions(mem)
-        if t == "FEATURE_PREDICATE":
-            return self._step_scan_feature_predicates(mem)
-        if t == "SEQUENCE":
-            return self._step_scan_sequences(mem)
-        if t == "INTERACTION":
-            return self._step_scan_interactions(mem)
-        _LOG.warning("STEP 4 SCAN: unknown trigger_type=%s — skipping.", trigger_type)
-        return None
+        return _scan_support.step_scan_for_type(self, trigger_type, mem)
 
     # ---- EVENT scan (Phase 3.1 + single-family constraint from Phase 2.3) ----
 
     def _step_scan_events(self, mem: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """Quality-weighted, single-family EVENT frontier scan (scan mode).
-
-        Enforces the single-family constraint from Phase 2.3: all events in
-        the batch come from the highest-quality untested family, keeping
-        attribution unambiguous.  Returns None when the EVENT frontier is
-        exhausted so the caller can move on to the next trigger type.
-        """
-        events_registry = self.registries.events.get("events", {})
-
-        tested_events: Set[str] = set()
-        try:
-            tested_df = read_memory_table(
-                self.config.program_id, "tested_regions", data_root=self.data_root
-            )
-            if not tested_df.empty and "event_type" in tested_df.columns:
-                tested_events = set(tested_df["event_type"].astype(str).unique())
-        except Exception:
-            _LOG.warning("Failed to read superseded stages from memory", exc_info=True)
-            pass
-
-        if self.ledger_path.exists():
-            try:
-                ledger = pd.read_parquet(self.ledger_path)
-                if "trigger_payload" in ledger.columns:
-                    def _eid(p: object) -> Optional[str]:
-                        try:
-                            parsed = json.loads(str(p))
-                            v = str(parsed.get("event_id", "")).strip()
-                            return v or None
-                        except Exception:
-                            return None
-                    extra = set(
-                        ledger["trigger_payload"].apply(_eid).dropna().astype(str)
-                    )
-                    tested_events |= extra
-            except Exception:
-                _LOG.warning("Failed to extract tested events from campaign ledger; skipping.", exc_info=True)
-        family_candidates: Dict[str, List[str]] = {}
-        for eid, meta in events_registry.items():
-            if not meta.get("enabled", True):
-                continue
-            if eid in tested_events or eid in avoid_events:
-                continue
-            family = str(meta.get("family", "UNKNOWN"))
-            family_candidates.setdefault(family, []).append(eid)
-
-        if not family_candidates:
-            _LOG.info("STEP 4 SCAN [EVENT]: frontier exhausted.")
-            return None
-
-        def _family_best_weight(fam_events: List[str]) -> float:
-            return max(self._quality_weights.get(e, _DEFAULT_QUALITY) for e in fam_events)
-
-        best_family = max(family_candidates, key=lambda f: _family_best_weight(family_candidates[f]))
-        candidates = sorted(
-            family_candidates[best_family],
-            key=lambda e: self._quality_weights.get(e, _DEFAULT_QUALITY),
-            reverse=True,
-        )
-        to_test = candidates[:3]
-        _LOG.info(
-            "STEP 4 SCAN [EVENT family=%s]: events=%s quality=%s",
-            best_family, to_test,
-            [self._quality_weights.get(e, _DEFAULT_QUALITY) for e in to_test],
-        )
-        return self._build_proposal(
-            events=to_test,
-            templates=["mean_reversion", "continuation"],
-            horizons=[12, 24],
-            description=f"EVENT scan [{best_family}] — {', '.join(to_test)}",
-            promotion_enabled=False,
-            date_scope=("2024-01-01", "2024-01-31"),
-            trigger_type="EVENT",
-            contexts=self._context_for_proposal(),
-        )
+        return _scan_support.step_scan_events(self, mem)
 
     # ---- STATE scan (Phase 3.1) ----
 
     def _step_scan_states(self, mem: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """Propose the next batch of STATE triggers from search_space.yaml.
-
-        Phase 3.1: STATE triggers capture carry, persistence, and
-        regime-conditional mean reversion.  States from search_space.yaml
-        that have not yet been tested are batched up to 4 at a time.
-        """
-        ss_states = self._load_search_space_states()
-        if not ss_states:
-            return None
-
-        tested_states: Set[str] = set()
-        try:
-            tested_df = read_memory_table(
-                self.config.program_id, "tested_regions", data_root=self.data_root
-            )
-            if not tested_df.empty and "event_type" in tested_df.columns:
-                # STATE triggers store the state_id in event_type column
-                if "trigger_type" in tested_df.columns:
-                    state_rows = tested_df[tested_df["trigger_type"].astype(str) == "STATE"]
-                else:
-                    state_rows = pd.DataFrame()
-                if not state_rows.empty:
-                    tested_states = set(state_rows["event_type"].astype(str).unique())
-        except Exception:
-            _LOG.warning("Failed to read superseded stages from memory", exc_info=True)
-            pass
-
-        candidates = [s for s in ss_states if s not in tested_states]
-        if not candidates:
-            _LOG.info("STEP 4 SCAN [STATE]: frontier exhausted.")
-            return None
-
-        to_test = candidates[:4]
-        _LOG.info("STEP 4 SCAN [STATE]: states=%s", to_test)
-        return self._build_proposal(
-            events=[],
-            templates=["mean_reversion", "continuation"],
-            horizons=[12, 24],
-            description=f"STATE scan — {', '.join(to_test)}",
-            promotion_enabled=False,
-            date_scope=("2024-01-01", "2024-03-31"),
-            trigger_type="STATE",
-            states=to_test,
-            contexts=self._context_for_proposal(),
-        )
+        return _scan_support.step_scan_states(self, mem)
 
     # ---- TRANSITION scan (Phase 3.1) ----
 
     def _step_scan_transitions(self, mem: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """Propose regime-change TRANSITION triggers from search_space.yaml.
-
-        Phase 3.1: TRANSITION triggers fire at the highest dislocation point —
-        the exact moment of regime change.  Each transition is a from→to pair.
-        """
-        ss_transitions = self._load_search_space_transitions()
-        if not ss_transitions:
-            return None
-
-        tested_keys: Set[str] = set()
-        try:
-            tested_df = read_memory_table(
-                self.config.program_id, "tested_regions", data_root=self.data_root
-            )
-            if not tested_df.empty and "trigger_type" in tested_df.columns:
-                tr_rows = tested_df[tested_df["trigger_type"].astype(str) == "TRANSITION"]
-                if not tr_rows.empty and "event_type" in tr_rows.columns:
-                    tested_keys = set(tr_rows["event_type"].astype(str).unique())
-        except Exception:
-            _LOG.warning("Failed to read superseded stages from memory", exc_info=True)
-            pass
-
-        # Filter transitions not yet tested (key = "from→to")
-        candidates = [
-            t for t in ss_transitions
-            if f"{t['from_state']}→{t['to_state']}" not in tested_keys
-        ]
-        if not candidates:
-            _LOG.info("STEP 4 SCAN [TRANSITION]: frontier exhausted.")
-            return None
-
-        to_test = candidates[:3]
-        labels = [f"{t['from_state']}→{t['to_state']}" for t in to_test]
-        _LOG.info("STEP 4 SCAN [TRANSITION]: %s", labels)
-        return self._build_proposal(
-            events=[],
-            templates=["mean_reversion", "continuation"],
-            horizons=[12, 24],
-            description=f"TRANSITION scan — {', '.join(labels)}",
-            promotion_enabled=False,
-            date_scope=("2024-01-01", "2024-03-31"),
-            trigger_type="TRANSITION",
-            transitions=to_test,
-            contexts=self._context_for_proposal(),
-        )
+        return _scan_support.step_scan_transitions(self, mem)
 
     # ---- FEATURE_PREDICATE scan (Phase 3.5) ----
 
     def _step_scan_feature_predicates(self, mem: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """Propose FEATURE_PREDICATE triggers from static + MI-generated candidates.
-
-        Phase 3.5: Static predicates from search_space.yaml are always included.
-        Phase 4.1: MI-generated predicates from the most recent feature_mi_scan
-        run are merged in, sorted by MI score descending so the highest-signal
-        data-driven predicates are proposed first.
-
-        Deduplication is by (feature, operator, threshold) key — if a static
-        predicate overlaps with an MI-generated one, it is kept once.
-        """
-        static_preds = self._load_search_space_predicates()
-        mi_preds = self._load_mi_candidate_predicates()
-
-        # Merge: static first (preserves manual curation), MI fills in new ones
-        def _pred_key(p: Dict[str, Any]) -> str:
-            return f"{p['feature']}|{p['operator']}|{p['threshold']}"
-
-        seen_keys: set[str] = set()
-        merged: List[Dict[str, Any]] = []
-        for pred in static_preds:
-            k = _pred_key(pred)
-            if k not in seen_keys:
-                seen_keys.add(k)
-                merged.append(pred)
-
-        # MI predicates sorted by score descending — best signal first
-        mi_sorted = sorted(mi_preds, key=lambda p: float(p.get("mi_score", 0.0)), reverse=True)
-        for pred in mi_sorted:
-            k = _pred_key(pred)
-            if k not in seen_keys:
-                seen_keys.add(k)
-                merged.append(pred)
-
-        if not merged:
-            _LOG.info("STEP 4 SCAN [FEATURE_PREDICATE]: no predicates available.")
-            return None
-
-        tested_keys: set[str] = set()
-        try:
-            tested_df = read_memory_table(
-                self.config.program_id, "tested_regions", data_root=self.data_root
-            )
-            if not tested_df.empty and "trigger_type" in tested_df.columns:
-                fp_rows = tested_df[tested_df["trigger_type"].astype(str) == "FEATURE_PREDICATE"]
-                if not fp_rows.empty and "event_type" in fp_rows.columns:
-                    tested_keys = set(fp_rows["event_type"].astype(str).unique())
-        except Exception:
-            _LOG.warning("Failed to read superseded stages from memory", exc_info=True)
-            pass
-
-        candidates = [p for p in merged if _pred_key(p) not in tested_keys]
-        if not candidates:
-            _LOG.info("STEP 4 SCAN [FEATURE_PREDICATE]: frontier exhausted.")
-            return None
-
-        to_test = candidates[:8]
-        mi_count = sum(1 for p in to_test if p.get("source") == "mi_scan")
-        _LOG.info(
-            "STEP 4 SCAN [FEATURE_PREDICATE]: %d predicates (%d static, %d MI-generated)",
-            len(to_test), len(to_test) - mi_count, mi_count,
-        )
-        return self._build_proposal(
-            events=[],
-            templates=["mean_reversion", "continuation"],
-            horizons=[12, 24],
-            description=f"FEATURE_PREDICATE scan — {len(to_test)} predicates ({mi_count} MI)",
-            promotion_enabled=False,
-            date_scope=("2024-01-01", "2024-03-31"),
-            trigger_type="FEATURE_PREDICATE",
-            feature_predicates=to_test,
-            contexts=self._context_for_proposal(),
-        )
+        return _scan_support.step_scan_feature_predicates(self, mem)
 
     # ---- SEQUENCE scan (Phase 3.4) ----
 
     def _step_scan_sequences(self, mem: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """Generate SEQUENCE triggers seeded from weak-signal event pairs.
-
-        Phase 3.4: After the event scan, reads tested_regions for event pairs
-        where mean_return_bps > 0 and t_stat nominally significant (> 1.0)
-        but which did not pass promotion gates.  These are candidates for
-        temporal co-occurrence alpha — neither event alone is strong enough,
-        but the sequence may be.
-        """
-        pairs = self._find_weak_signal_event_pairs()
-        if not pairs:
-            _LOG.info("STEP 4 SCAN [SEQUENCE]: no weak-signal pairs found.")
-            return None
-
-        sequences = [list(p) for p in pairs[:5]]
-        labels = [f"{a}→{b}" for a, b in sequences]
-        _LOG.info("STEP 4 SCAN [SEQUENCE]: pairs=%s", labels)
-        return self._build_proposal(
-            events=[],
-            templates=["mean_reversion", "continuation"],
-            horizons=[12, 24],
-            description=f"SEQUENCE scan — {', '.join(labels)}",
-            promotion_enabled=False,
-            date_scope=("2024-01-01", "2024-03-31"),
-            trigger_type="SEQUENCE",
-            sequences={"include": sequences, "max_gaps_bars": [6, 12]},
-            contexts=self._context_for_proposal(),
-        )
+        return _scan_support.step_scan_sequences(self, mem)
 
     # ---- INTERACTION scan (sixth trigger type — cross-dimensional motifs) ----
 
     def _step_scan_interactions(self, mem: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """Propose INTERACTION triggers from spec/grammar/interaction_registry.yaml.
-
-        INTERACTION triggers fire when two conditions are simultaneously true
-        (op=AND/CONFIRM) or when one fires while another is absent (op=EXCLUDE).
-        They capture cross-dimensional alpha that neither constituent alone detects.
-
-        Motifs are loaded from the domain interaction registry and proposed in
-        batches of up to 3.  Already-tested interaction keys are filtered out.
-        """
-        motifs = self._load_interaction_motifs()
-        if not motifs:
-            _LOG.info("STEP 4 SCAN [INTERACTION]: no motifs in interaction_registry.yaml.")
-            return None
-
-        tested_keys: Set[str] = set()
-        try:
-            tested_df = read_memory_table(
-                self.config.program_id, "tested_regions", data_root=self.data_root
-            )
-            if not tested_df.empty and "trigger_type" in tested_df.columns:
-                int_rows = tested_df[tested_df["trigger_type"].astype(str) == "INTERACTION"]
-                if not int_rows.empty and "event_type" in int_rows.columns:
-                    tested_keys = set(int_rows["event_type"].astype(str).unique())
-        except Exception:
-            _LOG.warning("Failed to read superseded stages from memory", exc_info=True)
-            pass
-
-        def _motif_key(m: Dict[str, Any]) -> str:
-            return f"{m['left']}|{m['op']}|{m['right']}"
-
-        candidates = [m for m in motifs if _motif_key(m) not in tested_keys]
-        if not candidates:
-            _LOG.info("STEP 4 SCAN [INTERACTION]: frontier exhausted.")
-            return None
-
-        to_test = candidates[:3]
-        labels = [f"{m['left']} {m['op']} {m['right']}" for m in to_test]
-        _LOG.info("STEP 4 SCAN [INTERACTION]: %s", labels)
-
-        # Build interaction specs for the trigger_space
-        interactions = [
-            {
-                "left": m["left"],
-                "right": m["right"],
-                "op": m["op"].upper(),
-                "lag": int(m.get("lag", 6)),
-            }
-            for m in to_test
-        ]
-
-        return self._build_proposal(
-            events=[],
-            templates=["mean_reversion", "continuation"],
-            horizons=[12, 24],
-            description=f"INTERACTION scan — {', '.join(labels)}",
-            promotion_enabled=False,
-            date_scope=("2024-01-01", "2024-03-31"),
-            trigger_type="INTERACTION",
-            interactions=interactions,
-            contexts=self._context_for_proposal(),
-        )
+        return _scan_support.step_scan_interactions(self, mem)
 
     def _load_interaction_motifs(self) -> List[Dict[str, Any]]:
-        """Load interaction motifs from spec/grammar/interaction_registry.yaml."""
-        try:
-            import yaml as _yaml
-            candidates = [
-                self._search_space_path.parent / "grammar" / "interaction_registry.yaml",
-                Path(__file__).parent.parent.parent.parent / "spec" / "grammar" / "interaction_registry.yaml",
-            ]
-            path = next((p for p in candidates if p.exists()), None)
-            if path is None:
-                return []
-            raw = _yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-            motifs = raw.get("motifs", [])
-            return [
-                m for m in motifs
-                if isinstance(m, dict) and "left" in m and "right" in m and "op" in m
-            ]
-        except Exception:
-            _LOG.warning("Failed to load search space component from %s", self._search_space_path, exc_info=True)
-            return []
+        return _scan_support.load_interaction_motifs(self)
 
     # ---- Cross-family explore (Phase 2.3, updated for trigger types) ----
 
     def _step_scan_frontier_cross_family(self, mem: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """Advance the EVENT frontier across all families (explore mode).
-
-        Phase 2.3 / Phase 3.1: explore mode removes the single-family
-        constraint and selects up to 5 events across all families.  Context
-        conditioning is applied when enabled.
-        """
-        events_registry = self.registries.events.get("events", {})
-        enabled_events: List[str] = [
-            eid for eid, meta in events_registry.items() if meta.get("enabled", True)
-        ]
-
-        tested_events: Set[str] = set()
-        try:
-            tested_df = read_memory_table(
-                self.config.program_id, "tested_regions", data_root=self.data_root
-            )
-            if not tested_df.empty and "event_type" in tested_df.columns:
-                tested_events = set(tested_df["event_type"].astype(str).unique())
-        except Exception:
-            _LOG.warning("Failed to read superseded stages from memory", exc_info=True)
-            pass
-
-        if self.ledger_path.exists():
-            try:
-                ledger = pd.read_parquet(self.ledger_path)
-                if "trigger_payload" in ledger.columns:
-                    def _eid2(p: object) -> Optional[str]:
-                        try:
-                            parsed = json.loads(str(p))
-                            v = str(parsed.get("event_id", "")).strip()
-                            return v or None
-                        except Exception:
-                            return None
-                    extra = set(ledger["trigger_payload"].apply(_eid2).dropna().astype(str))
-                    tested_events |= extra
-            except Exception:
-                _LOG.warning("Failed to extract tested events from campaign ledger (step 4); skipping.", exc_info=True)
-
-        avoid_events: Set[str] = mem["avoid_event_types"]
-        candidates = [e for e in enabled_events if e not in tested_events and e not in avoid_events]
-        if not candidates:
-            _LOG.info("STEP 4 EXPLORE (cross-family): frontier exhausted.")
-            return None
-
-        candidates.sort(key=lambda e: self._quality_weights.get(e, _DEFAULT_QUALITY), reverse=True)
-        to_test = candidates[:5]
-        families = {str(events_registry.get(e, {}).get("family", "?")) for e in to_test}
-        _LOG.info("STEP 4 EXPLORE (cross-family=%s): events=%s", sorted(families), to_test)
-
-        return self._build_proposal(
-            events=to_test,
-            templates=["mean_reversion", "continuation"],
-            horizons=[12, 24],
-            description=f"Cross-family explore — {', '.join(to_test)}",
-            promotion_enabled=False,
-            date_scope=("2024-01-01", "2024-03-31"),
-            trigger_type="EVENT",
-            contexts=self._context_for_proposal(),
-        )
+        return _scan_support.step_scan_frontier_cross_family(self, mem)
 
     # ---- Search-space YAML helpers (Phase 3.1/3.4/3.5) ----
 
     def _load_search_space_states(self) -> List[str]:
-        """Return state IDs from spec/search_space.yaml triggers.states section."""
-        try:
-            import yaml as _yaml
-            if not self._search_space_path.exists():
-                return []
-            raw = _yaml.safe_load(self._search_space_path.read_text(encoding="utf-8"))
-            return [str(s) for s in (raw or {}).get("triggers", {}).get("states", [])]
-        except Exception:
-            _LOG.warning("Failed to load search space component from %s", self._search_space_path, exc_info=True)
-            return []
+        return _scan_support.load_search_space_states(self)
 
     def _load_search_space_transitions(self) -> List[Dict[str, str]]:
-        """Return transition dicts from spec/search_space.yaml triggers.transitions."""
-        try:
-            import yaml as _yaml
-            if not self._search_space_path.exists():
-                return []
-            raw = _yaml.safe_load(self._search_space_path.read_text(encoding="utf-8"))
-            out = []
-            for t in (raw or {}).get("triggers", {}).get("transitions", []):
-                if isinstance(t, dict) and "from" in t and "to" in t:
-                    out.append({"from_state": str(t["from"]), "to_state": str(t["to"])})
-            return out
-        except Exception:
-            _LOG.warning("Failed to load search space component from %s", self._search_space_path, exc_info=True)
-            return []
+        return _scan_support.load_search_space_transitions(self)
 
     def _load_search_space_predicates(self) -> List[Dict[str, Any]]:
-        """Return feature predicate dicts from spec/search_space.yaml."""
-        try:
-            import yaml as _yaml
-            if not self._search_space_path.exists():
-                return []
-            raw = _yaml.safe_load(self._search_space_path.read_text(encoding="utf-8"))
-            preds = (raw or {}).get("triggers", {}).get("feature_predicates", [])
-            return [p for p in preds if isinstance(p, dict) and "feature" in p]
-        except Exception:
-            _LOG.warning("Failed to load search space component from %s", self._search_space_path, exc_info=True)
-            return []
+        return _scan_support.load_search_space_predicates(self)
 
     def _load_mi_candidate_predicates(self) -> List[Dict[str, Any]]:
-        """Phase 4.1 — Load MI-generated predicate candidates.
-
-        Scans ``data/reports/feature_mi/*/candidate_predicates.json`` for the
-        most recently written MI scan artefact and returns its predicate list.
-        Returns ``[]`` on any I/O or parse failure so the controller always
-        falls back gracefully to the static predicate set.
-        """
-        try:
-            feature_mi_root = self.data_root / "reports" / "feature_mi"
-            if not feature_mi_root.exists():
-                return []
-            # Find all candidate_predicates.json files under any run sub-dir
-            candidates = sorted(
-                feature_mi_root.rglob("candidate_predicates.json"),
-                key=lambda p: p.stat().st_mtime,
-                reverse=True,
-            )
-            if not candidates:
-                return []
-            most_recent = candidates[0]
-            raw = json.loads(most_recent.read_text(encoding="utf-8"))
-            if not isinstance(raw, list):
-                return []
-            # Keep only well-formed predicate dicts
-            valid = [
-                p for p in raw
-                if isinstance(p, dict) and all(k in p for k in ("feature", "operator", "threshold"))
-            ]
-            # Sort by MI score descending — highest-signal first regardless of file order
-            valid.sort(key=lambda p: float(p.get("mi_score", 0.0)), reverse=True)
-            return valid
-        except Exception as exc:
-            _LOG.debug("_load_mi_candidate_predicates: %s", exc)
-            return []
+        return _scan_support.load_mi_candidate_predicates(self)
 
     def _find_weak_signal_event_pairs(self) -> List[tuple]:
-        """Phase 3.4 — find event pairs with weak individual signal for SEQUENCE seeding.
-
-        Returns pairs of (event_a, event_b) where both events have
-        mean_return_bps > 0 and t_stat > 1.0 but did not pass promotion gates,
-        sorted by combined mean_return_bps descending.
-        """
-        try:
-            tested_df = read_memory_table(
-                self.config.program_id, "tested_regions", data_root=self.data_root
-            )
-        except Exception:
-            _LOG.warning("Failed to load search space component from %s", self._search_space_path, exc_info=True)
-            return []
-
-        if tested_df.empty:
-            return []
-
-        required = {"event_type", "mean_return_bps", "gate_promo_statistical"}
-        if not required.issubset(tested_df.columns):
-            return []
-
-        # Candidates: positive return, nominally significant, but not promoted
-        candidates = tested_df[
-            (pd.to_numeric(tested_df["mean_return_bps"], errors="coerce").fillna(0) > 0)
-            & (tested_df["gate_promo_statistical"].astype(str).str.lower().isin(["false", "0", "fail"]))
-            & (tested_df["trigger_type"].astype(str) == "EVENT" if "trigger_type" in tested_df.columns else True)
-        ].copy()
-
-        if candidates.empty or "event_type" not in candidates.columns:
-            return []
-
-        # Aggregate per event_type — pick events with best avg mean_return_bps
-        agg = (
-            candidates.groupby("event_type")["mean_return_bps"]
-            .apply(lambda s: pd.to_numeric(s, errors="coerce").mean())
-            .sort_values(ascending=False)
-        )
-
-        top_events = list(agg.head(6).index)  # Up to 6 events → up to 15 pairs
-        pairs = []
-        for i, a in enumerate(top_events):
-            for b in top_events[i + 1:]:
-                pairs.append((a, b))
-
-        return pairs[:5]  # Return top 5 pairs
+        return _scan_support.find_weak_signal_event_pairs(self)
 
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
 
     def _templates_for_event(self, event_id: str) -> List[str]:
-        """Return allowed templates for an event's canonical family.
-
-        Falls back to ["mean_reversion", "continuation"] if the event or
-        its family cannot be resolved from the registry.
-        """
-        events_registry = self.registries.events.get("events", {})
-        family = str(events_registry.get(event_id, {}).get("family", "")).strip()
-        template_reg = self.registries.templates.get("families", {})
-        templates: List[str] = template_reg.get(family, {}).get("allowed_templates", [])
-        if not templates:
-            templates = ["mean_reversion", "continuation"]
-        return templates
+        return _scan_support.templates_for_event(self, event_id)
 
     def _build_proposal(
         self,
@@ -1156,67 +555,25 @@ class CampaignController:
         # Phase 3.2 — context conditioning
         contexts: Optional[Dict[str, List[str]]] = None,
     ) -> Dict[str, Any]:
-        """Construct a valid experiment config dict ready for yaml.dump().
-
-        Phase 3.1: trigger_type controls which expansion path runs.
-        Phase 3.2: contexts adds regime conditioning to the proposal.
-        """
-        start, end = date_scope
-        trigger_space: Dict[str, Any] = {
-            "allowed_trigger_types": [trigger_type],
-        }
-        if trigger_type == "EVENT":
-            trigger_space["events"] = {"include": events}
-        elif trigger_type == "STATE":
-            trigger_space["states"] = {"include": states or []}
-        elif trigger_type == "TRANSITION":
-            trigger_space["transitions"] = {"include": transitions or []}
-        elif trigger_type == "FEATURE_PREDICATE":
-            trigger_space["feature_predicates"] = {"include": feature_predicates or []}
-        elif trigger_type == "SEQUENCE":
-            trigger_space["sequences"] = sequences or {"include": [], "max_gaps_bars": [6, 12]}
-        elif trigger_type == "INTERACTION":
-            trigger_space["interactions"] = {"include": interactions or []}
-
-        return {
-            "program_id": self.config.program_id,
-            "run_mode": "research",
-            "description": description,
-            "instrument_scope": {
-                "instrument_classes": ["crypto"],
-                "symbols": ["BTCUSDT"],
-                "timeframe": "5m",
-                "start": start,
-                "end": end,
-            },
-            "trigger_space": trigger_space,
-            "templates": {"include": templates},
-            "evaluation": {
-                "horizons_bars": horizons,
-                "directions": ["long", "short"],
-                "entry_lags": [1, 2],
-            },
-            # Phase 3.2: pass through context conditioning if provided
-            "contexts": {"include": contexts or {}},
-            "search_control": {
-                "max_hypotheses_total": 1000,
-                "max_hypotheses_per_template": 500,
-                "max_hypotheses_per_event_family": 500,
-            },
-            "promotion": {"enabled": promotion_enabled},
-        }
+        return _scan_support.build_proposal(
+            self,
+            events=events,
+            templates=templates,
+            horizons=horizons,
+            description=description,
+            promotion_enabled=promotion_enabled,
+            date_scope=date_scope,
+            trigger_type=trigger_type,
+            states=states,
+            transitions=transitions,
+            feature_predicates=feature_predicates,
+            sequences=sequences,
+            interactions=interactions,
+            contexts=contexts,
+        )
 
     def _context_for_proposal(self) -> Dict[str, List[str]]:
-        """Return context conditioning dict based on config.enable_context_conditioning.
-
-        Phase 3.2: When enabled, returns vol_regime: [low, high] so the
-        expansion engine generates regime-conditional hypotheses in a single
-        pass.  Extending to vol × trend uses the same mechanism — just add
-        the trend_state key.
-        """
-        if not self.config.enable_context_conditioning:
-            return {}
-        return {"vol_regime": ["low", "high"]}
+        return _scan_support.context_for_proposal(self)
 
     # ------------------------------------------------------------------
     # Pipeline execution
@@ -1333,7 +690,56 @@ class CampaignController:
             summary.top_hypotheses = top.to_dict(orient="records")
 
         self.summary_path.write_text(summary.to_json())
+        self._write_frontier_compat_from_ledger(df)
         return summary
+
+    def _write_frontier_compat_from_ledger(self, df: pd.DataFrame) -> None:
+        frontier: Dict[str, Any] = {}
+        if self.frontier_path.exists():
+            try:
+                frontier = json.loads(self.frontier_path.read_text(encoding="utf-8"))
+            except Exception:
+                frontier = {}
+
+        events_registry = self.registries.events.get("events", {})
+        enabled_events = sorted(
+            eid for eid, meta in events_registry.items() if bool(meta.get("enabled", True))
+        )
+        tested_events: Set[str] = set()
+
+        if "event_type" in df.columns:
+            tested_events |= set(df["event_type"].dropna().astype(str))
+
+        if "trigger_payload" in df.columns:
+            def _payload_event_id(payload: object) -> Optional[str]:
+                try:
+                    parsed = json.loads(str(payload))
+                except Exception:
+                    return None
+                value = str(parsed.get("event_id", "")).strip()
+                return value or None
+
+            tested_events |= set(df["trigger_payload"].apply(_payload_event_id).dropna().astype(str))
+
+        untested_events = [eid for eid in enabled_events if eid not in tested_events]
+        partially_explored_families: List[str] = []
+        family_to_events: Dict[str, List[str]] = {}
+        for eid in enabled_events:
+            family = str(events_registry.get(eid, {}).get("family", "")).strip()
+            if family:
+                family_to_events.setdefault(family, []).append(eid)
+        for family, family_events in family_to_events.items():
+            tested_count = sum(1 for eid in family_events if eid in tested_events)
+            if 0 < tested_count < len(family_events):
+                partially_explored_families.append(family)
+
+        frontier["untested_events"] = untested_events
+        frontier["untested_registry_events"] = untested_events
+        frontier["partially_explored_families"] = sorted(partially_explored_families)
+        self.frontier_path.write_text(
+            json.dumps(frontier, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
 
     # ------------------------------------------------------------------
     # Halt check

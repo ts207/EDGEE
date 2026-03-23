@@ -2,10 +2,9 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
-from typing import Dict, Any, List, Optional
+from typing import Any, Callable, Dict, List
 
 import numpy as np
-import pandas as pd
 
 _LOG = logging.getLogger(__name__)
 
@@ -15,14 +14,20 @@ class DataHealthMonitor:
     Supervises data feed freshness and connection heartbeats.
     """
 
-    def __init__(self, stale_threshold_sec: float = 10.0):
+    def __init__(
+        self,
+        stale_threshold_sec: float = 10.0,
+        *,
+        now_fn: Callable[[], datetime] | None = None,
+    ):
         self.stale_threshold_sec = stale_threshold_sec
+        self._now_fn = now_fn or (lambda: datetime.now(timezone.utc))
         self.last_update_times: Dict[str, datetime] = {}
         self.status: Dict[str, str] = {}  # "HEALTHY" | "STALE" | "DISCONNECTED"
 
     def on_event(self, symbol: str, stream: str):
         """Record the arrival of a new data event."""
-        now = datetime.now(timezone.utc)
+        now = self._now_fn()
         key = f"{symbol}:{stream}"
         self.last_update_times[key] = now
         self.status[key] = "HEALTHY"
@@ -31,7 +36,7 @@ class DataHealthMonitor:
         """
         Scan all monitored streams and identify stale feeds.
         """
-        now = datetime.now(timezone.utc)
+        now = self._now_fn()
         stale_streams = []
 
         for key, last_time in self.last_update_times.items():

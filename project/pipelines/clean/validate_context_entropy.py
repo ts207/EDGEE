@@ -6,7 +6,7 @@ import logging
 import sys
 import json
 import itertools
-from typing import Dict, List, Any
+from typing import Any, Dict, List, Tuple
 import networkx as nx
 
 import numpy as np

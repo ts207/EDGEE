@@ -38,6 +38,16 @@ from project.research.utils.decision_safety import (
 
 from project.core.execution_costs import resolve_execution_costs
 from project.io.utils import ensure_dir, write_parquet
+from project.pipelines.research.compile_strategy_blueprints_artifacts import (
+    write_strategy_contract_artifacts as _write_strategy_contract_artifacts_impl,
+)
+from project.pipelines.research.compile_strategy_blueprints_selection_support import (
+    candidate_id as _candidate_id,
+    load_gates_spec as _load_gates_spec,
+    passes_fallback_gate as _passes_fallback_gate,
+    passes_quality_floor as _passes_quality_floor,
+    rank_key as _rank_key,
+)
 from project.portfolio import AllocationSpec
 from project.specs.objective import (
     assert_low_capital_contract,
@@ -53,8 +63,6 @@ from project.research.candidate_schema import ensure_candidate_schema
 from project.research.blueprint_compilation import compile_blueprint
 from project.research.helpers.selection import (
     choose_event_rows as _selection_choose_event_rows,
-    passes_fallback_gate as _selection_passes_fallback_gate,
-    rank_key as _selection_rank_key,
 )
 from project.strategy.dsl.schema import Blueprint
 
@@ -64,33 +72,6 @@ def _copy_model(instance: Any, **updates: object) -> Any:
     if callable(model_copy):
         return model_copy(update=updates)
     return dataclasses.replace(instance, **updates)
-
-
-def _candidate_id(row: Dict[str, object], idx: int) -> str:
-    candidate_id = str(row.get("candidate_id", "")).strip()
-    if candidate_id:
-        return candidate_id
-    event = str(row.get("event", row.get("event_type", "candidate"))).strip() or "candidate"
-    return f"{event}_{idx}"
-
-
-def _load_gates_spec() -> Dict[str, Any]:
-    from project.specs.gates import load_gates_spec
-
-    return load_gates_spec(PROJECT_ROOT.parent)
-
-
-def _rank_key(row: Dict[str, object]) -> Tuple[float, float, float, float, str]:
-    return _selection_rank_key(row, safe_float_fn=safe_float, as_bool_fn=as_bool)
-
-
-def _passes_fallback_gate(row: Dict[str, object], gates: Dict[str, Any]) -> bool:
-    return _selection_passes_fallback_gate(
-        row,
-        gates,
-        safe_float_fn=safe_float,
-        safe_int_fn=safe_int,
-    )
 
 
 def _as_bool(value: object) -> bool:
@@ -153,91 +134,6 @@ def _choose_event_rows(
         as_bool_fn=_as_bool,
         safe_float_fn=_safe_float,
     )
-
-
-def _passes_quality_floor(
-    row: Dict[str, Any],
-    *,
-    strict_cost_fields: bool = False,
-    min_events: int = 0,
-    min_robustness: float = 0.0,
-    require_positive_expectancy: bool = False,
-    expected_cost_digest: str | None = None,
-    min_tob_coverage: float = 0.0,
-    min_net_expectancy_bps: float = 0.0,
-    max_fee_plus_slippage_bps: float = 1e9,
-    max_daily_turnover_multiple: float = 1e9,
-) -> bool:
-    n = safe_int(row.get("n_events"), 0)
-    if n < min_events:
-        return False
-    robustness = coerce_numeric_nan(row.get("robustness_score"))
-    if min_robustness > 0.0 and not finite_ge(robustness, min_robustness):
-        return False
-    tob_cov = coerce_numeric_nan(row.get("tob_coverage"))
-    if min_tob_coverage > 0.0 and not finite_ge(tob_cov, min_tob_coverage):
-        return False
-    net_exp = coerce_numeric_nan(
-        row.get(
-            "bridge_validation_after_cost_bps",
-            row.get("after_cost_expectancy_per_trade", 0.0) * 10_000.0,
-        )
-    )
-    if min_net_expectancy_bps > 0.0 and not finite_ge(net_exp, min_net_expectancy_bps):
-        return False
-    if require_positive_expectancy and not finite_ge(net_exp, 1e-9):
-        return False
-    turnover = coerce_numeric_nan(row.get("turnover_proxy_mean"))
-    turnover_cap = (
-        float(max_daily_turnover_multiple)
-        if max_daily_turnover_multiple is not None
-        else float("inf")
-    )
-    if np.isfinite(turnover_cap) and not finite_le(turnover, turnover_cap):
-        return False
-    if expected_cost_digest is not None:
-        actual_digest = str(row.get("cost_config_digest", "")).strip()
-        if actual_digest and actual_digest != str(expected_cost_digest).strip():
-            return False
-    if strict_cost_fields:
-        cost = coerce_numeric_nan(row.get("bridge_effective_cost_bps_per_trade"))
-        cost_cap = (
-            float(max_fee_plus_slippage_bps)
-            if max_fee_plus_slippage_bps is not None
-            else float("inf")
-        )
-        if np.isfinite(cost_cap) and not finite_le(cost, cost_cap):
-            return False
-    return True
-
-
-def _passes_fallback_gate(row: Dict[str, Any], gate_spec: Dict[str, Any]) -> bool:
-    t_stat = coerce_numeric_nan(row.get("t_stat"))
-    min_t = coerce_numeric_nan(gate_spec.get("min_t_stat"))
-    if not np.isfinite(min_t):
-        min_t = 0.0
-
-    if not finite_ge(t_stat, min_t):
-        return False
-
-    exp_bps = (
-        coerce_numeric_nan(
-            row.get("after_cost_expectancy_per_trade", row.get("expectancy_bps", 0.0) / 10_000.0)
-        )
-        * 10_000.0
-    )
-    min_exp = coerce_numeric_nan(gate_spec.get("min_after_cost_expectancy_bps"))
-    if not np.isfinite(min_exp):
-        min_exp = 0.0
-
-    if not finite_ge(exp_bps, min_exp):
-        return False
-
-    n = safe_int(row.get("n_events"), 0)
-    min_n = safe_int(gate_spec.get("min_sample_size"), 0)
-    if n < min_n:
-        return False
-    return True
 
 
 def _build_strategy_contract(
@@ -452,143 +348,26 @@ def _write_strategy_contract_artifacts(
     # Phase 4.4: path to live portfolio state JSON written by the live runner
     portfolio_state_path: str | None = None,
 ) -> Dict[str, Any]:
-    executable_dir = out_dir / "executable_strategy_specs"
-    allocation_dir = out_dir / "allocation_specs"
-    ensure_dir(executable_dir)
-    ensure_dir(allocation_dir)
-
-    executable_entries = []
-    allocation_entries = []
-    executor_lines = []
-
-    # Phase 4.4: Load live portfolio state to inform marginal contribution check.
-    # The live runner writes gross_exposure, bucket_exposures, and active strategy
-    # IDs so that new promotions are sized against what is already deployed.
-    live_portfolio_state: Dict[str, Any] = {}
-    if portfolio_state_path:
-        try:
-            ps_path = Path(portfolio_state_path)
-            if ps_path.exists():
-                live_portfolio_state = json.loads(ps_path.read_text(encoding="utf-8"))
-                LOGGER.info(
-                    "Loaded portfolio state from %s: gross_exposure=%.2f",
-                    ps_path,
-                    float(live_portfolio_state.get("gross_exposure", 0.0)),
-                )
-        except Exception as exc:
-            LOGGER.warning("Could not load portfolio_state_path %s: %s", portfolio_state_path, exc)
-
-    # Seed promoted_blueprints from live portfolio state so the marginal
-    # contribution check considers strategies already deployed, not just those
-    # compiled in this batch.  Each deployed strategy ID is represented as a
-    # lightweight stub carrying its recorded sizing parameters.
-    promoted_blueprints: list[Blueprint] = []
-    for deployed in live_portfolio_state.get("deployed_strategies", []):
-        try:
-            stub = MagicMock()
-            stub.id = str(deployed.get("blueprint_id", ""))
-            stub.sizing = MagicMock()
-            stub.sizing.risk_per_trade = float(deployed.get("risk_per_trade", 0.01))
-            stub.sizing.max_gross_leverage = float(deployed.get("max_gross_leverage", 2.0))
-            stub.sizing.portfolio_risk_budget = float(deployed.get("portfolio_risk_budget", 1.0))
-            promoted_blueprints.append(stub)
-        except Exception:
-            pass
-
-    marginal_contribution_log: list[Dict[str, Any]] = []
-
-    for bp in blueprints:
-        # Phase 4.4 — pre-promotion marginal contribution check
-        passes_mc, max_corr = _check_marginal_contribution(bp, promoted_blueprints)
-        marginal_contribution_log.append({
-            "blueprint_id": bp.id,
-            "max_similarity": round(max_corr, 4),
-            "passes_marginal_check": passes_mc,
-        })
-        if not passes_mc:
-            LOGGER.warning(
-                "Phase 4.4: Blueprint %s has high similarity (%.3f) to existing promoted "
-                "strategies — AllocationSpec risk_per_trade will be reduced.",
-                bp.id, max_corr,
-            )
-
-        executable_spec = _build_executable_strategy_spec(
-            blueprint=bp,
-            run_id=run_id,
-            retail_profile=retail_profile,
-            low_capital_contract=low_capital_contract,
-            effective_max_concurrent_positions=effective_max_concurrent_positions,
-            effective_per_position_notional_cap_usd=effective_per_position_notional_cap_usd,
-            default_fee_tier=default_fee_tier,
-            fees_bps_per_side=fees_bps_per_side,
-            slippage_bps_per_fill=slippage_bps_per_fill,
-        )
-        audit_row = (audit_rows or {}).get(bp.id)
-        allocation_spec = _build_allocation_spec(
-            blueprint=bp,
-            run_id=run_id,
-            retail_profile=retail_profile,
-            low_capital_contract=low_capital_contract,
-            effective_max_concurrent_positions=effective_max_concurrent_positions,
-            effective_per_position_notional_cap_usd=effective_per_position_notional_cap_usd,
-            default_fee_tier=default_fee_tier,
-            fees_bps_per_side=fees_bps_per_side,
-            slippage_bps_per_fill=slippage_bps_per_fill,
-            audit_row=audit_row,
-        )
-        try:
-            _validate_strategy_contract(
-                executable_spec,
-                low_capital_contract=low_capital_contract,
-                require_low_capital_contract=require_low_capital_contract,
-            )
-        except ValueError as exc:
-            LOGGER.warning("Strategy contract validation failed for %s: %s", bp.id, exc)
-        executable_path = executable_dir / f"{bp.id}.executable_strategy_spec.json"
-        executable_path.write_text(
-            json.dumps(executable_spec.model_dump(), indent=2), encoding="utf-8"
-        )
-        executable_entries.append(
-            {"id": bp.id, "candidate_id": bp.candidate_id, "path": str(executable_path)}
-        )
-        allocation_path = allocation_dir / f"{bp.id}.allocation_spec.json"
-        allocation_path.write_text(
-            json.dumps(allocation_spec.model_dump(), indent=2), encoding="utf-8"
-        )
-        allocation_entries.append(
-            {"id": bp.id, "candidate_id": bp.candidate_id, "path": str(allocation_path)}
-        )
-        executor_lines.append(json.dumps(executable_spec.execution.policy_executor_config))
-        # Only add to promoted set after writing — so check is against already-committed strategies
-        promoted_blueprints.append(bp)
-
-    # Write marginal contribution audit log
-    (out_dir / "marginal_contribution_log.json").write_text(
-        json.dumps(marginal_contribution_log, indent=2), encoding="utf-8"
+    return _write_strategy_contract_artifacts_impl(
+        blueprints=blueprints,
+        out_dir=out_dir,
+        run_id=run_id,
+        retail_profile=retail_profile,
+        low_capital_contract=low_capital_contract,
+        require_low_capital_contract=require_low_capital_contract,
+        effective_max_concurrent_positions=effective_max_concurrent_positions,
+        effective_per_position_notional_cap_usd=effective_per_position_notional_cap_usd,
+        default_fee_tier=default_fee_tier,
+        fees_bps_per_side=fees_bps_per_side,
+        slippage_bps_per_fill=slippage_bps_per_fill,
+        audit_rows=audit_rows,
+        portfolio_state_path=portfolio_state_path,
+        build_executable_strategy_spec_fn=_build_executable_strategy_spec,
+        build_allocation_spec_fn=_build_allocation_spec,
+        validate_strategy_contract_fn=_validate_strategy_contract,
+        ensure_dir_fn=ensure_dir,
+        logger=LOGGER,
     )
-
-    executable_index = {"count": len(executable_entries), "entries": executable_entries}
-    (out_dir / "executable_strategy_spec_index.json").write_text(
-        json.dumps(executable_index, indent=2), encoding="utf-8"
-    )
-    allocation_index = {"count": len(allocation_entries), "entries": allocation_entries}
-    (out_dir / "allocation_spec_index.json").write_text(
-        json.dumps(allocation_index, indent=2), encoding="utf-8"
-    )
-    (out_dir / "policy_executor_configs.jsonl").write_text(
-        "\n".join(executor_lines) + ("\n" if executor_lines else ""), encoding="utf-8"
-    )
-
-    return {
-        "count": len(executable_entries),
-        "entries": executable_entries,
-        "strategy_contract_count": len(executable_entries),
-        "strategy_contract_entries": executable_entries,
-        "executable_strategy_spec_count": len(executable_entries),
-        "executable_strategy_spec_entries": executable_entries,
-        "allocation_spec_count": len(allocation_entries),
-        "allocation_spec_entries": allocation_entries,
-    }
 
 
 def _load_run_mode(run_id: str) -> str:

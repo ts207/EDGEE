@@ -8,7 +8,7 @@ and exchange status in real-time.
 from __future__ import annotations
 
 import json
-import asyncio
+import threading
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -67,25 +67,25 @@ class KillSwitchSnapshot:
 
 
 class LiveStateStore:
-    """Thread-safe or async-safe store for LiveState (to be expanded)."""
+    """Thread-safe store for live account state and persisted snapshots."""
 
     def __init__(self, *, snapshot_path: str | Path | None = None):
         self.account = AccountState()
         self._last_snapshot_time: Optional[datetime] = None
         self.kill_switch = KillSwitchSnapshot()
         self._snapshot_path = Path(snapshot_path) if snapshot_path is not None else None
-        self._lock = asyncio.Lock()
+        self._lock = threading.RLock()
 
     def _maybe_persist(self) -> None:
         if self._snapshot_path is not None:
             self.save_snapshot(self._snapshot_path)
 
-    async def update_from_exchange_snapshot(self, data: Dict[str, Any]):
+    def update_from_exchange_snapshot(self, data: Dict[str, Any]) -> None:
         """
         Update state from a full exchange account/position snapshot.
         Expected format: typical CCXT or Binance account information.
         """
-        async with self._lock:
+        with self._lock:
             self.account.wallet_balance = float(data.get("wallet_balance", self.account.wallet_balance))
             self.account.margin_balance = float(data.get("margin_balance", self.account.margin_balance))
             self.account.available_balance = float(
@@ -95,28 +95,37 @@ class LiveStateStore:
                 data.get("exchange_status", self.account.exchange_status)
             )
 
-            positions_raw = data.get("positions", [])
-            for p in positions_raw:
-                qty = float(p.get("quantity", 0.0))
-                symbol = str(p.get("symbol")).upper()
-                if qty == 0:
-                    self.account.remove_position(symbol)
-                else:
-                    pos = PositionState(
-                        symbol=symbol,
-                        side="LONG" if qty > 0 else "SHORT",
-                        quantity=abs(qty),
-                        entry_price=float(p.get("entry_price", 0.0)),
-                        mark_price=float(p.get("mark_price", p.get("entry_price", 0.0))),
-                        unrealized_pnl=float(p.get("unrealized_pnl", 0.0)),
-                        liquidation_price=float(p.get("liquidation_price", 0.0))
-                        if p.get("liquidation_price")
-                        else None,
-                        leverage=float(p.get("leverage", 1.0) or 1.0),
-                        margin_type=str(p.get("margin_type", "ISOLATED")),
-                    )
-                    self.account.update_position(pos)
+            if "positions" in data:
+                positions_raw = list(data.get("positions", []))
+                seen_symbols: set[str] = set()
+                for p in positions_raw:
+                    qty = float(p.get("quantity", 0.0))
+                    symbol = str(p.get("symbol")).upper()
+                    if not symbol:
+                        continue
+                    seen_symbols.add(symbol)
+                    if qty == 0:
+                        self.account.remove_position(symbol)
+                    else:
+                        pos = PositionState(
+                            symbol=symbol,
+                            side="LONG" if qty > 0 else "SHORT",
+                            quantity=abs(qty),
+                            entry_price=float(p.get("entry_price", 0.0)),
+                            mark_price=float(p.get("mark_price", p.get("entry_price", 0.0))),
+                            unrealized_pnl=float(p.get("unrealized_pnl", 0.0)),
+                            liquidation_price=float(p.get("liquidation_price", 0.0))
+                            if p.get("liquidation_price")
+                            else None,
+                            leverage=float(p.get("leverage", 1.0) or 1.0),
+                            margin_type=str(p.get("margin_type", "ISOLATED")),
+                        )
+                        self.account.update_position(pos)
+                for symbol in list(self.account.positions):
+                    if symbol not in seen_symbols:
+                        self.account.remove_position(symbol)
 
+            self.account._recalculate_totals()
             self._last_snapshot_time = self.account.update_time
             self._maybe_persist()
 
