@@ -1,111 +1,68 @@
 # Researcher Onboarding
 
-This is the first doc to read as a research operator.
+This system is built around a closed research loop: observe -> retrieve memory -> propose -> execute -> evaluate -> write back.
 
-It tells you what this system is for, what the fundamental rules are, and how to run your first experiment safely.
+## What this system is
 
----
+EDGEE is not just a detector repository. It already includes:
 
-## What This System Is
+- campaign control,
+- memory and reflection storage,
+- frontier and search-intelligence logic,
+- hypothesis evaluation and promotion gating,
+- strategy blueprint compilation,
+- portfolio-aware sizing, and
+- live-state handoff surfaces.
 
-EDGEE is a research operating system for market studies. It is designed to:
+## The research unit
 
-- turn observations into explicit, falsifiable hypotheses
-- run bounded, replayable experiments
-- evaluate output against contract, statistical, and deployment gates
-- store reusable memory across runs
-- gate promotion only after evidence survives required checks
+Work in hypotheses, not in vague ideas.
 
-It is **not** a strategy toybox. It is **not** a place to run broad searches because more output seems valuable. Detector firings alone are not evidence.
+A hypothesis is a fully specified tuple over:
 
----
+- event or trigger family,
+- template,
+- direction,
+- horizon,
+- entry lag,
+- and context.
 
-## Five First Principles
+That tuple is what gets evaluated, written to memory, and considered for promotion.
 
-Keep these in mind at all times.
+## Five first principles
 
-1. **Artifacts are the source of truth.** A run is only as trustworthy as its reconciled outputs.
-2. **Contracts define trust.** A run that exits `0` but has missing or mismatched artifacts is not a good run.
-3. **Synthetic evidence is calibration evidence.** Do not present synthetic profitability as live-market evidence.
-4. **Confidence-aware context is the default.** Hard regime labels exist for compatibility, not as the authoritative filter.
-5. **Promotion is a gate, not a reward.** Attractive discovery output does not imply promotion readiness.
+1. Artifacts are the source of truth.
+2. Plan before material runs.
+3. Narrow before broad unless the run is explicitly a breadth scan.
+4. Synthetic success is calibration, not proof.
+5. Promotion is a gate, not a label.
 
----
+## Minimum safe run pattern
 
-## The Research Unit
+1. Inspect prior memory.
+2. Check the current search frontier.
+3. Build a fully specified proposal.
+4. Plan only first.
+5. Execute only after the plan is correct.
+6. Review the reflection and next-action output.
 
-The correct unit of research is a **hypothesis**, not a detector, not a strategy.
+## What is easy to miss
 
-A hypothesis specifies:
+The code already supports:
 
-| Field | Example |
-|---|---|
-| `event` | `FND_DISLOC` |
-| `canonical_family` | `STATISTICAL_DISLOCATION` |
-| `template` | `mean_reversion` |
-| `context` | high volatility, non-hostile spread state |
-| `side` | `short` |
-| `horizon` | 12 bars |
-| `entry_lag` | 1 bar |
-| `symbol_scope` | `BTCUSDT` |
+- memory-driven follow-up actions,
+- MI-derived feature predicates,
+- per-regime candidate surfacing,
+- hypothesis clustering before multiplicity correction,
+- and portfolio-aware allocation inputs.
 
-That is the unit you compare across runs, store in memory, and interpret in promotion. If you cannot write it in this form, the question is not ready to run.
+Older docs understate these features. Use the maintained docs and the cross-role audit instead of stale roadmap language.
 
----
+## Reading order
 
-## Translating a Question Into Repo-Native Terms
-
-Before running anything, convert your plain-language question.
-
-**Plain language:** "Funding dislocation may revert quickly in high volatility if spreads are still acceptable."
-
-**Repo-native:**
-- event: `FND_DISLOC`
-- family: `STATISTICAL_DISLOCATION`
-- template: `mean_reversion`
-- context: `ms_vol_state = HIGH`, `ms_spread_state` non-hostile
-- horizons: 12–24 bars (short intraday)
-
-If the translation is not possible, the question needs more specificity first.
-
----
-
-## The Minimum Safe Run Pattern
-
-Default to this sequence for every material run:
-
-1. Inspect memory for the same event, template, context, and symbol region.
-2. Inspect static event knowledge and prior benchmark status.
-3. Write a compact proposal in repo-native terms.
-4. Run `plan_only` and review the plan.
-5. Execute the narrow slice.
-6. Inspect artifacts in trust order (manifest → stage manifests → logs → reports → diagnostics).
-
-Do not skip `plan_only` for material runs.
-
-**Plan-only command:**
-```bash
-edge-run-all --run_id demo --symbols BTCUSDT --start 2024-01-01 --end 2024-01-31 --plan_only 1
-```
-
----
-
-## Smoke Verification
-
-Before any material run, verify the platform is in a working state.
-
-```bash
-edge-smoke --mode research
-```
-
----
-
-## Reading Order After This Doc
-
-Follow this sequence:
-
-1. [RESEARCH_LOOP.md](./RESEARCH_LOOP.md) — the full observe → reflect cycle
-2. [EXPERIMENT_PROTOCOL.md](./EXPERIMENT_PROTOCOL.md) — how to design and scope a single run
-3. [GUARDRAILS.md](./GUARDRAILS.md) — operating rules and stop conditions
-4. [ARTIFACTS_AND_CONTRACTS.md](./ARTIFACTS_AND_CONTRACTS.md) — how to trust output
-5. [BENCHMARK_GUIDE.md](./BENCHMARK_GUIDE.md) — current benchmark status and maintenance
+1. `docs/CURRENT_STATE_AND_GAPS.md`
+2. `docs/README.md`
+3. `researcher/RESEARCH_LOOP.md`
+4. `researcher/ARTIFACTS_AND_CONTRACTS.md`
+5. `researcher/MEMORY_AND_REFLECTION.md`
+6. `researcher/EXPERIMENT_PROTOCOL.md`

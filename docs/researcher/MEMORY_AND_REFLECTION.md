@@ -1,131 +1,61 @@
 # Memory and Reflection
 
-Memory prevents the system from repeating avoidable work. Reflection turns one run into reusable decision support for the next.
-
----
-
 ## Purpose
 
-Use memory to:
-- Avoid rerunning failed regions under new wording.
-- Retain fragile system facts that are not obvious from the code.
-- Distinguish market conclusions from system conclusions.
-- Prioritize the next best experiment.
+Memory is how the research loop compounds across runs.
 
----
+It stores what happened, what failed, what looked promising, and what should be tried next.
 
-## Memory Classes
+## Memory classes
 
-### Structural Memory
-Facts about how the repository behaves.
+### Structural memory
+Facts about the system and its supported surfaces.
 
-Examples:
-- A stage contract requires normalized candidates before promotion.
-- A quality report is emitted at a specific path after phase 2.
-- A promotion fallback uses the same normalized contract as the canonical path.
+### Experimental memory
+What happened in prior runs, including outcomes and conditions.
 
-### Experimental Memory
-Facts about what was tested and what happened.
+### Negative memory
+Regions or combinations that should not be retried blindly.
 
-Examples:
-- A specific family-template-context region survived costs on a given symbol in a given period.
-- A narrow slice failed in validation despite attractive train metrics.
+### Action memory
+Repairs, adjacent explorations, exploit follow-ups, and holds.
 
-### Negative Memory
-Facts about what to avoid.
+## Reflection schema
 
-Examples:
-- A broad noisy run pattern repeatedly produces low-trust output.
-- A region repeatedly fails retail net expectancy after costs regardless of template.
+A useful reflection should capture:
 
-### Action Memory
-Facts about what the next justified move should be.
+- mechanical outcome,
+- statistical outcome,
+- confidence,
+- failure class,
+- sample size,
+- and the recommended next action.
 
-Examples:
-- Rerun a narrow slice after a generator change that may have affected that region.
-- Stop re-testing a family-template region until live data coverage improves.
+## What should be written back
 
----
+At minimum, the loop should preserve:
 
-## Reflection Schema
+- reflections,
+- belief state,
+- tested regions,
+- next-action queues,
+- and any supersession tracking for repaired failures.
 
-Every meaningful run should produce a reflection that minimally covers:
+## Retrieval rule
 
-| Field | Description |
-|---|---|
-| `objective` | What belief was being tested |
-| `run_scope` | Symbol(s), date range, run ID |
-| `mechanical_status` | Did the pipeline run cleanly |
-| `statistical_status` | Did quality checks pass |
-| `primary_findings` | What the evidence showed |
-| `primary_failures` | What failed and why |
-| `belief_update` | How the finding changes the prior belief |
-| `next_action` | One of: `exploit`, `explore`, `repair`, `hold`, `stop` |
+The controller should read memory before proposing new work.
 
-For synthetic runs, also include:
-- Generator profile and noise scale
-- Truth-map path
-- Whether the result survived a second profile or only one synthetic world
+If the memory says to repair a broken pipeline, that takes priority over frontier expansion.
 
----
+## What older docs missed
 
-## Reflection Questions
+The code already supports more than a simple pass/fail memory model.
 
-After each meaningful run, answer:
+The missing documentation gap is not whether memory exists. The gap is how the controller is supposed to consume it.
 
-1. What prior belief did this run test?
-2. What evidence increased or decreased that belief?
-3. Was the result market-driven or system-driven?
-4. What reusable rule should be remembered?
-5. What exact next action is justified?
+## Related code
 
----
-
-## Write Rules
-
-- Store facts, not impressions.
-- Include run IDs and scope so the record is traceable.
-- Separate system issues from market conclusions explicitly.
-- Record both positive and negative findings.
-- Prefer short, high-signal entries over narrative.
-- Reference exact artifact families when that fact will matter later.
-
----
-
-## Retrieval Rules
-
-Before any new experiment, retrieve memory for:
-- The same event or family
-- The same template
-- The same symbol or timeframe
-- The same context
-- The same fail gate
-
-If prior memory shows repeated clean failure with no material new condition, do not rerun by default.
-
----
-
-## Priority Rules
-
-**Increase priority for experiments that:**
-- Resolve a known ambiguity.
-- Build on positive post-cost evidence.
-- Reduce uncertainty with a small run.
-- Validate a recent code or contract fix.
-
-**Decrease priority for experiments that:**
-- Duplicate prior unsuccessful slices.
-- Broaden scope without adding information.
-- Depend on known-broken contracts.
-- Produce warning-heavy output without changing the decision.
-
----
-
-## Memory Hygiene
-
-Supersede or downgrade memories that are:
-- Invalidated by code changes
-- Contradicted by cleaner reruns
-- Too vague to guide future selection
-
-Do not silently erase history when a superseded record is still more informative than no record. Mark it superseded with a note explaining what replaced it.
+- `project/research/knowledge/memory.py`
+- `project/research/knowledge/reflection.py`
+- `project/pipelines/research/update_campaign_memory.py`
+- `project/pipelines/research/campaign_controller.py`

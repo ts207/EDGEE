@@ -1,131 +1,61 @@
 # Architecture
 
-This document records the current package-surface decisions and import boundaries. It exists to prevent surface sprawl and to make the correct import path obvious for new code.
+This document lists the package surfaces that should be treated as canonical in the current repository snapshot.
 
----
+## Canonical surfaces
 
-## Canonical Surfaces
-
-These are the primary public surfaces. Prefer these for all new cross-domain imports.
-
-| Surface | Purpose |
-|---|---|
-| `project.pipelines.run_all` | Canonical orchestration entrypoint |
-| `project.research.services.candidate_discovery_service` | Canonical discovery service surface |
-| `project.research.services.promotion_service` | Canonical promotion service surface |
-| `project.research.services.reporting_service` | Canonical reporting surface |
-| `project.pipelines.research.phase2_candidate_discovery` | Pipeline entrypoint only — helper/policy code belongs in research service/spec modules |
-| `project.pipelines.research.promote_candidates` | Pipeline entrypoint only — promotion policy belongs in research service/promotion modules |
-| `project.strategy.dsl` | Canonical public Strategy DSL import surface |
-| `project.strategy.templates` | Canonical public strategy-template import surface |
-| `project.strategy.runtime` | Canonical public runtime-facing strategy surface |
-
----
-
-## Explicit Package-Root Surfaces
-
-These package roots exist as deliberate import surfaces, not implicit namespace folders. Import from the package root only.
-
-| Package | Purpose | Import rule |
+| Surface | Primary path | Role |
 |---|---|---|
-| `project.artifacts` | Artifact path and payload helpers for run- and report-scoped outputs | Import from package root |
-| `project.compilers` | Executable strategy-spec and blueprint transformation | Import from package root |
-| `project.eval` | Multiplicity and split-building helpers | Import from package root |
-| `project.experiments` | Experiment config loading and registry helpers | Import from package root |
-| `project.live` | Live runner, kill-switch, and runtime health helpers | Import from package root |
-| `project.portfolio` | Allocation, sizing, and risk-budget helpers | Import from package root |
-| `project.spec_registry` | Read-only YAML spec loaders and blueprint policy defaults | Import from package root only — not from `.loaders` or `.policy` directly |
-| `project.spec_validation` | Ontology, grammar, loader, and search-spec validation helpers | Import from package root |
+| Pipeline entrypoints | `project/pipelines/` | Run orchestration and stage wiring |
+| Research orchestration | `project/pipelines/research/` | Campaign control, discovery, promotion, reporting |
+| Research knowledge | `project/research/knowledge/` | Memory, reflections, schemas, query helpers |
+| Research services | `project/research/services/` | Business logic wrappers used by pipelines and operators |
+| Research promotion | `project/research/promotion/` | Promotion scoring, gates, clustering, reporting |
+| Research clustering | `project/research/clustering/` | PnL similarity and cluster representative selection |
+| Contracts | `project/contracts/` | Artifact, stage, and temporal contracts |
+| Live execution | `project/live/` | OMS, runner, health checks, drift, kill switch |
+| Portfolio | `project/portfolio/` | Allocation spec, sizing, and risk budget |
+| Strategy compilation | `project/compilers/` and `project/strategy/` | Blueprint/spec transformation and execution-facing strategy surfaces |
+| Spec registry | `project/spec_registry/` | Search-space and registry loading |
+| Domain models | `project/domain/` | Hypothesis and registry models |
 
----
+## Import policy
 
-## Explicit Subpackage Roots
+Prefer imports from these surfaces rather than reaching into implementation details from unrelated packages.
 
-These are package roots for active subdomains. Keep them thin. They should not absorb business logic.
+Examples:
 
-- `project.pipelines.clean`
-- `project.pipelines.features`
-- `project.pipelines.ingest`
-- `project.pipelines.smoke`
-- `project.research.clustering`
-- `project.research.reports`
-- `project.research.utils`
+- Use contracts for schema and stage agreement.
+- Use research services for reusable orchestration logic.
+- Use promotion modules for scoring and gate logic.
+- Use live and portfolio modules only where deployment state or sizing is genuinely needed.
 
-For `project.pipelines.clean`, `project.pipelines.features`, and `project.pipelines.ingest`, the package roots are lazy import shims over concrete stage entrypoints. Keep `__getattr__`-based dispatch minimal and deterministic.
+## Compatibility facades
 
----
+Some modules remain for compatibility with older paths or maintenance scripts. Treat them as facades unless the module is clearly the maintained source of truth for its surface.
 
-## Compatibility Facades
+If a facade and a canonical surface disagree, the canonical surface wins.
 
-These surfaces are still allowed, but only as pure re-export wrappers.
+## Missing or underdocumented surfaces
 
-- `project.apps.*`
-- `project.execution.*`
-- `project.infra.*`
+The codebase contains real implementations that are easy to miss in older docs:
 
-**Compatibility wrappers must:**
-- Include the `# COMPAT WRAPPER` marker at the top.
-- Import from canonical `project.*` modules.
-- Contain no local `def` or `class` logic.
+- `project/pipelines/research/campaign_controller.py`
+- `project/pipelines/research/search_intelligence.py`
+- `project/pipelines/research/feature_mi_scan.py`
+- `project/research/clustering/alpha_clustering.py`
+- `project/research/clustering/pnl_similarity.py`
+- `project/research/promotion/promotion_gate_evaluators.py`
+- `project/live/state.py`
+- `project/live/kill_switch.py`
 
-If a facade needs new behavior, add it to the canonical source module and re-export it — do not implement it inside the wrapper.
+These should be treated as first-class surfaces when editing docs or behavior.
 
----
+## Keeping this doc current
 
-## Strategy Namespace Boundary Policy
+Update this file when:
 
-| Package | Status | Rule |
-|---|---|---|
-| `project.strategy` | **Canonical** | All new models, DSL definitions, and template logic must be added here. |
-| `project.strategy.runtime` | **Legacy implementation tree** | Currently hosts concrete runtime logic (e.g. `dsl_runtime`). Still heavily used — 16 importers. Do not add new business logic here. |
-| `project.strategy._runtime` | **Target consolidation destination** | When the public surface is fully decoupled, move concrete implementation here or into `project.strategy.runtime` internals. |
-
----
-
-## Removed Surfaces
-
-These packages have been deleted. Do not re-create them.
-
-| Package | Replacement |
-|---|---|
-| `project.research.compat` | Canonical research service/spec modules |
-| `project.strategy_dsl` | `project.strategy.dsl` |
-| `project.strategy_templates` | `project.strategy.templates` |
-
-If any of these reappear, treat it as a regression and remove immediately.
-
----
-
-## Support Module Pattern
-
-Large policy or orchestration modules should split into focused support modules before architecture thresholds are relaxed. Current examples:
-
-- `project/pipelines/execution_engine_support.py`
-- `project/research/services/candidate_discovery_diagnostics.py`
-- `project/research/services/candidate_discovery_scoring.py`
-- `project/research/promotion/promotion_decision_support.py`
-- `project/research/promotion/promotion_result_support.py`
-- `project/research/promotion/promotion_reporting_support.py`
-
----
-
-## Current Policy Summary
-
-New public or cross-domain code should:
-- Prefer explicit package-root surfaces where they exist.
-- Use `project.strategy.dsl`, `project.strategy.templates`, `project.strategy.runtime` for strategy-related imports.
-- Use research service modules instead of removed compatibility packages.
-
-Transitional imports are only allowed from the currently documented importer set, enforced in architecture tests (`project/tests/test_architectural_integrity.py`).
-
-When migrating call sites: update tests and scripts before deleting compatibility modules.
-
----
-
-## Keeping This Doc Current
-
-After any package-surface migration:
-1. Recompute architecture metrics: `python3 -m project.scripts.build_system_map --check`
-2. Update `docs/generated/architecture_metrics.json`.
-3. Update the transitional importer counts in this doc if they changed.
-4. Update `project/tests/test_architectural_integrity.py` to match.
+- a new top-level package becomes part of the supported architecture,
+- a canonical import path changes,
+- a compatibility facade is removed, or
+- a new contract layer is introduced.
