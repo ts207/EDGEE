@@ -172,7 +172,7 @@ python3 -m project.scripts.generate_synthetic_crypto_regimes \
 python3 -m project.scripts.run_golden_synthetic_discovery
 python3 -m project.scripts.run_fast_synthetic_certification
 python3 -m project.scripts.validate_synthetic_detector_truth \
-  --run_id golden_synthetic_discovery
+  --run_id <run_id>
 ```
 
 Short synthetic windows are calibration first:

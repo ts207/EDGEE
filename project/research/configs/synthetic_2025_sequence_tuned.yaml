@@ -16,7 +16,7 @@ trigger_space:
 templates: [mean_reversion, reversal_or_squeeze]
 horizons_bars: [12, 24]
 directions: [long, short]
-entry_lags: [0]
+entry_lags: [1]
 knobs:
   candidate_promotion_min_events: 8
   run_phase2_conditional: 1

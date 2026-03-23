@@ -112,6 +112,65 @@ def _gate_rank(val: Any) -> int:
     return 0
 
 
+def _load_regime_conditional_candidates(*, run_id: str, data_root: Path) -> pd.DataFrame:
+    path = data_root / "reports" / "hypothesis_search" / run_id / "regime_conditional_candidates.parquet"
+    if not path.exists():
+        return pd.DataFrame()
+    try:
+        return pd.read_parquet(path)
+    except Exception:
+        return pd.DataFrame()
+
+
+def _coerce_contexts(value: Any) -> Dict[str, list[str]]:
+    payload = value
+    if isinstance(payload, str):
+        text = payload.strip()
+        if not text or text == "{}":
+            return {}
+        try:
+            payload = json.loads(text)
+        except json.JSONDecodeError:
+            return {}
+    if not isinstance(payload, dict):
+        return {}
+    out: Dict[str, list[str]] = {}
+    for key, raw in payload.items():
+        family = str(key).strip()
+        label = str(raw).strip()
+        if family and label:
+            out[family] = [label]
+    return out
+
+
+def _parse_best_regime_contexts(best_regime: Any) -> Dict[str, list[str]]:
+    regime = str(best_regime or "").strip().lower()
+    if not regime:
+        return {}
+
+    token_map = {
+        "high_vol": ("vol_regime", "high"),
+        "low_vol": ("vol_regime", "low"),
+        "funding_pos": ("carry_state", "funding_pos"),
+        "funding_neg": ("carry_state", "funding_neg"),
+        "trend": ("ms_trend_state", "trend"),
+        "chop": ("ms_trend_state", "chop"),
+        "tight": ("ms_spread_state", "tight"),
+        "wide": ("ms_spread_state", "wide"),
+    }
+    contexts: Dict[str, list[str]] = {}
+    for token, (family, label) in token_map.items():
+        if token in regime:
+            contexts[family] = [label]
+    return contexts
+
+
+def _merge_contexts(base: Dict[str, list[str]], override: Dict[str, list[str]]) -> Dict[str, list[str]]:
+    merged = dict(base)
+    merged.update(override)
+    return merged
+
+
 def _build_belief_state(
     *,
     tested_regions: pd.DataFrame,
@@ -192,6 +251,7 @@ def _build_next_actions(
     reflection: Dict[str, Any],
     tested_regions: pd.DataFrame,
     failures: pd.DataFrame,
+    regime_conditional_candidates: pd.DataFrame,
     exploit_top_k: int,
     repair_top_k: int,
 ) -> Dict[str, Any]:
@@ -232,6 +292,47 @@ def _build_next_actions(
     except json.JSONDecodeError:
         recommended_experiment = {}
 
+    explore_adjacent = []
+    if not regime_conditional_candidates.empty:
+        ranked = regime_conditional_candidates.copy()
+        if "priority_score" in ranked.columns:
+            ranked["priority_score"] = pd.to_numeric(ranked["priority_score"], errors="coerce").fillna(0.0)
+            ranked = ranked.sort_values(
+                ["priority_score", "best_regime_t_stat", "best_regime_mean_return_bps"],
+                ascending=[False, False, False],
+            )
+        for row in ranked.head(max(1, int(exploit_top_k))).to_dict(orient="records"):
+            pinned_contexts = _parse_best_regime_contexts(row.get("best_regime"))
+            proposed_scope = {
+                "event_type": str(row.get("event_type", "")).strip(),
+                "trigger_type": str(row.get("trigger_type", "EVENT")).strip().upper() or "EVENT",
+                "template_id": str(row.get("template_id", "")).strip(),
+                "direction": str(row.get("direction", "")).strip(),
+                "horizon": str(row.get("horizon", "")).strip(),
+                "entry_lag": int(row.get("entry_lag", 0) or 0),
+                "contexts": _merge_contexts(
+                    _coerce_contexts(row.get("context_json")),
+                    pinned_contexts,
+                ),
+                "best_regime": str(row.get("best_regime", "")).strip(),
+                "source_hypothesis_id": str(row.get("hypothesis_id", "")).strip(),
+            }
+            explore_adjacent.append(
+                {
+                    "reason": "strong regime slice despite weak aggregate result",
+                    "priority": "medium",
+                    "proposed_scope": proposed_scope,
+                }
+            )
+    if recommended_experiment:
+        explore_adjacent.append(
+            {
+                "reason": str(reflection.get("recommended_next_action", "")),
+                "priority": "medium",
+                "proposed_scope": recommended_experiment,
+            }
+        )
+
     return {
         "repair": [
             {
@@ -249,17 +350,7 @@ def _build_next_actions(
             }
             for row in exploit
         ],
-        "explore_adjacent": (
-            [
-                {
-                    "reason": str(reflection.get("recommended_next_action", "")),
-                    "priority": "medium",
-                    "proposed_scope": recommended_experiment,
-                }
-            ]
-            if recommended_experiment
-            else []
-        ),
+        "explore_adjacent": explore_adjacent,
         "hold": [],
     }
 
@@ -282,6 +373,10 @@ def update_campaign_memory(
 
     incoming_tested = build_tested_regions_snapshot(
         run_id=run_id, program_id=program_id, data_root=data_root
+    )
+    regime_conditional_candidates = _load_regime_conditional_candidates(
+        run_id=run_id,
+        data_root=data_root,
     )
     incoming_failures = build_failures_snapshot(
         run_id=run_id, program_id=program_id, data_root=data_root
@@ -379,6 +474,7 @@ def update_campaign_memory(
             reflection=reflection_row,
             tested_regions=tested_regions,
             failures=failures,
+            regime_conditional_candidates=regime_conditional_candidates,
             exploit_top_k=exploit_top_k,
             repair_top_k=repair_top_k,
         ),

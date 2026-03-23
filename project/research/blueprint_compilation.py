@@ -58,6 +58,31 @@ def _normalize_gate_audit_value(value: Any) -> str:
     return normalized
 
 
+def _coerce_bps(value: Any) -> float | None:
+    numeric = safe_float(value, np.nan)
+    if not np.isfinite(numeric):
+        return None
+    if abs(float(numeric)) <= 1.0:
+        return float(numeric) * 10_000.0
+    return float(numeric)
+
+
+def _resolve_expected_sizing_inputs(row: Dict[str, Any]) -> tuple[float | None, float | None]:
+    expected_return_bps = _coerce_bps(row.get("mean_return_bps", row.get("expectancy")))
+    stressed_bps = _coerce_bps(
+        row.get(
+            "stressed_after_cost_expectancy",
+            row.get("stressed_after_cost_expectancy_per_trade"),
+        )
+    )
+    if expected_return_bps is None:
+        return None, None
+    if stressed_bps is None:
+        return expected_return_bps, None
+    expected_adverse_bps = abs(float(stressed_bps)) * 1.5
+    return float(expected_return_bps), float(expected_adverse_bps)
+
+
 def _parse_symbol_scope(
     row: Dict[str, Any],
     run_symbols: List[str],
@@ -366,6 +391,7 @@ def compile_blueprint(
         op = operator_registry.get(template_verb, {})
         if op:
             operator_version = str(op.get("operator_version", "unknown")).strip()
+    expected_return_bps, expected_adverse_bps = _resolve_expected_sizing_inputs(merged_row)
 
     blueprint = Blueprint(
         id=bp_id,
@@ -425,6 +451,8 @@ def compile_blueprint(
                     merged_row.get("gate_after_cost_stressed_positive", False)
                 ),
                 "gate_bridge_tradable": as_bool(merged_row.get("gate_bridge_tradable", False)),
+                "expected_return_bps": expected_return_bps,
+                "expected_adverse_bps": expected_adverse_bps,
                 "blueprint_effective_lag_bars_used": int(effective_lag_used),
                 "policy_variant_id": str(merged_row.get("policy_variant_id", "")).strip(),
                 "variant_entry_delay_bars": safe_int(

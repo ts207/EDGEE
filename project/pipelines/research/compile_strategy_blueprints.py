@@ -50,6 +50,7 @@ from project.specs.ontology import (
 )
 from project.research.candidate_schema import ensure_candidate_schema
 from project.research.blueprint_compilation import compile_blueprint
+from project.research.clustering.pnl_similarity import calculate_similarity_matrix
 from project.research.helpers.selection import (
     choose_event_rows as _selection_choose_event_rows,
     passes_fallback_gate as _selection_passes_fallback_gate,
@@ -560,6 +561,269 @@ def _annotate_blueprints_with_external_validation_evidence(
     }
 
 
+def _symbol_bucket(symbol: str) -> str:
+    normalized = str(symbol or "").strip().upper()
+    for suffix in ("USDT", "USDC", "BUSD", "USD", "PERP"):
+        if normalized.endswith(suffix) and len(normalized) > len(suffix):
+            return normalized[: -len(suffix)]
+    return normalized or "UNKNOWN"
+
+
+def _load_portfolio_state(portfolio_state_path: str | None) -> Dict[str, Any]:
+    path_text = str(portfolio_state_path or "").strip()
+    if not path_text:
+        return {}
+    path = Path(path_text)
+    if not path.exists():
+        LOGGER.warning("Portfolio state path does not exist: %s", path)
+        return {}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        LOGGER.warning("Failed to load portfolio state from %s: %s", path, exc)
+        return {}
+    if not isinstance(payload, dict):
+        return {}
+
+    account = payload.get("account", {}) if isinstance(payload.get("account"), dict) else {}
+    wallet_balance = safe_float(
+        account.get("wallet_balance", payload.get("portfolio_value", 0.0)),
+        0.0,
+    )
+    margin_balance = safe_float(account.get("margin_balance"), wallet_balance)
+    portfolio_value = (
+        float(wallet_balance)
+        if float(wallet_balance) > 0.0
+        else float(margin_balance if margin_balance > 0.0 else 0.0)
+    )
+    available_balance = safe_float(account.get("available_balance"), portfolio_value)
+    positions = account.get("positions", [])
+    bucket_exposures: Dict[str, float] = {}
+    gross_exposure = 0.0
+    if isinstance(positions, list):
+        for pos in positions:
+            if not isinstance(pos, dict):
+                continue
+            symbol = str(pos.get("symbol", "")).strip().upper()
+            notional = abs(
+                safe_float(pos.get("quantity"), 0.0) * safe_float(pos.get("mark_price"), 0.0)
+            )
+            if notional <= 0.0:
+                continue
+            gross_exposure += float(notional)
+            bucket = _symbol_bucket(symbol)
+            bucket_exposures[bucket] = bucket_exposures.get(bucket, 0.0) + float(notional)
+
+    if not bucket_exposures and isinstance(payload.get("bucket_exposures"), dict):
+        bucket_exposures = {
+            str(key): float(safe_float(value, 0.0))
+            for key, value in payload["bucket_exposures"].items()
+        }
+    gross_exposure = max(
+        gross_exposure,
+        float(safe_float(payload.get("gross_exposure"), 0.0)),
+    )
+    available_balance_ratio = (
+        float(np.clip(available_balance / portfolio_value, 0.0, 1.0))
+        if portfolio_value > 0.0
+        else 1.0
+    )
+    return {
+        "source_path": str(path),
+        "portfolio_value": float(portfolio_value),
+        "available_balance": float(available_balance),
+        "available_balance_ratio": float(available_balance_ratio),
+        "gross_exposure": float(gross_exposure),
+        "bucket_exposures": bucket_exposures,
+        "current_vol": float(
+            safe_float(payload.get("current_vol", payload.get("realized_vol")), 0.0)
+        ),
+        "target_vol": float(safe_float(payload.get("target_vol"), 0.0)),
+        "max_gross_leverage": float(safe_float(payload.get("max_gross_leverage"), 1.0) or 1.0),
+    }
+
+
+def _parse_pnl_series(value: Any) -> pd.Series:
+    payload = value
+    if isinstance(payload, str):
+        text = payload.strip()
+        if not text:
+            return pd.Series(dtype=float)
+        try:
+            payload = json.loads(text)
+        except json.JSONDecodeError:
+            return pd.Series(dtype=float)
+    if isinstance(payload, pd.Series):
+        series = pd.to_numeric(payload, errors="coerce").dropna().reset_index(drop=True)
+        return series.astype(float)
+    if isinstance(payload, (list, tuple, np.ndarray)):
+        series = pd.to_numeric(pd.Series(list(payload)), errors="coerce").dropna().reset_index(drop=True)
+        return series.astype(float)
+    return pd.Series(dtype=float)
+
+
+def _calculate_candidate_correlation_by_candidate(
+    edge_df: pd.DataFrame,
+    *,
+    data_root: Path,
+    current_run_id: str,
+) -> Dict[str, float]:
+    if edge_df.empty or "candidate_id" not in edge_df.columns or "pnl_series" not in edge_df.columns:
+        return {}
+
+    current_columns: Dict[str, str] = {}
+    series_map: Dict[str, pd.Series] = {}
+    for row in edge_df.to_dict(orient="records"):
+        candidate_id = str(row.get("candidate_id", "")).strip()
+        pnl_series = _parse_pnl_series(row.get("pnl_series"))
+        if not candidate_id or len(pnl_series) < 3:
+            continue
+        column_name = f"current::{candidate_id}"
+        current_columns[candidate_id] = column_name
+        series_map[column_name] = pnl_series
+
+    promotions_root = data_root / "reports" / "promotions"
+    if not current_columns or not promotions_root.exists():
+        return {}
+
+    for run_dir in sorted(promotions_root.iterdir()):
+        if not run_dir.is_dir() or run_dir.name == str(current_run_id):
+            continue
+        candidate_path = run_dir / "promoted_candidates.parquet"
+        if not candidate_path.exists():
+            candidate_path = run_dir / "promoted_candidates.csv"
+        if not candidate_path.exists():
+            continue
+        try:
+            historical = (
+                pd.read_parquet(candidate_path)
+                if candidate_path.suffix == ".parquet"
+                else pd.read_csv(candidate_path)
+            )
+        except Exception:
+            continue
+        if historical.empty or "pnl_series" not in historical.columns:
+            continue
+        for idx, row in historical.iterrows():
+            candidate_id = str(row.get("candidate_id", "")).strip() or f"row_{idx}"
+            pnl_series = _parse_pnl_series(row.get("pnl_series"))
+            if len(pnl_series) < 3:
+                continue
+            column_name = f"historical::{run_dir.name}::{candidate_id}"
+            series_map[column_name] = pnl_series
+
+    historical_columns = [name for name in series_map if name.startswith("historical::")]
+    if not historical_columns:
+        return {}
+
+    similarity_matrix = calculate_similarity_matrix(pd.concat(series_map, axis=1))
+    correlations: Dict[str, float] = {}
+    for candidate_id, column_name in current_columns.items():
+        if column_name not in similarity_matrix.index:
+            continue
+        values = pd.to_numeric(
+            similarity_matrix.loc[column_name, historical_columns],
+            errors="coerce",
+        ).abs()
+        max_corr = values.max(skipna=True)
+        correlations[candidate_id] = float(max_corr) if np.isfinite(max_corr) else 0.0
+    return correlations
+
+
+def _resolve_portfolio_risk_multiplier(
+    blueprint: Blueprint,
+    portfolio_state: Dict[str, Any],
+) -> tuple[float, str, float, Dict[str, float]]:
+    if not portfolio_state:
+        return 1.0, _symbol_bucket(blueprint.symbol_scope.candidate_symbol), 0.0, {}
+
+    portfolio_value = float(safe_float(portfolio_state.get("portfolio_value"), 0.0))
+    if portfolio_value <= 0.0:
+        return 1.0, _symbol_bucket(blueprint.symbol_scope.candidate_symbol), 0.0, {}
+
+    gross_exposure = float(safe_float(portfolio_state.get("gross_exposure"), 0.0))
+    max_gross_leverage = max(float(safe_float(portfolio_state.get("max_gross_leverage"), 1.0)), 1.0)
+    gross_ratio = gross_exposure / portfolio_value
+    gross_multiplier = max(0.25, 1.0 - min(gross_ratio / max_gross_leverage, 1.0))
+
+    available_ratio = float(
+        np.clip(safe_float(portfolio_state.get("available_balance_ratio"), 1.0), 0.25, 1.0)
+    )
+
+    bucket = _symbol_bucket(blueprint.symbol_scope.candidate_symbol)
+    bucket_exposures = portfolio_state.get("bucket_exposures", {})
+    bucket_exposure = float(
+        safe_float(bucket_exposures.get(bucket), 0.0) if isinstance(bucket_exposures, dict) else 0.0
+    )
+    bucket_ratio = bucket_exposure / portfolio_value
+    bucket_multiplier = max(0.25, 1.0 - min(bucket_ratio, 0.75))
+
+    current_vol = float(safe_float(portfolio_state.get("current_vol"), 0.0))
+    target_vol = float(safe_float(portfolio_state.get("target_vol"), 0.0))
+    volatility_multiplier = (
+        max(0.25, min(1.0, target_vol / current_vol))
+        if current_vol > 0.0 and target_vol > 0.0 and current_vol > target_vol
+        else 1.0
+    )
+
+    components = {
+        "gross": float(gross_multiplier),
+        "available": float(available_ratio),
+        "bucket": float(bucket_multiplier),
+        "volatility": float(volatility_multiplier),
+    }
+    return min(components.values()), bucket, float(bucket_exposure), components
+
+
+def _apply_phase4_sizing_adjustments(
+    blueprints: List[Blueprint],
+    *,
+    portfolio_state: Dict[str, Any],
+    candidate_correlations: Dict[str, float],
+) -> List[Blueprint]:
+    adjusted: List[Blueprint] = []
+    for bp in blueprints:
+        max_corr = float(candidate_correlations.get(bp.candidate_id, 0.0))
+        correlation_multiplier = (1.0 - max_corr) if max_corr > 0.8 else 1.0
+        portfolio_multiplier, bucket, bucket_exposure, components = _resolve_portfolio_risk_multiplier(
+            bp,
+            portfolio_state,
+        )
+        total_multiplier = float(np.clip(correlation_multiplier * portfolio_multiplier, 0.0, 1.0))
+
+        sizing_updates = {
+            "portfolio_risk_budget": float(bp.sizing.portfolio_risk_budget) * total_multiplier,
+            "symbol_risk_budget": float(bp.sizing.symbol_risk_budget) * total_multiplier,
+        }
+        if bp.sizing.risk_per_trade is not None:
+            sizing_updates["risk_per_trade"] = float(bp.sizing.risk_per_trade) * total_multiplier
+        if bp.sizing.target_vol is not None:
+            sizing_updates["target_vol"] = float(bp.sizing.target_vol) * portfolio_multiplier
+        sizing = _copy_model(bp.sizing, **sizing_updates)
+
+        constraints = dict(bp.lineage.constraints)
+        constraints.update(
+            {
+                "portfolio_state_path": str(portfolio_state.get("source_path", "")),
+                "portfolio_value_usd": float(safe_float(portfolio_state.get("portfolio_value"), 0.0)),
+                "portfolio_gross_exposure_usd": float(
+                    safe_float(portfolio_state.get("gross_exposure"), 0.0)
+                ),
+                "portfolio_current_vol": float(safe_float(portfolio_state.get("current_vol"), 0.0)),
+                "portfolio_target_vol": float(safe_float(portfolio_state.get("target_vol"), 0.0)),
+                "portfolio_bucket": bucket,
+                "portfolio_bucket_exposure_usd": float(bucket_exposure),
+                "portfolio_risk_multiplier": float(portfolio_multiplier),
+                "portfolio_risk_components": components,
+                "max_promoted_pnl_correlation": float(max_corr),
+                "correlation_risk_multiplier": float(correlation_multiplier),
+            }
+        )
+        lineage = _copy_model(bp.lineage, constraints=constraints)
+        adjusted.append(_copy_model(bp, sizing=sizing, lineage=lineage))
+    return adjusted
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Compile strategy blueprints.")
     parser.add_argument("--run_id", required=True)
@@ -577,6 +841,7 @@ def main() -> int:
     parser.add_argument("--allow_fallback_blueprints", type=int, default=0)
     parser.add_argument("--min_events_floor", type=int, default=20)
     parser.add_argument("--out_path", default=None)
+    parser.add_argument("--portfolio_state_path", default=None)
 
     parser.add_argument("--quality_floor_fallback", type=float, default=0.0)
     args = parser.parse_args()
@@ -598,8 +863,36 @@ def main() -> int:
             run_id=args.run_id,
             required=True,
         )
+        low_capital_contract = assert_low_capital_contract(
+            contract,
+            stage_name="compile_strategy_blueprints",
+        )
+        resolved_costs = resolve_execution_costs(
+            project_root=PROJECT_ROOT,
+            config_paths=None,
+            fees_bps=args.fees_bps,
+            slippage_bps=args.slippage_bps,
+            cost_bps=args.cost_bps,
+        )
         operator_registry = _load_operator_registry()
         ontology_hash = ontology_spec_hash(PROJECT_ROOT.parent)
+        retail_profile = str(
+            getattr(contract, "retail_profile_name", args.retail_profile) or args.retail_profile
+        )
+        require_low_capital_contract = bool(
+            getattr(contract, "require_low_capital_contract", False)
+        )
+        effective_max_concurrent_positions = int(
+            safe_int(getattr(contract, "max_concurrent_positions", None), 1)
+        )
+        effective_per_position_notional_cap_usd = float(
+            safe_float(getattr(contract, "effective_per_position_notional_cap_usd", None), 0.0)
+        )
+        if effective_per_position_notional_cap_usd <= 0.0:
+            effective_per_position_notional_cap_usd = float(
+                safe_float(low_capital_contract.get("max_position_notional_usd"), 0.0)
+            )
+        default_fee_tier = str(low_capital_contract.get("fee_tier", "taker") or "taker")
 
         # 2. Checklist Gate
         if not args.ignore_checklist:
@@ -626,6 +919,7 @@ def main() -> int:
             else pd.read_csv(promoted_path)
         )
         edge_df = ensure_candidate_schema(edge_df)
+        _validate_promoted_candidates_frame(edge_df, source_label=str(promoted_path))
 
         # 3b. Deploy-mode retail viability gate
         run_mode = _load_run_mode(args.run_id)
@@ -651,13 +945,25 @@ def main() -> int:
                 run_id=args.run_id,
                 run_symbols=symbols,
                 stats={},  # Placeholder for detailed stats if needed
-                fees_bps=safe_float(args.fees_bps, 4.0),
-                slippage_bps=safe_float(args.slippage_bps, 2.0),
+                fees_bps=resolved_costs.fee_bps_per_side,
+                slippage_bps=resolved_costs.slippage_bps_per_fill,
                 ontology_spec_hash_value=ontology_hash,
-                cost_config_digest="unknown",
+                cost_config_digest=resolved_costs.config_digest,
                 operator_registry=operator_registry,
             )
             blueprints.append(bp)
+
+        portfolio_state = _load_portfolio_state(args.portfolio_state_path)
+        candidate_correlations = _calculate_candidate_correlation_by_candidate(
+            edge_df,
+            data_root=DATA_ROOT,
+            current_run_id=args.run_id,
+        )
+        blueprints = _apply_phase4_sizing_adjustments(
+            blueprints,
+            portfolio_state=portfolio_state,
+            candidate_correlations=candidate_correlations,
+        )
 
         # 5. Write Outputs
         out_jsonl = out_dir / "blueprints.jsonl"
@@ -665,7 +971,32 @@ def main() -> int:
             for bp in blueprints:
                 f.write(json.dumps(bp.to_dict(), sort_keys=True) + "\n")
 
-        finalize_manifest(manifest, "success", stats={"blueprint_count": len(blueprints)})
+        contract_artifacts = _write_strategy_contract_artifacts(
+            blueprints=blueprints,
+            out_dir=out_dir,
+            run_id=args.run_id,
+            retail_profile=retail_profile,
+            low_capital_contract=low_capital_contract,
+            require_low_capital_contract=require_low_capital_contract,
+            effective_max_concurrent_positions=effective_max_concurrent_positions,
+            effective_per_position_notional_cap_usd=effective_per_position_notional_cap_usd,
+            default_fee_tier=default_fee_tier,
+            fees_bps_per_side=resolved_costs.fee_bps_per_side,
+            slippage_bps_per_fill=resolved_costs.slippage_bps_per_fill,
+        )
+
+        finalize_manifest(
+            manifest,
+            "success",
+            stats={
+                "blueprint_count": len(blueprints),
+                "allocation_spec_count": int(contract_artifacts.get("allocation_spec_count", 0)),
+                "max_correlation_haircut_count": int(
+                    sum(1 for value in candidate_correlations.values() if value > 0.8)
+                ),
+                "portfolio_state_applied": bool(portfolio_state),
+            },
+        )
         return 0
     except Exception as exc:
         logging.exception("Compilation failed")

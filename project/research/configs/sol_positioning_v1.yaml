@@ -18,7 +18,7 @@ templates:
 evaluation:
   horizons_bars: [4, 8]
   directions: ["long", "short"]
-  entry_lags: [0]
+  entry_lags: [1]
 contexts:
   include: {}
 search_control:

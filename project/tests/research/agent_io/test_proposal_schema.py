@@ -35,8 +35,33 @@ def test_proposal_validation_warns_on_proxy_tier_events():
         "templates": ["continuation"],
         "horizons_bars": [12],
         "directions": ["long"],
-        "entry_lags": [0],
+        "entry_lags": [1],
     }
     warnings = validate_proposal_with_warnings(payload)
     proxy_warnings = [w for w in warnings if "proxy" in w.lower() and "ABSORPTION_EVENT" in w]
     assert proxy_warnings, f"Expected proxy-tier warning for ABSORPTION_EVENT; got: {warnings}"
+
+
+def test_proposal_validation_rejects_zero_entry_lag():
+    from project.research.agent_io.proposal_schema import load_agent_proposal
+
+    payload = {
+        "program_id": "test_invalid_lag",
+        "objective": "test",
+        "symbols": ["BTCUSDT"],
+        "timeframe": "5m",
+        "start": "2024-01-01",
+        "end": "2024-06-01",
+        "trigger_space": {
+            "allowed_trigger_types": ["EVENT"],
+            "events": {"include": ["ABSORPTION_EVENT"]},
+        },
+        "templates": ["continuation"],
+        "horizons_bars": [12],
+        "directions": ["long"],
+        "entry_lags": [0],
+    }
+    import pytest
+
+    with pytest.raises(ValueError, match="entry_lags contains invalid value"):
+        load_agent_proposal(payload)

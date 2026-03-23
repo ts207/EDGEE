@@ -94,10 +94,8 @@ edge-run-all --run_id demo --symbols BTCUSDT --start 2024-01-01 --end 2024-01-31
 
 Before any material run, verify the platform is in a working state.
 
-> **Note:** `edge-smoke` requires a `main()` entry point in `project/reliability/cli_smoke.py` to be wired. Until that is confirmed, use the script path directly:
-
 ```bash
-PYTHONPATH=. python3 -m project.reliability.cli_smoke --mode research
+edge-smoke --mode research
 ```
 
 ---

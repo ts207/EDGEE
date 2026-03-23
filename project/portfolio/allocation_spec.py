@@ -26,6 +26,8 @@ class SizingPolicySpec(BaseModel):
 
     mode: str
     risk_per_trade: float | None = None
+    expected_return_bps: float | None = None
+    expected_adverse_bps: float | None = None
     max_gross_leverage: float
     portfolio_risk_budget: float = 1.0
     symbol_risk_budget: float = 1.0
@@ -66,6 +68,8 @@ class AllocationSpec(BaseModel):
             "allocator_mode": str(constraints.get("allocator_mode", "heuristic")).strip().lower(),
             "allocator_deterministic": bool(constraints.get("allocator_deterministic", True)),
             "allocator_turnover_penalty": float(constraints.get("allocator_turnover_penalty", 0.0)),
+            "expected_return_bps": self.sizing_policy.expected_return_bps,
+            "expected_adverse_bps": self.sizing_policy.expected_adverse_bps,
             "strategy_risk_budgets": strategy_risk_budgets,
             "family_risk_budgets": family_risk_budgets,
             "strategy_family_map": strategy_family_map,
@@ -109,6 +113,8 @@ class AllocationSpec(BaseModel):
             sizing_policy=SizingPolicySpec(
                 mode=blueprint.sizing.mode,
                 risk_per_trade=blueprint.sizing.risk_per_trade,
+                expected_return_bps=constraints.get("expected_return_bps"),
+                expected_adverse_bps=constraints.get("expected_adverse_bps"),
                 max_gross_leverage=blueprint.sizing.max_gross_leverage,
                 portfolio_risk_budget=blueprint.sizing.portfolio_risk_budget,
                 symbol_risk_budget=blueprint.sizing.symbol_risk_budget,

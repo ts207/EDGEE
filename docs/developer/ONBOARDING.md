@@ -68,12 +68,10 @@ All registered in `pyproject.toml`:
 | `edge-live-engine` | `project.scripts.run_live_engine:main` |
 | `edge-phase2-discovery` | `project.pipelines.research.phase2_candidate_discovery:main` |
 | `edge-promote` | `project.pipelines.research.promote_candidates:main` |
-| `edge-smoke` | `project.reliability.cli_smoke:main` ⚠️ |
+| `edge-smoke` | `project.reliability.cli_smoke:main` |
 | `compile-strategy-blueprints` | `project.pipelines.research.compile_strategy_blueprints:main` |
 | `build-strategy-candidates` | `project.pipelines.research.build_strategy_candidates:main` |
 | `ontology-consistency-audit` | `project.scripts.ontology_consistency_audit:main` |
-
-> ⚠️ **Known issue:** `project/reliability/cli_smoke.py` does not currently define a top-level `def main()`. The `edge-smoke` command will fail with `AttributeError` until this is resolved. Use `PYTHONPATH=. python3 -m project.reliability.cli_smoke --mode research` as a workaround.
 
 ---
 

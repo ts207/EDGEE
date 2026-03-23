@@ -64,10 +64,13 @@ Remove `--plan_only 1` to execute. Always plan first on material runs.
 edge-run-all --run_id <id> --symbols BTCUSDT --start 2024-01-01 --end 2024-03-31 --plan_only 1
 
 # Phase 2 discovery only
-edge-phase2-discovery --run_id <id>
+edge-phase2-discovery --run_id <id> --symbols BTCUSDT
 
 # Promotion pass
 edge-promote --run_id <id>
+
+# Platform smoke verification
+edge-smoke --mode research
 ```
 
 ### Research
@@ -95,7 +98,8 @@ python3 -m project.scripts.run_golden_synthetic_discovery
 python3 -m project.scripts.run_fast_synthetic_certification
 
 # Validate detector truth after any synthetic run
-python3 -m project.scripts.validate_synthetic_detector_truth --run_id golden_synthetic_discovery
+# Use the actual run_id if you overrode the workflow default.
+python3 -m project.scripts.validate_synthetic_detector_truth --run_id <run_id>
 ```
 
 ### Benchmarks

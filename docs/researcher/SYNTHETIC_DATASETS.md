@@ -76,8 +76,10 @@ After any synthetic run, validate detector truth before interpreting results:
 
 ```bash
 python3 -m project.scripts.validate_synthetic_detector_truth \
-  --run_id golden_synthetic_discovery
+  --run_id <run_id>
 ```
+
+Use `golden_synthetic_discovery` only when you ran the maintained workflow without overriding `run_id`.
 
 **Important distinction:**
 - `expected_event_types` — hard pass/fail truth contract. Enforces both an off-regime ceiling and a minimum in-regime precision threshold.

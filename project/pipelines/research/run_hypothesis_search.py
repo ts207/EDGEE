@@ -28,6 +28,7 @@ from project.research.search.distributed_runner import run_distributed_search
 from project.research.search.bridge_adapter import (
     hypotheses_to_bridge_candidates,
     split_bridge_candidates,
+    _sanitize_event_type,
 )
 from project.research.search.evaluator import evaluated_records_from_metrics
 from project.research.phase2 import load_features
@@ -177,6 +178,157 @@ def _write_evaluation_artifacts(
     write_parquet(gate_failures, out_dir / "gate_failures.parquet")
 
 
+def _build_regime_conditional_candidates(
+    metrics: pd.DataFrame,
+    *,
+    min_overall_t_stat: float,
+    min_regime_t_stat: float = 1.5,
+    min_regime_n: int = 20,
+) -> pd.DataFrame:
+    if metrics.empty:
+        return pd.DataFrame()
+
+    required = {
+        "hypothesis_id",
+        "trigger_type",
+        "template_id",
+        "direction",
+        "horizon",
+        "entry_lag",
+        "context_json",
+        "mean_return_bps",
+        "t_stat",
+        "best_regime",
+        "best_regime_n",
+        "best_regime_mean_return_bps",
+        "best_regime_t_stat",
+        "regime_evaluations_json",
+        "valid",
+    }
+    legacy_required = required - {"regime_evaluations_json"}
+    if not (required.issubset(metrics.columns) or legacy_required.issubset(metrics.columns)):
+        return pd.DataFrame()
+
+    working = metrics.copy()
+    working["valid"] = working["valid"].fillna(False)
+    working["mean_return_bps"] = pd.to_numeric(working["mean_return_bps"], errors="coerce")
+    working["t_stat"] = pd.to_numeric(working["t_stat"], errors="coerce")
+    working["best_regime_mean_return_bps"] = pd.to_numeric(
+        working["best_regime_mean_return_bps"], errors="coerce"
+    )
+    working["best_regime_t_stat"] = pd.to_numeric(
+        working["best_regime_t_stat"], errors="coerce"
+    )
+    working["best_regime_n"] = (
+        pd.to_numeric(working["best_regime_n"], errors="coerce").fillna(0).astype(int)
+    )
+    prefiltered = working[
+        working["valid"]
+        & (working["mean_return_bps"] > 0.0)
+        & (working["t_stat"].abs() < float(min_overall_t_stat))
+    ].copy()
+    if prefiltered.empty:
+        return pd.DataFrame()
+
+    selected_rows: list[dict[str, object]] = []
+
+    for _, row in prefiltered.iterrows():
+        regime_payload = row.get("regime_evaluations_json", "[]")
+        regime_rows = []
+        if isinstance(regime_payload, str) and regime_payload.strip():
+            try:
+                decoded = json.loads(regime_payload)
+                if isinstance(decoded, list):
+                    regime_rows = [item for item in decoded if isinstance(item, dict)]
+            except json.JSONDecodeError:
+                regime_rows = []
+        if not regime_rows:
+            regime_rows = [
+                {
+                    "regime": row.get("best_regime"),
+                    "n": row.get("best_regime_n"),
+                    "mean_return_bps": row.get("best_regime_mean_return_bps"),
+                    "t_stat": row.get("best_regime_t_stat"),
+                    "valid": True,
+                }
+            ]
+
+        regime_df = pd.DataFrame(regime_rows)
+        if regime_df.empty:
+            continue
+        regime_df["valid"] = regime_df.get("valid", True).fillna(False)
+        regime_df["n"] = pd.to_numeric(regime_df.get("n"), errors="coerce").fillna(0).astype(int)
+        regime_df["mean_return_bps"] = pd.to_numeric(
+            regime_df.get("mean_return_bps"), errors="coerce"
+        )
+        regime_df["t_stat"] = pd.to_numeric(regime_df.get("t_stat"), errors="coerce")
+        regime_df["regime"] = regime_df.get("regime", "").astype(str)
+        regime_df = regime_df[
+            regime_df["valid"]
+            & (regime_df["n"] >= int(min_regime_n))
+            & (regime_df["mean_return_bps"] > 0.0)
+            & (regime_df["t_stat"] >= float(min_regime_t_stat))
+            & (regime_df["regime"].str.strip() != "")
+        ].copy()
+        if regime_df.empty:
+            continue
+
+        event_type = _sanitize_event_type(row)
+        for regime_row in regime_df.to_dict(orient="records"):
+            selected_rows.append(
+                {
+                    "hypothesis_id": row.get("hypothesis_id"),
+                    "event_type": event_type,
+                    "trigger_type": row.get("trigger_type"),
+                    "template_id": row.get("template_id"),
+                    "direction": row.get("direction"),
+                    "horizon": row.get("horizon"),
+                    "entry_lag": row.get("entry_lag"),
+                    "context_json": row.get("context_json"),
+                    "mean_return_bps": row.get("mean_return_bps"),
+                    "t_stat": row.get("t_stat"),
+                    "best_regime": regime_row.get("regime"),
+                    "best_regime_n": int(regime_row.get("n", 0) or 0),
+                    "best_regime_mean_return_bps": regime_row.get("mean_return_bps"),
+                    "best_regime_t_stat": regime_row.get("t_stat"),
+                }
+            )
+
+    if not selected_rows:
+        return pd.DataFrame()
+
+    selected = pd.DataFrame(selected_rows)
+    selected["priority_score"] = (
+        pd.to_numeric(selected["best_regime_t_stat"], errors="coerce").fillna(0.0)
+        - pd.to_numeric(selected["t_stat"], errors="coerce").abs().fillna(0.0)
+    )
+    selected["reason"] = "weak_overall_strong_regime"
+    selected = selected.sort_values(
+        ["priority_score", "best_regime_mean_return_bps", "mean_return_bps", "best_regime_n"],
+        ascending=[False, False, False, False],
+    )
+    return selected[
+        [
+            "hypothesis_id",
+            "event_type",
+            "trigger_type",
+            "template_id",
+            "direction",
+            "horizon",
+            "entry_lag",
+            "context_json",
+            "mean_return_bps",
+            "t_stat",
+            "best_regime",
+            "best_regime_n",
+            "best_regime_mean_return_bps",
+            "best_regime_t_stat",
+            "priority_score",
+            "reason",
+        ]
+    ].reset_index(drop=True)
+
+
 def _load_all_features(
     symbols: List[str],
     run_id: str,
@@ -238,6 +390,11 @@ def _make_parser() -> argparse.ArgumentParser:
         "--data_root",
         default=None,
         help="Optional override for data root (defaults to configured data root)",
+    )
+    parser.add_argument(
+        "--out_dir",
+        default=None,
+        help="Optional override for output directory",
     )
     return parser
 
@@ -303,6 +460,11 @@ def main() -> int:
     else:
         # Preserve schema by writing an empty frame with no rows.
         write_parquet(pd.DataFrame(), metrics_path)
+    regime_conditional = _build_regime_conditional_candidates(
+        metrics,
+        min_overall_t_stat=float(args.min_t_stat),
+    )
+    write_parquet(regime_conditional, out_dir / "regime_conditional_candidates.parquet")
     _, gate_failures = split_bridge_candidates(
         metrics,
         min_t_stat=args.min_t_stat,

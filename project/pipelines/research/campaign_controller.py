@@ -104,6 +104,9 @@ class CampaignConfig:
     # True   — adds vol_regime: [low, high] to every Step 4 proposal, tripling
     #           the regime-conditional hypothesis count per run.
     enable_context_conditioning: bool = False
+    # Phase 4.4: optional live portfolio snapshot consumed by downstream
+    # blueprint/allocation compilation for portfolio-aware sizing.
+    portfolio_state_path: str | None = None
 
     def __post_init__(self) -> None:
         # Default to EVENT-only; caller can expand to full trigger sequence
@@ -466,6 +469,8 @@ class CampaignController:
         event_type = str(scope.get("event_type", "")).strip()
         if not event_type:
             return None
+        raw_contexts = scope.get("contexts", {})
+        contexts = raw_contexts if isinstance(raw_contexts, dict) else {}
 
         _LOG.info("STEP 3 EXPLORE ADJACENT: event=%s", event_type)
 
@@ -478,6 +483,7 @@ class CampaignController:
             description=f"Explore adjacent — {event_type}",
             promotion_enabled=False,
             date_scope=("2024-01-01", "2024-06-30"),
+            contexts=contexts,
         )
 
     # ------------------------------------------------------------------
@@ -1205,6 +1211,7 @@ def main():
         default="scan",
         help="Proposal strategy: scan=frontier, exploit=promising regions, explore=adjacent",
     )
+    parser.add_argument("--portfolio_state_path", default=None)
     args = parser.parse_args()
 
     data_root = get_data_root()
@@ -1212,6 +1219,7 @@ def main():
         program_id=args.program_id,
         max_runs=args.max_runs,
         research_mode=args.research_mode,
+        portfolio_state_path=args.portfolio_state_path,
     )
     controller = CampaignController(config, data_root, Path(args.registry_root))
     controller.run_campaign()
