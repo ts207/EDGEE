@@ -35,12 +35,15 @@ from project.pipelines.research.campaign_controller import (
 # ---------------------------------------------------------------------------
 
 
-def _make_controller(tmp_path: Path, research_mode: str = "scan") -> CampaignController:
+def _make_controller(
+    tmp_path: Path, research_mode: str = "scan", **config_kwargs: Any
+) -> CampaignController:
     """Build a controller with a stubbed RegistryBundle so no real files needed."""
     config = CampaignConfig(
         program_id="test_program",
         max_runs=5,
         research_mode=research_mode,
+        **config_kwargs,
     )
     registry_root = tmp_path / "registries"
     registry_root.mkdir()
@@ -177,6 +180,20 @@ class TestStep1Repair:
         assert result is not None
         assert 0 not in result["evaluation"]["entry_lags"]
         assert all(lag >= 1 for lag in result["evaluation"]["entry_lags"])
+
+    def test_repair_uses_configured_date_scope(self, tmp_path):
+        ctrl = _make_controller(
+            tmp_path,
+            repair_date_scope=("2025-02-01", "2025-02-05"),
+        )
+        mem = _empty_memory()
+        mem["next_actions"]["repair"] = [{"proposed_scope": {"stage": "feature_pipeline"}}]
+
+        result = ctrl._step_repair(mem)
+
+        assert result is not None
+        assert result["instrument_scope"]["start"] == "2025-02-01"
+        assert result["instrument_scope"]["end"] == "2025-02-05"
 
 
 # ---------------------------------------------------------------------------

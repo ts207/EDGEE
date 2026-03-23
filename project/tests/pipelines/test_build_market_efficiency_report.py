@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pandas as pd
+import pytest
 
 from project.io.utils import write_parquet
 from project.pipelines.eval import build_market_efficiency_report as report_mod
@@ -68,3 +69,23 @@ def test_run_market_efficiency_report_writes_promised_artifact(
     assert int(persisted.loc[0, "observations"]) == 31
     assert finalized == [("success", {"rows": 1, "symbols": 1})]
 
+
+def test_run_market_efficiency_report_rejects_multisymbol_override_without_symbol_column(
+    tmp_path, monkeypatch
+) -> None:
+    bars = pd.DataFrame(
+        {
+            "timestamp": pd.date_range("2026-01-01", periods=16, freq="1min", tz="UTC"),
+            "close": [100.0 + idx for idx in range(16)],
+        }
+    )
+    bars_path = tmp_path / "bars_no_symbol.parquet"
+    write_parquet(bars, bars_path)
+    monkeypatch.setattr(report_mod, "get_data_root", lambda: tmp_path)
+
+    with pytest.raises(ValueError, match="without a 'symbol' column"):
+        report_mod.run_market_efficiency_report(
+            run_id="efficiency_test",
+            symbols=["BTCUSDT", "ETHUSDT"],
+            bars_path=str(bars_path),
+        )

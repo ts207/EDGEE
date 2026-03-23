@@ -47,6 +47,7 @@ class LiveEngineRunner:
             self.state_store,
             microstructure_recovery_streak=microstructure_recovery_streak,
         )
+        self.kill_switch.register_callback(self._on_kill_switch_triggered)
         if data_manager is None:
             from project.live.ingest.manager import LiveDataManager
 
@@ -76,6 +77,7 @@ class LiveEngineRunner:
         self.account_sync_failure_count = 0
         self._running = False
         self._tasks: List[asyncio.Task] = []
+        self._kill_switch_task: asyncio.Task | None = None
 
     @property
     def session_metadata(self) -> Dict[str, Any]:
@@ -282,13 +284,50 @@ class LiveEngineRunner:
     async def stop(self):
         _LOG.info("Stopping Live Engine...")
         self._running = False
-        await self.data_manager.stop()
+        await self._shutdown_runtime()
+
+    async def _shutdown_runtime(self) -> None:
+        try:
+            await self.data_manager.stop()
+        except Exception as exc:
+            _LOG.error("Failed to stop data manager during shutdown: %s", exc)
+
         for task in self._tasks:
             task.cancel()
+        for task in self._tasks:
             try:
                 await task
             except asyncio.CancelledError:
                 pass
+            except Exception as exc:
+                _LOG.error("Background task shutdown failed: %s", exc)
+        self._tasks = []
+
+    def _on_kill_switch_triggered(self, reason: KillSwitchReason, message: str) -> None:
+        self._running = False
+        if self._kill_switch_task is not None and not self._kill_switch_task.done():
+            return
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            _LOG.error(
+                "Kill-switch triggered without an active event loop; async unwind could not start."
+            )
+            return
+        self._kill_switch_task = loop.create_task(
+            self._handle_kill_switch_trigger(reason, message)
+        )
+
+    async def _handle_kill_switch_trigger(
+        self, reason: KillSwitchReason, message: str
+    ) -> None:
+        _LOG.critical("Actuating kill-switch %s: %s", reason.name, message)
+        try:
+            await self._shutdown_runtime()
+            await self.order_manager.cancel_all_orders()
+            await self.order_manager.flatten_all_positions(self.state_store)
+        except Exception as exc:
+            _LOG.error("Kill-switch actuation failed: %s", exc)
 
     async def _consume_klines(self):
         while self._running:

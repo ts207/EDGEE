@@ -41,8 +41,19 @@ def _load_symbol_bars(
     data_root: Path,
     symbol: str,
     timeframe: str,
-    bars_path: Path | None,
+    bars_override: pd.DataFrame | None = None,
+    bars_path: Path | None = None,
 ) -> pd.DataFrame:
+    if bars_override is not None:
+        df = bars_override
+        if df.empty:
+            return df
+        if "symbol" in df.columns:
+            filtered = df[df["symbol"].astype(str).str.upper() == symbol]
+            if not filtered.empty:
+                return filtered.reset_index(drop=True)
+        return df.reset_index(drop=True)
+
     if bars_path is not None:
         df = _load_bars_from_path(bars_path)
         if df.empty:
@@ -130,15 +141,27 @@ def run_market_efficiency_report(
     out_path: str | None = None,
 ) -> Path:
     data_root = get_data_root()
+    symbol_list = [str(symbol).strip().upper() for symbol in symbols if str(symbol).strip()]
     bars_override = Path(bars_path) if bars_path else None
+    override_frame = _load_bars_from_path(bars_override) if bars_override is not None else None
+    if (
+        override_frame is not None
+        and not override_frame.empty
+        and "symbol" not in override_frame.columns
+        and len(symbol_list) > 1
+    ):
+        raise ValueError(
+            "bars_path override without a 'symbol' column can only be used with a single symbol."
+        )
     report_frames: list[pd.DataFrame] = []
     input_paths: list[dict[str, str]] = []
 
-    for symbol in symbols:
+    for symbol in symbol_list:
         loaded = _load_symbol_bars(
             data_root=data_root,
             symbol=symbol,
             timeframe=timeframe,
+            bars_override=override_frame,
             bars_path=bars_override,
         )
         if loaded.empty:
@@ -172,7 +195,7 @@ def run_market_efficiency_report(
         "build_market_efficiency_report",
         run_id,
         {
-            "symbols": list(symbols),
+            "symbols": symbol_list,
             "timeframe": timeframe,
             "lag": lag,
             "bars_path": bars_path,

@@ -65,6 +65,11 @@ def finalize_experiment(
     # Initialize merged_df with hyps
     merged_df = hyps_df.copy()
     merged_df["run_id"] = run_id
+    finalized_at = pd.Timestamp.now(tz="UTC").isoformat()
+    if "created_at" not in merged_df.columns:
+        merged_df["created_at"] = finalized_at
+    else:
+        merged_df["created_at"] = merged_df["created_at"].fillna(finalized_at)
 
     if not results_df.empty:
         # Create unique evaluation map

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import logging
+from pathlib import Path
 from typing import Dict, List, Optional
 
 from project.domain.hypotheses import HypothesisSpec, TriggerSpec
@@ -13,10 +14,48 @@ from project.pipelines.research.experiment_engine_schema import (
 
 log = logging.getLogger(__name__)
 
-def _validate_campaign_status(request: AgentExperimentRequest, registries: RegistryBundle) -> None:
+def _resolve_experiment_data_root(data_root: Path | None) -> Path:
     from project.core.config import get_data_root
 
-    data_root = get_data_root()
+    return Path(data_root) if data_root is not None else get_data_root()
+
+
+def _ordered_run_ids(df) -> list[str]:
+    import pandas as pd
+
+    if df.empty or "run_id" not in df.columns:
+        return []
+
+    ordering = df.copy()
+    ordering["run_id"] = ordering["run_id"].astype(str).str.strip()
+    ordering = ordering[ordering["run_id"] != ""].copy()
+    if ordering.empty:
+        return []
+
+    ordering["_row_order"] = range(len(ordering))
+    if "created_at" in ordering.columns:
+        ordering["created_at"] = pd.to_datetime(ordering["created_at"], utc=True, errors="coerce")
+        summary = (
+            ordering.groupby("run_id", as_index=False)
+            .agg(last_created_at=("created_at", "max"), last_row=("_row_order", "max"))
+            .sort_values(["last_created_at", "last_row", "run_id"], kind="stable")
+        )
+    else:
+        summary = (
+            ordering.groupby("run_id", as_index=False)
+            .agg(last_row=("_row_order", "max"))
+            .sort_values(["last_row", "run_id"], kind="stable")
+        )
+    return summary["run_id"].tolist()
+
+
+def _validate_campaign_status(
+    request: AgentExperimentRequest,
+    registries: RegistryBundle,
+    *,
+    data_root: Path | None = None,
+) -> None:
+    data_root = _resolve_experiment_data_root(data_root)
     campaign_dir = data_root / "artifacts" / "experiments" / request.program_id
     ledger_path = campaign_dir / "tested_ledger.parquet"
     state_path = campaign_dir / "campaign_state.json"
@@ -48,7 +87,7 @@ def _validate_campaign_status(request: AgentExperimentRequest, registries: Regis
             )
 
         # Check for failure rates in last 2 runs
-        runs = df["run_id"].unique()
+        runs = _ordered_run_ids(df)
         if len(runs) >= 2:
             last_runs = runs[-2:]
             recent = df[df["run_id"].isin(last_runs)]
@@ -70,11 +109,14 @@ def _validate_campaign_status(request: AgentExperimentRequest, registries: Regis
                 )
 
 
-def _validate_proposal_quality(request: AgentExperimentRequest, registries: RegistryBundle) -> None:
+def _validate_proposal_quality(
+    request: AgentExperimentRequest,
+    registries: RegistryBundle,
+    *,
+    data_root: Path | None = None,
+) -> None:
     # Penalize redundancy and low-diversity
-    from project.core.config import get_data_root
-
-    data_root = get_data_root()
+    data_root = _resolve_experiment_data_root(data_root)
     ledger_path = (
         data_root / "artifacts" / "experiments" / request.program_id / "tested_ledger.parquet"
     )
@@ -108,7 +150,7 @@ def _validate_proposal_quality(request: AgentExperimentRequest, registries: Regi
         )
 
     # 2. Material difference from previous run
-    runs = df["run_id"].unique()
+    runs = _ordered_run_ids(df)
     if len(runs) > 0:
         last_run = df[df["run_id"] == runs[-1]]
         last_events = set(last_run["eid"].unique())

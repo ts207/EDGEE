@@ -306,6 +306,13 @@ def truncate(s: str, n: int = 200) -> str:
     return s[:n].replace("\n", " ").strip() if s else ""
 
 
+def is_bootstrap_internal_claim(claim: dict) -> bool:
+    if str(claim.get("status", "")).strip() == "bootstrap_internal":
+        return True
+    scope = claim.get("scope", {})
+    return isinstance(scope, dict) and str(scope.get("stage", "")).strip() == "bootstrap_internal"
+
+
 def _append_template_registry_rows(rows: list[dict]) -> None:
     registry = get_domain_registry()
     for event_type in sorted(registry.event_ids):
@@ -341,6 +348,7 @@ def main():
     rows = []
     skipped_tool_refs = 0
     skipped_empty = 0
+    skipped_bootstrap_internal = 0
     used_template_fallback = False
 
     if ATLAS_PATH.exists():
@@ -353,6 +361,10 @@ def main():
 
         for claim in claims:
             statement = claim.get("statement", "").strip()
+
+            if is_bootstrap_internal_claim(claim):
+                skipped_bootstrap_internal += 1
+                continue
 
             # Skip empty statements
             if not statement:
@@ -413,6 +425,7 @@ def main():
 
     print(f"  Skipped {skipped_tool_refs} tool-reference claims.")
     print(f"  Skipped {skipped_empty} empty-statement claims.")
+    print(f"  Skipped {skipped_bootstrap_internal} bootstrap-internal claims.")
     print(f"  Writing {len(rows)} rows to {OUTPUT_PATH} ...")
 
     with open(OUTPUT_PATH, "w", newline="", encoding="utf-8") as f:

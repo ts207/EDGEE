@@ -66,6 +66,11 @@ class CampaignConfig:
     # table available for this program.
     mi_scan_symbols: str = "BTCUSDT"
     mi_scan_timeframe: str = "5m"
+    repair_date_scope: tuple[str, str] = ("2024-01-01", "2024-01-07")
+    exploit_date_scope: tuple[str, str] = ("2023-10-01", "2024-03-31")
+    explore_date_scope: tuple[str, str] = ("2024-01-01", "2024-06-30")
+    scan_event_date_scope: tuple[str, str] = ("2024-01-01", "2024-01-31")
+    scan_general_date_scope: tuple[str, str] = ("2024-01-01", "2024-03-31")
 
     def __post_init__(self) -> None:
         # Default to EVENT-only; caller can expand to full trigger sequence
@@ -149,7 +154,10 @@ class CampaignController:
 
             try:
                 build_experiment_plan(
-                    config_path, self.registry_root, out_dir=self.campaign_dir / run_id
+                    config_path,
+                    self.registry_root,
+                    out_dir=self.campaign_dir / run_id,
+                    data_root=self.data_root,
                 )
             except Exception as exc:
                 _LOG.error("Failed to build plan for %s: %s", run_id, exc)
@@ -346,7 +354,7 @@ class CampaignController:
             horizons=[12],
             description=f"Repair diagnostic — stage={stage}",
             promotion_enabled=False,
-            date_scope=("2024-01-01", "2024-01-07"),
+            date_scope=self.config.repair_date_scope,
         )
 
     # ------------------------------------------------------------------
@@ -384,7 +392,7 @@ class CampaignController:
             horizons=[12, 24, 48],
             description=f"Exploit confirmatory — {event_type}",
             promotion_enabled=True,
-            date_scope=("2023-10-01", "2024-03-31"),
+            date_scope=self.config.exploit_date_scope,
         )
 
     # ------------------------------------------------------------------
@@ -408,7 +416,7 @@ class CampaignController:
                 horizons=[12, 24, 48],
                 description=f"Exploit promising region — {event_type}",
                 promotion_enabled=True,
-                date_scope=("2023-10-01", "2024-03-31"),
+                date_scope=self.config.exploit_date_scope,
             )
         return None
 
@@ -457,7 +465,7 @@ class CampaignController:
             horizons=[6, 12, 24, 48],
             description=f"Explore adjacent — {event_type}",
             promotion_enabled=False,
-            date_scope=("2024-01-01", "2024-06-30"),
+            date_scope=self.config.explore_date_scope,
             contexts=contexts,
         )
 

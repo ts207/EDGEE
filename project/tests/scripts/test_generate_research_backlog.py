@@ -68,3 +68,42 @@ def test_main_uses_atlas_claims_when_present(monkeypatch, tmp_path: Path) -> Non
     assert len(rows) == 1
     assert rows[0]["claim_id"] == "c1"
     assert rows[0]["source_id"] == "src1"
+
+
+def test_main_skips_bootstrap_internal_claims_and_falls_back(
+    monkeypatch, tmp_path: Path, capsys
+) -> None:
+    atlas_payload = {
+        "version": 1,
+        "claims": [
+            {
+                "claim_id": "bootstrap1",
+                "concept_id": "C_EVENT_DEFINITIONS",
+                "claim_type": "spec",
+                "statement": "Derived from local concept spec.",
+                "status": "bootstrap_internal",
+                "operationalization": {"features": ["rv_24h"], "label": ""},
+                "scope": {"assets": ["BTCUSDT"], "horizon": "5m", "stage": "bootstrap_internal"},
+                "evidence": [{"locator": "spec/concepts/C_EVENT_DEFINITIONS.yaml", "source_id": "local"}],
+            }
+        ],
+    }
+    atlas_path = tmp_path / "knowledge_atlas.json"
+    atlas_path.write_text(json.dumps(atlas_payload), encoding="utf-8")
+    output_path = tmp_path / "research_backlog.csv"
+    monkeypatch.setattr(backlog, "ATLAS_PATH", atlas_path)
+    monkeypatch.setattr(backlog, "OUTPUT_PATH", output_path)
+    monkeypatch.setattr(backlog, "get_domain_registry", lambda: _FakeRegistry())
+    monkeypatch.setattr(
+        backlog,
+        "TEMPLATE_REGISTRY_PATH",
+        Path("spec/templates/event_template_registry.yaml"),
+    )
+
+    assert backlog.main() is None
+
+    rows = list(csv.DictReader(output_path.open(encoding="utf-8")))
+    assert len(rows) == 2
+    captured = capsys.readouterr().out
+    assert "Skipped 1 bootstrap-internal claims." in captured
+    assert "Source mode: template_registry_fallback" in captured

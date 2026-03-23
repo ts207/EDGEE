@@ -84,13 +84,15 @@ def load_agent_experiment_config(path: Path) -> AgentExperimentRequest:
 def validate_agent_request(
     request: AgentExperimentRequest,
     registries: RegistryBundle,
+    *,
+    data_root: Path | None = None,
 ) -> None:
     _validate_templates(request, registries)
     _validate_instrument_compatibility(request, registries)
     _validate_contexts(request, registries)
     _validate_search_limits(request, registries)
-    _validate_campaign_status(request, registries)
-    _validate_proposal_quality(request, registries)
+    _validate_campaign_status(request, registries, data_root=data_root)
+    _validate_proposal_quality(request, registries, data_root=data_root)
 
     for trigger_type in request.trigger_space.allowed_trigger_types:
         trigger_type_upper = trigger_type.upper()
@@ -307,11 +309,12 @@ def build_experiment_plan(
     config_path: Path,
     registry_root: Path,
     out_dir: Optional[Path] = None,
+    data_root: Optional[Path] = None,
 ) -> ValidatedExperimentPlan:
     registries = RegistryBundle(registry_root)
     validate_registry_consistency(registries)
     request = load_agent_experiment_config(config_path)
-    validate_agent_request(request, registries)
+    validate_agent_request(request, registries, data_root=data_root)
     hypotheses = expand_hypotheses(request, registries)
 
     plan = ValidatedExperimentPlan(

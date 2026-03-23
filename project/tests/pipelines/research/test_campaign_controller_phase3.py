@@ -231,6 +231,18 @@ class TestContextConditioning:
         assert result is not None
         assert result["contexts"]["include"] == {}
 
+    def test_event_scan_uses_configured_date_scope(self, tmp_path):
+        ctrl = _make_ctrl(tmp_path, scan_event_date_scope=("2025-03-01", "2025-03-15"))
+        mem = _empty_mem()
+        with patch(
+            "project.pipelines.research.campaign_controller.read_memory_table",
+            return_value=pd.DataFrame(),
+        ):
+            result = ctrl._step_scan_events(mem)
+        assert result is not None
+        assert result["instrument_scope"]["start"] == "2025-03-01"
+        assert result["instrument_scope"]["end"] == "2025-03-15"
+
     def test_state_proposal_inherits_context(self, tmp_path):
         ctrl = _make_ctrl(tmp_path, enable_context_conditioning=True)
         mem = _empty_mem()

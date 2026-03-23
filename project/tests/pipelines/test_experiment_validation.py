@@ -1,7 +1,9 @@
 import pytest
 from pathlib import Path
 import yaml
+import pandas as pd
 from project.pipelines.research.experiment_engine import build_experiment_plan
+from project.pipelines.research.experiment_engine_validators import _ordered_run_ids
 
 
 @pytest.fixture
@@ -169,3 +171,29 @@ def test_validate_instrument_mismatch(registry_root, tmp_path):
         ValueError, match="Event 'VOL_SPIKE' is not allowed for instrument class 'equities'"
     ):
         build_experiment_plan(conf, registry_root)
+
+
+def test_build_experiment_plan_uses_explicit_data_root(registry_root, tmp_path, monkeypatch):
+    from project.core import config as config_mod
+
+    wrong_root = tmp_path / "wrong_root"
+    actual_root = tmp_path / "actual_root"
+    halted_dir = actual_root / "artifacts" / "experiments" / "test"
+    halted_dir.mkdir(parents=True)
+    (halted_dir / "campaign_state.json").write_text('{"state": "halted_unsupported"}')
+    monkeypatch.setattr(config_mod, "get_data_root", lambda: wrong_root)
+
+    conf = _make_config(tmp_path)
+    with pytest.raises(ValueError, match="cannot accept new proposals"):
+        build_experiment_plan(conf, registry_root, data_root=actual_root)
+
+
+def test_ordered_run_ids_prefers_created_at_over_row_encounter_order() -> None:
+    df = pd.DataFrame(
+        {
+            "run_id": ["run_new", "run_old"],
+            "created_at": ["2024-02-01T00:00:00+00:00", "2024-01-01T00:00:00+00:00"],
+        }
+    )
+
+    assert _ordered_run_ids(df) == ["run_old", "run_new"]

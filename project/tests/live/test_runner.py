@@ -18,12 +18,28 @@ class _DummyDataManager:
     def __init__(self) -> None:
         self.kline_queue = asyncio.Queue()
         self.ticker_queue = asyncio.Queue()
+        self.stop_calls = 0
 
     async def start(self) -> None:
         return None
 
     async def stop(self) -> None:
+        self.stop_calls += 1
         return None
+
+
+class _DummyOrderManager:
+    def __init__(self) -> None:
+        self.execution_attribution = []
+        self.cancel_calls = 0
+        self.flatten_calls = 0
+
+    async def cancel_all_orders(self) -> None:
+        self.cancel_calls += 1
+
+    async def flatten_all_positions(self, state_store) -> None:
+        assert state_store is not None
+        self.flatten_calls += 1
 
 
 def test_live_runner_exposes_persistent_session_metadata(tmp_path) -> None:
@@ -162,6 +178,29 @@ def test_live_runner_account_sync_success_resets_failure_count() -> None:
     assert runner.account_sync_failure_count == 0
     assert runner.state_store.account.wallet_balance == 123.0
     assert runner.kill_switch.status.is_active is False
+
+
+def test_live_runner_actuates_kill_switch_shutdown_and_unwind() -> None:
+    data_manager = _DummyDataManager()
+    order_manager = _DummyOrderManager()
+    runner = LiveEngineRunner(
+        ["btcusdt"],
+        order_manager=order_manager,
+        data_manager=data_manager,
+    )
+    runner._running = True
+
+    async def _exercise() -> None:
+        runner.kill_switch.trigger(KillSwitchReason.MANUAL, "manual test")
+        assert runner._kill_switch_task is not None
+        await runner._kill_switch_task
+
+    asyncio.run(_exercise())
+
+    assert runner._running is False
+    assert data_manager.stop_calls == 1
+    assert order_manager.cancel_calls == 1
+    assert order_manager.flatten_calls == 1
 
 
 class _DummyStrategy:
