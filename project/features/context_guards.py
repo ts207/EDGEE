@@ -33,11 +33,15 @@ def optional_state(
     valid = pd.Series(True, index=state.index, dtype=bool)
     if min_confidence is not None and confidence_col is not None:
         confidence = _optional_metric(df, confidence_col)
-        if not confidence.isna().all():
+        if confidence.isna().all():
+            valid &= False
+        else:
             valid &= (confidence >= float(min_confidence)).fillna(False)
     if max_entropy is not None and entropy_col is not None:
         entropy = _optional_metric(df, entropy_col)
-        if not entropy.isna().all():
+        if entropy.isna().all():
+            valid &= False
+        else:
             valid &= (entropy <= float(max_entropy)).fillna(False)
 
     return state.where(valid, np.nan)
@@ -47,8 +51,8 @@ def state_guard(
     state: pd.Series,
     *,
     predicate: Callable[[pd.Series], pd.Series],
-    lag: int = 0,
-    default_if_absent: bool = True,
+    lag: int = 1,
+    default_if_absent: bool = False,
 ) -> pd.Series:
     guard_source = state.shift(lag) if lag else state
     if guard_source.isna().all():
@@ -61,8 +65,8 @@ def state_at_least(
     column: str,
     minimum: float,
     *,
-    lag: int = 0,
-    default_if_absent: bool = True,
+    lag: int = 1,
+    default_if_absent: bool = False,
     min_confidence: float | None = None,
     max_entropy: float | None = None,
 ) -> pd.Series:
@@ -88,8 +92,8 @@ def state_at_most(
     column: str,
     maximum: float,
     *,
-    lag: int = 0,
-    default_if_absent: bool = True,
+    lag: int = 1,
+    default_if_absent: bool = False,
     min_confidence: float | None = None,
     max_entropy: float | None = None,
 ) -> pd.Series:
@@ -115,8 +119,8 @@ def state_in(
     column: str,
     values: Iterable[float],
     *,
-    lag: int = 0,
-    default_if_absent: bool = True,
+    lag: int = 1,
+    default_if_absent: bool = False,
     min_confidence: float | None = None,
     max_entropy: float | None = None,
 ) -> pd.Series:

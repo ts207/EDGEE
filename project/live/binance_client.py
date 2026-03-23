@@ -115,7 +115,12 @@ class BinanceFuturesClient:
         )
 
     async def create_market_order(
-        self, symbol: str, side: str, quantity: float, reduce_only: bool = False
+        self,
+        symbol: str,
+        side: str,
+        quantity: float,
+        reduce_only: bool = False,
+        new_client_order_id: str | None = None,
     ) -> Any:
         """POST /fapi/v1/order"""
         params = {
@@ -125,4 +130,6 @@ class BinanceFuturesClient:
             "quantity": quantity,
             "reduceOnly": "true" if reduce_only else "false",
         }
+        if new_client_order_id:
+            params["newClientOrderId"] = str(new_client_order_id)
         return await self._request("POST", "/fapi/v1/order", params=params, signed=True)

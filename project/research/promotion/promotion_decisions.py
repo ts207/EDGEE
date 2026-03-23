@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Any, Dict
+from pathlib import Path
 
 import numpy as np
 
@@ -56,10 +57,13 @@ def evaluate_row(
     bundle_version: str = "phase4_bundle_v1",
     is_reduced_evidence: bool = False,
     benchmark_certification: Dict[str, Any] | None = None,
+    run_id: str | None = None,
+    data_root: Path | None = None,
 ) -> Dict[str, Any]:
     try:
         from project.research.promotion.promotion_eligibility import _ReasonRecorder
         from project.research.utils.decision_safety import coerce_numeric_nan, finite_le
+        from project.research.promotion.promotion_decision_support import evaluate_sensitivity_gate
 
         reasons = _ReasonRecorder.create()
         event_type = str(row.get("event_type", row.get("event", ""))).strip() or "UNKNOWN_EVENT"
@@ -74,6 +78,27 @@ def evaluate_row(
                     promo_fail_reason="gate_promo_benchmark_certification",
                     category="benchmark_integrity",
                 )
+
+        # Sensitivity Gate (Phase 2)
+        sensitivity_max_score = 0.4
+        if promotion_confirmatory_gates:
+            sensitivity_max_score = float(promotion_confirmatory_gates.get("sensitivity_max_score", 0.4))
+        
+        sensitivity_status, sensitivity_msg = "pass", ""
+        if run_id and data_root:
+            from pathlib import Path as _Path
+            sensitivity_status, sensitivity_msg = evaluate_sensitivity_gate(
+                row, 
+                run_id=run_id, 
+                data_root=_Path(data_root), 
+                max_sensitivity_score=sensitivity_max_score
+            )
+        
+        if sensitivity_status == "fail":
+            reasons.add_reject(f"sensitivity_high ({sensitivity_msg})", category="stability")
+            reasons.add_promo_fail("gate_promo_sensitivity", category="stability")
+        
+        sensitivity_pass = (sensitivity_status == "pass")
 
         plan_row_id = str(row.get("plan_row_id", "")).strip()
         n_events = _quiet_int(row.get("n_events", row.get("sample_size", 0)), 0)
@@ -223,6 +248,7 @@ def evaluate_row(
             promotion_profile=promotion_profile,
             is_reduced_evidence=is_reduced_evidence,
             benchmark_pass=bench_pass,
+            sensitivity_pass=sensitivity_pass,
         )
         result["is_continuation_template_family"] = continuation_eval[
             "is_continuation_template_family"

@@ -27,7 +27,9 @@ def calculate_kendalls_tau(x: np.ndarray | pd.Series, y: np.ndarray | pd.Series)
         tau, _ = scipy_stats.kendalltau(x, y)
     except ImportError:
         tau, _ = _StatsCompat.kendalltau(x, y)
-    return float(tau)
+    if tau is None or not np.isfinite(tau):
+        return 0.0
+    return float(np.clip(tau, -0.999, 0.999))
 
 
 def test_cointegration(x: pd.Series, y: pd.Series) -> float:
@@ -51,8 +53,8 @@ def test_cointegration(x: pd.Series, y: pd.Series) -> float:
     try:
         from statsmodels.tsa.stattools import coint
 
-        _stat, pvalue, _crit = coint(xa, ya)
-        return float(np.clip(pvalue, 0.0, 1.0))
+        _stat, _pvalue, _crit = coint(xa, ya)
+        return _approx_coint_pvalue(float(_stat), n=len(aligned))
     except Exception:
         pass
 
@@ -62,47 +64,63 @@ def test_cointegration(x: pd.Series, y: pd.Series) -> float:
     if len(resid) < 10 or np.allclose(resid, resid[0]):
         return 1.0
 
-    # Simplified ADF-style test on residuals
+    # Lag-augmented ADF-style test on residuals.
+    # Regression: d(resid_t) = alpha + gamma * resid_{t-1} + phi * d(resid_{t-1}) + eps_t
     diff_resid = np.diff(resid)
     lag_resid = resid[:-1]
-    # Regression: d(resid) = gamma * resid(-1) + epsilon
-    gamma, *_ = np.linalg.lstsq(lag_resid.reshape(-1, 1), diff_resid, rcond=None)
-    gamma_val = float(gamma[0])
-    
-    # Standard error of gamma
-    eps = diff_resid - lag_resid * gamma_val
-    rss = np.sum(eps**2)
-    sample_var = rss / (len(diff_resid) - 1)
-    gamma_se = np.sqrt(sample_var / np.sum(lag_resid**2))
-    
-    t_stat = gamma_val / gamma_se if gamma_se > 0 else 0.0
-    
+    if len(diff_resid) < 3:
+        return 1.0
+    lag_diff = diff_resid[:-1]
+    y_dep = diff_resid[1:]
+    x_level = lag_resid[1:]
+    design = np.column_stack([np.ones(len(y_dep)), x_level, lag_diff])
+    coef, *_ = np.linalg.lstsq(design, y_dep, rcond=None)
+    gamma_val = float(coef[1])
+    eps = y_dep - design @ coef
+    dof = max(1, len(y_dep) - design.shape[1])
+    sample_var = float(np.sum(eps**2) / dof)
+    xtx = design.T @ design
+    try:
+        cov = sample_var * np.linalg.inv(xtx)
+        gamma_se = float(np.sqrt(max(cov[1, 1], 0.0)))
+    except np.linalg.LinAlgError:
+        gamma_se = float("nan")
+
+    t_stat = gamma_val / gamma_se if gamma_se and np.isfinite(gamma_se) and gamma_se > 0 else 0.0
+
     # MacKinnon (1994) approximate p-values for cointegration (N=2, constant, no trend)
-    # Tables for ADF test on residuals of a cointegrating regression
-    # For N=2 (one independent variable), the critical values are different from standard ADF
     return _approx_coint_pvalue(t_stat, n=len(resid))
 
 
 def _approx_coint_pvalue(t_stat: float, n: int) -> float:
     """
     Approximate p-value for Engle-Granger cointegration test (N=2, constant).
-    Based on MacKinnon (1994, 2010) critical values and finite-sample corrections.
+    Uses MacKinnon-style response surfaces when available and falls back to a
+    finite-sample logistic fit anchored to the sample-size-dependent critical
+    values.
     """
-    # Hard sample size gate per patch plan
     if n < 50:
         return 1.0
 
-    # Asymptotic critical values for N=2, constant, no trend
-    # 1%: -3.90, 5%: -3.34, 10%: -3.04
-    
-    # Better-fitted logistic approximation for ADF-style distribution
-    # p = 1 / (1 + exp(-a * (t_stat - t0)))
-    # Fitted to match MacKinnon CVs for case 2 (constant):
-    # -3.04 -> 0.10, -3.34 -> 0.05, -3.90 -> 0.01
-    a = 2.49
-    t0 = -2.157
-    
-    return float(np.clip(1.0 / (1.0 + np.exp(-a * (t_stat - t0))), 0.0, 1.0))
+    try:
+        from statsmodels.tsa.adfvalues import mackinnoncrit
+
+        crit_1, crit_5, crit_10 = map(float, mackinnoncrit(N=2, regression="c", nobs=max(3, n - 1)))
+        probs = np.array([0.01, 0.05, 0.10], dtype=float)
+        criticals = np.array([crit_1, crit_5, crit_10], dtype=float)
+        logits = np.log(probs / (1.0 - probs))
+        a, b = np.polyfit(criticals, logits, 1)
+        return float(np.clip(1.0 / (1.0 + np.exp(-(a * t_stat + b))), 0.0, 1.0))
+    except Exception:
+        # Finite-sample fallback calibrated against sample-size-dependent critical values.
+        crit_1 = -3.90 + 12.0 / max(50.0, float(n))
+        crit_5 = -3.34 + 10.0 / max(50.0, float(n))
+        crit_10 = -3.04 + 8.0 / max(50.0, float(n))
+        probs = np.array([0.01, 0.05, 0.10], dtype=float)
+        criticals = np.array([crit_1, crit_5, crit_10], dtype=float)
+        logits = np.log(probs / (1.0 - probs))
+        a, b = np.polyfit(criticals, logits, 1)
+        return float(np.clip(1.0 / (1.0 + np.exp(-(a * t_stat + b))), 0.0, 1.0))
 
 
 def _to_array(values: object) -> np.ndarray:

@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import threading
+import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum, auto
@@ -16,6 +18,7 @@ from typing import Any, Dict, List, Optional, Callable
 
 from project.live.health_checks import evaluate_pretrade_microstructure_gate
 from project.live.state import LiveStateStore
+from project.live.oms import LiveOrder, OrderSide, OrderType
 
 LOGGER = logging.getLogger(__name__)
 
@@ -47,6 +50,7 @@ class KillSwitchManager:
         self.status = KillSwitchStatus()
         self._on_trigger_callbacks: List[Callable[[KillSwitchReason, str], None]] = []
         self.microstructure_recovery_streak = max(1, int(microstructure_recovery_streak))
+        self._lock = threading.RLock()
         self._load_persisted_status()
 
     def register_callback(self, callback: Callable[[KillSwitchReason, str], None]):
@@ -65,10 +69,12 @@ class KillSwitchManager:
         }
 
     def _persist_status(self) -> None:
-        self.state_store.set_kill_switch_snapshot(self._serialize_status())
+        with self._lock:
+            self.state_store.set_kill_switch_snapshot(self._serialize_status())
 
     def _load_persisted_status(self) -> None:
-        snapshot = self.state_store.get_kill_switch_snapshot()
+        with self._lock:
+            snapshot = self.state_store.get_kill_switch_snapshot()
         reason_name = snapshot.get("reason")
         reason = None
         if reason_name:
@@ -95,49 +101,88 @@ class KillSwitchManager:
         )
 
     def trigger(self, reason: KillSwitchReason, message: str = ""):
-        if self.status.is_active:
-            return
+        callbacks: List[Callable[[KillSwitchReason, str], None]] = []
+        with self._lock:
+            if self.status.is_active:
+                return
 
-        self.status = KillSwitchStatus(
-            is_active=True,
-            reason=reason,
-            triggered_at=datetime.now(timezone.utc),
-            message=message,
-            recovery_streak=0,
-        )
-        self._persist_status()
+            self.status = KillSwitchStatus(
+                is_active=True,
+                reason=reason,
+                triggered_at=datetime.now(timezone.utc),
+                message=message,
+                recovery_streak=0,
+            )
+            self._persist_status()
+            callbacks = list(self._on_trigger_callbacks)
         LOGGER.critical(f"KILL-SWITCH TRIGGERED: {reason.name} - {message}")
 
-        for cb in self._on_trigger_callbacks:
+        for cb in callbacks:
             try:
                 cb(reason, message)
             except Exception as e:
                 LOGGER.error(f"Error in kill-switch callback: {e}")
 
     def reset(self):
-        self.status = KillSwitchStatus(is_active=False)
-        self._persist_status()
+        with self._lock:
+            self.status = KillSwitchStatus(is_active=False)
+            self._persist_status()
         LOGGER.info("Kill-switch reset.")
 
     def check_drawdown(self, max_drawdown_pct: float = 0.10):
         """Trigger if current drawdown from peak equity exceeds limit."""
-        equity = self.state_store.account.wallet_balance
-        unrealized = self.state_store.account.total_unrealized_pnl
-        current_total_equity = equity + unrealized
-        
-        # Update high-water mark
-        if current_total_equity > self.status.peak_equity:
-            self.status.peak_equity = current_total_equity
-            self._persist_status()
+        with self._lock:
+            equity = self.state_store.account.wallet_balance
+            unrealized = self.state_store.account.total_unrealized_pnl
+            current_total_equity = equity + unrealized
 
-        peak = max(self.status.peak_equity, 1e-9)
-        drawdown = (peak - current_total_equity) / peak
-        
-        if drawdown > max_drawdown_pct:
-            self.trigger(
-                KillSwitchReason.EXCESSIVE_DRAWDOWN,
-                f"Drawdown {drawdown:.2%} exceeded limit {max_drawdown_pct:.2%} (Peak: {peak:.2f}, Current: {current_total_equity:.2f})",
-            )
+            # Update high-water mark
+            if current_total_equity > self.status.peak_equity:
+                self.status.peak_equity = current_total_equity
+                self._persist_status()
+
+            peak = max(self.status.peak_equity, 1e-9)
+            drawdown = (peak - current_total_equity) / peak
+
+            if drawdown > max_drawdown_pct:
+                self.trigger(
+                    KillSwitchReason.EXCESSIVE_DRAWDOWN,
+                    f"Drawdown {drawdown:.2%} exceeded limit {max_drawdown_pct:.2%} (Peak: {peak:.2f}, Current: {current_total_equity:.2f})",
+                )
+
+    def evaluate_microstructure_gate(
+        self,
+        *,
+        spread_bps: float | None,
+        depth_usd: float | None,
+        tob_coverage: float | None,
+        max_spread_bps: float,
+        min_depth_usd: float,
+        min_tob_coverage: float,
+    ) -> Dict[str, object]:
+        gate = evaluate_pretrade_microstructure_gate(
+            spread_bps=spread_bps,
+            depth_usd=depth_usd,
+            tob_coverage=tob_coverage,
+            max_spread_bps=max_spread_bps,
+            min_depth_usd=min_depth_usd,
+            min_tob_coverage=min_tob_coverage,
+        )
+        with self._lock:
+            if self.status.is_active and self.status.reason not in {
+                None,
+                KillSwitchReason.MICROSTRUCTURE_BREAKDOWN,
+            }:
+                gate["is_tradable"] = False
+                gate["reasons"] = list(gate.get("reasons", [])) + ["kill_switch_active"]
+                gate["recovery_streak"] = int(self.status.recovery_streak)
+                gate["required_recovery_streak"] = int(self.microstructure_recovery_streak)
+            elif self.status.is_active and self.status.reason == KillSwitchReason.MICROSTRUCTURE_BREAKDOWN:
+                gate["is_tradable"] = False
+                gate["reasons"] = list(gate.get("reasons", [])) + ["microstructure_cooldown"]
+                gate["recovery_streak"] = int(self.status.recovery_streak)
+                gate["required_recovery_streak"] = int(self.microstructure_recovery_streak)
+        return gate
 
     def check_microstructure(
         self,
@@ -160,53 +205,61 @@ class KillSwitchManager:
             min_depth_usd=min_depth_usd,
             min_tob_coverage=min_tob_coverage,
         )
-        if self.status.is_active and self.status.reason not in {
-            None,
-            KillSwitchReason.MICROSTRUCTURE_BREAKDOWN,
-        }:
-            gate["is_tradable"] = False
-            gate["reasons"] = list(gate.get("reasons", [])) + ["kill_switch_active"]
-            gate["recovery_streak"] = int(self.status.recovery_streak)
-            gate["required_recovery_streak"] = int(self.microstructure_recovery_streak)
-            return gate
-
-        if not gate["is_tradable"]:
-            self.status.recovery_streak = 0
-            self._persist_status()
-            details = ",".join(gate["reasons"]) or "microstructure_breakdown"
-            self.trigger(
+        with self._lock:
+            if self.status.is_active and self.status.reason not in {
+                None,
                 KillSwitchReason.MICROSTRUCTURE_BREAKDOWN,
-                (
-                    f"Pre-trade microstructure gate failed ({details}): "
-                    f"spread_bps={gate['spread_bps']}, depth_usd={gate['depth_usd']}, "
-                    f"tob_coverage={gate['tob_coverage']}"
-                ),
-            )
-            gate["recovery_streak"] = 0
-            gate["required_recovery_streak"] = int(self.microstructure_recovery_streak)
-            return gate
-
-        if (
-            self.status.is_active
-            and self.status.reason == KillSwitchReason.MICROSTRUCTURE_BREAKDOWN
-        ):
-            self.status.recovery_streak += 1
-            if self.status.recovery_streak < self.microstructure_recovery_streak:
+            }:
                 gate["is_tradable"] = False
-                gate["reasons"] = ["microstructure_cooldown"]
+                gate["reasons"] = list(gate.get("reasons", [])) + ["kill_switch_active"]
                 gate["recovery_streak"] = int(self.status.recovery_streak)
                 gate["required_recovery_streak"] = int(self.microstructure_recovery_streak)
-                self.status.message = (
-                    "Microstructure recovery in progress "
-                    f"({self.status.recovery_streak}/{self.microstructure_recovery_streak})"
-                )
-                self._persist_status()
                 return gate
-            self.reset()
-            gate["recovered"] = True
 
-        gate["recovery_streak"] = int(self.status.recovery_streak)
-        gate["required_recovery_streak"] = int(self.microstructure_recovery_streak)
+            if not gate["is_tradable"]:
+                if self.status.is_active and self.status.reason == KillSwitchReason.MICROSTRUCTURE_BREAKDOWN:
+                    self.status.recovery_streak = 0
+                    self._persist_status()
+                    gate["recovery_streak"] = 0
+                    gate["required_recovery_streak"] = int(self.microstructure_recovery_streak)
+                    return gate
+
+                self.status.recovery_streak = 0
+                self._persist_status()
+                details = ",".join(gate["reasons"]) or "microstructure_breakdown"
+                self.trigger(
+                    KillSwitchReason.MICROSTRUCTURE_BREAKDOWN,
+                    (
+                        f"Pre-trade microstructure gate failed ({details}): "
+                        f"spread_bps={gate['spread_bps']}, depth_usd={gate['depth_usd']}, "
+                        f"tob_coverage={gate['tob_coverage']}"
+                    ),
+                )
+                gate["recovery_streak"] = 0
+                gate["required_recovery_streak"] = int(self.microstructure_recovery_streak)
+                return gate
+
+            if (
+                self.status.is_active
+                and self.status.reason == KillSwitchReason.MICROSTRUCTURE_BREAKDOWN
+            ):
+                self.status.recovery_streak += 1
+                if self.status.recovery_streak < self.microstructure_recovery_streak:
+                    gate["is_tradable"] = False
+                    gate["reasons"] = ["microstructure_cooldown"]
+                    gate["recovery_streak"] = int(self.status.recovery_streak)
+                    gate["required_recovery_streak"] = int(self.microstructure_recovery_streak)
+                    self.status.message = (
+                        "Microstructure recovery in progress "
+                        f"({self.status.recovery_streak}/{self.microstructure_recovery_streak})"
+                    )
+                    self._persist_status()
+                    return gate
+                self.reset()
+                gate["recovered"] = True
+
+            gate["recovery_streak"] = int(self.status.recovery_streak)
+            gate["required_recovery_streak"] = int(self.microstructure_recovery_streak)
         return gate
 
 
@@ -223,8 +276,9 @@ class UnwindOrchestrator:
     async def unwind_all(self):
         """
         Produce market-sell/market-buy orders for all active positions.
-        
+
         Sequentially unwinds positions to avoid overwhelming liquidity.
+        Uses deterministic client order IDs so retries remain idempotent.
         """
         if self.is_unwinding:
             return
@@ -233,7 +287,7 @@ class UnwindOrchestrator:
         try:
             # 1. Cancel all open orders first
             await self.oms_manager.cancel_all_orders()
-            
+
             # 2. Get positions
             positions = self.state_store.account.positions
             if not positions:
@@ -242,58 +296,68 @@ class UnwindOrchestrator:
 
             # Sort by size (USD notional) descending to reduce risk fastest
             sorted_positions = sorted(
-                positions.values(), 
-                key=lambda p: abs(p.quantity * p.mark_price), 
-                reverse=True
+                positions.values(),
+                key=lambda p: abs(p.quantity * p.mark_price),
+                reverse=True,
             )
 
             # 3. Flatten positions sequentially with retry logic
             for pos in sorted_positions:
                 if abs(pos.quantity) <= 1e-10:
                     continue
-                    
+
                 symbol = pos.symbol
-                qty = pos.quantity
-                side = "SELL" if pos.side == "LONG" else "BUY"
-                
-                LOGGER.info(f"Unwinding {symbol} {side} {qty}")
-                
-                # Retry loop for this position
-                max_retries = 3
+                side = OrderSide.SELL if pos.side == "LONG" else OrderSide.BUY
+                client_order_id = f"kill-{symbol}-{uuid.uuid4().hex}"
+
+                LOGGER.info("Unwinding %s %s %s", symbol, side.name, pos.quantity)
+
+                max_retries = 5
+                backoff = 0.5
                 for attempt in range(max_retries):
                     try:
-                        # Re-fetch position to get remaining qty
                         current_pos = self.state_store.account.positions.get(symbol)
                         if not current_pos or abs(current_pos.quantity) <= 1e-10:
+                            LOGGER.info("Position %s already flat", symbol)
                             break
-                            
-                        # Use market order
-                        # Note: In a real implementation, we might want to split large orders
-                        # For now, we assume the exchange handles the market order splitting or we accept slippage
-                        await self.oms_manager.exchange_client.create_market_order(
-                            symbol=symbol, 
-                            side=side, 
-                            quantity=current_pos.quantity, 
-                            reduce_only=True
+
+                        order = LiveOrder(
+                            client_order_id=client_order_id,
+                            symbol=symbol,
+                            side=side,
+                            order_type=OrderType.MARKET,
+                            quantity=float(current_pos.quantity),
+                            metadata={"idempotency_key": client_order_id, "reduce_only": True},
                         )
-                        
-                        # Wait briefly for fill
-                        await asyncio.sleep(1.0)
-                        
-                        # Check if filled
+                        submitter = getattr(self.oms_manager, "submit_order_async", None)
+                        if callable(submitter):
+                            await submitter(order)
+                        else:
+                            await self.oms_manager.exchange_client.create_market_order(
+                                symbol=symbol,
+                                side=side.name,
+                                quantity=float(current_pos.quantity),
+                                reduce_only=True,
+                                new_client_order_id=client_order_id,
+                            )
+
+                        await asyncio.sleep(backoff)
+                        backoff = min(backoff * 2.0, 5.0)
+
                         current_pos = self.state_store.account.positions.get(symbol)
                         if not current_pos or abs(current_pos.quantity) <= 1e-10:
-                            LOGGER.info(f"Successfully unwound {symbol}")
+                            LOGGER.info("Successfully unwound %s", symbol)
                             break
-                        
-                        LOGGER.warning(f"Partial unwind for {symbol}, retrying...")
-                        
+
+                        LOGGER.warning("Partial unwind for %s, retrying...", symbol)
+
                     except Exception as e:
-                        LOGGER.error(f"Unwind attempt {attempt+1} failed for {symbol}: {e}")
-                        await asyncio.sleep(2.0 * (attempt + 1)) # Backoff
+                        LOGGER.error("Unwind attempt %s failed for %s: %s", attempt + 1, symbol, e)
+                        await asyncio.sleep(min(backoff, 5.0))
+                        backoff = min(backoff * 2.0, 5.0)
 
             LOGGER.warning("Emergency unwind orchestration completed.")
         except Exception as e:
-            LOGGER.error(f"Error during emergency unwind: {e}")
+            LOGGER.error("Error during emergency unwind: %s", e)
         finally:
             self.is_unwinding = False

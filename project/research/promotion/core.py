@@ -128,6 +128,8 @@ def promote_candidates(
 
         bench_cert = benchmark_certs.get(family)
 
+        run_id = str(promotion_spec.get("run_id", "")).strip()
+
         eval_row = evaluate_row(
             row=row,
             hypothesis_index=hypothesis_index,
@@ -155,6 +157,8 @@ def promote_candidates(
             enforce_timeframe_consensus=enforce_timeframe_consensus,
             is_reduced_evidence=is_reduced_evidence,
             benchmark_certification=bench_cert,
+            run_id=run_id,
+            data_root=data_root,
         )
         merged = dict(row)
         merged.update(eval_row)

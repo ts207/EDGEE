@@ -31,6 +31,46 @@ def _safe_read_legacy_ledger(path: Path) -> pd.DataFrame:
         return pd.DataFrame()
 
 
+def _build_dynamic_quality_weights(
+    tested_regions: pd.DataFrame,
+    static_weights: Dict[str, float],
+    *,
+    min_evaluations: int = 5,
+    alpha: float = 0.4,  # blend factor: 0 = fully static, 1 = fully empirical
+) -> Dict[str, float]:
+    """Blend static YAML quality weights with empirical promotion rates.
+
+    Only events with at least `min_evaluations` evaluations contribute an
+    empirical signal; below that floor the static weight is used unchanged.
+    """
+    if tested_regions.empty or "event_type" not in tested_regions.columns:
+        return static_weights
+
+    grouped = (
+        tested_regions.groupby("event_type")
+        .agg(
+            n_eval=("candidate_id", "count"),
+            n_promoted=("eval_status", lambda s: (s.astype(str) == "promoted").sum()),
+        )
+        .reset_index()
+    )
+
+    dynamic: Dict[str, float] = dict(static_weights)
+    for row in grouped.to_dict(orient="records"):
+        event = str(row["event_type"])
+        n_eval = int(row["n_eval"])
+        n_promoted = int(row["n_promoted"])
+        if n_eval < min_evaluations:
+            continue
+
+        empirical = float(n_promoted) / max(n_eval, 1)
+        # Normalise empirical rate to same scale as static weights (0–3)
+        empirical_scaled = empirical * 3.0
+        static = static_weights.get(event, DEFAULT_EVENT_PRIORITY_WEIGHT)
+        dynamic[event] = (1 - alpha) * static + alpha * empirical_scaled
+    return dynamic
+
+
 def _build_summary(program_id: str, tested_regions: pd.DataFrame, *, top_k: int) -> Dict[str, Any]:
     if tested_regions.empty:
         return {"program_id": program_id, "status": "no_data"}
@@ -249,7 +289,10 @@ def update_search_intelligence(
             )
 
     # Phase 2.2: load quality weights from the centralised spec_registry loader
-    quality_weights = load_event_priority_weights(search_space_path)
+    static_weights = load_event_priority_weights(search_space_path)
+
+    # Phase 2-A: blend with empirical win rates if available
+    quality_weights = _build_dynamic_quality_weights(tested_regions, static_weights)
 
     summary = _build_summary(program_id, tested_regions, top_k=summary_top_k)
     frontier = _build_frontier(

@@ -83,6 +83,7 @@ def _assemble_promotion_result(
     promotion_profile: str,
     is_reduced_evidence: bool = False,
     benchmark_pass: bool = True,
+    sensitivity_pass: bool = True,
 ) -> Dict[str, Any]:
     # In non-deploy modes, missing OOS evidence is visible via `oos_pass_state` but
     # does not block promotion. Deploy-mode enforcement still happens upstream.
@@ -108,6 +109,7 @@ def _assemble_promotion_result(
         and robustness_pass
         and regime_pass
         and benchmark_pass
+        and sensitivity_pass
         and (retail_viability_pass or not bool(require_retail_viability))
         and (low_capital_viability_pass or not bool(require_low_capital_viability))
     )
@@ -228,4 +230,5 @@ def _assemble_promotion_result(
         "gate_promo_timeframe_consensus": "pass" if timeframe_consensus_pass else "fail",
         "gate_promo_continuation_quality": "pass" if continuation_quality_pass else "fail",
         "gate_promo_benchmark_certification": "pass" if benchmark_pass else "fail",
+        "gate_promo_sensitivity": "pass" if sensitivity_pass else "fail",
     }

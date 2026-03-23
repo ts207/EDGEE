@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Literal, Optional
 
 import numpy as np
 import pandas as pd
@@ -18,6 +18,7 @@ def block_bootstrap_pnl(
     n_iterations: int = 1000,
     random_seed: int = _DEFAULT_RANDOM_SEED,
     periods_per_year: Optional[int] = None,
+    pnl_mode: Literal["dollar", "return"] = "dollar",
 ) -> Dict[str, float]:
     pnl = pd.to_numeric(pnl_series, errors="coerce").dropna().values
     n = len(pnl)
@@ -49,10 +50,16 @@ def block_bootstrap_pnl(
         mean_ret = np.mean(bootstrapped_pnl)
         ann_ret = mean_ret * periods_per_year
         annualized_returns.append(ann_ret)
-        equity = np.cumprod(1.0 + bootstrapped_pnl)
+
+        if pnl_mode == "return":
+            equity = np.cumprod(1.0 + bootstrapped_pnl)
+        else:
+            equity = np.cumsum(bootstrapped_pnl)
+            equity = equity - equity[0]
         peak = np.maximum.accumulate(equity)
-        dd = (peak - equity) / peak
-        max_drawdowns.append(np.max(dd))
+        safe_peak = np.where(peak > 0.0, peak, 1.0)
+        dd = np.where(peak > 0.0, (peak - equity) / safe_peak, 0.0)
+        max_drawdowns.append(float(np.max(dd)))
 
     return {
         "bootstrap_return_p05": float(np.percentile(annualized_returns, 5)),

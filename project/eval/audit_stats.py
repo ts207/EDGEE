@@ -3,7 +3,7 @@ import pandas as pd
 from typing import List, Dict, Any
 
 
-def permutation_test(returns: pd.Series, n_permutations: int = 1000) -> float:
+def permutation_test(returns: pd.Series, n_permutations: int = 10000) -> float:
     """
     Calculate the p-value of the mean return using a permutation test.
     It randomly flips the signs of the returns to create a null distribution.
@@ -43,11 +43,12 @@ def detect_selection_bias(p_values: List[float], n_hypotheses: int) -> Dict[str,
     # alpha_corrected = 1 - (1 - alpha_global)^(1/n)
     # If best_p > alpha_corrected, we fail to reject the global null
 
-    is_biased = best_p > expected_best_p * 2.0  # Heuristic: if best is 2x expected, it's weak
+    is_biased = bool(best_p > expected_best_p * 2.0)  # Heuristic: if best is 2x expected, it's weak
 
     return {
         "best_observed_p": best_p,
         "expected_best_p": expected_best_p,
         "n_hypotheses": n_hypotheses,
+        "is_biased": is_biased,
         "is_suspicious": bool(best_p > expected_best_p * 5.0),  # Very weak best p
     }

@@ -17,10 +17,14 @@ def calculate_portfolio_risk_multiplier(
     """
     Calculate risk multiplier based on portfolio constraints and volatility.
     """
-    # Leverage constraint
-    leverage_cap = (
-        max(0.0, 1.0 - (gross_exposure / max_gross_leverage)) if max_gross_leverage > 0 else 0.0
-    )
+    if max_gross_leverage <= 0.0:
+        return 0.0
+
+    # Hard leverage gate: stay fully sized until the soft-cap region is reached,
+    # then stop adding risk instead of linearly tapering to zero.
+    soft_cap_ratio = 0.90
+    exposure_ratio = max(0.0, gross_exposure / max_gross_leverage)
+    leverage_cap = 1.0 if exposure_ratio <= soft_cap_ratio else 0.0
 
     # Volatility scaling
     vol_scale = target_vol / max(1e-6, current_vol)

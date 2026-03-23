@@ -129,22 +129,27 @@ class LiveStateStore:
             self._last_snapshot_time = self.account.update_time
             self._maybe_persist()
 
-    def reconcile(self, exchange_data: Dict[str, Any], tolerance: float = 1e-6) -> List[str]:
+    def reconcile(
+        self,
+        exchange_data: Dict[str, Any],
+        balance_tolerance_usd: float = 0.10,
+        qty_tolerance_fraction: float = 1e-4,
+    ) -> List[str]:
         """
         Compare current state with exchange data and return a list of discrepancies.
         Discrepancies are returned as human-readable error messages.
         """
         errors = []
 
-        # 1. Compare Wallet Balance
+        # 1. Compare Wallet Balance with an absolute USD tolerance.
         exchange_wallet = float(exchange_data.get("wallet_balance", 0.0))
-        if abs(self.account.wallet_balance - exchange_wallet) > tolerance:
+        if abs(self.account.wallet_balance - exchange_wallet) > float(balance_tolerance_usd):
             errors.append(
                 f"Wallet balance mismatch: local={self.account.wallet_balance}, "
                 f"exchange={exchange_wallet}"
             )
 
-        # 2. Compare Positions
+        # 2. Compare Positions with quantity-relative tolerance.
         exchange_positions = {
             str(p["symbol"]).upper(): p for p in exchange_data.get("positions", [])
         }
@@ -160,7 +165,9 @@ class LiveStateStore:
             if l_pos and l_pos.side == "SHORT":
                 l_qty = -l_qty
 
-            if abs(e_qty - l_qty) > tolerance:
+            scale = max(abs(e_qty), abs(l_qty), 1.0)
+            abs_tol = max(scale * float(qty_tolerance_fraction), 1e-8)
+            if abs(e_qty - l_qty) > abs_tol:
                 errors.append(
                     f"Position mismatch for {sym}: local_qty={l_qty}, exchange_qty={e_qty}"
                 )

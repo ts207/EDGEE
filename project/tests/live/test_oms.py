@@ -142,6 +142,21 @@ def test_order_cancellation():
     assert mgr.order_history[0].status == OrderStatus.CANCELLED
 
 
+def test_terminal_status_updates_do_not_overwrite_fills():
+    mgr = OrderManager()
+    order = LiveOrder("order2b", "ETHUSDT", OrderSide.SELL, OrderType.LIMIT, 10.0, 3000.0)
+    mgr.add_order(order)
+
+    mgr.on_fill("order2b", fill_qty=10.0, fill_price=2995.0)
+    assert mgr.order_history[0].status == OrderStatus.FILLED
+
+    # Late cancel ACK must not overwrite the filled terminal state.
+    mgr.on_order_update("order2b", OrderStatus.CANCELLED)
+
+    assert mgr.order_history[0].status == OrderStatus.FILLED
+    assert "order2b" not in mgr.active_orders
+
+
 def test_submit_order_accepts_safe_microstructure():
     mgr = OrderManager()
     kill_switch = KillSwitchManager(LiveStateStore())

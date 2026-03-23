@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from project.strategy.dsl.schema import Blueprint
 
@@ -37,6 +37,19 @@ class SizingPolicySpec(BaseModel):
     # Both default to None (unpopulated) so existing code paths are unaffected.
     expected_return_bps: float | None = None
     expected_adverse_bps: float | None = None
+
+    @field_validator("mode")
+    @classmethod
+    def validate_mode(cls, v: str) -> str:
+        mode = str(v).strip().lower()
+        allowed = {"fixed", "fixed_risk", "kelly", "vol_target"}
+        if mode not in allowed:
+            raise ValueError(
+                "sizing_policy.mode must be one of 'fixed', 'fixed_risk', 'kelly', or 'vol_target', "
+                f"got {v!r}"
+            )
+        # Preserve the historically used alias for fixed-risk sizing.
+        return "fixed_risk" if mode == "fixed" else mode
 
 
 class RiskControlSpec(BaseModel):

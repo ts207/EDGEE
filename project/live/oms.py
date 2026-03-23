@@ -16,6 +16,7 @@ from typing import Any, Dict, List, Optional
 import pandas as pd
 
 from project.engine.strategy_executor import StrategyResult, build_live_order_metadata
+from project.live.health_checks import evaluate_pretrade_microstructure_gate
 from project.live.execution_attribution import (
     ExecutionAttributionRecord,
     build_execution_attribution_record,
@@ -54,6 +55,11 @@ class OrderType(Enum):
     MARKET = auto()
 
 
+_TERMINAL_STATES = frozenset(
+    {OrderStatus.FILLED, OrderStatus.CANCELLED, OrderStatus.REJECTED, OrderStatus.EXPIRED}
+)
+
+
 @dataclass
 class LiveOrder:
     client_order_id: str
@@ -81,12 +87,27 @@ class LiveOrder:
             self.remaining_quantity = self.quantity
 
     def update_status(self, new_status: OrderStatus, exchange_id: Optional[str] = None):
+        if self.status in _TERMINAL_STATES and new_status != self.status:
+            LOGGER.warning(
+                "Ignoring status transition %s -> %s for order %s (already terminal)",
+                self.status.name,
+                new_status.name,
+                self.client_order_id,
+            )
+            return
         self.status = new_status
         if exchange_id:
             self.exchange_order_id = exchange_id
         self.updated_at = datetime.now(timezone.utc)
 
     def apply_fill(self, fill_qty: float, fill_price: float):
+        if self.status in _TERMINAL_STATES:
+            LOGGER.warning(
+                "Ignoring fill for terminal order %s in status %s",
+                self.client_order_id,
+                self.status.name,
+            )
+            return
         total_filled = self.filled_quantity + fill_qty
         # Update WAP
         self.avg_fill_price = (
@@ -114,6 +135,45 @@ class OrderManager:
 
     def get_order(self, client_order_id: str) -> Optional[LiveOrder]:
         return self.active_orders.get(client_order_id)
+
+    @staticmethod
+    def evaluate_microstructure_gate(
+        *,
+        spread_bps: float | None,
+        depth_usd: float | None,
+        tob_coverage: float | None,
+        max_spread_bps: float,
+        min_depth_usd: float,
+        min_tob_coverage: float,
+    ) -> Dict[str, Any]:
+        return evaluate_pretrade_microstructure_gate(
+            spread_bps=spread_bps,
+            depth_usd=depth_usd,
+            tob_coverage=tob_coverage,
+            max_spread_bps=max_spread_bps,
+            min_depth_usd=min_depth_usd,
+            min_tob_coverage=min_tob_coverage,
+        )
+
+    @staticmethod
+    def _submit_market_order_kwargs(order: LiveOrder) -> Dict[str, Any]:
+        return {
+            "symbol": order.symbol,
+            "side": order.side.name,
+            "quantity": order.quantity,
+            "reduce_only": False,
+        }
+
+    def _market_order_call_kwargs(self, order: LiveOrder) -> Dict[str, Any]:
+        kwargs = self._submit_market_order_kwargs(order)
+        try:
+            sig = inspect.signature(self.exchange_client.create_market_order)  # type: ignore[union-attr]
+            params = sig.parameters
+            if "new_client_order_id" in params or "newClientOrderId" in params:
+                kwargs["new_client_order_id"] = order.client_order_id
+        except Exception:
+            pass
+        return kwargs
 
     def submit_order(
         self,
@@ -211,12 +271,20 @@ class OrderManager:
             )
 
         try:
-            venue_response = await self.exchange_client.create_market_order(
-                symbol=order.symbol,
-                side=order.side.name,
-                quantity=order.quantity,
-                reduce_only=False,
-            )
+            venue_kwargs = {
+                "symbol": order.symbol,
+                "side": order.side.name,
+                "quantity": order.quantity,
+                "reduce_only": False,
+            }
+            try:
+                sig = inspect.signature(self.exchange_client.create_market_order)
+                params = sig.parameters
+                if "new_client_order_id" in params or "newClientOrderId" in params:
+                    venue_kwargs["new_client_order_id"] = order.client_order_id
+            except Exception:
+                pass
+            venue_response = await self.exchange_client.create_market_order(**venue_kwargs)
         except Exception as exc:
             order.update_status(OrderStatus.REJECTED)
             self.order_history.append(order)
@@ -287,7 +355,10 @@ class OrderManager:
             LOGGER.warning(f"Received update for unknown order {client_order_id}")
             return
 
+        previous_status = order.status
         order.update_status(status, exchange_id=kwargs.get("exchange_order_id"))
+        if order.status != status:
+            return
 
         if status in (
             OrderStatus.FILLED,
@@ -295,8 +366,11 @@ class OrderManager:
             OrderStatus.REJECTED,
             OrderStatus.EXPIRED,
         ):
-            self.order_history.append(order)
-            del self.active_orders[client_order_id]
+            if client_order_id in self.active_orders:
+                self.order_history.append(order)
+                del self.active_orders[client_order_id]
+            elif previous_status not in _TERMINAL_STATES:
+                self.order_history.append(order)
 
     def on_fill(self, client_order_id: str, fill_qty: float, fill_price: float):
         order = self.get_order(client_order_id)
@@ -304,12 +378,21 @@ class OrderManager:
             LOGGER.warning(f"Received fill for unknown order {client_order_id}")
             return
 
+        if order.status in _TERMINAL_STATES and order.status != OrderStatus.FILLED:
+            LOGGER.warning(
+                "Ignoring fill for terminal order %s in status %s",
+                client_order_id,
+                order.status.name,
+            )
+            return
+
         order.apply_fill(fill_qty, fill_price)
 
         if order.status == OrderStatus.FILLED:
             self._record_execution_attribution(order)
-            self.order_history.append(order)
-            del self.active_orders[client_order_id]
+            if client_order_id in self.active_orders:
+                self.order_history.append(order)
+                del self.active_orders[client_order_id]
 
     def _record_execution_attribution(self, order: LiveOrder) -> None:
         metadata = dict(order.metadata or {})

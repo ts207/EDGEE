@@ -35,7 +35,7 @@ def _load_event_quality_weights(search_space_path: Path) -> Dict[str, float]:
 @dataclass
 class CampaignConfig:
     program_id: str
-    max_runs: int = 5
+    max_runs: int = 50
     max_hypotheses_total: int = 5000
     max_consecutive_no_signal: int = 2
     halt_on_empty_share: float = 0.8
@@ -53,7 +53,7 @@ class CampaignConfig:
     # False  — unconditional (default, safe for initial event scan).
     # True   — adds vol_regime: [low, high] to every Step 4 proposal, tripling
     #           the regime-conditional hypothesis count per run.
-    enable_context_conditioning: bool = False
+    enable_context_conditioning: bool = True
 
     # Phase 4.4: optional live portfolio snapshot consumed by downstream
     # blueprint/allocation compilation for portfolio-aware sizing.
@@ -61,7 +61,7 @@ class CampaignConfig:
     # Phase 4.1: automatically run feature_mi_scan before the first proposal
     # cycle so the controller always has fresh MI-derived predicate candidates.
     # Set to False to skip (e.g. when features are unavailable or for speed).
-    auto_run_mi_scan: bool = False
+    auto_run_mi_scan: bool = True
     # Symbols and timeframe used for the auto MI scan — must match the feature
     # table available for this program.
     mi_scan_symbols: str = "BTCUSDT"
@@ -73,9 +73,16 @@ class CampaignConfig:
     scan_general_date_scope: tuple[str, str] = ("2024-01-01", "2024-03-31")
 
     def __post_init__(self) -> None:
-        # Default to EVENT-only; caller can expand to full trigger sequence
+        # Default to the full trigger sequence
         if self.scan_trigger_types is None:
-            self.scan_trigger_types = ["EVENT"]
+            self.scan_trigger_types = [
+                "EVENT",
+                "STATE",
+                "TRANSITION",
+                "FEATURE_PREDICATE",
+                "SEQUENCE",
+                "INTERACTION",
+            ]
 
 
 @dataclass
@@ -662,6 +669,10 @@ class CampaignController:
             str(config_path),
             "--registry_root",
             str(self.registry_root),
+            "--run_campaign_memory_update",
+            "1",
+            "--program_id",
+            self.config.program_id,
         ]
         _LOG.info("Command: %s", " ".join(cmd))
         subprocess.run(cmd, check=True, cwd=str(Path.cwd()))
@@ -798,7 +809,7 @@ class CampaignController:
 def main():
     parser = argparse.ArgumentParser(description="Run an autonomous EDGE research campaign.")
     parser.add_argument("--program_id", required=True)
-    parser.add_argument("--max_runs", type=int, default=3)
+    parser.add_argument("--max_runs", type=int, default=50)
     parser.add_argument("--registry_root", default="project/configs/registries")
     parser.add_argument(
         "--research_mode",
@@ -806,7 +817,17 @@ def main():
         default="scan",
         help="Proposal strategy: scan=frontier, exploit=promising regions, explore=adjacent",
     )
+    parser.add_argument("--report", action="store_true", help="Print campaign health report and exit")
     args = parser.parse_args()
+
+    if args.report:
+        from project.research.services.campaign_memory_rollup_service import build_campaign_memory_rollup
+        rollup = build_campaign_memory_rollup(
+            program_id=args.program_id,
+            data_root=get_data_root(),
+        )
+        print(json.dumps(rollup, indent=2))
+        sys.exit(0)
 
     data_root = get_data_root()
     config = CampaignConfig(

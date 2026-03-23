@@ -195,6 +195,34 @@ def _build_belief_state(
             ]
         ].to_dict(orient="records")
 
+    # Phase 2-B: Aggregate avoidance from event_statistics
+    try:
+        # Resolve data_root for memory table read; default to standard if missing
+        program_id = reflection.get("program_id", "")
+        if program_id:
+            event_stats = read_memory_table(program_id, "event_statistics")
+            if not event_stats.empty:
+                OVERFIT_GATES = frozenset([
+                    "gate_promo_multiplicity_diagnostics",
+                    "gate_promo_negative_control_missing",
+                    "gate_promo_negative_control_fail",
+                ])
+                for row in event_stats.to_dict(orient="records"):
+                    gate = str(row.get("dominant_fail_gate", "")).strip()
+                    n_eval = int(row.get("times_evaluated", 0) or 0)
+                    n_promoted = int(row.get("times_promoted", 0) or 0)
+                    if n_eval >= 10 and gate in OVERFIT_GATES:
+                        avoid_regions.append({
+                            "region_key": f"event_aggregate:{row['event_type']}",
+                            "event_type": str(row["event_type"]),
+                            "trigger_type": "EVENT",
+                            "reason": f"aggregate overfitting signal: {gate} ({n_eval} evals, {n_promoted} promoted)",
+                            "confidence": 0.7,
+                            "failure_cause_class": "overfitting",
+                        })
+    except Exception as exc:
+        _LOG.warning("Failed to propagate aggregate avoidance signals: %s", exc)
+
     open_repairs = []
     if not failures.empty:
         open_repairs = (

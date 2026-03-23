@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 from pathlib import Path
-from typing import Dict, Tuple
+from typing import Dict, Tuple, Mapping
 
 from project.io.utils import (
     choose_partition_dir,
@@ -139,7 +139,9 @@ def merge_event_flags(features: pd.DataFrame, event_flags: pd.DataFrame | None) 
 
 
 def merge_event_features(
-    features: pd.DataFrame, event_features: pd.DataFrame | None, ffill_limit: int = 12
+    features: pd.DataFrame,
+    event_features: pd.DataFrame | None,
+    ffill_limit: int | Dict[str, int] = 12,
 ) -> pd.DataFrame:
     if event_features is None or event_features.empty:
         return features
@@ -149,8 +151,17 @@ def merge_event_features(
     ef = ef.dropna(subset=["timestamp"]).drop_duplicates(subset=["timestamp"], keep="last")
     merged = out.merge(ef, on="timestamp", how="left")
     event_cols = [c for c in ef.columns if c != "timestamp"]
-    if event_cols and ffill_limit > 0:
-        merged[event_cols] = merged[event_cols].ffill(limit=ffill_limit)
+    if not event_cols:
+        return merged
+
+    if isinstance(ffill_limit, dict):
+        default_limit = int(ffill_limit.get("_default", ffill_limit.get("*", 0)))
+        for col in event_cols:
+            limit = int(ffill_limit.get(col, default_limit))
+            if limit > 0:
+                merged[col] = merged[col].ffill(limit=limit)
+    elif int(ffill_limit) > 0:
+        merged[event_cols] = merged[event_cols].ffill(limit=int(ffill_limit))
     return merged
 
 
@@ -165,7 +176,7 @@ def assemble_symbol_context(
     end_ts: pd.Timestamp | None = None,
     event_flags: pd.DataFrame | None = None,
     event_features: pd.DataFrame | None = None,
-    event_feature_ffill_bars: int = 12,
+    event_feature_ffill_bars: int | Dict[str, int] = 12,
     higher_timeframe_features: Dict[str, pd.DataFrame] | None = None,
 ) -> pd.DataFrame:
     context = load_context_data(data_root, symbol, run_id=run_id, timeframe=timeframe)
@@ -219,5 +230,8 @@ def assemble_symbol_context(
                 on="timestamp",
                 direction="backward",
             )
+            htf_cols = [f"{c}_{tf}" for c in cols_to_map]
+            if htf_cols:
+                features[htf_cols] = features[htf_cols].shift(1)
 
     return features

@@ -176,6 +176,17 @@ def _optional_float(raw: object) -> float | None:
     return float(raw)
 
 
+def _required_float(params: Mapping[str, object], key: str) -> float:
+    if key not in params or params.get(key) is None:
+        raise ValueError(f"build_allocation_contract requires explicit {key}")
+    return float(params[key])
+
+
+def _lagged_for_vol_estimation(series: pd.Series, *, limits: RiskLimits) -> pd.Series:
+    lag_bars = max(1, int(limits.vol_window_bars // 2)) if limits.vol_estimator_mode == "rolling" else max(1, int(limits.vol_ewma_halflife_bars // 2))
+    return _as_float_series(series).shift(lag_bars)
+
+
 def build_allocation_contract(params: Mapping[str, object]) -> AllocationContract:
     raw_allocation_spec = params.get("allocation_spec")
     if raw_allocation_spec is not None:
@@ -190,10 +201,10 @@ def build_allocation_contract(params: Mapping[str, object]) -> AllocationContrac
         }
     limits = RiskLimits(
         portfolio_max_exposure=float(params.get("portfolio_max_exposure", 10.0)),
-        max_portfolio_gross=float(params.get("max_portfolio_gross", 10.0)),
-        max_strategy_gross=float(params.get("max_strategy_gross", 10.0)),
-        max_symbol_gross=float(params.get("max_symbol_gross", 10.0)),
-        max_new_exposure_per_bar=float(params.get("max_new_exposure_per_bar", 10.0)),
+        max_portfolio_gross=_required_float(params, "max_portfolio_gross"),
+        max_strategy_gross=_required_float(params, "max_strategy_gross"),
+        max_symbol_gross=_required_float(params, "max_symbol_gross"),
+        max_new_exposure_per_bar=_required_float(params, "max_new_exposure_per_bar"),
         target_annual_vol=_optional_float(params.get("target_annual_volatility")),
         max_pairwise_correlation=_optional_float(params.get("max_pairwise_correlation")),
         max_drawdown_limit=_optional_float(params.get("drawdown_limit")),
@@ -388,15 +399,13 @@ def allocate_position_details(
     # ----- Original allocator logic (preserved) -----
     if limits.enable_correlation_allocation and len(requested) > 1:
         try:
+            if not strategy_returns:
+                raise ValueError(
+                    "correlation allocation requires strategy_returns; position-change covariance is disabled"
+                )
             df_req = pd.DataFrame(requested).fillna(0.0)
-            if strategy_returns:
-                # Use returns (PnL) for covariance instead of position changes (turnover)
-                df_ret = pd.DataFrame(strategy_returns).reindex(df_req.index).fillna(0.0)
-                cov = df_ret.cov()
-            else:
-                # Fallback to position-change covariance if returns not provided
-                diff = df_req.diff().fillna(0.0)
-                cov = diff.cov()
+            df_ret = pd.DataFrame(strategy_returns).reindex(df_req.index).fillna(0.0)
+            cov = df_ret.cov()
 
             if (cov.isnull().any().any()) or len(cov) != len(requested):
                 raise ValueError("invalid covariance for allocation")
@@ -593,12 +602,17 @@ def allocate_position_details(
             # Per-strategy vol scaling before portfolio sum
             per_strategy_vol_scales = {}
             for key in ordered:
-                s_pnl = strategy_returns[key].reindex(aligned_index).fillna(0.0)
+                s_pnl = _lagged_for_vol_estimation(
+                    strategy_returns[key].reindex(aligned_index).fillna(0.0), limits=limits
+                )
                 if limits.vol_estimator_mode == "ewma":
                     s_std = s_pnl.ewm(halflife=limits.vol_ewma_halflife_bars, adjust=False).std()
                 else:
-                    s_std = s_pnl.rolling(window=limits.vol_window_bars, min_periods=min(288, limits.vol_window_bars)).std()
-                
+                    s_std = s_pnl.rolling(
+                        window=limits.vol_window_bars,
+                        min_periods=min(288, limits.vol_window_bars),
+                    ).std()
+
                 s_ann_vol = s_std * np.sqrt(bars_per_year)
                 # Scale each strategy to its share of the target portfolio vol (equal share as baseline)
                 # If we have K strategies, we might want each to have target_vol / sqrt(K) if they were independent.
@@ -608,22 +622,24 @@ def allocate_position_details(
                 s_scale = (target_vol / s_ann_vol.replace(0.0, np.nan)).replace([np.inf, -np.inf], np.nan).fillna(1.0)
                 per_strategy_vol_scales[key] = s_scale.clip(lower=0.0, upper=2.0 if limits.allow_lever_up else 1.0)
 
-            # Portfolio correction pass: estimate portfolio vol after per-strategy scaling
-            # This is a heuristic to ensure the final portfolio vol stays near target
-            # despite correlations.
+            # Portfolio correction pass: estimate portfolio vol from the post-cap
+            # allocation that will actually be traded.
             scaled_pnl_sum = pd.Series(0.0, index=aligned_index)
             for key in ordered:
-                scaled_pnl_sum += strategy_returns[key].reindex(aligned_index).fillna(0.0) * per_strategy_vol_scales[key]
-            
+                pos_weighted_ret = allocated[key] * _lagged_for_vol_estimation(
+                    strategy_returns[key].reindex(aligned_index).fillna(0.0), limits=limits
+                )
+                scaled_pnl_sum += pos_weighted_ret
+
             if limits.vol_estimator_mode == "ewma":
                 p_std = scaled_pnl_sum.ewm(halflife=limits.vol_ewma_halflife_bars, adjust=False).std()
             else:
                 p_std = scaled_pnl_sum.rolling(window=limits.vol_window_bars, min_periods=min(288, limits.vol_window_bars)).std()
-            
+
             p_ann_vol = p_std * np.sqrt(bars_per_year)
             portfolio_correction = (target_vol / p_ann_vol.replace(0.0, np.nan)).replace([np.inf, -np.inf], np.nan).fillna(1.0)
-            portfolio_correction = portfolio_correction.clip(lower=0.0, upper=1.0) # only scale down in correction
-            
+            portfolio_correction = portfolio_correction.clip(lower=0.0, upper=1.0)  # only scale down in correction
+
             for key in ordered:
                 total_s_scale = (per_strategy_vol_scales[key] * portfolio_correction).fillna(1.0).clip(lower=0.0)
                 allocated[key] = allocated[key] * total_s_scale
@@ -631,7 +647,9 @@ def allocate_position_details(
         
         elif portfolio_pnl_series is not None:
             # Fallback to portfolio-level uniform scaling
-            pnl = portfolio_pnl_series.reindex(aligned_index).fillna(0.0)
+            pnl = _lagged_for_vol_estimation(
+                portfolio_pnl_series.reindex(aligned_index).fillna(0.0), limits=limits
+            )
             if limits.vol_estimator_mode == "ewma":
                 roll_std = pnl.ewm(halflife=limits.vol_ewma_halflife_bars, adjust=False).std()
             else:  # "rolling"
@@ -732,6 +750,10 @@ def allocate_position_details(
         if allocated
         else pd.Series(0.0, index=aligned_index)
     )
+    if not requested_gross.empty:
+        # Final allocation must not exceed the requested gross exposure once caps
+        # and overlays have been applied.
+        assert bool((allocated_gross <= requested_gross + 1e-9).all())
     req_total = float(requested_gross.sum())
     alloc_total = float(allocated_gross.sum())
     clipped_fraction = (

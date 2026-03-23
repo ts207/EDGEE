@@ -747,6 +747,7 @@ def execute_promotion(config: PromotionConfig) -> PromotionServiceResult:
         promotion_confirmatory_gates = gate_spec.get("promotion_confirmatory_gates", {})
         hypothesis_index = _load_hypothesis_index(run_id=config.run_id, data_root=data_root)
         promotion_spec = {
+            "run_id": config.run_id,
             "ontology_spec_hash": ontology_hash,
             "source_run_mode": source_run_mode,
             "source_profile": source_profile,

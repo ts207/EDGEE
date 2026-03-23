@@ -428,6 +428,39 @@ def _evaluate_control_audit_and_dsr(
     }
 
 
+def evaluate_sensitivity_gate(
+    candidate: Dict[str, Any],
+    *,
+    run_id: str,
+    data_root: Path,
+    max_sensitivity_score: float = 0.4,
+) -> tuple[str, str]:
+    """Fail candidates whose performance is highly sensitive to parameter choice.
+
+    Reads the sensitivity report written by eval/sensitivity.py for this run.
+    If the report is absent, the gate passes (fail-open for research mode).
+    """
+    sensitivity_path = (
+        data_root / "reports" / "sensitivity" / run_id / "sensitivity_summary.parquet"
+    )
+    if not sensitivity_path.exists():
+        return "pass", "sensitivity report absent — gate skipped"
+
+    try:
+        df = pd.read_parquet(sensitivity_path)
+    except Exception:
+        return "pass", "sensitivity report unreadable — gate skipped"
+
+    candidate_id = str(candidate.get("candidate_id", "")).strip()
+    if candidate_id and "candidate_id" in df.columns:
+        row = df[df["candidate_id"] == candidate_id]
+        if not row.empty:
+            score = float(row.iloc[0].get("sensitivity_score", 0.0) or 0.0)
+            if score > max_sensitivity_score:
+                return "fail", f"sensitivity_score={score:.3f} > {max_sensitivity_score}"
+    return "pass", "within sensitivity tolerance"
+
+
 def _evaluate_deploy_oos_and_low_capital(
     *,
     row: Dict[str, Any],
