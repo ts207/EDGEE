@@ -16,7 +16,7 @@ try:
 except ModuleNotFoundError:
     from project.core.stats import stats
 
-from project.core.stats import bh_adjust
+from project.core.stats import bh_adjust, newey_west_t_stat_for_mean
 from project.core.constants import HORIZON_BARS_BY_TIMEFRAME
 from project.core.validation import ts_ns_utc
 from project.research.direction_semantics import resolve_effect_sign
@@ -42,7 +42,6 @@ def distribution_stats(returns: np.ndarray) -> Dict[str, float]:
     std = float(np.std(clean, ddof=1))
     if std == 0:
         return {"mean": mean, "std": 0.0, "t_stat": 0.0, "p_value": 1.0}
-    from project.core.stats import newey_west_t_stat_for_mean
 
     nw = newey_west_t_stat_for_mean(clean)
     t_stat = float(nw.t_stat) if np.isfinite(nw.t_stat) else mean / (std / np.sqrt(len(clean)))
@@ -750,8 +749,13 @@ def calculate_expectancy_stats(
         if w_sum > 0
         else float(returns_series.std())
     )
+    
+    # Use Newey-West HAC t-stat to account for autocorrelation
+    nw = newey_west_t_stat_for_mean(returns_series)
     t_stat = (
-        float(mean_ret / (std_ret / np.sqrt(max(n_eff, 1.0)))) if std_ret > 0 and n_eff > 1 else 0.0
+        float(nw.t_stat) if np.isfinite(nw.t_stat) 
+        else float(mean_ret / (std_ret / np.sqrt(max(n_eff, 1.0)))) if std_ret > 0 and n_eff > 1 
+        else 0.0
     )
     p_value = two_sided_p_from_t(t_stat, int(max(n_eff - 1, 1)))
 

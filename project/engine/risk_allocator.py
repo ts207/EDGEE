@@ -56,6 +56,10 @@ except Exception:
     _clamp_positions = _clamp_positions_py
 
 
+import logging
+
+_LOG = logging.getLogger(__name__)
+
 @dataclass(frozen=True)
 class RiskLimits:
     max_portfolio_gross: float = 1.0
@@ -74,6 +78,9 @@ class RiskLimits:
     symbol_max_exposure: float | None = None
     portfolio_max_exposure: float | None = None
     enable_correlation_allocation: bool = False
+    
+    # Safety: don't increase leverage by more than 1x based on vol alone unless opted in.
+    allow_lever_up: bool = False
 
     # Vol estimator configuration
     vol_estimator_mode: str = "rolling"  # "rolling" | "ewma"
@@ -224,6 +231,7 @@ def build_allocation_contract(params: Mapping[str, object]) -> AllocationContrac
         portfolio_max_drawdown=_optional_float(params.get("portfolio_max_drawdown")),
         symbol_max_exposure=_optional_float(params.get("max_symbol_exposure")),
         enable_correlation_allocation=bool(params.get("enable_correlation_allocation", False)),
+        allow_lever_up=bool(params.get("allow_lever_up", False)),
     )
     policy = AllocationPolicy(
         mode=str(params.get("allocator_mode", "heuristic")).strip().lower(),
@@ -508,10 +516,30 @@ def allocate_position_details(
             df_alloc = pd.DataFrame({k: v for k, v in allocated.items()})
             if df_alloc.empty or len(df_alloc) < 2:
                 raise ValueError("insufficient history for correlation estimate")
-            corr_window = min(len(df_alloc), max(20, min(576, len(df_alloc))))
-            corr_mat = df_alloc.tail(corr_window).corr().abs().fillna(0.0)
-            np.fill_diagonal(corr_mat.values, 0.0)
-            max_corr = float(corr_mat.values.max())
+
+            # Use a rolling window for correlation to capture time-varying risk
+            # Default to 288 bars (1 day at 5m) if not specified, but stay within history
+            corr_window = min(len(df_alloc), 288)
+            
+            # Calculate rolling pairwise correlation matrices
+            # To avoid huge memory/compute for very long series, we only scale where needed
+            # For backtest efficiency, we compute the max rolling correlation bar-by-bar
+            # This is still O(N * K^2) but is necessary for time-varying protection
+            rolling_corr = df_alloc.rolling(window=corr_window, min_periods=max(20, corr_window // 4)).corr().abs()
+            
+            # Extract max pairwise correlation at each bar (excluding self-correlation)
+            # rolling_corr has a MultiIndex (timestamp, strategy)
+            max_corr_series = pd.Series(0.0, index=aligned_index)
+            
+            # Iterate through timestamps to find the max off-diagonal correlation
+            # We use a vectorized approach by unstacking the second level
+            unstacked = rolling_corr.unstack(level=1)
+            # Remove identity correlations (strategy vs itself)
+            for strategy in ordered:
+                if (strategy, strategy) in unstacked.columns:
+                    unstacked[(strategy, strategy)] = np.nan
+            
+            max_corr_series = unstacked.max(axis=1).fillna(0.0)
 
             # Determine effective limit — use stressed limit on stressed bars if provided
             if (
@@ -521,41 +549,34 @@ def allocate_position_details(
             ):
                 regime_aligned = regime_series.reindex(aligned_index).astype(str)
                 is_stressed = regime_aligned.isin(limits.stressed_regime_values)
-                # On stressed bars, apply the tighter limit
+                
                 stressed_limit = float(limits.stressed_max_pairwise_correlation)
                 normal_limit = float(limits.max_pairwise_correlation)
-                if is_stressed.any() and max_corr > stressed_limit:
-                    scale_factor = min(1.0, stressed_limit / max_corr)
-                    _flag(
-                        "stressed_pairwise_correlation",
-                        pd.Series(is_stressed & (max_corr > stressed_limit), index=aligned_index),
-                    )
-                    for key in ordered:
-                        allocated[key] = allocated[key].where(
-                            ~is_stressed, allocated[key] * scale_factor
-                        )
-                # On calm bars, apply the normal limit
-                if (not is_stressed).any() and max_corr > normal_limit:
-                    scale_factor_calm = min(1.0, normal_limit / max_corr)
-                    _flag(
-                        "max_pairwise_correlation",
-                        pd.Series((~is_stressed) & (max_corr > normal_limit), index=aligned_index),
-                    )
-                    for key in ordered:
-                        allocated[key] = allocated[key].where(
-                            is_stressed, allocated[key] * scale_factor_calm
-                        )
+                
+                # Bar-by-bar scale factor
+                scale_series = pd.Series(1.0, index=aligned_index)
+                
+                # Stressed bars
+                stressed_mask = is_stressed & (max_corr_series > stressed_limit) & (max_corr_series > 0)
+                scale_series[stressed_mask] = stressed_limit / max_corr_series[stressed_mask]
+                
+                # Normal bars
+                normal_mask = (~is_stressed) & (max_corr_series > normal_limit) & (max_corr_series > 0)
+                scale_series[normal_mask] = normal_limit / max_corr_series[normal_mask]
+                
+                scale_series = scale_series.clip(lower=0.0, upper=1.0)
+                _flag("max_pairwise_correlation", scale_series < 0.999999)
+                for key in ordered:
+                    allocated[key] = allocated[key] * scale_series
             else:
-                if max_corr > limits.max_pairwise_correlation > 0:
-                    scale_factor = min(1.0, limits.max_pairwise_correlation / max_corr)
-                    _flag(
-                        "max_pairwise_correlation",
-                        pd.Series(scale_factor < 0.999999, index=aligned_index),
-                    )
+                limit = float(limits.max_pairwise_correlation)
+                if limit > 0:
+                    scale_series = (limit / max_corr_series.replace(0.0, np.nan)).fillna(1.0).clip(lower=0.0, upper=1.0)
+                    _flag("max_pairwise_correlation", scale_series < 0.999999)
                     for key in ordered:
-                        allocated[key] = allocated[key] * scale_factor
+                        allocated[key] = allocated[key] * scale_series
         except Exception:
-            pass
+            _LOG.warning("Rolling correlation scaling failed", exc_info=True)
 
     if regime_series is not None and regime_scale_map:
         regime_aligned = regime_series.reindex(aligned_index).astype(str)
@@ -582,7 +603,9 @@ def allocate_position_details(
             .replace([np.inf, -np.inf], np.nan)
             .fillna(1.0)
         )
-        vol_scale_series = vol_scale.clip(lower=0.0, upper=1.0)
+        # Apply safety cap on vol scaling
+        upper_bound = 2.0 if limits.allow_lever_up else 1.0
+        vol_scale_series = vol_scale.clip(lower=0.0, upper=upper_bound)
         _flag("target_annual_vol", vol_scale_series < 0.999999)
 
     dd_scale_series = pd.Series(1.0, index=aligned_index)

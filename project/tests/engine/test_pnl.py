@@ -157,7 +157,9 @@ class TestComputePnlComponents:
         pos = pd.Series([0.0, 1.0, 1.0], index=idx)
         ret = pd.Series([0.0, 0.0, 0.0], index=idx)
         funding = pd.Series([0.0, 0.001, 0.001], index=idx)
-        result = compute_pnl_components(pos, ret, cost_bps=0.0, funding_rate=funding)
+        result = compute_pnl_components(
+            pos, ret, cost_bps=0.0, funding_rate=funding, use_event_aligned_funding=False
+        )
         # Bar 2: prior_pos=1, funding=0.001 → funding_pnl = -1 * 0.001 = -0.001
         assert result["funding_pnl"].iloc[2] == pytest.approx(-0.001)
 
@@ -190,7 +192,12 @@ class TestComputePnlComponents:
         funding = pd.Series([0.0, 0.0, 0.001], index=idx)
         borrow = pd.Series([0.0, 0.0, 0.0], index=idx)
         result = compute_pnl_components(
-            pos, ret, cost_bps=10.0, funding_rate=funding, borrow_rate=borrow
+            pos,
+            ret,
+            cost_bps=10.0,
+            funding_rate=funding,
+            borrow_rate=borrow,
+            use_event_aligned_funding=False,
         )
         gross = result["gross_pnl"].iloc[2]
         cost = result["trading_cost"].iloc[2]

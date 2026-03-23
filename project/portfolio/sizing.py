@@ -64,6 +64,7 @@ def calculate_target_notional(
     """
     # 1. Base Sizing from Edge (Kelly-ish / Risk-Adjusted)
     # Convert bps-like inputs to decimal returns so the multiplier is unit invariant.
+    vol_decimal = abs(_to_decimal_return(vol_regime))
     gross_expected_return, net_expected_return = _resolve_net_expected_return(
         expected_return_bps=expected_return_bps,
         expected_cost_bps=expected_cost_bps,
@@ -75,8 +76,8 @@ def calculate_target_notional(
     # to a conservative estimate. Here we rely on vol_regime (implied/realized vol)
     # scaled to the trade horizon if possible, or just the variance of the strategy returns.
     
-    # Let's use max(1e-8, vol_regime**2) assuming vol_regime is the relevant volatility.
-    risk_variance = max(1e-8, float(vol_regime)**2)
+    # Let's use max(1e-8, vol_decimal**2) assuming vol_decimal is the relevant volatility.
+    risk_variance = max(1e-8, float(vol_decimal)**2)
     edge = float(event_score) * net_expected_return
 
     # Kelly-like multiplier

@@ -280,6 +280,7 @@ class CampaignController:
                     payload = json.loads(path.read_text(encoding="utf-8"))
                     return payload if isinstance(payload, dict) else {}
                 except Exception:
+                    _LOG.warning("Failed to load JSON memory from %s", path, exc_info=True)
                     return {}
             return {}
 
@@ -288,6 +289,7 @@ class CampaignController:
                 try:
                     return pd.read_parquet(path)
                 except Exception:
+                    _LOG.warning("Failed to load Parquet memory from %s", path, exc_info=True)
                     return pd.DataFrame()
             return pd.DataFrame()
 
@@ -329,6 +331,7 @@ class CampaignController:
                     ]["stage"].astype(str).unique()
                 )
         except Exception:
+            _LOG.warning("Failed to read superseded stages from memory", exc_info=True)
             pass
 
         return {
@@ -576,6 +579,7 @@ class CampaignController:
             if not tested_df.empty and "event_type" in tested_df.columns:
                 tested_events = set(tested_df["event_type"].astype(str).unique())
         except Exception:
+            _LOG.warning("Failed to read superseded stages from memory", exc_info=True)
             pass
 
         if self.ledger_path.exists():
@@ -665,6 +669,7 @@ class CampaignController:
                 if not state_rows.empty:
                     tested_states = set(state_rows["event_type"].astype(str).unique())
         except Exception:
+            _LOG.warning("Failed to read superseded stages from memory", exc_info=True)
             pass
 
         candidates = [s for s in ss_states if s not in tested_states]
@@ -708,6 +713,7 @@ class CampaignController:
                 if not tr_rows.empty and "event_type" in tr_rows.columns:
                     tested_keys = set(tr_rows["event_type"].astype(str).unique())
         except Exception:
+            _LOG.warning("Failed to read superseded stages from memory", exc_info=True)
             pass
 
         # Filter transitions not yet tested (key = "from→to")
@@ -784,6 +790,7 @@ class CampaignController:
                 if not fp_rows.empty and "event_type" in fp_rows.columns:
                     tested_keys = set(fp_rows["event_type"].astype(str).unique())
         except Exception:
+            _LOG.warning("Failed to read superseded stages from memory", exc_info=True)
             pass
 
         candidates = [p for p in merged if _pred_key(p) not in tested_keys]
@@ -867,6 +874,7 @@ class CampaignController:
                 if not int_rows.empty and "event_type" in int_rows.columns:
                     tested_keys = set(int_rows["event_type"].astype(str).unique())
         except Exception:
+            _LOG.warning("Failed to read superseded stages from memory", exc_info=True)
             pass
 
         def _motif_key(m: Dict[str, Any]) -> str:
@@ -922,6 +930,7 @@ class CampaignController:
                 if isinstance(m, dict) and "left" in m and "right" in m and "op" in m
             ]
         except Exception:
+            _LOG.warning("Failed to load search space component from %s", self._search_space_path, exc_info=True)
             return []
 
     # ---- Cross-family explore (Phase 2.3, updated for trigger types) ----
@@ -946,6 +955,7 @@ class CampaignController:
             if not tested_df.empty and "event_type" in tested_df.columns:
                 tested_events = set(tested_df["event_type"].astype(str).unique())
         except Exception:
+            _LOG.warning("Failed to read superseded stages from memory", exc_info=True)
             pass
 
         if self.ledger_path.exists():
@@ -997,6 +1007,7 @@ class CampaignController:
             raw = _yaml.safe_load(self._search_space_path.read_text(encoding="utf-8"))
             return [str(s) for s in (raw or {}).get("triggers", {}).get("states", [])]
         except Exception:
+            _LOG.warning("Failed to load search space component from %s", self._search_space_path, exc_info=True)
             return []
 
     def _load_search_space_transitions(self) -> List[Dict[str, str]]:
@@ -1012,6 +1023,7 @@ class CampaignController:
                     out.append({"from_state": str(t["from"]), "to_state": str(t["to"])})
             return out
         except Exception:
+            _LOG.warning("Failed to load search space component from %s", self._search_space_path, exc_info=True)
             return []
 
     def _load_search_space_predicates(self) -> List[Dict[str, Any]]:
@@ -1024,6 +1036,7 @@ class CampaignController:
             preds = (raw or {}).get("triggers", {}).get("feature_predicates", [])
             return [p for p in preds if isinstance(p, dict) and "feature" in p]
         except Exception:
+            _LOG.warning("Failed to load search space component from %s", self._search_space_path, exc_info=True)
             return []
 
     def _load_mi_candidate_predicates(self) -> List[Dict[str, Any]]:
@@ -1074,6 +1087,7 @@ class CampaignController:
                 self.config.program_id, "tested_regions", data_root=self.data_root
             )
         except Exception:
+            _LOG.warning("Failed to load search space component from %s", self._search_space_path, exc_info=True)
             return []
 
         if tested_df.empty:

@@ -15,8 +15,13 @@ def test_drawdown_trigger():
     store = LiveStateStore()
     mgr = KillSwitchManager(store)
 
-    # Setup account: $1000 balance, but -$200 unrealized PnL (20% drawdown)
+    # 1. Establish peak at $1000
     store.account.wallet_balance = 1000.0
+    mgr.check_drawdown(max_drawdown_pct=0.15)
+    assert mgr.status.peak_equity == 1000.0
+    assert not mgr.status.is_active
+
+    # 2. Drawdown to $800 (20%)
     store.account.update_position(
         PositionState(
             symbol="BTCUSDT",

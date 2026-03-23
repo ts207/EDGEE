@@ -62,9 +62,44 @@ def test_cointegration(x: pd.Series, y: pd.Series) -> float:
     if len(resid) < 10 or np.allclose(resid, resid[0]):
         return 1.0
 
-    # Conservative fallback: without statsmodels' MacKinnon tables we avoid
-    # returning an invalid Student-t p-value under the unit-root null.
-    return 1.0
+    # Simplified ADF-style test on residuals
+    diff_resid = np.diff(resid)
+    lag_resid = resid[:-1]
+    # Regression: d(resid) = gamma * resid(-1) + epsilon
+    gamma, *_ = np.linalg.lstsq(lag_resid.reshape(-1, 1), diff_resid, rcond=None)
+    gamma_val = float(gamma[0])
+    
+    # Standard error of gamma
+    eps = diff_resid - lag_resid * gamma_val
+    rss = np.sum(eps**2)
+    sample_var = rss / (len(diff_resid) - 1)
+    gamma_se = np.sqrt(sample_var / np.sum(lag_resid**2))
+    
+    t_stat = gamma_val / gamma_se if gamma_se > 0 else 0.0
+    
+    # MacKinnon (1994) approximate p-values for cointegration (N=2, constant, no trend)
+    # Tables for ADF test on residuals of a cointegrating regression
+    # For N=2 (one independent variable), the critical values are different from standard ADF
+    return _approx_coint_pvalue(t_stat, n=len(resid))
+
+
+def _approx_coint_pvalue(t_stat: float, n: int) -> float:
+    """
+    Approximate p-value for Engle-Granger cointegration test (N=2, constant).
+    Based on MacKinnon (1994) critical values.
+    """
+    # 1%, 5%, 10% critical values for N=2, constant, no trend
+    # From MacKinnon (1991, 2010): -3.90, -3.34, -3.04
+    if t_stat < -3.90:
+        return 0.01
+    if t_stat < -3.34:
+        return 0.05
+    if t_stat < -3.04:
+        return 0.10
+    
+    # Logistic approximation for the right tail
+    # Standard normal would be too permissive
+    return float(np.clip(1.0 / (1.0 + np.exp(-1.5 * (t_stat + 2.5))), 0.0, 1.0))
 
 
 def _to_array(values: object) -> np.ndarray:
@@ -245,26 +280,10 @@ def _kurtosis(values: Iterable[float], fisher: bool = True) -> float:
     m2 = float(np.mean(centered**2))
     if m2 <= 0.0:
         return 0.0
-    
-    # Unbiased estimator for excess kurtosis (Fisher)
-    # k = [(n+1)n / ((n-1)(n-2)(n-3))] * sum((x-mean)^4)/std^4 - 3(n-1)^2/((n-2)(n-3))
-    # We compute fourth moment m4 first, but need sum of powers.
-    # sum((x-mean)^4) = m4 * n
-    # s2 = m2 * n / (n-1) (unbiased variance) -> we usually use m2 (biased) in standard formula?
-    # No, let's use the explicit sums.
-    
-    s4 = np.sum(centered**4)
-    s2 = np.sum(centered**2) # This is n * m2
-    
-    if s2 == 0:
-        return 0.0
-        
+
     if fisher:
         # Implementation of unbiased excess kurtosis
         # Reference: https://en.wikipedia.org/wiki/Kurtosis#Standard_unbiased_estimator
-        term1 = (n * (n + 1)) / ((n - 1) * (n - 2) * (n - 3))
-        term2 = s4 / (s2**2 / (n**2)) # Wait, s2 is sum of squares. m2 = s2/n.
-        # simpler: use scipy if available, else manual
         # Manual formula using m2 and m4 (biased moments)
         # g2 = m4/m2^2 - 3 (biased excess)
         # G2 = ((n+1) * g2 + 6) * (n-1) / ((n-2)*(n-3))
@@ -285,6 +304,13 @@ def _kendalltau(x: object, y: object) -> Tuple[float, float]:
     n = xa.size
     if n < 2:
         return 0.0, 1.0
+    
+    # Scalability guard: pure-Python implementation is O(n^2)
+    if n > 1000:
+        raise ImportError(
+            f"Sample size n={n} > 1000 for Kendall's Tau but scipy is not available. "
+            "The pure-Python fallback is O(n^2) and will be too slow. Please install scipy."
+        )
 
     concordant = 0
     discordant = 0
