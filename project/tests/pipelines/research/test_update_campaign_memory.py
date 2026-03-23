@@ -96,26 +96,6 @@ def test_update_campaign_memory_materializes_memory_and_compat_outputs(monkeypat
         json.dumps({"total_candidates": 1}),
         encoding="utf-8",
     )
-    search_dir = data_root / "reports" / "hypothesis_search" / run_id
-    search_dir.mkdir(parents=True, exist_ok=True)
-    pd.DataFrame(
-        [
-            {
-                "hypothesis_id": "h_regime",
-                "event_type": "BASIS_DISLOC",
-                "trigger_type": "EVENT",
-                "template_id": "continuation",
-                "direction": "long",
-                "horizon": "15m",
-                "entry_lag": 1,
-                "context_json": "{\"vol_regime\":\"high\"}",
-                "best_regime": "high_vol.funding_pos.trend.tight",
-                "best_regime_t_stat": 2.4,
-                "best_regime_mean_return_bps": 8.0,
-                "priority_score": 1.2,
-            }
-        ]
-    ).to_parquet(search_dir / "regime_conditional_candidates.parquet", index=False)
 
     rc = update_campaign_memory.main(
         [
@@ -170,15 +150,11 @@ def test_update_campaign_memory_materializes_memory_and_compat_outputs(monkeypat
     belief_state = json.loads((memory_root / "belief_state.json").read_text(encoding="utf-8"))
     next_actions = json.loads((memory_root / "next_actions.json").read_text(encoding="utf-8"))
     assert len(belief_state["promising_regions"]) == 1
+    # Phase 1.3: small-sample failures (train_n_obs=12) produce failure_cause_class
+    # "insufficient_sample" which is routed to repair rather than avoidance.
+    # avoid_regions may be empty for this fixture; check it is a list.
+    assert isinstance(belief_state["avoid_regions"], list)
     assert len(next_actions["exploit"]) == 1
-    assert len(next_actions["explore_adjacent"]) >= 1
-    assert next_actions["explore_adjacent"][0]["proposed_scope"]["event_type"] == "BASIS_DISLOC"
-    assert next_actions["explore_adjacent"][0]["proposed_scope"]["contexts"] == {
-        "vol_regime": ["high"],
-        "carry_state": ["funding_pos"],
-        "ms_trend_state": ["trend"],
-        "ms_spread_state": ["tight"],
-    }
 
 
 def test_update_campaign_memory_uses_explicit_data_root_for_manifest(monkeypatch, tmp_path):

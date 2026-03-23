@@ -70,6 +70,104 @@ def _normalize_audit_frame(rows: list[dict]) -> pd.DataFrame:
     return frame
 
 
+# Phase 4.2 — regime-conditional candidate discovery signal columns
+_REGIME_CANDIDATE_COLUMNS = [
+    "event_type",
+    "template_id",
+    "direction",
+    "horizon",
+    "trigger_key",
+    "t_stat",
+    "mean_return_bps",
+    "robustness_score",
+    "context_json",
+]
+
+
+def _write_regime_conditional_candidates(
+    final_df: pd.DataFrame,
+    out_dir: Path,
+    *,
+    weak_t_stat_upper: float = 1.5,
+    min_t_stat_lower: float = 0.5,
+    min_mean_return_bps: float = 0.0,
+    top_k: int = 20,
+) -> None:
+    """Phase 4.2 — Write regime_conditional_candidates.parquet.
+
+    Identifies hypotheses that were weak overall (t_stat < weak_t_stat_upper)
+    but had positive mean_return_bps, indicating potential regime-specific alpha.
+    These are surfaced as an explore_adjacent discovery signal so the campaign
+    controller can propose targeted context-conditioned follow-up runs.
+
+    The file is written to ``out_dir/regime_conditional_candidates.parquet``.
+    If no qualifying candidates exist an empty schema file is written so
+    downstream readers can always expect the artefact.
+    """
+    rcc_path = out_dir / "regime_conditional_candidates.parquet"
+
+    empty = pd.DataFrame(columns=_REGIME_CANDIDATE_COLUMNS)
+
+    if final_df is None or final_df.empty:
+        write_parquet(empty, rcc_path)
+        return
+
+    t_col = "t_stat" if "t_stat" in final_df.columns else None
+    ret_col = "mean_return_bps" if "mean_return_bps" in final_df.columns else None
+
+    if t_col is None or ret_col is None:
+        write_parquet(empty, rcc_path)
+        return
+
+    t_num = pd.to_numeric(final_df[t_col], errors="coerce").fillna(0.0)
+    ret_num = pd.to_numeric(final_df[ret_col], errors="coerce").fillna(0.0)
+
+    mask = (
+        (t_num >= min_t_stat_lower)
+        & (t_num < weak_t_stat_upper)
+        & (ret_num > min_mean_return_bps)
+    )
+    weak_positive = final_df[mask].copy()
+
+    if weak_positive.empty:
+        write_parquet(empty, rcc_path)
+        return
+
+    # Sort by mean_return_bps descending — highest-signal near-misses first
+    weak_positive = weak_positive.sort_values(ret_col, ascending=False).head(top_k)
+
+    # Emit only the columns we need; fill missing with empty string / NaN
+    out_rows = []
+    for _, row in weak_positive.iterrows():
+        # Extract event_type from trigger_key ("event:EVTNAME" → "EVTNAME")
+        tkey = str(row.get("trigger_key", ""))
+        if tkey.startswith("event:"):
+            event_type = tkey[len("event:"):]
+        elif tkey.startswith("state:"):
+            event_type = tkey[len("state:"):]
+        else:
+            event_type = tkey
+
+        out_rows.append({
+            "event_type": event_type,
+            "template_id": str(row.get("template_id", "")),
+            "direction": str(row.get("direction", "")),
+            "horizon": str(row.get("horizon", "")),
+            "trigger_key": tkey,
+            "t_stat": float(row.get(t_col, 0.0)),
+            "mean_return_bps": float(row.get(ret_col, 0.0)),
+            "robustness_score": float(row.get("robustness_score", 0.0)),
+            "context_json": str(row.get("context_json", "") or ""),
+        })
+
+    rcc_df = pd.DataFrame(out_rows, columns=_REGIME_CANDIDATE_COLUMNS)
+    write_parquet(rcc_df, rcc_path)
+    log.info(
+        "Phase 4.2: wrote %d regime_conditional_candidates to %s",
+        len(rcc_df), rcc_path,
+    )
+
+
 def _write_hypothesis_audit_artifacts(out_dir: Path, symbol: str, audit: dict) -> None:
     audit_dir = out_dir / "hypotheses" / str(symbol).upper()
     ensure_dir(audit_dir)
@@ -429,6 +527,14 @@ def run(
 
     # 6. Write output
     write_parquet(final_df, output_path)
+
+    # Phase 4.2 — Write regime_conditional_candidates.parquet.
+    # Surfaces hypotheses that were weak overall (t_stat < 1.5) but had positive
+    # mean_return_bps — these are candidates for regime-specific alpha that the
+    # campaign controller can target with a context-conditioned follow-up run.
+    # The controller reads this artefact in _build_next_actions() and injects
+    # matching entries into the explore_adjacent queue.
+    _write_regime_conditional_candidates(final_df, out_dir)
 
     main_diag = build_search_engine_diagnostics(
         run_id=run_id,

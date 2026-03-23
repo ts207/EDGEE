@@ -2,30 +2,29 @@
 
 A research platform for event-driven alpha discovery in crypto markets.
 
-EDGEE turns market observations into explicit, testable hypotheses, runs them through a structured pipeline, and gates any result on mechanical, statistical, and deployment-readiness checks before promotion. The system now includes memory-aware campaign control, MI-based candidate generation, hypothesis clustering, promotion scoring, blueprint compilation, and live-state-aware sizing.
+EDGEE turns market observations into explicit, testable hypotheses, runs them through a structured pipeline, and gates any result on mechanical, statistical, and deployment-readiness checks before it can be promoted. The goal is reproducible, cost-aware, narrowly attributed research — not output volume.
 
 ---
 
-## What it does now
+## What It Does
 
-The platform is organized around these surfaces:
+The pipeline runs in eight stages:
 
-- Ingest, clean, and feature pipelines for market data
-- Market context and regime labeling
-- Research orchestration through the campaign controller
-- Memory, reflection, and next-action persistence
-- Hypothesis evaluation, stress testing, and promotion gating
-- Candidate clustering and PnL similarity filtering
-- Strategy blueprint compilation and allocation sizing
-- Live runner state, health, drift, and kill-switch handling
+```
+ingest → clean → build_features → build_market_context
+  → phase1_analysis (detect events)
+  → phase2_discovery (evaluate hypotheses)
+  → promotion (gate candidates)
+  → strategy_packaging (compile blueprints)
+```
 
-The important distinction is this: the system is no longer just a detector stack. The research loop already reads and writes state across runs.
+Each stage produces versioned, manifest-tracked artifacts. A run is only trustworthy when its artifacts reconcile — a `0` exit code is not sufficient.
 
 ---
 
 ## Install
 
-Requires Python 3.11+.
+**Requires Python 3.11+**
 
 ```bash
 pip install -e .
@@ -52,120 +51,191 @@ edge-run-all \
   --plan_only 1
 ```
 
-Remove `--plan_only 1` to execute. Use plan-only mode first for any material run.
+Remove `--plan_only 1` to execute. Always plan first on material runs.
 
 ---
 
-## Common commands
+## Common Commands
 
 ### Pipeline
 
 ```bash
+# Full pipeline (plan first)
 edge-run-all --run_id <id> --symbols BTCUSDT --start 2024-01-01 --end 2024-03-31 --plan_only 1
-edge-phase2-discovery --run_id <id> --symbols BTCUSDT
+
+# Phase 2 discovery only
+edge-phase2-discovery --run_id <id>
+
+# Promotion pass
 edge-promote --run_id <id>
-edge-smoke --mode research
-compile-strategy-blueprints --run_id <id>
 ```
 
-### Research and memory
+### Research
 
 ```bash
+# Broad edge discovery
+make discover-edges
+
+# Targeted event discovery
+make discover-target SYMBOLS=BTCUSDT EVENT=VOL_SHOCK
+
+# Inspect knowledge base and prior memory
 python3 -m project.research.knowledge.query knobs
 python3 -m project.research.knowledge.query memory --program_id btc_campaign
 python3 -m project.research.knowledge.query static --event BASIS_DISLOC
 ```
 
-### Synthetic validation
+### Synthetic Validation
 
 ```bash
+# Broad synthetic discovery (maintained golden workflow)
 python3 -m project.scripts.run_golden_synthetic_discovery
+
+# Fast certification (narrow, for CI/pre-merge)
 python3 -m project.scripts.run_fast_synthetic_certification
-python3 -m project.scripts.validate_synthetic_detector_truth --run_id <run_id>
+
+# Validate detector truth after any synthetic run
+python3 -m project.scripts.validate_synthetic_detector_truth --run_id golden_synthetic_discovery
 ```
 
-### Benchmarks and maintenance
+### Benchmarks
 
 ```bash
+# Run full maintenance cycle and certify
 make benchmark-maintenance
+
+# Review latest certified results
 PYTHONPATH=. python3 project/scripts/show_benchmark_review.py
+```
+
+### Live Engine
+
+```bash
+# Inspect session metadata
+edge-live-engine --config project/configs/golden_certification.yaml --print_session_metadata
+
+# Launch with state snapshot
+edge-live-engine --config project/configs/golden_certification.yaml --snapshot_path artifacts/live_state.json
+```
+
+Systemd service templates: `deploy/systemd/`. Environment templates: `deploy/env/`.
+
+### Build and Test
+
+```bash
+make test           # Full test suite (407 test files)
+make test-fast      # Excludes @pytest.mark.slow
+make lint           # Ruff lint
+make format-check   # Ruff format check (no writes)
+make format         # Apply formatting
+```
+
+### Maintenance
+
+```bash
+# Regenerate machine-owned architecture artifacts
 python3 -m project.scripts.build_system_map --check
-python3 -m project.scripts.detector_coverage_audit --md-out docs/generated/detector_coverage.md --json-out docs/generated/detector_coverage.json --check
+python3 -m project.scripts.detector_coverage_audit \
+  --md-out docs/generated/detector_coverage.md \
+  --json-out docs/generated/detector_coverage.json \
+  --check
 ```
 
 ---
 
-## Repository layout
+## Repo Layout
 
-```text
+```
 project/           Application code
   pipelines/       Stage entrypoints and orchestration
-  research/        Discovery, promotion, evaluation, knowledge, services
-  live/            Live runner, OMS, drift, health, kill switch
-  portfolio/       Allocation, risk budget, and sizing
-  contracts/       Stage, artifact, and temporal contracts
-  spec_registry/   Search-space and registry loaders
-  strategy/        Strategy DSL and templates
+  events/          Detectors, families, registries
+  features/        Shared feature and regime helpers
+  research/        Discovery, promotion, evaluation, diagnostics
+  strategy/        DSL, templates, runtime
+  contracts/       Stage and artifact contracts
+  spec_registry/   YAML spec loaders
+  live/            Live engine and kill-switch
+  scripts/         Operator and maintenance entry points
   tests/           Regression, contract, smoke, and architecture tests
 
-spec/              Events, features, hypotheses, objectives, and search space
-docs/              Role docs and maintained references
-  researcher/      Research operator docs
-  developer/       Developer docs
-  CURRENT_STATE_AND_GAPS.md  Cross-role audit and doc-gap index
+spec/              YAML definitions: events, features, states, grammar, search, strategies
+docs/              Operator and reference documentation
+  researcher/      Research operator docs (loop, experiments, guardrails, ontology)
+  developer/       Developer docs (architecture, maintenance, tech stack)
+  generated/       Machine-owned diagnostics — do not hand-edit
 deploy/            Systemd units and environment templates
-data/              Local runtime outputs and run artifacts
+data/              Local runtime outputs (not source files)
 ```
 
 ---
 
-## Key surfaces
+## Key Surfaces
 
 | Surface | Path |
 |---|---|
 | End-to-end orchestrator | `project/pipelines/run_all.py` |
-| Phase 2 discovery | `project/pipelines/research/phase2_candidate_discovery.py` |
-| Campaign controller | `project/pipelines/research/campaign_controller.py` |
-| Memory update | `project/pipelines/research/update_campaign_memory.py` |
-| MI scan | `project/pipelines/research/feature_mi_scan.py` |
-| Search intelligence | `project/pipelines/research/search_intelligence.py` |
-| Promotion services | `project/research/services/promotion_service.py` |
-| Candidate discovery services | `project/research/services/candidate_discovery_service.py` |
-| Clustering | `project/research/clustering/alpha_clustering.py` |
-| Promotion gating | `project/research/promotion/promotion_gate_evaluators.py` |
-| Blueprint compilation | `project/pipelines/research/compile_strategy_blueprints.py` |
-| Allocation spec | `project/portfolio/allocation_spec.py` |
-| Live runner | `project/live/runner.py` |
-| Stage and artifact contracts | `project/contracts/` |
-| Ontology and memory | `project/research/knowledge/` |
+| Stage and artifact contracts | `project/contracts/pipeline_registry.py` |
+| Discovery service | `project/research/services/candidate_discovery_service.py` |
+| Promotion service | `project/research/services/promotion_service.py` |
+| Detector catalog | `project/events/detectors/catalog.py` |
+| Strategy DSL | `project/strategy/dsl/` |
+| Strategy templates | `project/strategy/templates/` |
+| Feature registry | `project/core/feature_registry.py` |
+| Agent I/O (proposal → run) | `project/research/agent_io/` |
 
 ---
 
-## Research unit
+## The Research Unit
 
-The platform is built around hypotheses, not loose detector output.
+The platform is built around **hypotheses**, not detectors and not strategies.
 
-A hypothesis specifies the event or trigger family, template, direction, horizon, entry lag, and context. That tuple is what gets evaluated, stored in memory, and gated for promotion.
+A hypothesis specifies an event, a canonical family, a template, a context, a side, a horizon, an entry lag, and a symbol scope. That is what gets evaluated, stored in memory, and gated in promotion.
 
-The canonical event families remain the contract boundary for template eligibility and direction semantics. The docs should describe those families as a stable ontology, not as a casual taxonomy.
-
----
-
-## Documentation map
-
-- Researchers start with `docs/researcher/ONBOARDING.md`
-- Developers start with `docs/developer/ONBOARDING.md`
-- The role map lives in `docs/README.md`
-- The cross-role audit lives in `docs/CURRENT_STATE_AND_GAPS.md`
-
-`docs/EDGE_Vision.docx` is a roadmap archive and should be read as a vision note, not as the active operational manual.
+The 9 canonical event families (`LIQUIDITY_DISLOCATION`, `VOLATILITY_TRANSITION`, `POSITIONING_EXTREMES`, `FORCED_FLOW_AND_EXHAUSTION`, `TREND_STRUCTURE`, `STATISTICAL_DISLOCATION`, `REGIME_TRANSITION`, `INFORMATION_DESYNC`, `TEMPORAL_STRUCTURE`) constrain which templates are legal for each event type.
 
 ---
 
-## Core rules
+## Documentation
 
-- Artifacts are the source of truth.
-- Plan before material runs.
-- Synthetic results are calibration, not proof.
-- Promotion is a gate, not a label.
-- Narrow before broad unless the run is explicitly a breadth scan.
+The docs are split by role.
+
+**Researchers** — start with [`docs/researcher/ONBOARDING.md`](docs/researcher/ONBOARDING.md)
+
+**Developers** — start with [`docs/developer/ONBOARDING.md`](docs/developer/ONBOARDING.md)
+
+**The full map** — [`docs/README.md`](docs/README.md)
+
+---
+
+## Agent / Autonomous Controller Quickstart
+
+```bash
+# 1. Inspect knobs and prior memory
+python3 -m project.research.knowledge.query knobs
+python3 -m project.research.knowledge.query memory --program_id btc_campaign
+
+# 2. Translate a proposal YAML to repo-native config
+python3 -m project.research.agent_io.proposal_to_experiment \
+  --proposal /path/to/proposal.yaml \
+  --registry_root project/configs/registries \
+  --config_path /tmp/experiment.yaml \
+  --overrides_path /tmp/run_all_overrides.json
+
+# 3. Plan before running
+python3 -m project.research.agent_io.issue_proposal \
+  --proposal /path/to/proposal.yaml \
+  --registry_root project/configs/registries \
+  --plan_only 1
+```
+
+The full operator guide for autonomous controllers is in [`CLAUDE.md`](CLAUDE.md).
+
+---
+
+## Core Rules
+
+- **Artifacts are the source of truth.** Read manifests before interpreting output.
+- **`plan_only` before material runs.** Verify scope before execution.
+- **Synthetic runs are calibration, not proof.** Do not present synthetic profitability as live-market evidence.
+- **Promotion is a gate.** Attractive discovery output is not promotion readiness.
+- **Narrow before broad.** One family, one template, one context per run by default.

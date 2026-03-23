@@ -26,7 +26,7 @@ def _load_search_limit_defaults(registry_root: Path) -> Dict[str, Any]:
     return {
         "horizons_bars": list(defaults.get("horizons_bars", [1, 3, 12, 24, 72])),
         "directions": list(defaults.get("directions", ["long", "short"])),
-        "entry_lags": list(defaults.get("entry_lags", [1, 2])),
+        "entry_lags": list(defaults.get("entry_lags", [0, 1, 2])),
         "max_hypotheses_total": int(limits.get("max_hypotheses_total", 1000)),
         "max_hypotheses_per_template": int(limits.get("max_hypotheses_per_template", 250)),
         "max_hypotheses_per_event_family": int(limits.get("max_hypotheses_per_event_family", 300)),

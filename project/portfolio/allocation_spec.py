@@ -26,12 +26,17 @@ class SizingPolicySpec(BaseModel):
 
     mode: str
     risk_per_trade: float | None = None
-    expected_return_bps: float | None = None
-    expected_adverse_bps: float | None = None
     max_gross_leverage: float
     portfolio_risk_budget: float = 1.0
     symbol_risk_budget: float = 1.0
     signal_scaling: Dict[str, Any] = Field(default_factory=dict)
+    # Phase 4.4: sizing inputs populated from promotion audit data.
+    # expected_return_bps — mean return from the promotion audit row (mean_return_bps).
+    # expected_adverse_bps — stressed adverse scenario derived from
+    #   stressed_after_cost_expectancy × 1.5 (per the vision spec).
+    # Both default to None (unpopulated) so existing code paths are unaffected.
+    expected_return_bps: float | None = None
+    expected_adverse_bps: float | None = None
 
 
 class RiskControlSpec(BaseModel):
@@ -68,8 +73,6 @@ class AllocationSpec(BaseModel):
             "allocator_mode": str(constraints.get("allocator_mode", "heuristic")).strip().lower(),
             "allocator_deterministic": bool(constraints.get("allocator_deterministic", True)),
             "allocator_turnover_penalty": float(constraints.get("allocator_turnover_penalty", 0.0)),
-            "expected_return_bps": self.sizing_policy.expected_return_bps,
-            "expected_adverse_bps": self.sizing_policy.expected_adverse_bps,
             "strategy_risk_budgets": strategy_risk_budgets,
             "family_risk_budgets": family_risk_budgets,
             "strategy_family_map": strategy_family_map,
@@ -100,8 +103,22 @@ class AllocationSpec(BaseModel):
         default_fee_tier: str,
         fees_bps_per_side: float,
         slippage_bps_per_fill: float,
+        # Phase 4.4: sizing inputs from promotion audit data.
+        # When provided these replace None defaults in SizingPolicySpec,
+        # enabling the live runner to use calibrated Kelly-adjusted sizing.
+        expected_return_bps: float | None = None,
+        expected_adverse_bps: float | None = None,
     ) -> "AllocationSpec":
         constraints = dict(blueprint.lineage.constraints or {})
+        # Fallback: read sizing inputs from blueprint constraints if not explicitly provided.
+        # This covers blueprints compiled via blueprint_compilation.py which embeds
+        # expected_return_bps / expected_adverse_bps directly in the lineage constraints.
+        if expected_return_bps is None:
+            v = constraints.get("expected_return_bps")
+            expected_return_bps = float(v) if v is not None else None
+        if expected_adverse_bps is None:
+            v = constraints.get("expected_adverse_bps")
+            expected_adverse_bps = float(v) if v is not None else None
         return cls(
             metadata=AllocationMetadata(
                 run_id=run_id,
@@ -113,12 +130,12 @@ class AllocationSpec(BaseModel):
             sizing_policy=SizingPolicySpec(
                 mode=blueprint.sizing.mode,
                 risk_per_trade=blueprint.sizing.risk_per_trade,
-                expected_return_bps=constraints.get("expected_return_bps"),
-                expected_adverse_bps=constraints.get("expected_adverse_bps"),
                 max_gross_leverage=blueprint.sizing.max_gross_leverage,
                 portfolio_risk_budget=blueprint.sizing.portfolio_risk_budget,
                 symbol_risk_budget=blueprint.sizing.symbol_risk_budget,
                 signal_scaling=dict(blueprint.sizing.signal_scaling),
+                expected_return_bps=expected_return_bps,
+                expected_adverse_bps=expected_adverse_bps,
             ),
             risk_controls=RiskControlSpec(
                 low_capital_contract=dict(low_capital_contract),

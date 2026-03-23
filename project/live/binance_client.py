@@ -21,6 +21,12 @@ class BinanceFuturesClient:
     def __init__(self, api_key: str, api_secret: str):
         self.api_key = api_key
         self.api_secret = api_secret
+        self._session: Optional[aiohttp.ClientSession] = None
+
+    async def close(self):
+        if self._session:
+            await self._session.close()
+            self._session = None
 
     def _sign(self, params: Dict[str, Any]) -> str:
         query_string = urlencode(params)
@@ -39,13 +45,15 @@ class BinanceFuturesClient:
         headers = {"X-MBX-APIKEY": self.api_key}
         url = f"{self.BASE_URL}{path}"
 
-        async with aiohttp.ClientSession() as session:
-            async with session.request(method, url, params=params, headers=headers) as resp:
-                data = await resp.json()
-                if resp.status != 200:
-                    _LOG.error(f"Binance API Error: {resp.status} {data}")
-                    resp.raise_for_status()
-                return data
+        if self._session is None or self._session.closed:
+            self._session = aiohttp.ClientSession()
+
+        async with self._session.request(method, url, params=params, headers=headers) as resp:
+            data = await resp.json()
+            if resp.status != 200:
+                _LOG.error(f"Binance API Error: {resp.status} {data}")
+                resp.raise_for_status()
+            return data
 
     async def get_account_v2(self) -> Dict[str, Any]:
         """GET /fapi/v2/account"""

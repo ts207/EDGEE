@@ -11,7 +11,6 @@ feature_predicate triggers all resolve to a boolean mask over the feature table.
 
 from __future__ import annotations
 
-import json
 import logging
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -61,8 +60,6 @@ METRICS_COLUMNS = [
     "direction",
     "horizon",
     "template_id",
-    "entry_lag",
-    "context_json",
     "n",
     "train_n_obs",
     "validation_n_obs",
@@ -80,11 +77,6 @@ METRICS_COLUMNS = [
     "stress_score",
     "kill_switch_count",
     "capacity_proxy",
-    "best_regime",
-    "best_regime_n",
-    "best_regime_mean_return_bps",
-    "best_regime_t_stat",
-    "regime_evaluations_json",
     "valid",
     "invalid_reason",
 ]
@@ -129,66 +121,7 @@ def _null_row(spec: HypothesisSpec, n: int, reason: str = "unknown") -> Dict[str
         },
     )
     row = evaluated.to_record()
-    row["entry_lag"] = int(spec.entry_lag)
-    row["context_json"] = json.dumps(spec.context or {}, sort_keys=True)
     return {column: row.get(column) for column in METRICS_COLUMNS}
-
-
-def _best_regime_summary(
-    regime_evals: pd.DataFrame,
-    *,
-    direction_sign: float,
-) -> Dict[str, Any]:
-    if regime_evals.empty:
-        return {
-            "best_regime": "",
-            "best_regime_n": 0,
-            "best_regime_mean_return_bps": float("nan"),
-            "best_regime_t_stat": float("nan"),
-        }
-
-    valid = regime_evals[regime_evals["valid"].fillna(False)].copy()
-    if valid.empty:
-        return {
-            "best_regime": "",
-            "best_regime_n": 0,
-            "best_regime_mean_return_bps": float("nan"),
-            "best_regime_t_stat": float("nan"),
-        }
-
-    valid["directional_mean_bps"] = (
-        pd.to_numeric(valid["mean_return_bps"], errors="coerce").fillna(float("nan")) * direction_sign
-    )
-    valid["directional_t_stat"] = (
-        pd.to_numeric(valid["t_stat"], errors="coerce").fillna(float("nan")) * direction_sign
-    )
-    aligned = valid[
-        (valid["directional_mean_bps"] > 0.0) & (valid["directional_t_stat"] > 0.0)
-    ].copy()
-    ranked = aligned if not aligned.empty else valid
-    ranked = ranked.sort_values(
-        ["directional_t_stat", "directional_mean_bps", "n"],
-        ascending=[False, False, False],
-    )
-    best = ranked.iloc[0]
-    return {
-        "best_regime": str(best.get("regime", "")),
-        "best_regime_n": int(pd.to_numeric(best.get("n", 0), errors="coerce") or 0),
-        "best_regime_mean_return_bps": float(
-            pd.to_numeric(best.get("mean_return_bps"), errors="coerce")
-        ),
-        "best_regime_t_stat": float(pd.to_numeric(best.get("t_stat"), errors="coerce")),
-    }
-
-
-def _serialize_regime_evaluations(regime_evals: pd.DataFrame) -> str:
-    if regime_evals.empty:
-        return "[]"
-    serializable = regime_evals.copy()
-    for column in ("n", "mean_return_bps", "t_stat", "hit_rate"):
-        if column in serializable.columns:
-            serializable[column] = pd.to_numeric(serializable[column], errors="coerce")
-    return json.dumps(serializable.to_dict(orient="records"), sort_keys=True)
 
 
 def evaluate_hypothesis_batch(
@@ -261,6 +194,7 @@ def evaluate_hypothesis_batch(
     stress_masks = {s["name"]: _apply_stress_mask(s, features) for s in STRESS_SCENARIOS}
 
     rows: List[Dict[str, Any]] = []
+    regime_rows: List[Dict[str, Any]] = []  # Phase 4.2 — per-hypothesis regime breakdown
 
     for spec in hypotheses:
         feasibility = check_hypothesis_feasibility(spec, features=features)
@@ -403,7 +337,6 @@ def evaluate_hypothesis_batch(
 
         # 2. Composite Robustness Score
         robustness = compute_robustness_score(regime_evals, overall_direction=direction_sign)
-        best_regime = _best_regime_summary(regime_evals, direction_sign=direction_sign)
 
         # 3. Stress Test Score
         stress_evals = evaluate_stress_scenarios(
@@ -455,8 +388,6 @@ def evaluate_hypothesis_batch(
             checked=checked,
             valid=True,
             metrics={
-                "entry_lag": int(spec.entry_lag),
-                "context_json": json.dumps(spec.context or {}, sort_keys=True),
                 "n": n,
                 **split_counts,
                 "mean_return_bps": round(mean_bps, 4),
@@ -470,17 +401,45 @@ def evaluate_hypothesis_batch(
                 "stress_score": round(stress_score, 4),
                 "kill_switch_count": ks_count,
                 "capacity_proxy": capacity,
-                "best_regime": best_regime["best_regime"],
-                "best_regime_n": best_regime["best_regime_n"],
-                "best_regime_mean_return_bps": best_regime["best_regime_mean_return_bps"],
-                "best_regime_t_stat": best_regime["best_regime_t_stat"],
-                "regime_evaluations_json": _serialize_regime_evaluations(regime_evals),
             },
         )
         row = evaluated.to_record()
         rows.append({column: row.get(column) for column in METRICS_COLUMNS})
 
+        # Phase 4.2 — Accumulate per-regime breakdown for every evaluated hypothesis.
+        # The full regime_evals DataFrame is richer than the scalar robustness_score:
+        # it exposes hypotheses where aggregate performance is weak but per-regime
+        # performance is strong — the regime-specific alpha signal.
+        if not regime_evals.empty and "t_stat" in regime_evals.columns:
+            h_id = row.get("hypothesis_id", "")
+            trigger = row.get("trigger_key", "")
+            for _, r_row in regime_evals.iterrows():
+                if r_row.get("valid", False):
+                    regime_rows.append({
+                        "hypothesis_id": h_id,
+                        "trigger_key": trigger,
+                        "template_id": spec.template_id,
+                        "direction": spec.direction,
+                        "horizon": spec.horizon,
+                        "regime": str(r_row.get("regime", "")),
+                        "n": int(r_row.get("n", 0)),
+                        "mean_return_bps": float(r_row.get("mean_return_bps", 0.0)),
+                        "t_stat": float(r_row.get("t_stat", 0.0)),
+                        "hit_rate": float(r_row.get("hit_rate", 0.0)),
+                    })
+
     df = pd.DataFrame(rows, columns=METRICS_COLUMNS)
+
+    # Attach per-regime rows as a metadata attribute so callers can persist it
+    # without changing the public return type.  run_hypothesis_search.py reads
+    # this attribute and writes regime_breakdown.parquet alongside metrics.
+    df.attrs["regime_breakdown"] = (
+        pd.DataFrame(regime_rows) if regime_rows else pd.DataFrame(
+            columns=["hypothesis_id", "trigger_key", "template_id", "direction",
+                     "horizon", "regime", "n", "mean_return_bps", "t_stat", "hit_rate"]
+        )
+    )
+
     log.info(
         "Evaluated %d hypotheses: %d valid, %d below min_sample_size=%d",
         len(hypotheses),

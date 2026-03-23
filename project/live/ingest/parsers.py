@@ -56,25 +56,30 @@ def parse_kline_event(payload: Dict[str, Any]) -> Optional[KlineEvent]:
     )
 
 
-def parse_book_ticker_event(payload: Dict[str, Any]) -> Optional[BookTickerEvent]:
+def parse_book_ticker_event(
+    payload: Dict[str, Any], arrival_ts: Optional[pd.Timestamp] = None
+) -> Optional[BookTickerEvent]:
     """Parse Binance bookTicker stream message."""
     data = payload.get("data", payload)
 
-    event_type = data.get("e")
-    if event_type != "bookTicker":
-        # Note: best book ticker may not have 'e' field in single stream,
-        # but in combined stream it does if 'stream' name is used.
-        # Single stream: {"u":400900217,"s":"BNBUSDT","b":"25.3519","B":"31.21","a":"25.3652","A":"40.66"}
-        if "s" in data and "b" in data and "a" in data:
-            pass  # Valid book ticker
-        else:
-            return None
+    # Single stream: {"u":..., "s":"BNBUSDT","b":"25.3519","B":"31.21","a":"25.3652","A":"40.66"}
+    # Combined stream: {"stream":"...","data":{...}}
+    if not ("s" in data and "b" in data and "a" in data):
+        return None
+
+    # E = Event time, T = Transaction time (if available in stream data)
+    # If missing, use provided arrival_ts (socket arrival time)
+    ts = data.get("E", data.get("T"))
+    if ts:
+        timestamp = pd.to_datetime(ts, unit="ms", utc=True)
+    elif arrival_ts is not None:
+        timestamp = arrival_ts
+    else:
+        timestamp = pd.Timestamp.now(tz="UTC")
 
     return BookTickerEvent(
         symbol=data.get("s", ""),
-        timestamp=pd.to_datetime(
-            data.get("E", data.get("T", pd.Timestamp.now().value // 10**6)), unit="ms", utc=True
-        ),
+        timestamp=timestamp,
         best_bid_price=float(data.get("b", 0.0)),
         best_bid_qty=float(data.get("B", 0.0)),
         best_ask_price=float(data.get("a", 0.0)),

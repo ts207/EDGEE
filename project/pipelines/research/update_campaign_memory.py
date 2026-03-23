@@ -112,65 +112,6 @@ def _gate_rank(val: Any) -> int:
     return 0
 
 
-def _load_regime_conditional_candidates(*, run_id: str, data_root: Path) -> pd.DataFrame:
-    path = data_root / "reports" / "hypothesis_search" / run_id / "regime_conditional_candidates.parquet"
-    if not path.exists():
-        return pd.DataFrame()
-    try:
-        return pd.read_parquet(path)
-    except Exception:
-        return pd.DataFrame()
-
-
-def _coerce_contexts(value: Any) -> Dict[str, list[str]]:
-    payload = value
-    if isinstance(payload, str):
-        text = payload.strip()
-        if not text or text == "{}":
-            return {}
-        try:
-            payload = json.loads(text)
-        except json.JSONDecodeError:
-            return {}
-    if not isinstance(payload, dict):
-        return {}
-    out: Dict[str, list[str]] = {}
-    for key, raw in payload.items():
-        family = str(key).strip()
-        label = str(raw).strip()
-        if family and label:
-            out[family] = [label]
-    return out
-
-
-def _parse_best_regime_contexts(best_regime: Any) -> Dict[str, list[str]]:
-    regime = str(best_regime or "").strip().lower()
-    if not regime:
-        return {}
-
-    token_map = {
-        "high_vol": ("vol_regime", "high"),
-        "low_vol": ("vol_regime", "low"),
-        "funding_pos": ("carry_state", "funding_pos"),
-        "funding_neg": ("carry_state", "funding_neg"),
-        "trend": ("ms_trend_state", "trend"),
-        "chop": ("ms_trend_state", "chop"),
-        "tight": ("ms_spread_state", "tight"),
-        "wide": ("ms_spread_state", "wide"),
-    }
-    contexts: Dict[str, list[str]] = {}
-    for token, (family, label) in token_map.items():
-        if token in regime:
-            contexts[family] = [label]
-    return contexts
-
-
-def _merge_contexts(base: Dict[str, list[str]], override: Dict[str, list[str]]) -> Dict[str, list[str]]:
-    merged = dict(base)
-    merged.update(override)
-    return merged
-
-
 def _build_belief_state(
     *,
     tested_regions: pd.DataFrame,
@@ -255,6 +196,12 @@ def _build_next_actions(
     exploit_top_k: int,
     repair_top_k: int,
 ) -> Dict[str, Any]:
+    """Build the next_actions queue from memory artefacts.
+
+    Phase 4.2: regime_conditional_candidates are injected into explore_adjacent
+    with context conditioning derived from the best-performing regime slice,
+    so the controller's follow-up run targets the specific regime.
+    """
     exploit = []
     if not tested_regions.empty:
         ranked_df = tested_regions.copy()
@@ -292,7 +239,11 @@ def _build_next_actions(
     except json.JSONDecodeError:
         recommended_experiment = {}
 
-    explore_adjacent = []
+    # Phase 4.2 — Regime-conditional explore_adjacent entries.
+    # Each entry carries a proposed_scope with context pinned to the best-
+    # performing regime so the controller generates context-conditioned runs.
+    explore_adjacent: list[Dict[str, Any]] = []
+
     if not regime_conditional_candidates.empty:
         ranked = regime_conditional_candidates.copy()
         if "priority_score" in ranked.columns:
@@ -324,6 +275,7 @@ def _build_next_actions(
                     "proposed_scope": proposed_scope,
                 }
             )
+
     if recommended_experiment:
         explore_adjacent.append(
             {
@@ -353,6 +305,84 @@ def _build_next_actions(
         "explore_adjacent": explore_adjacent,
         "hold": [],
     }
+def _load_regime_conditional_candidates(*, run_id: str, data_root: Path) -> pd.DataFrame:
+    """Phase 4.2 — Load regime_conditional_candidates.parquet for this run.
+
+    Written by _write_regime_conditional_candidates() in phase2_search_engine.py
+    or run_hypothesis_search.py. Checks both standard output paths so that
+    either pipeline's artefact is found.
+    Returns an empty DataFrame on any I/O failure.
+    """
+    candidates = [
+        data_root / "reports" / "hypothesis_search" / run_id / "regime_conditional_candidates.parquet",
+        data_root / "reports" / "phase2" / run_id / "search_engine" / "regime_conditional_candidates.parquet",
+        data_root / "reports" / "phase2" / run_id / "regime_conditional_candidates.parquet",
+    ]
+    for path in candidates:
+        if path.exists():
+            try:
+                return pd.read_parquet(path)
+            except Exception:
+                continue
+    return pd.DataFrame()
+
+
+def _coerce_contexts(value: Any) -> Dict[str, list]:
+    """Coerce a context_json value (str or dict) to {family: [label]} dict."""
+    payload = value
+    if isinstance(payload, str):
+        text = payload.strip()
+        if not text or text == "{}":
+            return {}
+        try:
+            payload = json.loads(text)
+        except json.JSONDecodeError:
+            return {}
+    if not isinstance(payload, dict):
+        return {}
+    out: Dict[str, list] = {}
+    for key, raw in payload.items():
+        family = str(key).strip()
+        label = str(raw).strip()
+        if family and label:
+            out[family] = [label]
+    return out
+
+
+def _parse_best_regime_contexts(best_regime: Any) -> Dict[str, list]:
+    """Convert a best_regime label string to a context conditioning dict.
+
+    Maps token substrings from regime labels produced by regime_evaluator.py
+    to the context dimension / label pairs used by the campaign controller.
+    """
+    regime = str(best_regime or "").strip().lower()
+    if not regime:
+        return {}
+
+    token_map = {
+        "high_vol":    ("vol_regime",     "high"),
+        "low_vol":     ("vol_regime",     "low"),
+        "funding_pos": ("carry_state",    "funding_pos"),
+        "funding_neg": ("carry_state",    "funding_neg"),
+        "trend":       ("ms_trend_state", "trend"),
+        "chop":        ("ms_trend_state", "chop"),
+        "tight":       ("ms_spread_state", "tight"),
+        "wide":        ("ms_spread_state", "wide"),
+    }
+    contexts: Dict[str, list] = {}
+    for token, (family, label) in token_map.items():
+        if token in regime:
+            contexts[family] = [label]
+    return contexts
+
+
+def _merge_contexts(
+    base: Dict[str, list], override: Dict[str, list]
+) -> Dict[str, list]:
+    """Merge two context dicts; override wins on key conflicts."""
+    merged = dict(base)
+    merged.update(override)
+    return merged
 
 
 def update_campaign_memory(
@@ -373,10 +403,6 @@ def update_campaign_memory(
 
     incoming_tested = build_tested_regions_snapshot(
         run_id=run_id, program_id=program_id, data_root=data_root
-    )
-    regime_conditional_candidates = _load_regime_conditional_candidates(
-        run_id=run_id,
-        data_root=data_root,
     )
     incoming_failures = build_failures_snapshot(
         run_id=run_id, program_id=program_id, data_root=data_root
@@ -474,7 +500,9 @@ def update_campaign_memory(
             reflection=reflection_row,
             tested_regions=tested_regions,
             failures=failures,
-            regime_conditional_candidates=regime_conditional_candidates,
+            regime_conditional_candidates=_load_regime_conditional_candidates(
+                run_id=run_id, data_root=data_root
+            ),
             exploit_top_k=exploit_top_k,
             repair_top_k=repair_top_k,
         ),

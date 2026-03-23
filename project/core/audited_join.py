@@ -75,6 +75,7 @@ def audited_merge_asof(
         if stale_rate > 0.05:  # Global 5% threshold
             msg = f"Audited join for {feature_name} failed: excessive stale usage {stale_rate:.2%} > 5%"
             LOGGER.error(msg)
-            # In confirmatory mode we'd raise here, but for now we follow the existing pattern
+            # Enforce data quality: fail hard on stale data
+            raise RuntimeError(msg)
 
     return merged

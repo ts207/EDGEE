@@ -8,6 +8,7 @@ and exchange status in real-time.
 from __future__ import annotations
 
 import json
+import asyncio
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -73,49 +74,51 @@ class LiveStateStore:
         self._last_snapshot_time: Optional[datetime] = None
         self.kill_switch = KillSwitchSnapshot()
         self._snapshot_path = Path(snapshot_path) if snapshot_path is not None else None
+        self._lock = asyncio.Lock()
 
     def _maybe_persist(self) -> None:
         if self._snapshot_path is not None:
             self.save_snapshot(self._snapshot_path)
 
-    def update_from_exchange_snapshot(self, data: Dict[str, Any]):
+    async def update_from_exchange_snapshot(self, data: Dict[str, Any]):
         """
         Update state from a full exchange account/position snapshot.
         Expected format: typical CCXT or Binance account information.
         """
-        self.account.wallet_balance = float(data.get("wallet_balance", self.account.wallet_balance))
-        self.account.margin_balance = float(data.get("margin_balance", self.account.margin_balance))
-        self.account.available_balance = float(
-            data.get("available_balance", self.account.available_balance)
-        )
-        self.account.exchange_status = str(
-            data.get("exchange_status", self.account.exchange_status)
-        )
+        async with self._lock:
+            self.account.wallet_balance = float(data.get("wallet_balance", self.account.wallet_balance))
+            self.account.margin_balance = float(data.get("margin_balance", self.account.margin_balance))
+            self.account.available_balance = float(
+                data.get("available_balance", self.account.available_balance)
+            )
+            self.account.exchange_status = str(
+                data.get("exchange_status", self.account.exchange_status)
+            )
 
-        positions_raw = data.get("positions", [])
-        for p in positions_raw:
-            qty = float(p.get("quantity", 0.0))
-            symbol = str(p.get("symbol")).upper()
-            if qty == 0:
-                self.account.remove_position(symbol)
-            else:
-                pos = PositionState(
-                    symbol=symbol,
-                    side="LONG" if qty > 0 else "SHORT",
-                    quantity=abs(qty),
-                    entry_price=float(p.get("entry_price", 0.0)),
-                    mark_price=float(p.get("mark_price", p.get("entry_price", 0.0))),
-                    unrealized_pnl=float(p.get("unrealized_pnl", 0.0)),
-                    liquidation_price=float(p.get("liquidation_price", 0.0))
-                    if p.get("liquidation_price")
-                    else None,
-                    leverage=float(p.get("leverage", 1.0) or 1.0),
-                    margin_type=str(p.get("margin_type", "ISOLATED")),
-                )
-                self.account.update_position(pos)
+            positions_raw = data.get("positions", [])
+            for p in positions_raw:
+                qty = float(p.get("quantity", 0.0))
+                symbol = str(p.get("symbol")).upper()
+                if qty == 0:
+                    self.account.remove_position(symbol)
+                else:
+                    pos = PositionState(
+                        symbol=symbol,
+                        side="LONG" if qty > 0 else "SHORT",
+                        quantity=abs(qty),
+                        entry_price=float(p.get("entry_price", 0.0)),
+                        mark_price=float(p.get("mark_price", p.get("entry_price", 0.0))),
+                        unrealized_pnl=float(p.get("unrealized_pnl", 0.0)),
+                        liquidation_price=float(p.get("liquidation_price", 0.0))
+                        if p.get("liquidation_price")
+                        else None,
+                        leverage=float(p.get("leverage", 1.0) or 1.0),
+                        margin_type=str(p.get("margin_type", "ISOLATED")),
+                    )
+                    self.account.update_position(pos)
 
-        self._last_snapshot_time = self.account.update_time
-        self._maybe_persist()
+            self._last_snapshot_time = self.account.update_time
+            self._maybe_persist()
 
     def reconcile(self, exchange_data: Dict[str, Any], tolerance: float = 1e-6) -> List[str]:
         """

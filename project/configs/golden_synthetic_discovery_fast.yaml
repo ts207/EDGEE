@@ -19,8 +19,8 @@ directions:
   - long
   - short
 entry_lags:
+  - 0
   - 1
-  - 2
 interpretation_scope: detector_and_pipeline_calibration_only
 required_outputs:
   - synthetic/{run_id}/synthetic_generation_manifest.json

@@ -56,8 +56,11 @@ def horizon_bars(horizon: str) -> int:
 
 
 def forward_log_returns(close: pd.Series, horizon_bars: int) -> pd.Series:
+    """
+    Calculate forward log returns in Basis Points (BPS).
+    """
     log_close = np.log(close.clip(lower=1e-12))
-    return log_close.shift(-horizon_bars) - log_close
+    return (log_close.shift(-horizon_bars) - log_close) * 10_000.0
 
 
 def excursion_stats(

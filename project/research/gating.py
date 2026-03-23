@@ -16,6 +16,7 @@ try:
 except ModuleNotFoundError:
     from project.core.stats import stats
 
+from project.core.stats import bh_adjust
 from project.core.constants import HORIZON_BARS_BY_TIMEFRAME
 from project.core.validation import ts_ns_utc
 from project.research.direction_semantics import resolve_effect_sign
@@ -29,25 +30,6 @@ from project.research.helpers.shrinkage import (
 )
 
 log = logging.getLogger(__name__)
-
-
-def bh_adjust(p_values: np.ndarray) -> np.ndarray:
-    """Benjamini-Hochberg FDR adjustment."""
-    if len(p_values) == 0:
-        return p_values
-    n = len(p_values)
-    idx = np.argsort(p_values)
-    sorted_p = p_values[idx]
-    adj_p = np.zeros(n)
-    min_p = 1.0
-    for i in range(n - 1, -1, -1):
-        q = sorted_p[i] * n / (i + 1)
-        min_p = min(min_p, q)
-        adj_p[i] = min_p
-    # map back to original order
-    rev_idx = np.zeros(n, dtype=int)
-    rev_idx[idx] = np.arange(n)
-    return adj_p[rev_idx]
 
 
 def distribution_stats(returns: np.ndarray) -> Dict[str, float]:

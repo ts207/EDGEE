@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import re
 from datetime import timedelta
 from typing import Iterable, List, Optional
@@ -169,6 +170,7 @@ def assign_split_labels(
 
     excluded_mask = valid & labels.isna()
     if bool(excluded_mask.any()):
+        logging.getLogger(__name__).debug(f"Dropping {excluded_mask.sum()} rows due to embargo/purge/invalid split.")
         out = out.loc[~excluded_mask].copy()
         labels = labels.loc[out.index]
     out[split_col] = labels.astype(str)

@@ -485,11 +485,11 @@ def _apply_hierarchical_shrinkage(
         on=global_cols,
         how="left",
     )
-
-    out["shrinkage_weight_family"] = np.where(
-        out["lambda_family_status"] == "insufficient_data",
-        1.0,
-        out["n_family"]
+out["shrinkage_weight_family"] = np.where(
+    out["lambda_family_status"] == "insufficient_data",
+    0.0,
+    n / (n + lambda_family),
+)
         / (
             out["n_family"]
             + pd.to_numeric(out["lambda_family"], errors="coerce").fillna(float(lambda_family))
@@ -552,11 +552,11 @@ def _apply_hierarchical_shrinkage(
         on=family_cols,
         how="left",
     )
-
-    out["shrinkage_weight_event"] = np.where(
-        out["lambda_event_status"] == "insufficient_data",
-        1.0,
-        out["n_event"]
+out["shrinkage_weight_event"] = np.where(
+    out["lambda_event_status"] == "insufficient_data",
+    0.0,
+    n / (n + lambda_event),
+)
         / (
             out["n_event"]
             + pd.to_numeric(out["lambda_event"], errors="coerce").fillna(float(lambda_event))
@@ -624,7 +624,7 @@ def _apply_hierarchical_shrinkage(
     # 3. State layer (cross-symbol)
     out["shrinkage_weight_state_group"] = np.where(
         out["lambda_state_status"] == "insufficient_data",
-        1.0,
+        0.0,
         out["n_state"]
         / (
             out["n_state"]

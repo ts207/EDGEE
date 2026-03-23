@@ -104,9 +104,18 @@ class CampaignConfig:
     # True   — adds vol_regime: [low, high] to every Step 4 proposal, tripling
     #           the regime-conditional hypothesis count per run.
     enable_context_conditioning: bool = False
+
     # Phase 4.4: optional live portfolio snapshot consumed by downstream
     # blueprint/allocation compilation for portfolio-aware sizing.
     portfolio_state_path: str | None = None
+    # Phase 4.1: automatically run feature_mi_scan before the first proposal
+    # cycle so the controller always has fresh MI-derived predicate candidates.
+    # Set to False to skip (e.g. when features are unavailable or for speed).
+    auto_run_mi_scan: bool = False
+    # Symbols and timeframe used for the auto MI scan — must match the feature
+    # table available for this program.
+    mi_scan_symbols: str = "BTCUSDT"
+    mi_scan_timeframe: str = "5m"
 
     def __post_init__(self) -> None:
         # Default to EVENT-only; caller can expand to full trigger sequence
@@ -166,6 +175,11 @@ class CampaignController:
 
     def run_campaign(self):
         _LOG.info("Starting campaign: %s (mode=%s)", self.config.program_id, self.config.research_mode)
+
+        # Phase 4.1 — Run MI scan once before the first proposal cycle so the
+        # controller has fresh data-driven predicate candidates from the start.
+        if self.config.auto_run_mi_scan:
+            self._run_mi_scan_pre_step()
 
         for run_idx in range(self.config.max_runs):
             _LOG.info("Iteration %d/%d", run_idx + 1, self.config.max_runs)
@@ -469,10 +483,17 @@ class CampaignController:
         event_type = str(scope.get("event_type", "")).strip()
         if not event_type:
             return None
-        raw_contexts = scope.get("contexts", {})
-        contexts = raw_contexts if isinstance(raw_contexts, dict) else {}
 
         _LOG.info("STEP 3 EXPLORE ADJACENT: event=%s", event_type)
+
+        # Propagate any context conditioning embedded in the explore scope.
+        # Regime-conditional explore entries (from Phase 4.2 regime signal injection)
+        # carry a contexts dict so the follow-up run targets the specific regime.
+        raw_contexts = scope.get("contexts", {})
+        contexts = raw_contexts if isinstance(raw_contexts, dict) else {}
+        # Merge with config-level context conditioning (config wins on conflict)
+        if self.config.enable_context_conditioning and not contexts:
+            contexts = self._context_for_proposal()
 
         # Use all templates for the family — the adjacent exploration tests template sensitivity
         templates = self._templates_for_event(event_type)
@@ -530,6 +551,8 @@ class CampaignController:
             return self._step_scan_feature_predicates(mem)
         if t == "SEQUENCE":
             return self._step_scan_sequences(mem)
+        if t == "INTERACTION":
+            return self._step_scan_interactions(mem)
         _LOG.warning("STEP 4 SCAN: unknown trigger_type=%s — skipping.", trigger_type)
         return None
 
@@ -817,6 +840,90 @@ class CampaignController:
             contexts=self._context_for_proposal(),
         )
 
+    # ---- INTERACTION scan (sixth trigger type — cross-dimensional motifs) ----
+
+    def _step_scan_interactions(self, mem: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Propose INTERACTION triggers from spec/grammar/interaction_registry.yaml.
+
+        INTERACTION triggers fire when two conditions are simultaneously true
+        (op=AND/CONFIRM) or when one fires while another is absent (op=EXCLUDE).
+        They capture cross-dimensional alpha that neither constituent alone detects.
+
+        Motifs are loaded from the domain interaction registry and proposed in
+        batches of up to 3.  Already-tested interaction keys are filtered out.
+        """
+        motifs = self._load_interaction_motifs()
+        if not motifs:
+            _LOG.info("STEP 4 SCAN [INTERACTION]: no motifs in interaction_registry.yaml.")
+            return None
+
+        tested_keys: Set[str] = set()
+        try:
+            tested_df = read_memory_table(
+                self.config.program_id, "tested_regions", data_root=self.data_root
+            )
+            if not tested_df.empty and "trigger_type" in tested_df.columns:
+                int_rows = tested_df[tested_df["trigger_type"].astype(str) == "INTERACTION"]
+                if not int_rows.empty and "event_type" in int_rows.columns:
+                    tested_keys = set(int_rows["event_type"].astype(str).unique())
+        except Exception:
+            pass
+
+        def _motif_key(m: Dict[str, Any]) -> str:
+            return f"{m['left']}|{m['op']}|{m['right']}"
+
+        candidates = [m for m in motifs if _motif_key(m) not in tested_keys]
+        if not candidates:
+            _LOG.info("STEP 4 SCAN [INTERACTION]: frontier exhausted.")
+            return None
+
+        to_test = candidates[:3]
+        labels = [f"{m['left']} {m['op']} {m['right']}" for m in to_test]
+        _LOG.info("STEP 4 SCAN [INTERACTION]: %s", labels)
+
+        # Build interaction specs for the trigger_space
+        interactions = [
+            {
+                "left": m["left"],
+                "right": m["right"],
+                "op": m["op"].upper(),
+                "lag": int(m.get("lag", 6)),
+            }
+            for m in to_test
+        ]
+
+        return self._build_proposal(
+            events=[],
+            templates=["mean_reversion", "continuation"],
+            horizons=[12, 24],
+            description=f"INTERACTION scan — {', '.join(labels)}",
+            promotion_enabled=False,
+            date_scope=("2024-01-01", "2024-03-31"),
+            trigger_type="INTERACTION",
+            interactions=interactions,
+            contexts=self._context_for_proposal(),
+        )
+
+    def _load_interaction_motifs(self) -> List[Dict[str, Any]]:
+        """Load interaction motifs from spec/grammar/interaction_registry.yaml."""
+        try:
+            import yaml as _yaml
+            candidates = [
+                self._search_space_path.parent / "grammar" / "interaction_registry.yaml",
+                Path(__file__).parent.parent.parent.parent / "spec" / "grammar" / "interaction_registry.yaml",
+            ]
+            path = next((p for p in candidates if p.exists()), None)
+            if path is None:
+                return []
+            raw = _yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+            motifs = raw.get("motifs", [])
+            return [
+                m for m in motifs
+                if isinstance(m, dict) and "left" in m and "right" in m and "op" in m
+            ]
+        except Exception:
+            return []
+
     # ---- Cross-family explore (Phase 2.3, updated for trigger types) ----
 
     def _step_scan_frontier_cross_family(self, mem: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -1035,6 +1142,7 @@ class CampaignController:
         transitions: Optional[List[Dict[str, str]]] = None,
         feature_predicates: Optional[List[Dict[str, Any]]] = None,
         sequences: Optional[Dict[str, Any]] = None,
+        interactions: Optional[List[Dict[str, Any]]] = None,
         # Phase 3.2 — context conditioning
         contexts: Optional[Dict[str, List[str]]] = None,
     ) -> Dict[str, Any]:
@@ -1057,6 +1165,8 @@ class CampaignController:
             trigger_space["feature_predicates"] = {"include": feature_predicates or []}
         elif trigger_type == "SEQUENCE":
             trigger_space["sequences"] = sequences or {"include": [], "max_gaps_bars": [6, 12]}
+        elif trigger_type == "INTERACTION":
+            trigger_space["interactions"] = {"include": interactions or []}
 
         return {
             "program_id": self.config.program_id,
@@ -1101,6 +1211,47 @@ class CampaignController:
     # ------------------------------------------------------------------
     # Pipeline execution
     # ------------------------------------------------------------------
+
+    def _run_mi_scan_pre_step(self) -> None:
+        """Phase 4.1 — Run feature MI scan once before the first proposal cycle.
+
+        Loads features for the configured symbols/timeframe, runs
+        run_feature_mi_scan(), and writes candidate_predicates.json to
+        data/reports/feature_mi/<program_id>/ so _load_mi_candidate_predicates()
+        picks it up on the first Step-4 proposal.
+
+        Failures are logged and swallowed — a missing MI scan should never
+        block a campaign from starting.
+        """
+        try:
+            from project.pipelines.research.feature_mi_scan import run_feature_mi_scan
+            from project.research.phase2 import load_features
+
+            symbols = [s.strip().upper() for s in self.config.mi_scan_symbols.split(",") if s.strip()]
+            parts = []
+            for sym in symbols:
+                df = load_features(self.data_root, self.config.program_id, sym,
+                                   timeframe=self.config.mi_scan_timeframe)
+                if not df.empty:
+                    df = df.copy()
+                    df["symbol"] = sym
+                    parts.append(df)
+
+            if not parts:
+                _LOG.info("MI scan pre-step: no features found for %s — skipping.", symbols)
+                return
+
+            import pandas as _pd
+            features = _pd.concat(parts, ignore_index=True)
+
+            out_dir = self.data_root / "reports" / "feature_mi" / self.config.program_id
+            result = run_feature_mi_scan(features, out_dir=out_dir)
+            _LOG.info(
+                "MI scan pre-step complete: %d MI rows, %d candidate predicates → %s",
+                result["mi_rows"], result["candidate_predicates"], result["out_dir"],
+            )
+        except Exception as exc:
+            _LOG.warning("MI scan pre-step failed (non-fatal): %s", exc)
 
     def _execute_pipeline(self, config_path: Path, run_id: str):
         _LOG.info("Executing pipeline for %s...", run_id)
@@ -1211,7 +1362,6 @@ def main():
         default="scan",
         help="Proposal strategy: scan=frontier, exploit=promising regions, explore=adjacent",
     )
-    parser.add_argument("--portfolio_state_path", default=None)
     args = parser.parse_args()
 
     data_root = get_data_root()
@@ -1219,7 +1369,6 @@ def main():
         program_id=args.program_id,
         max_runs=args.max_runs,
         research_mode=args.research_mode,
-        portfolio_state_path=args.portfolio_state_path,
     )
     controller = CampaignController(config, data_root, Path(args.registry_root))
     controller.run_campaign()

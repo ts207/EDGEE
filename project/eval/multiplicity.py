@@ -6,8 +6,8 @@ import json
 from pathlib import Path
 from typing import List, Dict, Any, Tuple, Optional
 
+from project.core.stats import bh_adjust
 from project.research.validation.multiple_testing import (
-    adjust_pvalues_bh,
     adjust_pvalues_by,
 )
 
@@ -56,7 +56,7 @@ def benjamini_hochberg(
     This is a compatibility wrapper over the research validation adjustment
     backend so eval/reporting paths share the same q-value implementation.
     """
-    q_values = adjust_pvalues_bh(p_values)
+    q_values = bh_adjust(np.array(p_values))
     if len(q_values) == 0:
         return [], []
     reject = np.asarray(q_values, dtype=float) <= float(alpha)

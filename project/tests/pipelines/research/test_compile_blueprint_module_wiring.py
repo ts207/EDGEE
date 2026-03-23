@@ -135,85 +135,21 @@ def test_main_compilation_loop_accepts_record_dicts(monkeypatch, tmp_path):
                 "candidate_id": "cand_1",
                 "event_type": "VOL_SHOCK",
                 "status": "PROMOTED",
-                "pnl_series": json.dumps([1.0, -0.5, 0.75, 1.25]),
             }
         ]
     ).to_parquet(promo_dir / "promoted_candidates.parquet", index=False)
-    historical_dir = data_root / "reports" / "promotions" / "prior_run"
-    historical_dir.mkdir(parents=True, exist_ok=True)
-    pd.DataFrame(
-        [
-            {
-                "candidate_id": "prior_cand",
-                "event_type": "VOL_SHOCK",
-                "status": "PROMOTED",
-                "pnl_series": json.dumps([1.0, -0.5, 0.75, 1.25]),
-            }
-        ]
-    ).to_parquet(historical_dir / "promoted_candidates.parquet", index=False)
-    portfolio_state_path = data_root / "live_state.json"
-    portfolio_state_path.write_text(
-        json.dumps(
-            {
-                "account": {
-                    "wallet_balance": 1_000.0,
-                    "available_balance": 600.0,
-                    "positions": [
-                        {
-                            "symbol": "BTCUSDT",
-                            "quantity": 0.01,
-                            "mark_price": 30_000.0,
-                        }
-                    ],
-                },
-                "current_vol": 0.30,
-                "target_vol": 0.15,
-            }
-        ),
-        encoding="utf-8",
-    )
 
     monkeypatch.setattr(compiler, "DATA_ROOT", data_root)
     monkeypatch.setattr(compiler, "_checklist_decision", lambda _run_id: "PROMOTE")
     monkeypatch.setattr(compiler, "_load_run_mode", lambda _run_id: "research")
     monkeypatch.setattr(compiler, "ontology_spec_hash", lambda _root: "sha256:test")
     monkeypatch.setattr(compiler, "_load_operator_registry", lambda: {})
-    monkeypatch.setattr(
-        compiler,
-        "resolve_objective_profile_contract",
-        lambda **_: type(
-            "Contract",
-            (),
-            {
-                "retail_profile_name": "capital_constrained",
-                "require_low_capital_contract": False,
-                "max_concurrent_positions": 2,
-                "effective_per_position_notional_cap_usd": 5_000.0,
-                "low_capital_contract": {"fee_tier": "taker", "max_position_notional_usd": 5_000.0},
-            },
-        )(),
-    )
     monkeypatch.setattr(compiler, "start_manifest", lambda *args, **kwargs: {})
     monkeypatch.setattr(compiler, "finalize_manifest", lambda *args, **kwargs: None)
 
     def _fake_compile_blueprint(**kwargs):
         row = kwargs["merged_row"]
-        blueprint = _make_blueprint(bp_id="bp_1", candidate_id=str(row["candidate_id"]))
-        return (
-            blueprint.model_copy(
-                update={
-                    "lineage": blueprint.lineage.model_copy(
-                        update={
-                            "constraints": {
-                                "expected_return_bps": 12.0,
-                                "expected_adverse_bps": 4.5,
-                            }
-                        }
-                    )
-                }
-            ),
-            0,
-        )
+        return _make_blueprint(bp_id="bp_1", candidate_id=str(row["candidate_id"])), 0
 
     monkeypatch.setattr(compiler, "compile_blueprint", _fake_compile_blueprint)
     monkeypatch.setattr(
@@ -227,8 +163,6 @@ def test_main_compilation_loop_accepts_record_dicts(monkeypatch, tmp_path):
             "BTCUSDT",
             "--ignore_checklist",
             "1",
-            "--portfolio_state_path",
-            str(portfolio_state_path),
         ],
     )
 
@@ -238,18 +172,3 @@ def test_main_compilation_loop_accepts_record_dicts(monkeypatch, tmp_path):
     assert out_path.exists()
     payload = json.loads(out_path.read_text(encoding="utf-8").splitlines()[0])
     assert payload["candidate_id"] == "cand_1"
-    assert payload["sizing"]["risk_per_trade"] < 0.01
-    assert payload["lineage"]["constraints"]["portfolio_state_path"] == str(portfolio_state_path)
-    assert payload["lineage"]["constraints"]["max_promoted_pnl_correlation"] >= 0.99
-    allocation_path = (
-        data_root
-        / "reports"
-        / "strategy_blueprints"
-        / run_id
-        / "allocation_specs"
-        / "bp_1.allocation_spec.json"
-    )
-    assert allocation_path.exists()
-    allocation_payload = json.loads(allocation_path.read_text(encoding="utf-8"))
-    assert allocation_payload["sizing_policy"]["expected_return_bps"] == 12.0
-    assert allocation_payload["sizing_policy"]["expected_adverse_bps"] == 4.5

@@ -37,6 +37,7 @@ class KillSwitchStatus:
     triggered_at: Optional[datetime] = None
     message: str = ""
     recovery_streak: int = 0
+    peak_equity: float = 0.0
 
 
 class KillSwitchManager:
@@ -59,6 +60,7 @@ class KillSwitchManager:
             else None,
             "message": str(self.status.message),
             "recovery_streak": int(self.status.recovery_streak),
+            "peak_equity": float(self.status.peak_equity),
         }
 
     def _persist_status(self) -> None:
@@ -88,6 +90,7 @@ class KillSwitchManager:
             triggered_at=triggered_at,
             message=str(snapshot.get("message", "")),
             recovery_streak=int(snapshot.get("recovery_streak", 0) or 0),
+            peak_equity=float(snapshot.get("peak_equity", 0.0)),
         )
 
     def trigger(self, reason: KillSwitchReason, message: str = ""):
@@ -116,17 +119,24 @@ class KillSwitchManager:
         LOGGER.info("Kill-switch reset.")
 
     def check_drawdown(self, max_drawdown_pct: float = 0.10):
-        """Trigger if current unrealized PnL exceeds drawdown limit."""
+        """Trigger if current drawdown from peak equity exceeds limit."""
         equity = self.state_store.account.wallet_balance
         unrealized = self.state_store.account.total_unrealized_pnl
+        current_total_equity = equity + unrealized
+        
+        # Update high-water mark
+        if current_total_equity > self.status.peak_equity:
+            self.status.peak_equity = current_total_equity
+            self._persist_status()
 
-        if equity > 0:
-            drawdown = -unrealized / equity
-            if drawdown > max_drawdown_pct:
-                self.trigger(
-                    KillSwitchReason.EXCESSIVE_DRAWDOWN,
-                    f"Drawdown {drawdown:.2%} exceeded limit {max_drawdown_pct:.2%}",
-                )
+        peak = max(self.status.peak_equity, 1e-9)
+        drawdown = (peak - current_total_equity) / peak
+        
+        if drawdown > max_drawdown_pct:
+            self.trigger(
+                KillSwitchReason.EXCESSIVE_DRAWDOWN,
+                f"Drawdown {drawdown:.2%} exceeded limit {max_drawdown_pct:.2%} (Peak: {peak:.2f}, Current: {current_total_equity:.2f})",
+            )
 
     def check_microstructure(
         self,
@@ -212,6 +222,8 @@ class UnwindOrchestrator:
     async def unwind_all(self):
         """
         Produce market-sell/market-buy orders for all active positions.
+        
+        Sequentially unwinds positions to avoid overwhelming liquidity.
         """
         if self.is_unwinding:
             return
@@ -220,11 +232,66 @@ class UnwindOrchestrator:
         try:
             # 1. Cancel all open orders first
             await self.oms_manager.cancel_all_orders()
+            
+            # 2. Get positions
+            positions = self.state_store.account.positions
+            if not positions:
+                LOGGER.info("No positions to unwind.")
+                return
 
-            # 2. Flatten all positions
-            await self.oms_manager.flatten_all_positions(self.state_store)
+            # Sort by size (USD notional) descending to reduce risk fastest
+            sorted_positions = sorted(
+                positions.values(), 
+                key=lambda p: abs(p.quantity * p.mark_price), 
+                reverse=True
+            )
 
-            LOGGER.warning("Emergency unwind orchestration completed successfully.")
+            # 3. Flatten positions sequentially with retry logic
+            for pos in sorted_positions:
+                if abs(pos.quantity) <= 1e-10:
+                    continue
+                    
+                symbol = pos.symbol
+                qty = pos.quantity
+                side = "SELL" if pos.side == "LONG" else "BUY"
+                
+                LOGGER.info(f"Unwinding {symbol} {side} {qty}")
+                
+                # Retry loop for this position
+                max_retries = 3
+                for attempt in range(max_retries):
+                    try:
+                        # Re-fetch position to get remaining qty
+                        current_pos = self.state_store.account.positions.get(symbol)
+                        if not current_pos or abs(current_pos.quantity) <= 1e-10:
+                            break
+                            
+                        # Use market order
+                        # Note: In a real implementation, we might want to split large orders
+                        # For now, we assume the exchange handles the market order splitting or we accept slippage
+                        await self.oms_manager.exchange_client.create_market_order(
+                            symbol=symbol, 
+                            side=side, 
+                            quantity=current_pos.quantity, 
+                            reduce_only=True
+                        )
+                        
+                        # Wait briefly for fill
+                        await asyncio.sleep(1.0)
+                        
+                        # Check if filled
+                        current_pos = self.state_store.account.positions.get(symbol)
+                        if not current_pos or abs(current_pos.quantity) <= 1e-10:
+                            LOGGER.info(f"Successfully unwound {symbol}")
+                            break
+                        
+                        LOGGER.warning(f"Partial unwind for {symbol}, retrying...")
+                        
+                    except Exception as e:
+                        LOGGER.error(f"Unwind attempt {attempt+1} failed for {symbol}: {e}")
+                        await asyncio.sleep(2.0 * (attempt + 1)) # Backoff
+
+            LOGGER.warning("Emergency unwind orchestration completed.")
         except Exception as e:
             LOGGER.error(f"Error during emergency unwind: {e}")
         finally:

@@ -59,6 +59,7 @@ def _normalize_gate_audit_value(value: Any) -> str:
 
 
 def _coerce_bps(value: Any) -> float | None:
+    """Coerce a value to bps, converting decimal returns (abs ≤ 1.0) to bps."""
     numeric = safe_float(value, np.nan)
     if not np.isfinite(numeric):
         return None
@@ -68,6 +69,11 @@ def _coerce_bps(value: Any) -> float | None:
 
 
 def _resolve_expected_sizing_inputs(row: Dict[str, Any]) -> tuple[float | None, float | None]:
+    """Extract expected_return_bps and expected_adverse_bps from a candidate row.
+
+    Returns (expected_return_bps, expected_adverse_bps).
+    expected_adverse_bps = stressed_after_cost_expectancy × 1.5.
+    """
     expected_return_bps = _coerce_bps(row.get("mean_return_bps", row.get("expectancy")))
     stressed_bps = _coerce_bps(
         row.get(
@@ -391,6 +397,7 @@ def compile_blueprint(
         op = operator_registry.get(template_verb, {})
         if op:
             operator_version = str(op.get("operator_version", "unknown")).strip()
+
     expected_return_bps, expected_adverse_bps = _resolve_expected_sizing_inputs(merged_row)
 
     blueprint = Blueprint(

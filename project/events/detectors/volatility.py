@@ -12,8 +12,12 @@ from project.features.rolling_thresholds import lagged_rolling_quantile
 
 
 def _ewma_z(series: pd.Series, span: int) -> pd.Series:
-    ewma = series.ewm(span=span, adjust=False).mean()
-    ewmvar = series.ewm(span=span, adjust=False).var()
+    # Shift series by 1 to compute EWMA/Var on data strictly prior to t.
+    # This prevents the current spike from inflating the volatility baseline
+    # and dampening its own z-score.
+    baseline = series.shift(1)
+    ewma = baseline.ewm(span=span, adjust=False).mean()
+    ewmvar = baseline.ewm(span=span, adjust=False).var()
     ewmstd = np.sqrt(ewmvar)
     return (series - ewma) / ewmstd.replace(0, np.nan)
 
@@ -106,10 +110,13 @@ class VolSpikeDetector(VolatilityBase):
         return features["rv_z"].abs()
 
     def compute_direction(self, idx: int, features: dict[str, pd.Series], **params: Any) -> str:
-        # Look at price move over the lookback used for RV (96 bars)
+        # Look at price move over the lookback used for RV (default 96 bars)
+        # Use parameterized window if available, else default to 12 as per original code but now configurable
+        # Ideally should match the detection window (e.g. 96).
+        window = int(params.get("rv_window", 96))
         close = features.get("close")
         if close is not None:
-            ret = close.iloc[idx] / close.iloc[max(0, idx - 12)] - 1.0
+            ret = close.iloc[idx] / close.iloc[max(0, idx - window)] - 1.0
             return "up" if ret > 0 else "down" if ret < 0 else "non_directional"
         return "non_directional"
 

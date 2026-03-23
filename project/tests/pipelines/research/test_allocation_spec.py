@@ -4,7 +4,6 @@ import json
 
 from project.pipelines.research import compile_strategy_blueprints as compiler
 from project.portfolio.allocation_spec import AllocationSpec
-from project.research.blueprint_compilation import _resolve_expected_sizing_inputs
 from project.strategy.dsl.schema import (
     Blueprint,
     EntrySpec,
@@ -65,11 +64,7 @@ def _make_blueprint() -> Blueprint:
             source_path="source.csv",
             compiler_version="strategy_dsl_v1",
             generated_at_utc="1970-01-01T00:00:00Z",
-            constraints={
-                "retail_profile": "capital_constrained",
-                "expected_return_bps": 18.0,
-                "expected_adverse_bps": 6.0,
-            },
+            constraints={"retail_profile": "capital_constrained"},
         ),
     )
 
@@ -98,11 +93,6 @@ def test_build_allocation_spec_sections():
     assert payload["sizing_policy"]["portfolio_risk_budget"] == 0.8
     assert payload["risk_controls"]["max_concurrent_positions"] == 3
     assert payload["allocation_policy"]["symbol_scope"]["candidate_symbol"] == "BTCUSDT"
-    assert payload["sizing_policy"]["expected_return_bps"] == 18.0
-    assert payload["sizing_policy"]["expected_adverse_bps"] == 6.0
-    allocator_params = spec.to_allocator_params()
-    assert allocator_params["expected_return_bps"] == 18.0
-    assert allocator_params["expected_adverse_bps"] == 6.0
 
 
 def test_write_strategy_contract_artifacts_emits_allocation_spec_artifacts(tmp_path):
@@ -129,15 +119,3 @@ def test_write_strategy_contract_artifacts_emits_allocation_spec_artifacts(tmp_p
         (tmp_path / "allocation_spec_index.json").read_text(encoding="utf-8")
     )
     assert index_payload["count"] == 1
-
-
-def test_resolve_expected_sizing_inputs_uses_stressed_expectancy_as_adverse():
-    expected_return_bps, expected_adverse_bps = _resolve_expected_sizing_inputs(
-        {
-            "mean_return_bps": 18.0,
-            "stressed_after_cost_expectancy": 4.0,
-        }
-    )
-
-    assert expected_return_bps == 18.0
-    assert expected_adverse_bps == 6.0

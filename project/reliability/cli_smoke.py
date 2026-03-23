@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import argparse
 import json
 from pathlib import Path
 from typing import Any, Dict
@@ -131,6 +130,9 @@ def run_smoke_cli(
     return summary
 
 
+import argparse
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run EDGEE smoke and artifact validation checks.")
     parser.add_argument(
@@ -156,12 +158,12 @@ def main(argv: list[str] | None = None) -> int:
     summary = run_smoke_cli(
         str(args.mode),
         root=root,
-        seed=int(args.seed),
-        storage_mode=str(args.storage_mode),
     )
+    import sys
     print(json.dumps(summary, indent=2, sort_keys=True))
     return 0
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    import sys
+    sys.exit(main())

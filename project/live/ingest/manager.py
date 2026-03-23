@@ -75,12 +75,13 @@ class LiveDataManager:
 
     def _on_message(self, message: Dict[str, Any]):
         stream_name = message.get("stream", "")
+        arrival_ts = pd.Timestamp.now(timezone.utc)
 
         if "kline" in stream_name:
             event = parse_kline_event(message)
             if event:
                 self._enqueue_threadsafe(self.kline_queue, event, "Kline")
         elif "bookTicker" in stream_name or "b" in message.get("data", message):
-            event = parse_book_ticker_event(message)
+            event = parse_book_ticker_event(message, arrival_ts)
             if event:
                 self._enqueue_threadsafe(self.ticker_queue, event, "Ticker")

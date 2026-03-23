@@ -15,7 +15,7 @@ trigger_space:
 templates: [reversal_or_squeeze]
 horizons_bars: [12, 24]
 directions: [long, short]
-entry_lags: [1]
+entry_lags: [0]
 knobs:
   candidate_promotion_min_events: 8
   run_phase2_conditional: 1

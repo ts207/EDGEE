@@ -50,16 +50,31 @@ def _severity_score(df: pd.DataFrame) -> pd.Series:
 
 def _cleanliness_score(df: pd.DataFrame) -> pd.Series:
     result = pd.Series(1.0, index=df.index)
+    if "enter_ts" not in df.columns:
+        return result
+        
     for sym, grp in df.groupby("symbol", sort=False):
-        idx = grp.index
-        n = len(idx)
-        counts = np.ones(n, dtype=float)
-        for k in range(n):
-            lo = max(0, k - _CLEANLINESS_LOOKBACK)
-            hi = min(n, k + _CLEANLINESS_LOOKBACK + 1)
-            counts[k] = float(hi - lo - 1)
+        # Ensure we have datetime objects
+        times = pd.to_datetime(grp["enter_ts"], utc=True).sort_values()
+        if times.empty:
+            continue
+            
+        # Use a 50-minute window (approx 10 bars * 5 min) centered
+        # effectively [t - 25m, t + 25m] to match _CLEANLINESS_LOOKBACK=5 (5 bars each side)
+        time_values = times.values
+        window = np.timedelta64(25, 'm')
+        
+        # Count neighbors within window
+        left_idx = np.searchsorted(time_values, time_values - window, side='left')
+        right_idx = np.searchsorted(time_values, time_values + window, side='right')
+        
+        counts = (right_idx - left_idx).astype(float) - 1.0  # Exclude self
+        counts = np.maximum(counts, 0.0) # Safety
+        
         max_neighbors = max(counts.max(), 1.0)
-        result.loc[idx] = 1.0 - (counts / max_neighbors)
+        # Map back to original index
+        result.loc[times.index] = 1.0 - (counts / max_neighbors)
+        
     return result.clip(0.0, 1.0)
 
 

@@ -57,15 +57,25 @@ class BinanceWebSocketClient:
         max_retries = 5
         base_delay = 1.0
         retry_count = 0
+        last_connect_time = 0.0
 
         while self._running:
             try:
                 async with websockets.connect(url) as ws:
                     self._connection = ws
                     _LOG.info("Connected to Binance WS.")
-                    retry_count = 0
+                    
+                    # Reset retry count only if connection was stable for > 60s
+                    if time.time() - last_connect_time > 60.0:
+                        retry_count = 0
+                    last_connect_time = time.time()
 
                     async for message in ws:
+                        # Reset on first successful message if stable? 
+                        # Better to use time-based.
+                        if time.time() - last_connect_time > 60.0:
+                            retry_count = 0
+                            
                         if not self._running:
                             break
                         try:

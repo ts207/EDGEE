@@ -104,7 +104,7 @@ class AgentProposal:
     instrument_classes: List[str] = field(default_factory=lambda: ["crypto"])
     horizons_bars: List[int] = field(default_factory=lambda: [12, 24])
     directions: List[str] = field(default_factory=lambda: ["long", "short"])
-    entry_lags: List[int] = field(default_factory=lambda: [1, 2])
+    entry_lags: List[int] = field(default_factory=lambda: [0])
     contexts: Dict[str, List[str]] = field(default_factory=dict)
     search_control: Dict[str, int] = field(default_factory=dict)
     artifacts: Dict[str, bool] = field(default_factory=dict)
@@ -180,7 +180,7 @@ def load_agent_proposal(path_or_payload: str | Path | Dict[str, Any]) -> AgentPr
         ),
         horizons_bars=_as_int_list(raw.get("horizons_bars", [12, 24]), field_name="horizons_bars"),
         directions=_as_str_list(raw.get("directions", ["long", "short"]), field_name="directions"),
-        entry_lags=_as_int_list(raw.get("entry_lags", [1, 2]), field_name="entry_lags"),
+        entry_lags=_as_int_list(raw.get("entry_lags", [0]), field_name="entry_lags"),
         contexts=_normalize_contexts(raw.get("contexts", {})),
         search_control=dict(raw.get("search_control", {}) or {}),
         artifacts=dict(raw.get("artifacts", {}) or {}),
@@ -205,11 +205,6 @@ def _validate_proposal(proposal: AgentProposal) -> None:
         raise ValueError("directions must contain at least one direction")
     if not proposal.entry_lags:
         raise ValueError("entry_lags must contain at least one lag")
-    bad_lags = [int(lag) for lag in proposal.entry_lags if int(lag) < 1]
-    if bad_lags:
-        raise ValueError(
-            f"entry_lags contains invalid value(s) {bad_lags}. Use entry_lags: [1, 2] or higher."
-        )
     allowed = set(proposal.trigger_space.get("allowed_trigger_types", []))
     if "EVENT" in allowed and not proposal.trigger_space.get("events", {}).get("include"):
         raise ValueError("EVENT trigger proposals must include trigger_space.events.include")

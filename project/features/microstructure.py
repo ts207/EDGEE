@@ -26,7 +26,7 @@ def calculate_roll(close_series: pd.Series, window: int = 24) -> pd.Series:
     """
     diff = close_series.diff()
     # Lagged covariance to ensure PIT
-    cov = diff.shift(1).rolling(window).cov(diff.shift(2))
+    cov = diff.rolling(window).cov(diff.shift(1))
     return 2 * np.sqrt(np.maximum(0, -cov))
 
 
@@ -37,7 +37,7 @@ def calculate_roll_spread_bps(close: pd.Series, window: int = 24) -> pd.Series:
     """
     diff = close.diff()
     # Lagged covariance
-    cov = diff.shift(1).rolling(window).cov(diff.shift(2))
+    cov = diff.rolling(window).cov(diff.shift(1))
     roll_spread = 2 * np.sqrt(np.maximum(0, -cov)) / close.shift(1) * 10000
     return roll_spread
 
@@ -89,7 +89,7 @@ def calculate_vpin_score(volume: pd.Series, buy_volume: pd.Series, window: int =
 
     # VPIN = sum|V_buy - V_sell| / Total_Volume over window
     # Lagged to ensure PIT
-    vpin = oi.rolling(window, min_periods=1).sum() / volume.rolling(window, min_periods=1).sum()
+    vpin = oi.rolling(window, min_periods=1).sum() / volume.rolling(window, min_periods=1).sum().replace(0.0, np.nan)
     return vpin.shift(1)
 
 

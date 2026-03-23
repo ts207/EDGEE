@@ -183,6 +183,23 @@ def _student_t_cdf_scalar(x: float, df: float) -> float:
         return float(_norm_cdf(x))
     if x == 0.0:
         return 0.5
+        
+    # Optimization: Use regularized incomplete beta function if available
+    try:
+        from scipy.special import betainc
+        # CDF = 1 - 0.5 * I_z(df/2, 0.5) where z = df / (df + x^2) for x > 0
+        # CDF = 0.5 * I_z(df/2, 0.5) for x < 0
+        # Symmetry: F(-x) = 1 - F(x)
+        # Using the x > 0 formula:
+        # F(x) = 1 - 0.5 * betainc(df/2, 0.5, df / (df + x**2))
+        
+        x_sq = x * x
+        z = df / (df + x_sq)
+        val = 0.5 * betainc(df / 2.0, 0.5, z)
+        return float(1.0 - val) if x > 0 else float(val)
+    except ImportError:
+        pass
+
     upper = abs(float(x))
     n_steps = int(min(4000, max(400, math.ceil(upper * 200))))
     grid = np.linspace(0.0, upper, n_steps + 1)
@@ -239,9 +256,35 @@ def _kurtosis(values: Iterable[float], fisher: bool = True) -> float:
     m2 = float(np.mean(centered**2))
     if m2 <= 0.0:
         return 0.0
-    m4 = float(np.mean(centered**4))
-    raw = float(m4 / (m2 * m2))
-    return float(raw - 3.0) if fisher else float(raw)
+    
+    # Unbiased estimator for excess kurtosis (Fisher)
+    # k = [(n+1)n / ((n-1)(n-2)(n-3))] * sum((x-mean)^4)/std^4 - 3(n-1)^2/((n-2)(n-3))
+    # We compute fourth moment m4 first, but need sum of powers.
+    # sum((x-mean)^4) = m4 * n
+    # s2 = m2 * n / (n-1) (unbiased variance) -> we usually use m2 (biased) in standard formula?
+    # No, let's use the explicit sums.
+    
+    s4 = np.sum(centered**4)
+    s2 = np.sum(centered**2) # This is n * m2
+    
+    if s2 == 0:
+        return 0.0
+        
+    if fisher:
+        # Implementation of unbiased excess kurtosis
+        # Reference: https://en.wikipedia.org/wiki/Kurtosis#Standard_unbiased_estimator
+        term1 = (n * (n + 1)) / ((n - 1) * (n - 2) * (n - 3))
+        term2 = s4 / (s2**2 / (n**2)) # Wait, s2 is sum of squares. m2 = s2/n.
+        # simpler: use scipy if available, else manual
+        # Manual formula using m2 and m4 (biased moments)
+        # g2 = m4/m2^2 - 3 (biased excess)
+        # G2 = ((n+1) * g2 + 6) * (n-1) / ((n-2)*(n-3))
+        g2 = (float(np.mean(centered**4)) / (m2**2)) - 3.0
+        return ((n + 1) * g2 + 6) * (n - 1) / ((n - 2) * (n - 3))
+    else:
+        # Biased population kurtosis (Pearson)
+        m4 = float(np.mean(centered**4))
+        return float(m4 / (m2 * m2))
 
 
 def _kendalltau(x: object, y: object) -> Tuple[float, float]:
@@ -352,7 +395,7 @@ def canonical_bh_group_key(
     horizon: str,
     state_id: Optional[str] = None,
     symbol: Optional[str] = None,
-    include_symbol: bool = True,
+    include_symbol: bool = False,
     direction_bucket: Optional[str] = None,
 ) -> str:
     """Canonical BH-FDR grouping key.
@@ -417,7 +460,10 @@ def newey_west_t_stat_for_mean(
 
 
 def bh_adjust(p_values: np.ndarray) -> np.ndarray:
-    """Benjamini-Hochberg FDR adjustment. Returns adjusted p-values clipped to [0, 1]."""
+    """
+    Benjamini-Hochberg FDR adjustment. Returns adjusted p-values clipped to [0, 1].
+    Canonical implementation.
+    """
     arr = np.asarray(p_values, dtype=float)
     n = len(arr)
     if n == 0:

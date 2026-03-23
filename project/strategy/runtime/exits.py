@@ -30,7 +30,8 @@ def check_exit_conditions(
     # 2. Target Hit
     target_value = float(blueprint_exit.get("target_value", 0.05))
     target_type = str(blueprint_exit.get("target_type", "percent")).lower()
-
+    
+    # Calculate target price
     if target_type == "percent":
         target_price = (
             position_entry_price * (1.0 + target_value)
@@ -51,8 +52,22 @@ def check_exit_conditions(
             else position_entry_price * (1.0 - target_value)
         )
 
-    if (is_long and close >= target_price) or (not is_long and close <= target_price):
-        return True, "target_hit"
+    # Check against open (gap) and close
+    bar_open = float(bar["open"])
+    bar_close = float(bar["close"])
+    
+    if is_long:
+        # For long, hit target if high >= target. But here we only have open/close.
+        # Conservative: check max(open, close) >= target
+        high_proxy = max(bar_open, bar_close)
+        if high_proxy >= target_price:
+            return True, "target_hit"
+    else:
+        # For short, hit target if low <= target.
+        # Conservative: check min(open, close) <= target
+        low_proxy = min(bar_open, bar_close)
+        if low_proxy <= target_price:
+            return True, "target_hit"
 
     # 3. Stop Hit
     stop_value = float(blueprint_exit.get("stop_value", 0.03))
@@ -78,8 +93,18 @@ def check_exit_conditions(
             else position_entry_price * (1.0 + stop_value)
         )
 
-    if (is_long and close <= stop_price) or (not is_long and close >= stop_price):
-        return True, "stop_hit"
+    if is_long:
+        # For long, stop hit if low <= stop.
+        # Check min(open, close) <= stop (capture gap down)
+        low_proxy = min(bar_open, bar_close)
+        if low_proxy <= stop_price:
+            return True, "stop_hit"
+    else:
+        # For short, stop hit if high >= stop.
+        # Check max(open, close) >= stop (capture gap up)
+        high_proxy = max(bar_open, bar_close)
+        if high_proxy >= stop_price:
+            return True, "stop_hit"
 
     # 4. Invalidation / Opposing Event
     if market_data:

@@ -19,7 +19,8 @@ def condition_mask_node(merged: pd.DataFrame, node: ConditionNodeSpec) -> pd.Ser
 
         expr = str(node.expression).strip()
         # Strictly allow only column names, math operators, numbers, and basic boolean operators
-        if not re.match(r"^[\w\s\.\+\-\*/<>=&\|~()]+$", expr) or re.search(
+        # \s includes newlines, so we replace it with [ \t] to prevent multiline injection
+        if not re.match(r"^[\w \t\.\+\-\*/<>=&\|~()]+$", expr) or re.search(
             r"\b(import|eval|exec|open|__)\b", expr
         ):
             LOGGER.error(f"Blocked unsafe or complex expression: '{expr}'")
@@ -59,8 +60,9 @@ def condition_mask_node(merged: pd.DataFrame, node: ConditionNodeSpec) -> pd.Ser
         return ((series >= val) & (series <= high)).fillna(False)
     if op in {"zscore_gt", "zscore_lt"}:
         window = int(node.window_bars)
-        mean = series.rolling(window, min_periods=window).mean()
-        raw_std = series.rolling(window, min_periods=window).std()
+        # Shift by 1 to avoid lookahead bias (PIT compliance)
+        mean = series.rolling(window, min_periods=window).mean().shift(1)
+        raw_std = series.rolling(window, min_periods=window).std().shift(1)
         std = raw_std.replace(0.0, np.nan)
         z = (series - mean) / std
         if op == "zscore_gt":

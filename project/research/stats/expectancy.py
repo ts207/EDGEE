@@ -29,7 +29,9 @@ def distribution_stats(returns: pd.Series) -> Dict[str, float]:
     mean_val = float(clean.mean())
     median_val = float(clean.median())
     std_val = float(clean.std())
-    t_stat = float(mean_val / (std_val / np.sqrt(n))) if std_val > 0.0 and n > 1 else 0.0
+    # Use Newey-West t-stat to account for autocorrelation
+    nw_res = newey_west_t_stat_for_mean(clean)
+    t_stat = float(nw_res.t_stat) if np.isfinite(nw_res.t_stat) else 0.0
     return {
         "samples": n,
         "mean_return": mean_val,
@@ -168,9 +170,24 @@ def apply_robust_survivor_gates(
         out["oos_pass"] = False
     out["oos_pass"] = out["oos_pass"].astype(bool)
 
-    out["composite_p_value"] = np.maximum(out["hac_p"], out["bootstrap_p"]).clip(
-        lower=0.0, upper=1.0
-    )
+    # Issue 5: Composite p-value
+    # Prefer Fisher's method if scipy is available, otherwise fallback to HAC p-value (primary parametric test)
+    # Avoid taking max() which discards evidence.
+    try:
+        from scipy.stats import chi2
+        # Fisher's combined probability test: -2 * sum(ln(p)) ~ Chi2(2k)
+        # We have 2 tests: HAC and Bootstrap.
+        # Clip p-values to avoid log(0)
+        p1 = out["hac_p"].clip(lower=1e-12)
+        p2 = out["bootstrap_p"].clip(lower=1e-12)
+        fisher_stat = -2.0 * (np.log(p1) + np.log(p2))
+        # Survival function of Chi2 with 4 degrees of freedom
+        out["composite_p_value"] = chi2.sf(fisher_stat, 4)
+    except ImportError:
+        # Fallback to HAC p-value as the primary metric for FDR
+        out["composite_p_value"] = out["hac_p"]
+
+    out["composite_p_value"] = out["composite_p_value"].clip(lower=0.0, upper=1.0)
     out["fdr_q_value"] = bh_adjust(out["composite_p_value"]).astype(float)
 
     out["gate_legacy_survivor"] = (
@@ -178,11 +195,15 @@ def apply_robust_survivor_gates(
         & (out["event_mean"] > 0.0)
         & (out["event_t"] >= float(legacy_tstat_threshold))
     )
+    
+    # Issue 6: Bootstrap is two-sided, gate is one-sided.
+    # We halve the bootstrap p-value to approximate a one-sided test (assuming mean > 0 is checked)
+    # or strictly check p/2 <= alpha.
     out["gate_robust_survivor"] = (
         (out["event_samples"] >= int(min_samples))
         & (out["event_mean"] > 0.0)
         & (out["hac_t"] >= float(robust_hac_t_threshold))
-        & (out["bootstrap_p"] <= float(bootstrap_alpha))
+        & ((out["bootstrap_p"] / 2.0) <= float(bootstrap_alpha))
         & (out["fdr_q_value"] <= float(fdr_q))
         & (out["oos_samples"] >= int(oos_min_samples))
         & ((not int(require_oos_positive)) | out["oos_positive"])

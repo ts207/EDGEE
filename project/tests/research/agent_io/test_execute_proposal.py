@@ -5,7 +5,6 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 
-import project.research.agent_io.proposal_to_experiment as proposal_to_experiment_module
 import yaml
 
 from project.research.agent_io.execute_proposal import build_run_all_command, execute_proposal
@@ -55,7 +54,7 @@ def _write_registry(reg_dir: Path) -> None:
                 "defaults": {
                     "horizons_bars": [12, 24],
                     "directions": ["long", "short"],
-                    "entry_lags": [1, 2],
+                    "entry_lags": [0, 1],
                 },
             }
         )
@@ -87,7 +86,7 @@ def _write_proposal(path: Path) -> None:
                 "contexts": {"session": ["open"]},
                 "horizons_bars": [12],
                 "directions": ["long", "short"],
-                "entry_lags": [1],
+                "entry_lags": [0],
                 "knobs": {"candidate_promotion_min_events": 60},
             }
         ),
@@ -136,21 +135,6 @@ def test_execute_proposal_translates_and_invokes_run_all(monkeypatch, tmp_path):
         captured["kwargs"] = kwargs
         return SimpleNamespace(returncode=0, stdout="Plan for run unit_run:\n", stderr="")
 
-    monkeypatch.setattr(
-        proposal_to_experiment_module,
-        "_build_experiment_plan",
-        lambda *args, **kwargs: type(
-            "Plan",
-            (),
-            {
-                "program_id": "btc_campaign",
-                "estimated_hypothesis_count": 2,
-                "required_detectors": [],
-                "required_features": [],
-                "required_states": [],
-            },
-        )(),
-    )
     monkeypatch.setattr(execute_proposal_module.subprocess, "run", _fake_run)
 
     result = execute_proposal(

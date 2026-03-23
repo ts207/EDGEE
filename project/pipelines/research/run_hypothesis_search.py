@@ -28,7 +28,6 @@ from project.research.search.distributed_runner import run_distributed_search
 from project.research.search.bridge_adapter import (
     hypotheses_to_bridge_candidates,
     split_bridge_candidates,
-    _sanitize_event_type,
 )
 from project.research.search.evaluator import evaluated_records_from_metrics
 from project.research.phase2 import load_features
@@ -178,155 +177,106 @@ def _write_evaluation_artifacts(
     write_parquet(gate_failures, out_dir / "gate_failures.parquet")
 
 
-def _build_regime_conditional_candidates(
+def _write_regime_conditional_candidates_from_breakdown(
     metrics: pd.DataFrame,
+    regime_breakdown: "pd.DataFrame | None",
+    out_dir: Path,
     *,
-    min_overall_t_stat: float,
-    min_regime_t_stat: float = 1.5,
+    weak_overall_threshold: float = 1.5,
+    strong_regime_threshold: float = 1.5,
     min_regime_n: int = 20,
-) -> pd.DataFrame:
-    if metrics.empty:
-        return pd.DataFrame()
+) -> None:
+    """Phase 4.2 (deep hook) — Write regime_conditional_candidates.parquet using
+    the full per-regime breakdown from evaluate_by_regime().
 
-    required = {
-        "hypothesis_id",
-        "trigger_type",
-        "template_id",
-        "direction",
-        "horizon",
-        "entry_lag",
-        "context_json",
-        "mean_return_bps",
-        "t_stat",
-        "best_regime",
-        "best_regime_n",
-        "best_regime_mean_return_bps",
-        "best_regime_t_stat",
-        "regime_evaluations_json",
-        "valid",
-    }
-    legacy_required = required - {"regime_evaluations_json"}
-    if not (required.issubset(metrics.columns) or legacy_required.issubset(metrics.columns)):
-        return pd.DataFrame()
+    Identifies hypotheses where:
+      - Overall t_stat < weak_overall_threshold (aggregate signal is weak)
+      - At least one regime has t_stat > strong_regime_threshold with n >= min_regime_n
 
-    working = metrics.copy()
-    working["valid"] = working["valid"].fillna(False)
-    working["mean_return_bps"] = pd.to_numeric(working["mean_return_bps"], errors="coerce")
-    working["t_stat"] = pd.to_numeric(working["t_stat"], errors="coerce")
-    working["best_regime_mean_return_bps"] = pd.to_numeric(
-        working["best_regime_mean_return_bps"], errors="coerce"
+    This is the vision-doc description of regime-specific alpha: edges that the
+    aggregate evaluator would discard but that are real within a specific market
+    regime.  The campaign controller reads this artefact and adds entries to the
+    explore_adjacent queue with the strong regime pinned as context.
+    """
+    rcc_path = out_dir / "regime_conditional_candidates.parquet"
+    _RCC_COLS = [
+        "hypothesis_id", "trigger_key", "template_id", "direction", "horizon",
+        "event_type", "overall_t_stat", "best_regime", "best_regime_t_stat",
+        "best_regime_mean_return_bps", "best_regime_n",
+    ]
+    empty = pd.DataFrame(columns=_RCC_COLS)
+
+    if regime_breakdown is None or regime_breakdown.empty:
+        write_parquet(empty, rcc_path)
+        return
+
+    if metrics.empty or "t_stat" not in metrics.columns or "hypothesis_id" not in metrics.columns:
+        write_parquet(empty, rcc_path)
+        return
+
+    overall = metrics[["hypothesis_id", "t_stat", "trigger_key",
+                        "template_id", "direction", "horizon"]].copy()
+    overall["t_stat"] = pd.to_numeric(overall["t_stat"], errors="coerce").fillna(0.0)
+
+    # Only candidates with weak overall signal
+    weak_overall = overall[overall["t_stat"].abs() < weak_overall_threshold]
+    if weak_overall.empty:
+        write_parquet(empty, rcc_path)
+        return
+
+    # Within each weak hypothesis find the best-performing regime
+    rb = regime_breakdown.copy()
+    rb["t_stat"] = pd.to_numeric(rb["t_stat"], errors="coerce").fillna(0.0)
+    rb["n"] = pd.to_numeric(rb["n"], errors="coerce").fillna(0).astype(int)
+    rb["mean_return_bps"] = pd.to_numeric(rb["mean_return_bps"], errors="coerce").fillna(0.0)
+
+    strong_regime = rb[
+        (rb["t_stat"] >= strong_regime_threshold) & (rb["n"] >= min_regime_n)
+    ]
+    if strong_regime.empty:
+        write_parquet(empty, rcc_path)
+        return
+
+    # Pick best regime per hypothesis
+    best = (
+        strong_regime.sort_values("t_stat", ascending=False)
+        .groupby("hypothesis_id", as_index=False)
+        .first()
+        .rename(columns={
+            "regime": "best_regime",
+            "t_stat": "best_regime_t_stat",
+            "mean_return_bps": "best_regime_mean_return_bps",
+            "n": "best_regime_n",
+        })
     )
-    working["best_regime_t_stat"] = pd.to_numeric(
-        working["best_regime_t_stat"], errors="coerce"
+
+    # Join to weak-overall hypotheses
+    merged = weak_overall.merge(best[["hypothesis_id", "best_regime",
+                                       "best_regime_t_stat", "best_regime_mean_return_bps",
+                                       "best_regime_n"]],
+                                on="hypothesis_id", how="inner")
+    if merged.empty:
+        write_parquet(empty, rcc_path)
+        return
+
+    # Derive event_type from trigger_key ("event:NAME" → "NAME")
+    def _event_from_trigger(tk: str) -> str:
+        tk = str(tk)
+        for prefix in ("event:", "state:", "transition:"):
+            if tk.startswith(prefix):
+                return tk[len(prefix):]
+        return tk
+
+    merged["event_type"] = merged["trigger_key"].apply(_event_from_trigger)
+    merged = merged.rename(columns={"t_stat": "overall_t_stat"})
+    merged = merged.sort_values("best_regime_t_stat", ascending=False)
+
+    out_cols = [c for c in _RCC_COLS if c in merged.columns]
+    write_parquet(merged[out_cols].head(30), rcc_path)
+    LOG.info(
+        "Phase 4.2 deep hook: %d regime_conditional_candidates (weak overall, strong per-regime)",
+        len(merged),
     )
-    working["best_regime_n"] = (
-        pd.to_numeric(working["best_regime_n"], errors="coerce").fillna(0).astype(int)
-    )
-    prefiltered = working[
-        working["valid"]
-        & (working["mean_return_bps"] > 0.0)
-        & (working["t_stat"].abs() < float(min_overall_t_stat))
-    ].copy()
-    if prefiltered.empty:
-        return pd.DataFrame()
-
-    selected_rows: list[dict[str, object]] = []
-
-    for _, row in prefiltered.iterrows():
-        regime_payload = row.get("regime_evaluations_json", "[]")
-        regime_rows = []
-        if isinstance(regime_payload, str) and regime_payload.strip():
-            try:
-                decoded = json.loads(regime_payload)
-                if isinstance(decoded, list):
-                    regime_rows = [item for item in decoded if isinstance(item, dict)]
-            except json.JSONDecodeError:
-                regime_rows = []
-        if not regime_rows:
-            regime_rows = [
-                {
-                    "regime": row.get("best_regime"),
-                    "n": row.get("best_regime_n"),
-                    "mean_return_bps": row.get("best_regime_mean_return_bps"),
-                    "t_stat": row.get("best_regime_t_stat"),
-                    "valid": True,
-                }
-            ]
-
-        regime_df = pd.DataFrame(regime_rows)
-        if regime_df.empty:
-            continue
-        regime_df["valid"] = regime_df.get("valid", True).fillna(False)
-        regime_df["n"] = pd.to_numeric(regime_df.get("n"), errors="coerce").fillna(0).astype(int)
-        regime_df["mean_return_bps"] = pd.to_numeric(
-            regime_df.get("mean_return_bps"), errors="coerce"
-        )
-        regime_df["t_stat"] = pd.to_numeric(regime_df.get("t_stat"), errors="coerce")
-        regime_df["regime"] = regime_df.get("regime", "").astype(str)
-        regime_df = regime_df[
-            regime_df["valid"]
-            & (regime_df["n"] >= int(min_regime_n))
-            & (regime_df["mean_return_bps"] > 0.0)
-            & (regime_df["t_stat"] >= float(min_regime_t_stat))
-            & (regime_df["regime"].str.strip() != "")
-        ].copy()
-        if regime_df.empty:
-            continue
-
-        event_type = _sanitize_event_type(row)
-        for regime_row in regime_df.to_dict(orient="records"):
-            selected_rows.append(
-                {
-                    "hypothesis_id": row.get("hypothesis_id"),
-                    "event_type": event_type,
-                    "trigger_type": row.get("trigger_type"),
-                    "template_id": row.get("template_id"),
-                    "direction": row.get("direction"),
-                    "horizon": row.get("horizon"),
-                    "entry_lag": row.get("entry_lag"),
-                    "context_json": row.get("context_json"),
-                    "mean_return_bps": row.get("mean_return_bps"),
-                    "t_stat": row.get("t_stat"),
-                    "best_regime": regime_row.get("regime"),
-                    "best_regime_n": int(regime_row.get("n", 0) or 0),
-                    "best_regime_mean_return_bps": regime_row.get("mean_return_bps"),
-                    "best_regime_t_stat": regime_row.get("t_stat"),
-                }
-            )
-
-    if not selected_rows:
-        return pd.DataFrame()
-
-    selected = pd.DataFrame(selected_rows)
-    selected["priority_score"] = (
-        pd.to_numeric(selected["best_regime_t_stat"], errors="coerce").fillna(0.0)
-        - pd.to_numeric(selected["t_stat"], errors="coerce").abs().fillna(0.0)
-    )
-    selected["reason"] = "weak_overall_strong_regime"
-    selected = selected.sort_values(
-        ["priority_score", "best_regime_mean_return_bps", "mean_return_bps", "best_regime_n"],
-        ascending=[False, False, False, False],
-    )
-    return selected[
-        [
-            "hypothesis_id",
-            "event_type",
-            "trigger_type",
-            "template_id",
-            "direction",
-            "horizon",
-            "entry_lag",
-            "context_json",
-            "mean_return_bps",
-            "t_stat",
-            "best_regime",
-            "best_regime_n",
-            "best_regime_mean_return_bps",
-            "best_regime_t_stat",
-            "priority_score",
-            "reason",
-        ]
-    ].reset_index(drop=True)
 
 
 def _load_all_features(
@@ -387,14 +337,14 @@ def _make_parser() -> argparse.ArgumentParser:
         help="DBSCAN eps (Euclidean distance in normalised metric space, default 0.3)",
     )
     parser.add_argument(
+        "--out_dir",
+        default=None,
+        help="Optional explicit output directory (for tests/local runs)",
+    )
+    parser.add_argument(
         "--data_root",
         default=None,
         help="Optional override for data root (defaults to configured data root)",
-    )
-    parser.add_argument(
-        "--out_dir",
-        default=None,
-        help="Optional override for output directory",
     )
     return parser
 
@@ -460,11 +410,22 @@ def main() -> int:
     else:
         # Preserve schema by writing an empty frame with no rows.
         write_parquet(pd.DataFrame(), metrics_path)
-    regime_conditional = _build_regime_conditional_candidates(
-        metrics,
-        min_overall_t_stat=float(args.min_t_stat),
-    )
-    write_parquet(regime_conditional, out_dir / "regime_conditional_candidates.parquet")
+
+    # Phase 4.2 — Write per-hypothesis regime breakdown.
+    # evaluate_hypothesis_batch() accumulates per-regime rows in df.attrs["regime_breakdown"].
+    # This parquet is the richer signal surfaced by the campaign controller:
+    # hypotheses weak overall (t_stat < 1.5) but strong per-regime (t_stat > 1.5)
+    # are regime-specific alpha candidates that aggregate scoring would discard.
+    regime_breakdown = metrics.attrs.get("regime_breakdown", None) if not metrics.empty else None
+    if regime_breakdown is not None and not regime_breakdown.empty:
+        write_parquet(regime_breakdown, out_dir / "regime_breakdown.parquet")
+        LOG.info(
+            "Phase 4.2: wrote %d per-regime rows to %s",
+            len(regime_breakdown), out_dir / "regime_breakdown.parquet",
+        )
+    # Also write the regime_conditional_candidates artefact used by update_campaign_memory.
+    # Identifies hypotheses with weak aggregate t_stat but positive mean_return_bps.
+    _write_regime_conditional_candidates_from_breakdown(metrics, regime_breakdown, out_dir)
     _, gate_failures = split_bridge_candidates(
         metrics,
         min_t_stat=args.min_t_stat,

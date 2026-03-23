@@ -15,11 +15,6 @@ from project.portfolio.risk_budget import (
 _LOG = logging.getLogger(__name__)
 
 
-def _to_decimal_return(value: float) -> float:
-    numeric = float(value)
-    return numeric / 10_000.0 if abs(numeric) > 1.0 else numeric
-
-
 def _resolve_volatility_adjustment(vol_regime: float, portfolio_state: Dict[str, Any]) -> float:
     """
     Convert a regime-vol input into a one-way sizing throttle.
@@ -68,8 +63,15 @@ def calculate_target_notional(
         expected_return_bps=expected_return_bps,
         expected_cost_bps=expected_cost_bps,
     )
-    expected_adverse = abs(_to_decimal_return(expected_adverse_bps))
-    risk_variance = max(1e-8, expected_adverse**2)
+    # expected_adverse_bps is strictly BPS
+    expected_adverse = abs(float(expected_adverse_bps) / 10_000.0)
+    
+    # Use actual return variance (or a robust proxy) if available, otherwise fallback
+    # to a conservative estimate. Here we rely on vol_regime (implied/realized vol)
+    # scaled to the trade horizon if possible, or just the variance of the strategy returns.
+    
+    # Let's use max(1e-8, vol_regime**2) assuming vol_regime is the relevant volatility.
+    risk_variance = max(1e-8, float(vol_regime)**2)
     edge = float(event_score) * net_expected_return
 
     # Kelly-like multiplier

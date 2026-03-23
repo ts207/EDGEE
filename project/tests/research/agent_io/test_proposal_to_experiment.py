@@ -5,7 +5,6 @@ import json
 import pytest
 import yaml
 
-import project.research.agent_io.proposal_to_experiment as proposal_to_experiment_module
 from project.research.agent_io.proposal_schema import load_agent_proposal
 from project.research.agent_io.proposal_to_experiment import (
     build_run_all_overrides,
@@ -65,7 +64,7 @@ def registry_root(tmp_path):
                 "defaults": {
                     "horizons_bars": [12, 24],
                     "directions": ["long", "short"],
-                    "entry_lags": [1, 2],
+                    "entry_lags": [0, 1],
                 },
             }
         )
@@ -96,7 +95,7 @@ def _proposal_payload(**overrides):
         "contexts": {"session": ["open"]},
         "horizons_bars": [12],
         "directions": ["long", "short"],
-        "entry_lags": [1],
+        "entry_lags": [0],
         "knobs": {"candidate_promotion_min_events": 60},
     }
     payload.update(overrides)
@@ -127,23 +126,7 @@ def test_load_agent_proposal_rejects_inspect_only_knobs():
 def test_translate_and_validate_proposal_builds_valid_experiment_and_overrides(
     tmp_path,
     registry_root,
-    monkeypatch,
 ):
-    monkeypatch.setattr(
-        proposal_to_experiment_module,
-        "_build_experiment_plan",
-        lambda *args, **kwargs: type(
-            "Plan",
-            (),
-            {
-                "program_id": "btc_campaign",
-                "estimated_hypothesis_count": 2,
-                "required_detectors": [],
-                "required_features": [],
-                "required_states": [],
-            },
-        )(),
-    )
     out_dir = tmp_path / "artifacts"
     result = translate_and_validate_proposal(
         _proposal_payload(),
