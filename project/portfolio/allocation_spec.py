@@ -88,6 +88,7 @@ class AllocationSpec(BaseModel):
             "drawdown_limit": constraints.get("drawdown_limit"),
             "portfolio_max_drawdown": constraints.get("portfolio_max_drawdown"),
             "max_symbol_exposure": constraints.get("max_symbol_exposure"),
+            "pnl_mode": constraints.get("pnl_mode", "dollar"),
         }
 
     @classmethod

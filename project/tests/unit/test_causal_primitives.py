@@ -31,17 +31,19 @@ def test_trailing_quantile_pit():
 def test_trailing_percentile_rank_pit():
     series = pd.Series([1, 10, 2, 11, 3, 12, 4, 13], name="val")
     # window=2, lag=1
-    # t=3: current=11. Past=[1, 10]. 11 > both. Rank=1.0
-    # t=4: current=3. Past=[10, 2]. 3 > 2. Rank=0.5
-    # t=5: current=12. Past=[2, 11]. 12 > both. Rank=1.0
-    # t=6: current=4. Past=[11, 3]. 4 > 3. Rank=0.5
-
+    # First valid rank is at t=3.
+    # At t=2 in unshifted rolling: x=[1, 10, 2], rank of 2 in [1, 10] is 0.5.
+    # With lag=1, this 0.5 value appears at t=3.
+    # At t=3 in unshifted rolling: x=[10, 2, 11], rank of 11 in [10, 2] is 1.0.
+    # With lag=1, this 1.0 value appears at t=4.
+    
     res = trailing_percentile_rank(series, window=2, lag=1)
 
     assert pd.isna(res[0])
     assert pd.isna(res[1])
-    assert res[2] == 0.5
-    assert res[3] == 1.0
-    assert res[4] == 0.5
-    assert res[5] == 1.0
-    assert res[6] == 0.5
+    assert pd.isna(res[2])
+    assert res[3] == 0.5
+    assert res[4] == 1.0
+    assert res[5] == 0.5
+    assert res[6] == 1.0
+    assert res[7] == 0.5

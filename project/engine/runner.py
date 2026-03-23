@@ -355,6 +355,7 @@ def run_engine(
 
     raw_positions_by_strategy = {}
     requested_scale_by_strategy = {}
+    strategy_returns = {}
     for name, frame in strategy_frames.items():
         validate_strategy_frame_schema(frame, frame_name=f"strategy frame [{name}]")
         raw_positions_by_strategy[name] = frame.groupby("timestamp", sort=True)[
@@ -363,6 +364,7 @@ def run_engine(
         requested_scale_by_strategy[name] = frame.groupby("timestamp", sort=True)[
             "requested_position_scale"
         ].mean()
+        strategy_returns[name] = frame.groupby("timestamp", sort=True)["gross_pnl"].sum()
 
     allocation_diagnostics = pd.DataFrame()
     allocation_contract: AllocationContract | None = None
@@ -380,6 +382,7 @@ def run_engine(
             requested_scale_by_strategy,
             allocation_contract.limits,
             contract=allocation_contract,
+            strategy_returns=strategy_returns,
         )
         allocation_contract = allocation.contract
         allocation_diagnostics = allocation.diagnostics.copy()

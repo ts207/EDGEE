@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import numpy as np
 import pandas as pd
 
@@ -52,11 +53,8 @@ def fit_t_copula(u1: np.ndarray, u2: np.ndarray) -> tuple[float, float]:
         
     rho = float(np.sin(np.pi / 2 * tau))
     
-    # Estimate degrees of freedom (df)
-    # A simple heuristic for crypto: heavy tails (df between 3 and 10)
-    # For now, we'll use a fixed df=4.0 which is a good baseline for crypto tail risk,
-    # or could be optimized via MLE in a full implementation.
-    df = 4.0
+    # Estimate degrees of freedom (df) via MLE
+    df = _estimate_t_df_mle(u1, u2, rho)
     return rho, df
 
 
@@ -148,20 +146,17 @@ def _t_copula_log_likelihood(
     rho2 = rho ** 2
     safe_denom = max(1.0 - rho2, 1e-10)
     quad_form = (t1 ** 2 - 2 * rho * t1 * t2 + t2 ** 2) / safe_denom
-    # log|Sigma|^{1/2} = 0.5*log(1-rho^2)
+
+    # Constant part: log(gamma((df+2)/2) / (gamma(df/2) * pi * df * sqrt(1-rho^2)))
     log_bivariate_t = (
-        np.log(df / 2.0 + 0.5 * (t1 ** 2 + t2 ** 2 - 2 * rho * t1 * t2))  # placeholder
-    )
-    # Exact formula:
-    import math
-    log_bivariate_t = (
-        math.lgamma((df + 2) / 2)
-        - math.lgamma(df / 2)
+        math.lgamma((df + 2) / 2.0)
+        - math.lgamma(df / 2.0)
         - np.log(df * np.pi)
         - 0.5 * np.log(safe_denom)
         - ((df + 2) / 2) * np.log(1.0 + quad_form / df)
     )
     log_copula_dens = log_bivariate_t - log_ft1 - log_ft2
+
     finite = log_copula_dens[np.isfinite(log_copula_dens)]
     return float(finite.sum()) if finite.size > 0 else -np.inf
 

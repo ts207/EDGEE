@@ -4,7 +4,7 @@ from project.engine.pnl import compute_pnl_ledger
 
 def test_funding_overcounting_default():
     # 5-minute bars for 1 day = 288 bars
-    idx = pd.date_range("2025-01-01", periods=288, freq="5min")
+    idx = pd.date_range("2025-01-01", periods=288, freq="5min", tz="UTC")
     pos = pd.Series(1.0, index=idx)
     close = pd.Series(100.0, index=idx)
     # Funding rate of 0.01% (0.0001) every 8 hours

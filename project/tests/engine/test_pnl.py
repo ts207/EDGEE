@@ -23,8 +23,8 @@ from project.engine.pnl import (
 )
 
 
-def _ts(n: int) -> pd.DatetimeIndex:
-    return pd.date_range("2024-01-01", periods=n, freq="5min", tz="UTC")
+def _ts(n: int, freq: str = "1h") -> pd.DatetimeIndex:
+    return pd.date_range("2024-01-01", periods=n, freq=freq, tz="UTC")
 
 
 # ---------------------------------------------------------------------------
@@ -241,7 +241,7 @@ def test_no_funding_when_position_flat_at_event():
 
 def test_compute_pnl_components_event_aligned_funding():
     """Integration: compute_pnl_components with use_event_aligned_funding=True fires only at event bars."""
-    idx = pd.date_range("2023-01-01 07:00", periods=24, freq="5min", tz="UTC")
+    idx = pd.date_range("2023-01-01 07:00", periods=24, freq="1h", tz="UTC")
     close = pd.Series(100.0, index=idx)
     pos = pd.Series(1.0, index=idx)
     ret = compute_returns(close)
@@ -254,10 +254,12 @@ def test_compute_pnl_components_event_aligned_funding():
         funding_rate=funding_rate,
         use_event_aligned_funding=True,
     )
-    # Only the 08:00 bar (idx[12]) should have nonzero funding_pnl
+    # Only the 08:00 bar (idx[1]), 16:00 bar (idx[9]), 00:00 bar (idx[17]) should have nonzero funding_pnl
     nonzero_funding = result["funding_pnl"][result["funding_pnl"] != 0.0]
-    assert len(nonzero_funding) == 1
-    assert nonzero_funding.index[0] == idx[12]
+    assert len(nonzero_funding) == 3
+    assert nonzero_funding.index[0] == idx[1]
+    assert nonzero_funding.index[1] == idx[9]
+    assert nonzero_funding.index[2] == idx[17]
 
     # Same inputs without event alignment should have nonzero funding at all held bars
     result_smeared = compute_pnl_components(

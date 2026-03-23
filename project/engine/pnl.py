@@ -63,6 +63,9 @@ def compute_funding_pnl_event_aligned(
     Apply funding only on bars whose timestamp falls on a funding event hour (0, 8, 16 UTC).
     Position is the prior-bar position (signal held going into the event timestamp).
     """
+    if not (hasattr(pos.index, "tz") and pos.index.tz is not None and str(pos.index.tz) == "UTC"):
+        raise ValueError("funding PnL alignment requires a UTC-localized index")
+
     aligned_pos = pos.fillna(0.0).astype(float)
     prior_pos = aligned_pos.shift(1).fillna(0.0)
 
@@ -241,6 +244,18 @@ def compute_pnl_ledger(
     use_event_aligned_funding: bool = True,
 ) -> pd.DataFrame:
     """Compute an explicit per-bar execution and PnL ledger."""
+    # Guard against funding overcount on sub-hourly frequencies
+    if not use_event_aligned_funding and funding_rate is not None:
+        idx = target_position.index
+        if len(idx) > 1:
+            # Check if bar duration is less than 1 hour
+            delta = idx[1] - idx[0]
+            if delta < pd.Timedelta(hours=1):
+                raise ValueError(
+                    f"Sub-hourly bars ({delta}) require use_event_aligned_funding=True "
+                    "to prevent funding overcount."
+                )
+
     state = build_execution_state(
         target_position=target_position,
         close=close,
@@ -313,7 +328,7 @@ def compute_pnl_components(
     borrow_rate: pd.Series | None = None,
     use_event_aligned_funding: bool = True,
     execution_mode: str = "close",
-) -> pd.DataFrame:
+    ) -> pd.DataFrame:
     """
     Legacy per-bar PnL component calculation.
 
@@ -323,9 +338,18 @@ def compute_pnl_components(
         (long→short in a single bar) when ``execution_mode="next_open"``
         because it lacks per-bar open prices.  ``compute_pnl_ledger`` models
         fills and holding periods explicitly.
-
-    This compatibility path is retained only for existing tests.
     """
+    # Guard against funding overcount on sub-hourly frequencies
+    if not use_event_aligned_funding and funding_rate is not None:
+        idx = pos.index
+        if len(idx) > 1:
+            delta = idx[1] - idx[0]
+            if delta < pd.Timedelta(hours=1):
+                raise ValueError(
+                    f"Sub-hourly bars ({delta}) require use_event_aligned_funding=True "
+                    "to prevent funding overcount."
+                )
+
     import warnings
     warnings.warn(
         "compute_pnl_components is deprecated and will be removed in a future release. "
@@ -333,6 +357,7 @@ def compute_pnl_components(
         DeprecationWarning,
         stacklevel=2,
     )
+
     aligned_pos = pos.reindex(ret.index).fillna(0.0).astype(float)
     prior_pos = aligned_pos.shift(1).fillna(0.0)
 

@@ -112,5 +112,5 @@ def trailing_percentile_rank(
     # and we want 'window' points of history.
     rolled = series.rolling(window=window + 1, min_periods=min_periods + 1).apply(_rank, raw=True)
     return (
-        rolled.shift(lag - 1) if lag > 0 else rolled
-    )  # If lag=1, no extra shift needed beyond window inclusion
+        rolled.shift(lag) if lag > 0 else rolled
+    )

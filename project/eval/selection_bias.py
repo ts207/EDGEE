@@ -32,7 +32,8 @@ def probabilistic_sharpe_ratio(
     skew = float(stats.skew(pnl_arr))
     kurt = float(stats.kurtosis(pnl_arr, fisher=True))  # excess kurtosis
     # Standard error of SR (Lo 2002 adjusted for non-normality)
-    radicand = (1.0 + 0.5 * sr**2 - skew * sr + ((kurt + 3.0) / 4.0) * sr**2) / (n - 1)
+    # Corrected: Bailey & Lopez de Prado (2012) uses (excess_kurtosis / 4.0)
+    radicand = (1.0 + 0.5 * sr**2 - skew * sr + (kurt / 4.0) * sr**2) / (n - 1)
     se = np.sqrt(max(0.0, radicand))
     if se <= 0.0:
         return 1.0 if sr > benchmark_sr else 0.0
@@ -54,7 +55,7 @@ def deflated_sharpe_ratio(
     expected_max is a dimensionless z-score scaled by 1/sqrt(n), which is the
     standard deviation of the raw SR estimator (mean/std of pnl observations).
     """
-    n_arr = pd.to_numeric(pnl, errors="coerce").dropna().values
+    pnl_arr = pd.to_numeric(pnl, errors="coerce").dropna().values
     n = len(pnl_arr)
     if n < 10 or n_trials < 1:
         return 0.0

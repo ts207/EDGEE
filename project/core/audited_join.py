@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import pandas as pd
 import numpy as np
-from typing import Optional, Any, Dict
+from typing import Optional, Any, Dict, Literal
 
 LOGGER = logging.getLogger(__name__)
 
@@ -21,6 +21,7 @@ def audited_merge_asof(
     audit_registry: Optional[Any] = None,
     symbol: str,
     run_id: str,
+    stale_action: Literal["raise", "warn", "ignore"] = "raise",
 ) -> pd.DataFrame:
     """
     L1: Centralized audited as-of join helper.
@@ -74,8 +75,11 @@ def audited_merge_asof(
         stale_rate = stale_mask.mean()
         if stale_rate > 0.05:  # Global 5% threshold
             msg = f"Audited join for {feature_name} failed: excessive stale usage {stale_rate:.2%} > 5%"
-            LOGGER.error(msg)
-            # Enforce data quality: fail hard on stale data
-            raise RuntimeError(msg)
+            if stale_action == "raise":
+                LOGGER.error(msg)
+                raise RuntimeError(msg)
+            elif stale_action == "warn":
+                LOGGER.warning(msg)
+            # if ignore, do nothing
 
     return merged

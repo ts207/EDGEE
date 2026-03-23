@@ -177,9 +177,8 @@ class TestRiskAllocator:
         # Cumprod equity: 1.0 -> 0.90 -> 0.80
         # Drawdowns: 0%, 10%, 20%
 
-        limits = RiskLimits(max_drawdown_limit=0.25)
+        limits = RiskLimits(max_drawdown_limit=0.25, pnl_mode="return")
         scales, _ = allocate_position_scales(pos, {}, limits, portfolio_pnl_series=pnl)
-
         # Bar 0: 0% DD -> factor 1.0
         assert scales["s1"].iloc[0] == pytest.approx(1.0)
         # Bar 1: 10% DD / 25% limit -> factor = (25-10)/25 = 15/25 = 0.6

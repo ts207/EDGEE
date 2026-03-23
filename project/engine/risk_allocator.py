@@ -9,6 +9,7 @@ import pandas as pd
 
 from project.core.constants import BARS_PER_YEAR_BY_TIMEFRAME
 from project.portfolio import AllocationSpec
+from typing import Any, Dict, List, Mapping, Optional, Literal
 
 
 ALLOCATION_CONTRACT_SCHEMA_VERSION = "allocation_contract_v1"
@@ -16,14 +17,16 @@ ALLOCATION_DIAGNOSTICS_SCHEMA_VERSION = "allocation_diagnostics_v1"
 
 
 # Convert a PnL path into an equity curve for drawdown calculations.
-def _equity_curve_from_pnl(pnl: pd.Series) -> pd.Series:
+def _equity_curve_from_pnl(
+    pnl: pd.Series, pnl_mode: Literal["dollar", "return"] = "dollar"
+) -> pd.Series:
     clean = pd.to_numeric(pnl, errors="coerce").fillna(0.0).astype(float)
     if clean.empty:
         return pd.Series(dtype=float)
-    # Heuristic: values much larger than 1.0 are dollar PnL, not per-bar returns.
-    if clean.abs().median() > 1.0 or clean.abs().max() > 2.0:
+    if pnl_mode == "dollar":
         return 1.0 + clean.cumsum()
     return (1.0 + clean).cumprod()
+
 
 
 # Provide an optimised implementation for the per-bar clamping loop used
@@ -34,6 +37,19 @@ def _equity_curve_from_pnl(pnl: pd.Series) -> pd.Series:
 # exceed the specified ``max_new`` threshold.
 def _clamp_positions_py(raw: np.ndarray, max_new: float) -> np.ndarray:
     n = raw.size
+    if n == 0:
+        return raw
+    
+    # Path-dependent loop is not vectorizable, but we can early-exit 
+    # if the raw changes are already within limits.
+    # Note: we check diff from 0 for the first element.
+    first_ok = abs(raw[0]) <= max_new
+    if first_ok and n > 1:
+        if np.abs(np.diff(raw)).max() <= max_new:
+            return raw
+    elif first_ok and n == 1:
+        return raw
+
     out = np.empty_like(raw)
     prior = 0.0
     for i in range(n):
@@ -78,6 +94,7 @@ class RiskLimits:
     symbol_max_exposure: float | None = None
     portfolio_max_exposure: float | None = None
     enable_correlation_allocation: bool = False
+    pnl_mode: Literal["dollar", "return"] = "dollar"
     
     # Safety: don't increase leverage by more than 1x based on vol alone unless opted in.
     allow_lever_up: bool = False
@@ -231,6 +248,7 @@ def build_allocation_contract(params: Mapping[str, object]) -> AllocationContrac
         portfolio_max_drawdown=_optional_float(params.get("portfolio_max_drawdown")),
         symbol_max_exposure=_optional_float(params.get("max_symbol_exposure")),
         enable_correlation_allocation=bool(params.get("enable_correlation_allocation", False)),
+        pnl_mode=params.get("pnl_mode", "dollar"), # type: ignore
         allow_lever_up=bool(params.get("allow_lever_up", False)),
     )
     policy = AllocationPolicy(
@@ -353,6 +371,7 @@ def allocate_position_details(
     portfolio_pnl_series: pd.Series | None = None,
     regime_series: pd.Series | None = None,
     regime_scale_map: Dict[str, float] | None = None,
+    strategy_returns: Dict[str, pd.Series] | None = None,
 ) -> AllocationDetails:
     resolved_contract = contract or AllocationContract(limits=limits)
     if not raw_positions_by_strategy:
@@ -398,6 +417,10 @@ def allocate_position_details(
             .fillna(1.0)
         )
         requested[key] = (pos * scale.clip(lower=0.0)).astype(float)
+    # L-3: Policy weights are applied to pre-cap exposures ('requested').
+    # Subsequent strategy, family, and portfolio caps are applied to 'allocated'
+    # which may further scale back these positions. The final risk budget split
+    # may deviate from the policy if some strategies hit their caps.
     policy_weights = _resolve_policy_weights(requested, ordered, resolved_contract)
     if resolved_contract.policy.mode == "deterministic_optimizer" and policy_weights:
         for key in ordered:
@@ -414,8 +437,15 @@ def allocate_position_details(
     if limits.enable_correlation_allocation and len(requested) > 1:
         try:
             df_req = pd.DataFrame(requested).fillna(0.0)
-            diff = df_req.diff().fillna(0.0)
-            cov = diff.cov()
+            if strategy_returns:
+                # Use returns (PnL) for covariance instead of position changes (turnover)
+                df_ret = pd.DataFrame(strategy_returns).reindex(df_req.index).fillna(0.0)
+                cov = df_ret.cov()
+            else:
+                # Fallback to position-change covariance if returns not provided
+                diff = df_req.diff().fillna(0.0)
+                cov = diff.cov()
+
             if (cov.isnull().any().any()) or len(cov) != len(requested):
                 raise ValueError("invalid covariance for allocation")
 
@@ -513,7 +543,22 @@ def allocate_position_details(
 
     if limits.max_pairwise_correlation is not None and len(allocated) > 1:
         try:
-            df_alloc = pd.DataFrame({k: v for k, v in allocated.items()})
+            if strategy_returns:
+                # Use returns (PnL) for correlation instead of positions
+                # We need to scale the raw returns by the allocation scale factor
+                # to account for any strategy-level caps applied so far.
+                allocated_returns = {}
+                for key in ordered:
+                    raw_pos = _as_float_series(raw_positions_by_strategy[key]).reindex(aligned_index).fillna(0.0)
+                    # Avoid division by zero: where raw_pos is zero, scale is 1.0 (no change)
+                    # but return would be zero anyway if pos is zero.
+                    # We can use the ratio of allocated/raw_pos as the scale factor.
+                    scale_factor = (allocated[key] / raw_pos.replace(0.0, np.nan)).fillna(1.0).clip(lower=0.0, upper=1.0)
+                    allocated_returns[key] = strategy_returns[key].reindex(aligned_index).fillna(0.0) * scale_factor
+                df_alloc = pd.DataFrame(allocated_returns)
+            else:
+                df_alloc = pd.DataFrame({k: v for k, v in allocated.items()})
+
             if df_alloc.empty or len(df_alloc) < 2:
                 raise ValueError("insufficient history for correlation estimate")
 
@@ -588,43 +633,90 @@ def allocate_position_details(
             allocated[key] = allocated[key] * regime_scale_vals
 
     vol_scale_series = pd.Series(1.0, index=aligned_index)
-    if limits.target_annual_vol is not None and portfolio_pnl_series is not None:
-        pnl = portfolio_pnl_series.reindex(aligned_index).fillna(0.0)
-        if limits.vol_estimator_mode == "ewma":
-            roll_std = pnl.ewm(halflife=limits.vol_ewma_halflife_bars, adjust=False).std()
-        else:  # "rolling"
-            roll_std = pnl.rolling(
-                window=limits.vol_window_bars,
-                min_periods=min(288, limits.vol_window_bars),
-            ).std()
-        ann_vol = roll_std * np.sqrt(float(max(1.0, limits.bars_per_year)))
-        vol_scale = (
-            (limits.target_annual_vol / ann_vol.replace(0.0, np.nan))
-            .replace([np.inf, -np.inf], np.nan)
-            .fillna(1.0)
-        )
-        # Apply safety cap on vol scaling
-        upper_bound = 2.0 if limits.allow_lever_up else 1.0
-        vol_scale_series = vol_scale.clip(lower=0.0, upper=upper_bound)
-        _flag("target_annual_vol", vol_scale_series < 0.999999)
+    if limits.target_annual_vol is not None:
+        target_vol = float(limits.target_annual_vol)
+        bars_per_year = float(max(1.0, limits.bars_per_year))
+        
+        if strategy_returns and len(ordered) > 0:
+            # Per-strategy vol scaling before portfolio sum
+            per_strategy_vol_scales = {}
+            for key in ordered:
+                s_pnl = strategy_returns[key].reindex(aligned_index).fillna(0.0)
+                if limits.vol_estimator_mode == "ewma":
+                    s_std = s_pnl.ewm(halflife=limits.vol_ewma_halflife_bars, adjust=False).std()
+                else:
+                    s_std = s_pnl.rolling(window=limits.vol_window_bars, min_periods=min(288, limits.vol_window_bars)).std()
+                
+                s_ann_vol = s_std * np.sqrt(bars_per_year)
+                # Scale each strategy to its share of the target portfolio vol (equal share as baseline)
+                # If we have K strategies, we might want each to have target_vol / sqrt(K) if they were independent.
+                # However, the requirement is to use per-strategy information.
+                # Let's scale each to the target_vol as if it were the only strategy, 
+                # then apply a portfolio correction.
+                s_scale = (target_vol / s_ann_vol.replace(0.0, np.nan)).replace([np.inf, -np.inf], np.nan).fillna(1.0)
+                per_strategy_vol_scales[key] = s_scale.clip(lower=0.0, upper=2.0 if limits.allow_lever_up else 1.0)
+
+            # Portfolio correction pass: estimate portfolio vol after per-strategy scaling
+            # This is a heuristic to ensure the final portfolio vol stays near target
+            # despite correlations.
+            scaled_pnl_sum = pd.Series(0.0, index=aligned_index)
+            for key in ordered:
+                scaled_pnl_sum += strategy_returns[key].reindex(aligned_index).fillna(0.0) * per_strategy_vol_scales[key]
+            
+            if limits.vol_estimator_mode == "ewma":
+                p_std = scaled_pnl_sum.ewm(halflife=limits.vol_ewma_halflife_bars, adjust=False).std()
+            else:
+                p_std = scaled_pnl_sum.rolling(window=limits.vol_window_bars, min_periods=min(288, limits.vol_window_bars)).std()
+            
+            p_ann_vol = p_std * np.sqrt(bars_per_year)
+            portfolio_correction = (target_vol / p_ann_vol.replace(0.0, np.nan)).replace([np.inf, -np.inf], np.nan).fillna(1.0)
+            portfolio_correction = portfolio_correction.clip(lower=0.0, upper=1.0) # only scale down in correction
+            
+            for key in ordered:
+                total_s_scale = (per_strategy_vol_scales[key] * portfolio_correction).fillna(1.0).clip(lower=0.0)
+                allocated[key] = allocated[key] * total_s_scale
+                _flag("target_annual_vol", total_s_scale < 0.999999)
+        
+        elif portfolio_pnl_series is not None:
+            # Fallback to portfolio-level uniform scaling
+            pnl = portfolio_pnl_series.reindex(aligned_index).fillna(0.0)
+            if limits.vol_estimator_mode == "ewma":
+                roll_std = pnl.ewm(halflife=limits.vol_ewma_halflife_bars, adjust=False).std()
+            else:  # "rolling"
+                roll_std = pnl.rolling(
+                    window=limits.vol_window_bars,
+                    min_periods=min(288, limits.vol_window_bars),
+                ).std()
+            ann_vol = roll_std * np.sqrt(bars_per_year)
+            vol_scale = (
+                (target_vol / ann_vol.replace(0.0, np.nan))
+                .replace([np.inf, -np.inf], np.nan)
+                .fillna(1.0)
+            )
+            # Apply safety cap on vol scaling
+            upper_bound = 2.0 if limits.allow_lever_up else 1.0
+            vol_scale_series = vol_scale.clip(lower=0.0, upper=upper_bound)
+            _flag("target_annual_vol", vol_scale_series < 0.999999)
+            for key in ordered:
+                allocated[key] = allocated[key] * vol_scale_series
 
     dd_scale_series = pd.Series(1.0, index=aligned_index)
     if limits.max_drawdown_limit is not None and portfolio_pnl_series is not None:
         pnl = portfolio_pnl_series.reindex(aligned_index).fillna(0.0)
-        equity = _equity_curve_from_pnl(pnl)
+        equity = _equity_curve_from_pnl(pnl, pnl_mode=limits.pnl_mode)
         peak = equity.cummax().replace(0.0, np.nan)
         drawdown = ((peak - equity) / peak).replace([np.inf, -np.inf], np.nan).fillna(0.0)
         dd_factor = (limits.max_drawdown_limit - drawdown) / limits.max_drawdown_limit
         dd_scale_series = dd_factor.clip(lower=0.0, upper=1.0)
         _flag("max_drawdown_limit", dd_scale_series < 0.999999)
 
-    dynamic_overlay_series = (vol_scale_series * dd_scale_series).fillna(1.0)
+    dynamic_overlay_series = dd_scale_series.fillna(1.0)
     for key in ordered:
         allocated[key] = allocated[key] * dynamic_overlay_series
 
     if limits.portfolio_max_drawdown is not None and portfolio_pnl_series is not None:
         pnl = portfolio_pnl_series.reindex(aligned_index).fillna(0.0)
-        equity = _equity_curve_from_pnl(pnl)
+        equity = _equity_curve_from_pnl(pnl, pnl_mode=limits.pnl_mode)
         peak = equity.cummax().replace(0.0, np.nan)
         drawdown = ((peak - equity) / peak).replace([np.inf, -np.inf], np.nan).fillna(0.0)
         reject_mask = drawdown > limits.portfolio_max_drawdown

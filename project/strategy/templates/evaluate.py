@@ -6,7 +6,7 @@ from project.strategy.templates.compiler import compile_positions
 from project.strategy.templates.data_bundle import DataBundle
 
 try:
-    from project.engine.pnl import compute_pnl_components, compute_returns
+    from project.engine.pnl import compute_pnl_ledger, compute_returns
 except ImportError:
     pass  # We will rely on sys.path or the package root correctly mapping engine
 
@@ -21,10 +21,11 @@ def evaluate_candidates(
         raise ValueError("DataBundle prices must contain a 'close' column.")
 
     close = bundle.prices["close"].astype(float)
-    ret = compute_returns(close)
+    open_ = bundle.prices["open"].astype(float) if "open" in bundle.prices.columns else None
 
     cost_bps = engine_cfg.get("cost_bps", 5.0)
     execution_lag = int(engine_cfg.get("execution_lag_bars", 1))
+    execution_mode = "next_open" if open_ is not None else "close"
 
     for spec in specs:
         pos, debug = compile_positions(spec, bundle)
@@ -33,15 +34,15 @@ def evaluate_candidates(
         if execution_lag > 0:
             pos = pos.shift(execution_lag).fillna(0).astype(int)
 
-        pnl_df = compute_pnl_components(
-            pos=pos,
-            ret=ret,
+        ledger = compute_pnl_ledger(
+            target_position=pos,
+            close=close,
+            open_=open_,
+            execution_mode=execution_mode,
             cost_bps=cost_bps,
-            funding_rate=None,
-            borrow_rate=None,
         )
 
-        pnl = pnl_df["pnl"]
+        pnl = ledger["net_pnl"]
 
         pos_float = pos.astype(float)
         turnover = (pos_float - pos_float.shift(1).fillna(0.0)).abs().sum()
