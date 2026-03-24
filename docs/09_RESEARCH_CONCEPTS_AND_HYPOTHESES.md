@@ -57,7 +57,7 @@ Strategies must demonstrate positive after-cost expectancy under these condition
 
 ---
 
-## Pre-Registered Hypothesis: H_LIFT_STATE_CONDITIONED_V1
+## Pre-Registered Hypothesis: H_LIFT_STATE_CONDITIONED_V1  ?why is this repeated again with no context or logic, why is it here, what does it do
 
 The most prominent pre-registered hypothesis in the repo:
 

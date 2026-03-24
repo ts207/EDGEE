@@ -14,9 +14,9 @@ All research primitives in EDGEE are defined declaratively in `spec/` as YAML fi
 
 ```yaml
 event_type: VOL_SHOCK                      # Unique event identifier
-synthetic_coverage: uncovered              # covered | uncovered
+synthetic_coverage: uncovered  ?what does it do            # covered | uncovered
 active: true
-status: validated                          # validated | experimental | deprecated
+status: validated   ?how and why                       # validated | experimental | deprecated
 canonical_family: VOLATILITY_TRANSITION    # One of the 9 canonical families
 reports_dir: vol_shock_relaxation          # Output directory
 events_file: vol_shock_relaxation_events.parquet
@@ -95,9 +95,9 @@ provenance:
   claim_id: ["CL_0075", ...]
 ```
 
-### Feature Catalog
+### Feature Catalog- ?are detectors and other modules using these features effectively and correctly?
 
-| Feature | Family | Description |
+| Feature | Family | Description 
 |---|---|---|
 | `amihud` | microstructure | Amihud illiquidity ratio (abs return / dollar volume) |
 | `atr` | volatility | Average True Range |
@@ -203,7 +203,7 @@ Templates constrain what strategy shapes are legal for each event family:
 | TEMPORAL_STRUCTURE | `mean_reversion`, `continuation`, `tail_risk_avoid`, `only_if_no_news_window` |
 | EXECUTION_FRICTION | `slippage_aware_filter`, `tail_risk_avoid`, `only_if_liquidity` |
 
-### Named Event Sequences (`sequence_registry.yaml`)
+### Named Event Sequences (`sequence_registry.yaml`)  ?explain the logic and instructions as it is most important alpha source
 
 Multi-event temporal patterns that can be used as composite triggers:
 
@@ -257,7 +257,7 @@ Multi-event temporal patterns that can be used as composite triggers:
 | Min ESS per regime | 20 |
 | Require regime stability | true |
 
-**Shadow tier:**
+**Shadow tier:**  ?how this tier is used
 
 | Criterion | Value |
 |---|---|
@@ -284,7 +284,7 @@ defaults:
     funding_bps: ["extreme_pos", "extreme_neg"]
     ms_trend_state: ["0", "1", "2"]
     ms_spread_state: ["0", "1"]
-    severity_bucket: ["minor", "moderate", "extreme"]
+    severity_bucket: ["minor", "moderate", "extreme"]  ?explain this severity bucket
 ```
 
 ---
@@ -323,7 +323,7 @@ The live engine runs two processing lanes with strict causal separation:
 
 | Lane | Cadence | Purpose | Alpha | Execution |
 |---|---|---|---|---|
-| `alpha_5s` | 5 seconds | Alpha signal computation | ✓ | ✗ |
+| `alpha_5s` | 5 seconds | Alpha signal computation | ✓ | ✗ |  ?explain the alpha signal computation
 | `exec_1s` | 1 second | Order management | ✗ | ✓ |
 
 The firewall (`spec/runtime/firewall.yaml`) enforces that alpha computations cannot observe post-trade execution state.
@@ -347,19 +347,19 @@ The firewall (`spec/runtime/firewall.yaml`) enforces that alpha computations can
 The hypothesis search space defines which triggers, templates, contexts, horizons, and directions are valid combinations for Phase 2 discovery.
 
 **Trigger types:**
-- `events` — discrete market events (44 listed in search space)
+- `events` — discrete market events (44 listed in search space)  ?why these counts are different
 - `states` — regime/structural states
 - `transitions` — state → state transitions
 - `feature_predicates` — continuous feature conditions
 
-**Notable annotations in search space:**
-- `[QUALITY: HIGH]` — `LIQUIDATION_CASCADE` (IG 0.000467)
+**Notable annotations in search space:**  ?explain
+- `[QUALITY: HIGH]` — `LIQUIDATION_CASCADE` (IG 0.000467)    
 - `[QUALITY: MODERATE]` — `OVERSHOOT_AFTER_SHOCK` (IG 0.000226)
 - `[QUALITY: LOW]` — `LIQUIDITY_VACUUM` (IG 0.000134)
 
 ---
 
-## 12. Pre-Registered Hypothesis (`spec/hypotheses/lift_state_conditioned_v1.yaml`)
+## 12. Pre-Registered Hypothesis (`spec/hypotheses/lift_state_conditioned_v1.yaml`)  ?why this specific whats the use, remove if not important
 
 An example of a formally pre-registered hypothesis (required before any 60-day validation run):
 

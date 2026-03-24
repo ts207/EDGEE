@@ -18,7 +18,7 @@ The canonical workflow is a bounded, replayable loop:
 observe → retrieve memory → define objective → propose → plan → execute → evaluate → reflect → adapt
 ```
 
-Optimize for: **reproducibility → post-cost robustness → contract cleanliness → narrow attribution → decision quality**
+Optimize for: **reproducibility → post-cost robustness → contract cleanliness → narrow attribution → decision quality -alpha discovery**
 
 ---
 
@@ -26,7 +26,7 @@ Optimize for: **reproducibility → post-cost robustness → contract cleanlines
 
 Always check prior memory and available knobs before starting:
 
-```bash
+```bash    ?example knobs, use cases
 # What knobs are tunable?
 python3 -m project.research.knowledge.query knobs
 
@@ -62,7 +62,7 @@ directions: [long, short]
 entry_lags: [0, 1, 2]
 ```
 
-**Rules:**
+**Rules:**  ?review rules optimize and should be flexible 
 - One event family or narrow trigger set per run
 - One template family per run
 - One primary context family per run
@@ -86,7 +86,7 @@ python3 -m project.research.agent_io.proposal_to_experiment \
 
 **Always plan first on material runs.** Planning validates scope without writing artifacts.
 
-```bash
+```bash  ?why 3 different but same options, explain them and recommend
 # Via issue_proposal (with memory bookkeeping)
 python3 -m project.research.agent_io.issue_proposal \
   --proposal /path/to/proposal.yaml \
@@ -127,19 +127,21 @@ edge-run-all \
 ### Targeted Discovery (single event)
 
 ```bash
-make discover-target SYMBOLS=BTCUSDT EVENT=VOL_SHOCK
+make discover-target SYMBOLS=BTCUSDT EVENT=VOL_SHOCK    ?what does it discover and test exactly
 ```
 
 ### Full Discovery (all events)
 
 ```bash
-make discover-edges
+make discover-edges      ?what does it discover and test exactly
+```
 ```
 
 ### Promotion Pass
 
 ```bash
-edge-promote --run_id btc_vol_shock_001
+edge-promote --run_id btc_vol_shock_001  
+
 ```
 
 ### Blueprint Compilation
@@ -161,7 +163,7 @@ A run must be evaluated on **three layers**:
 - Are artifact counts and hashes consistent?
 - Are there any contract violations?
 
-**Never trust a run based on exit code alone.** Read the manifests.
+**Never trust a run based on exit code alone.** Read the manifests. ?more explicit instructions
 
 ### Layer 2 — Statistical Quality
 
@@ -175,7 +177,7 @@ Check at minimum:
 
 ```bash
 # View benchmark review
-PYTHONPATH=. python3 project/scripts/show_benchmark_review.py
+PYTHONPATH=. python3 project/scripts/show_benchmark_review.py ?what benchmark, benchmark of what, use cases
 ```
 
 ### Layer 3 — Deployment Relevance
