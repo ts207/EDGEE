@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from project.pipelines.research import analyze_events
+from project.research import analyze_events
 from project.events.detectors.registry import get_detector, load_all_detectors
 
 

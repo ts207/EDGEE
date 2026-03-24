@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 import pandas as pd
 
-from project.pipelines.research import select_profitable_strategies as stage
+from project.research import select_profitable_strategies as stage
 
 
 def test_select_profitable_strategies_filters_candidates(monkeypatch, tmp_path):

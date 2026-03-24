@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pandas as pd
 
-from project.pipelines.research.bridge_evaluate_phase2 import (
+from project.research.bridge_evaluate_phase2 import (
     _build_policy_variant_specs,
     _evaluate_policy_variants_for_candidate,
     _policy_variant_flip_summary,

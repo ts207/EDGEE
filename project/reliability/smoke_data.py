@@ -16,7 +16,7 @@ from project.core.config import get_data_root
 from project.core.feature_schema import feature_dataset_dir_name
 from project.engine.runner import run_engine
 from project.io.utils import ensure_dir, write_parquet
-from project.pipelines.research.cli.promotion_cli import run_promotion_cli
+from project.research.cli.promotion_cli import run_promotion_cli
 from project.research.candidate_schema import ensure_candidate_schema
 from project.research.discovery import _synthesize_registry_candidates
 from project.research.services.candidate_discovery_service import (
@@ -249,7 +249,12 @@ def run_engine_smoke(dataset: SmokeDatasetInfo) -> Dict[str, Any]:
         symbols=["BTCUSDT"],
         strategies=["dsl_interpreter_v1__smoke_dsl"],
         params_by_strategy={"dsl_interpreter_v1__smoke_dsl": {"dsl_blueprint": bp.model_dump()}},
-        params={},
+        params={
+            "max_portfolio_gross": 1.0,
+            "max_strategy_gross": 1.0,
+            "max_symbol_gross": 1.0,
+            "max_new_exposure_per_bar": 2.0,
+        },
         cost_bps=5.0,
         start_ts=dataset.start_ts,
         end_ts=dataset.end_ts,

@@ -6,7 +6,7 @@ import sys
 import numpy as np
 import pandas as pd
 
-from project.pipelines.research import build_strategy_candidates
+from project.research import build_strategy_candidates
 
 
 def test_edge_candidate_market_entry_action_is_executable(monkeypatch):

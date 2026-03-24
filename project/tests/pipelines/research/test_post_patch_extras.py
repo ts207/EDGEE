@@ -16,12 +16,12 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from project.pipelines.research.campaign_controller import (
+from project.research.campaign_controller import (
     CampaignConfig,
     CampaignController,
     _DEFAULT_QUALITY,
 )
-from project.pipelines.research.run_hypothesis_search import (
+from project.research.run_hypothesis_search import (
     _write_regime_conditional_candidates_from_breakdown,
 )
 
@@ -78,7 +78,7 @@ class TestInteractionTrigger:
         ctrl = _make_ctrl(tmp_path, scan_trigger_types=["INTERACTION"])
         mem = _empty_mem()
         with patch(
-            "project.pipelines.research.campaign_controller.read_memory_table",
+            "project.research.campaign_controller.read_memory_table",
             return_value=pd.DataFrame(),
         ):
             result = ctrl._step_scan_interactions(mem)
@@ -95,7 +95,7 @@ class TestInteractionTrigger:
         ctrl = _make_ctrl(tmp_path)
         mem = _empty_mem()
         with patch(
-            "project.pipelines.research.campaign_controller.read_memory_table",
+            "project.research.campaign_controller.read_memory_table",
             return_value=pd.DataFrame(),
         ):
             result = ctrl._step_scan_interactions(mem)
@@ -106,7 +106,7 @@ class TestInteractionTrigger:
         ctrl = _make_ctrl(tmp_path)
         mem = _empty_mem()
         with patch(
-            "project.pipelines.research.campaign_controller.read_memory_table",
+            "project.research.campaign_controller.read_memory_table",
             return_value=pd.DataFrame(),
         ):
             result = ctrl._step_scan_interactions(mem)
@@ -132,7 +132,7 @@ class TestInteractionTrigger:
             "event_type": [tested_key],
         })
         with patch(
-            "project.pipelines.research.campaign_controller.read_memory_table",
+            "project.research.campaign_controller.read_memory_table",
             return_value=tested_df,
         ), patch.object(ctrl, "_load_interaction_motifs", return_value=[m]):
             result = ctrl._step_scan_interactions(_empty_mem())
@@ -189,7 +189,7 @@ class TestMiScanPreStep:
     def test_pre_step_skips_when_disabled(self, tmp_path):
         ctrl = _make_ctrl(tmp_path, auto_run_mi_scan=False)
         with patch(
-            "project.pipelines.research.campaign_controller.CampaignController._run_mi_scan_pre_step"
+            "project.research.campaign_controller.CampaignController._run_mi_scan_pre_step"
         ) as mock_scan:
             # Simulate run_campaign stub — just call the pre-step decision
             if ctrl.config.auto_run_mi_scan:
@@ -416,7 +416,7 @@ class TestPortfolioStatePath:
 
     def test_deployed_strategies_seed_promoted_blueprints(self, tmp_path):
         """Live deployed strategies populate promoted_blueprints for marginal check."""
-        from project.pipelines.research.compile_strategy_blueprints import (
+        from project.research.compile_strategy_blueprints import (
             _check_marginal_contribution,
         )
         portfolio_state = {
@@ -447,7 +447,7 @@ class TestPortfolioStatePath:
 
     def test_portfolio_state_not_found_is_silently_skipped(self, tmp_path):
         """Missing portfolio_state_path must not cause an error."""
-        from project.pipelines.research.compile_strategy_blueprints import (
+        from project.research.compile_strategy_blueprints import (
             _write_strategy_contract_artifacts,
         )
 
@@ -466,13 +466,13 @@ class TestPortfolioStatePath:
         bp.execution.policy_executor_config = {}
 
         with patch(
-            "project.pipelines.research.compile_strategy_blueprints._build_executable_strategy_spec",
+            "project.research.compile_strategy_blueprints._build_executable_strategy_spec",
             return_value=MagicMock(model_dump=lambda: {}, execution=MagicMock(policy_executor_config={})),
         ), patch(
-            "project.pipelines.research.compile_strategy_blueprints._build_allocation_spec",
+            "project.research.compile_strategy_blueprints._build_allocation_spec",
             return_value=MagicMock(model_dump=lambda: {}),
         ), patch(
-            "project.pipelines.research.compile_strategy_blueprints._validate_strategy_contract",
+            "project.research.compile_strategy_blueprints._validate_strategy_contract",
         ):
             result = _write_strategy_contract_artifacts(
                 blueprints=[bp],
@@ -492,7 +492,7 @@ class TestPortfolioStatePath:
 
     def test_marginal_contribution_log_written(self, tmp_path):
         """marginal_contribution_log.json should be written for every compile batch."""
-        from project.pipelines.research.compile_strategy_blueprints import (
+        from project.research.compile_strategy_blueprints import (
             _write_strategy_contract_artifacts,
         )
         bp = MagicMock()
@@ -509,13 +509,13 @@ class TestPortfolioStatePath:
         bp.symbol_scope.model_dump.return_value = {"symbols": ["BTCUSDT"]}
 
         with patch(
-            "project.pipelines.research.compile_strategy_blueprints._build_executable_strategy_spec",
+            "project.research.compile_strategy_blueprints._build_executable_strategy_spec",
             return_value=MagicMock(model_dump=lambda: {}, execution=MagicMock(policy_executor_config={})),
         ), patch(
-            "project.pipelines.research.compile_strategy_blueprints._build_allocation_spec",
+            "project.research.compile_strategy_blueprints._build_allocation_spec",
             return_value=MagicMock(model_dump=lambda: {}),
         ), patch(
-            "project.pipelines.research.compile_strategy_blueprints._validate_strategy_contract",
+            "project.research.compile_strategy_blueprints._validate_strategy_contract",
         ):
             _write_strategy_contract_artifacts(
                 blueprints=[bp],

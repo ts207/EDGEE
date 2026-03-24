@@ -20,14 +20,14 @@ data/reports/feature_mi/<run_id>/
 
 Usage (CLI)
 -----------
-    python -m project.pipelines.research.feature_mi_scan \\
+    python -m project.research.feature_mi_scan \\
         --run_id <run_id> \\
         --symbols BTCUSDT \\
         --timeframe 5m
 
 Usage (library)
 ---------------
-    from project.pipelines.research.feature_mi_scan import run_feature_mi_scan
+    from project.research.feature_mi_scan import run_feature_mi_scan
     result = run_feature_mi_scan(features_df, out_dir=Path("..."))
 """
 

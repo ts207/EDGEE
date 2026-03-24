@@ -84,7 +84,7 @@ DUMMY_REGISTRY = {
 }
 
 
-@patch("project.pipelines.research.registry_validation.load_template_registry")
+@patch("project.research.registry_validation.load_template_registry")
 def test_filter_events_by_agent_selection(mock_load_registry, tmp_path):
     mock_load_registry.return_value = DUMMY_REGISTRY
 
@@ -114,7 +114,7 @@ def test_filter_events_by_agent_selection(mock_load_registry, tmp_path):
     assert not any("TREND_ACCELERATION" in n for n in names)
 
 
-@patch("project.pipelines.research.registry_validation.load_template_registry")
+@patch("project.research.registry_validation.load_template_registry")
 def test_invalid_event_raises_error(mock_load_registry, tmp_path):
     mock_load_registry.return_value = DUMMY_REGISTRY
 
@@ -135,7 +135,7 @@ def test_invalid_event_raises_error(mock_load_registry, tmp_path):
         )
 
 
-@patch("project.pipelines.research.registry_validation.load_template_registry")
+@patch("project.research.registry_validation.load_template_registry")
 def test_invalid_template_raises_error(mock_load_registry, tmp_path):
     mock_load_registry.return_value = DUMMY_REGISTRY
 
@@ -156,7 +156,7 @@ def test_invalid_template_raises_error(mock_load_registry, tmp_path):
         )
 
 
-@patch("project.pipelines.research.registry_validation.load_template_registry")
+@patch("project.research.registry_validation.load_template_registry")
 def test_pass_templates_and_horizons_to_stages(mock_load_registry, tmp_path):
     mock_load_registry.return_value = DUMMY_REGISTRY
 

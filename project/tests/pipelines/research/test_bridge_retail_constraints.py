@@ -5,7 +5,7 @@ from pathlib import Path
 import pandas as pd
 
 from project.engine.execution_model import load_calibration_config
-from project.pipelines.research.bridge_evaluate_phase2 import (
+from project.research.bridge_evaluate_phase2 import (
     _resolve_bridge_policy,
     _build_bridge_symbol_calibrations,
     _evaluate_bridge_row,

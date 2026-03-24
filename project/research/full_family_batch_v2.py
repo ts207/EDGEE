@@ -6,8 +6,8 @@ from typing import Any, Callable, Mapping, Sequence
 
 import pandas as pd
 
-from project.pipelines.research.approval_registry_v2 import write_registry_status_artifacts
-from project.pipelines.research.approval_workflow_v2 import (
+from project.research.approval_registry_v2 import write_registry_status_artifacts
+from project.research.approval_workflow_v2 import (
     ApprovalDecision,
     evaluate_approval_workflow,
 )

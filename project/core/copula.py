@@ -41,6 +41,9 @@ def fit_t_copula(u1: np.ndarray, u2: np.ndarray) -> tuple[float, float]:
     """
     Estimate parameters for a Student-t copula: (rho, df).
     Degrees of freedom (df) controls tail dependence.
+    
+    Note: The relationship rho = sin(pi/2 * tau) assumes the copula correctly 
+    captures the underlying dependence structure (elliptical margins).
     """
     # Quick estimate of rho using Spearman's rho or Kendall's tau
     # For Student-t, rho = sin(pi/2 * tau)
@@ -162,9 +165,22 @@ def _t_copula_log_likelihood(
 
 
 def _estimate_t_df_mle(
-    u1: np.ndarray, u2: np.ndarray, rho: float, df_candidates: tuple = (3, 4, 5, 6, 8, 10, 15, 20)
+    u1: np.ndarray, 
+    u2: np.ndarray, 
+    rho: float, 
+    df_candidates: tuple = (2.5, 3, 3.5, 4, 4.5, 5, 6, 7, 8, 10, 12, 15, 20, 30, 50)
 ) -> float:
-    """Grid-search MLE for Student-t copula degrees of freedom."""
+    """
+    Grid-search MLE for Student-t copula degrees of freedom.
+    Higher resolution grid for heavy-tail regimes.
+    """
+    if len(u1) < 50:
+        import logging
+        logging.getLogger(__name__).warning(
+            "Sample size N=%d is small for t-copula MLE; df estimate may be unstable. Defaulting to df=4.0 if likelihood is flat.", 
+            len(u1)
+        )
+
     best_ll = -np.inf
     best_df = 4.0
     for df in df_candidates:

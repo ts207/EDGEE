@@ -112,6 +112,7 @@ class KillSwitchManager:
                 triggered_at=datetime.now(timezone.utc),
                 message=message,
                 recovery_streak=0,
+                peak_equity=self.status.peak_equity,  # preserve high-water mark
             )
             self._persist_status()
             callbacks = list(self._on_trigger_callbacks)
@@ -125,7 +126,10 @@ class KillSwitchManager:
 
     def reset(self):
         with self._lock:
-            self.status = KillSwitchStatus(is_active=False)
+            self.status = KillSwitchStatus(
+                is_active=False,
+                peak_equity=self.status.peak_equity,  # preserve high-water mark
+            )
             self._persist_status()
         LOGGER.info("Kill-switch reset.")
 
@@ -272,6 +276,7 @@ class UnwindOrchestrator:
         self.state_store = state_store
         self.oms_manager = oms_manager
         self.is_unwinding = False
+        self._lock = asyncio.Lock()
 
     async def unwind_all(self):
         """
@@ -280,10 +285,10 @@ class UnwindOrchestrator:
         Sequentially unwinds positions to avoid overwhelming liquidity.
         Uses deterministic client order IDs so retries remain idempotent.
         """
-        if self.is_unwinding:
-            return
-
-        self.is_unwinding = True
+        async with self._lock:
+            if self.is_unwinding:
+                return
+            self.is_unwinding = True
         try:
             # 1. Cancel all open orders first
             await self.oms_manager.cancel_all_orders()

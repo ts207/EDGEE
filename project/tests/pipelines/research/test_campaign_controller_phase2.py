@@ -21,7 +21,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from project.pipelines.research.campaign_controller import (
+from project.research.campaign_controller import (
     CampaignConfig,
     CampaignController,
     CampaignSummary,
@@ -370,7 +370,7 @@ class TestStep4FrontierScan:
         mem = _empty_memory()
 
         with patch.object(ctrl, "_read_memory", return_value=mem), \
-             patch("project.pipelines.research.campaign_controller.read_memory_table",
+             patch("project.research.campaign_controller.read_memory_table",
                    return_value=__import__("pandas").DataFrame()):
             result = ctrl._step_scan_frontier(mem)
 
@@ -382,7 +382,7 @@ class TestStep4FrontierScan:
         mem = _empty_memory()
         mem["avoid_event_types"] = {"ZSCORE_STRETCH", "FND_DISLOC", "VOL_SHOCK", "LIQUIDATION_CASCADE"}
 
-        with patch("project.pipelines.research.campaign_controller.read_memory_table",
+        with patch("project.research.campaign_controller.read_memory_table",
                    return_value=__import__("pandas").DataFrame()):
             result = ctrl._step_scan_frontier(mem)
 
@@ -399,7 +399,7 @@ class TestStep4FrontierScan:
         }
         mem = _empty_memory()
 
-        with patch("project.pipelines.research.campaign_controller.read_memory_table",
+        with patch("project.research.campaign_controller.read_memory_table",
                    return_value=__import__("pandas").DataFrame()):
             result = ctrl._step_scan_frontier(mem)
 
@@ -415,7 +415,7 @@ class TestStep4FrontierScan:
         # Fake tested_regions with ZSCORE_STRETCH already tested
         tested_df = pd.DataFrame({"event_type": ["ZSCORE_STRETCH"]})
 
-        with patch("project.pipelines.research.campaign_controller.read_memory_table",
+        with patch("project.research.campaign_controller.read_memory_table",
                    return_value=tested_df):
             result = ctrl._step_scan_frontier(mem)
 
@@ -427,7 +427,7 @@ class TestStep4FrontierScan:
         ctrl = _make_controller(tmp_path)
         mem = _empty_memory()
 
-        with patch("project.pipelines.research.campaign_controller.read_memory_table",
+        with patch("project.research.campaign_controller.read_memory_table",
                    return_value=__import__("pandas").DataFrame()):
             result = ctrl._step_scan_frontier(mem)
 
@@ -454,7 +454,7 @@ class TestPriorityOrder:
         }
         self._patch_mem(ctrl, mem)
 
-        with patch("project.pipelines.research.campaign_controller.read_memory_table",
+        with patch("project.research.campaign_controller.read_memory_table",
                    return_value=__import__("pandas").DataFrame()):
             result = ctrl._propose_next_request()
 
@@ -473,7 +473,7 @@ class TestPriorityOrder:
         ]
         self._patch_mem(ctrl, mem)
 
-        with patch("project.pipelines.research.campaign_controller.read_memory_table",
+        with patch("project.research.campaign_controller.read_memory_table",
                    return_value=__import__("pandas").DataFrame()):
             result = ctrl._propose_next_request()
 
@@ -489,7 +489,7 @@ class TestPriorityOrder:
         ]
         self._patch_mem(ctrl, mem)
 
-        with patch("project.pipelines.research.campaign_controller.read_memory_table",
+        with patch("project.research.campaign_controller.read_memory_table",
                    return_value=__import__("pandas").DataFrame()):
             result = ctrl._propose_next_request()
 
@@ -502,7 +502,7 @@ class TestPriorityOrder:
         mem = _empty_memory()
         self._patch_mem(ctrl, mem)
 
-        with patch("project.pipelines.research.campaign_controller.read_memory_table",
+        with patch("project.research.campaign_controller.read_memory_table",
                    return_value=__import__("pandas").DataFrame()):
             result = ctrl._propose_next_request()
 
@@ -637,7 +637,7 @@ def test_run_campaign_continues_after_pipeline_failure(tmp_path):
     )
     ctrl._should_halt = lambda summary: False
 
-    with patch("project.pipelines.research.campaign_controller.build_experiment_plan", return_value=None):
+    with patch("project.research.campaign_controller.build_experiment_plan", return_value=None):
         ctrl.run_campaign()
 
     assert counts["updated"] == 1

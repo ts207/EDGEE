@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pandas as pd
 
-import project.pipelines.research.compile_strategy_blueprints as compiler
+import project.research.compile_strategy_blueprints as compiler
 from project.events.registry import EVENT_REGISTRY_SPECS
 
 

@@ -9,7 +9,7 @@ import pandas as pd
 import pytest
 
 import project.research.services.candidate_discovery_service as svc
-import project.pipelines.research.experiment_engine as experiment_engine
+import project.research.experiment_engine as experiment_engine
 
 
 # Shared helpers (duplicated from part1 to keep each file self-contained)

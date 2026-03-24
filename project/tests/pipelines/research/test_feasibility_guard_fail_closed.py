@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from project.pipelines.research.feasibility_guard import FeasibilityGuard
+from project.research.feasibility_guard import FeasibilityGuard
 
 
 def test_unknown_dataset_id_fails_closed(tmp_path):

@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 import pytest
-from project.pipelines.research.analyze_interaction_lift import calculate_lift
+from project.research.analyze_interaction_lift import calculate_lift
 
 
 def test_calculate_lift_basic():

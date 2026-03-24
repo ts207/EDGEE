@@ -254,7 +254,7 @@ def execute_candidate_discovery(config: CandidateDiscoveryConfig) -> CandidateDi
                 import importlib
 
                 experiment_engine = importlib.import_module(
-                    "project.pipelines.research.experiment_engine"
+                    "project.research.experiment_engine"
                 )
                 plan = experiment_engine.build_experiment_plan(
                     Path(config.experiment_config),

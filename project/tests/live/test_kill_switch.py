@@ -6,8 +6,10 @@ Verify that the KillSwitchManager correctly detects risk and triggers.
 
 from __future__ import annotations
 
+import asyncio
+
 import pytest
-from project.live.kill_switch import KillSwitchManager, KillSwitchReason, KillSwitchStatus
+from project.live.kill_switch import KillSwitchManager, KillSwitchReason, KillSwitchStatus, UnwindOrchestrator
 from project.live.state import LiveStateStore, PositionState
 
 
@@ -269,3 +271,74 @@ def test_kill_switch_auto_persists_via_state_store_snapshot_path(tmp_path) -> No
     restored_store = LiveStateStore.load_snapshot(snapshot_path)
     assert restored_store.get_kill_switch_snapshot()["is_active"] is True
     assert restored_store.get_kill_switch_snapshot()["reason"] == "MICROSTRUCTURE_BREAKDOWN"
+
+
+# ---------------------------------------------------------------------------
+# Regression: Bug 1.1 — peak equity must survive trigger() and reset()
+# ---------------------------------------------------------------------------
+
+
+def test_peak_equity_preserved_after_trigger():
+    """Kill-switch trigger() and reset() must not erase the high-water mark."""
+    store = LiveStateStore()
+    mgr = KillSwitchManager(store)
+
+    # 1. Establish peak at $1000
+    store.account.wallet_balance = 1000.0
+    store.account.total_unrealized_pnl = 0.0
+    mgr.check_drawdown(max_drawdown_pct=0.15)
+    assert mgr.status.peak_equity == pytest.approx(1000.0)
+
+    # 2. Trigger kill-switch manually — peak must survive
+    mgr.trigger(KillSwitchReason.MANUAL, "regression test")
+    assert mgr.status.is_active
+    assert mgr.status.peak_equity == pytest.approx(1000.0), (
+        "peak_equity was erased by trigger() — Bug 1.1 regression"
+    )
+
+    # 3. Reset — peak must still survive
+    mgr.reset()
+    assert not mgr.status.is_active
+    assert mgr.status.peak_equity == pytest.approx(1000.0), (
+        "peak_equity was erased by reset() — Bug 1.1 regression"
+    )
+
+    # 4. A second drawdown event must still detect drawdown relative to $1000
+    store.account.wallet_balance = 800.0  # 20% drawdown from $1000
+    mgr.check_drawdown(max_drawdown_pct=0.15)
+    assert mgr.status.is_active, (
+        "Drawdown check did not trigger after reset — peak must still be $1000"
+    )
+    assert mgr.status.reason == KillSwitchReason.EXCESSIVE_DRAWDOWN
+
+
+# ---------------------------------------------------------------------------
+# Regression: Bug 1.3 — unwind lock must prevent double-execution
+# ---------------------------------------------------------------------------
+
+
+def test_unwind_lock_prevents_double_execution():
+    """Two concurrent calls to unwind_all() must not both proceed."""
+    call_count = 0
+
+    class FakeOms:
+        async def cancel_all_orders(self):
+            nonlocal call_count
+            call_count += 1
+            # Simulate slow cancellation so the second caller arrives while busy
+            await asyncio.sleep(0.05)
+
+    store = LiveStateStore()
+    orchestrator = UnwindOrchestrator(state_store=store, oms_manager=FakeOms())
+
+    async def run():
+        await asyncio.gather(
+            orchestrator.unwind_all(),
+            orchestrator.unwind_all(),
+        )
+
+    asyncio.run(run())
+    # Only one of the two concurrent calls should have proceeded past the guard
+    assert call_count == 1, (
+        f"cancel_all_orders() called {call_count} times — Bug 1.3 double-unwind regression"
+    )

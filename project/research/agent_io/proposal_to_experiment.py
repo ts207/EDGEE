@@ -13,7 +13,7 @@ from project.spec_registry import load_yaml_path
 
 
 def _build_experiment_plan(*args: Any, **kwargs: Any) -> Any:
-    module = importlib.import_module("project.pipelines.research.experiment_engine")
+    module = importlib.import_module("project.research.experiment_engine")
     return module.build_experiment_plan(*args, **kwargs)
 
 

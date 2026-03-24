@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 from project.domain.hypotheses import HypothesisSpec, TriggerSpec
-from project.pipelines.research.experiment_engine_schema import (
+from project.research.experiment_engine_schema import (
     AgentExperimentRequest,
     RegistryBundle,
 )

@@ -319,7 +319,7 @@ def _synthesize_experiment_hypotheses(
     """Synthesize candidates from an experiment plan for a specific event trigger context."""
     import importlib
 
-    experiment_engine = importlib.import_module("project.pipelines.research.experiment_engine")
+    experiment_engine = importlib.import_module("project.research.experiment_engine")
 
     plan = experiment_engine.build_experiment_plan(Path(experiment_config), Path(registry_root))
 

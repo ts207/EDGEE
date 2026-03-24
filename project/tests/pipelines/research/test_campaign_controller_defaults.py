@@ -1,7 +1,7 @@
 import subprocess
 import sys
 from pathlib import Path
-from project.pipelines.research.campaign_controller import CampaignConfig, CampaignController
+from project.research.campaign_controller import CampaignConfig, CampaignController
 from project.core.config import get_data_root
 
 def test_scan_trigger_types_default_includes_all():

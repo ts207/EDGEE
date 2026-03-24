@@ -176,7 +176,7 @@ class TestPhase2CostResolution:
 
     def test_resolve_phase2_costs_reads_fees_yaml(self, tmp_path):
         """Cost must come from fees.yaml (fee+slippage), not a CLI default of 5 bps."""
-        from project.pipelines.research.phase2_cost_model import _resolve_phase2_costs
+        from project.research.phase2_cost_model import _resolve_phase2_costs
 
         configs = tmp_path / "configs"
         configs.mkdir()
@@ -192,7 +192,7 @@ class TestPhase2CostResolution:
 
     def test_cost_coordinate_contains_required_fields(self, tmp_path):
         """Cost coordinate dict must include config_digest, cost_bps, fee/slippage fields."""
-        from project.pipelines.research.phase2_cost_model import _resolve_phase2_costs
+        from project.research.phase2_cost_model import _resolve_phase2_costs
 
         configs = tmp_path / "configs"
         configs.mkdir()
@@ -207,7 +207,7 @@ class TestPhase2CostResolution:
 
     def test_fees_bps_override_arg_works(self, tmp_path):
         """CLI --fees_bps must override fees.yaml fee; slippage still from yaml."""
-        from project.pipelines.research.phase2_cost_model import _resolve_phase2_costs
+        from project.research.phase2_cost_model import _resolve_phase2_costs
 
         configs = tmp_path / "configs"
         configs.mkdir()

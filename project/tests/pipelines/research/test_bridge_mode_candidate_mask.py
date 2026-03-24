@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from project.pipelines.research.bridge_evaluate_phase2 import (
+from project.research.bridge_evaluate_phase2 import (
     _load_candidates,
     _select_bridge_candidates,
 )

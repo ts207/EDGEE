@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from project.pipelines.research.permutation_gate import permutation_test_expectancy
+from project.research.permutation_gate import permutation_test_expectancy
 
 
 class TestPermutationGate:

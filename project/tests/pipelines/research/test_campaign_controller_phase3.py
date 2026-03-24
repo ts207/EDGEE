@@ -17,12 +17,12 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from project.pipelines.research.campaign_controller import (
+from project.research.campaign_controller import (
     CampaignConfig,
     CampaignController,
     _DEFAULT_QUALITY,
 )
-from project.pipelines.research.run_hypothesis_search import _cluster_deduplicate
+from project.research.run_hypothesis_search import _cluster_deduplicate
 
 
 # ---------------------------------------------------------------------------
@@ -91,7 +91,7 @@ class TestScanTriggerTypeSequencing:
         ctrl = _make_ctrl(tmp_path, scan_trigger_types=["EVENT", "STATE"])
         mem = _empty_mem()
         with patch(
-            "project.pipelines.research.campaign_controller.read_memory_table",
+            "project.research.campaign_controller.read_memory_table",
             return_value=pd.DataFrame(),
         ):
             result = ctrl._step_scan_frontier(mem)
@@ -103,7 +103,7 @@ class TestScanTriggerTypeSequencing:
         mem = _empty_mem()
         all_events = pd.DataFrame({"event_type": ["EVT_A1", "EVT_A2", "EVT_B1"]})
         with patch(
-            "project.pipelines.research.campaign_controller.read_memory_table",
+            "project.research.campaign_controller.read_memory_table",
             return_value=all_events,
         ):
             result = ctrl._step_scan_frontier(mem)
@@ -118,7 +118,7 @@ class TestScanTriggerTypeSequencing:
         mem = _empty_mem()
         all_events = pd.DataFrame({"event_type": ["EVT_A1", "EVT_A2", "EVT_B1"]})
         with patch(
-            "project.pipelines.research.campaign_controller.read_memory_table",
+            "project.research.campaign_controller.read_memory_table",
             return_value=all_events,
         ):
             result = ctrl._step_scan_frontier(mem)
@@ -129,7 +129,7 @@ class TestScanTriggerTypeSequencing:
         ctrl = _make_ctrl(tmp_path, scan_trigger_types=["STATE"])
         mem = _empty_mem()
         with patch(
-            "project.pipelines.research.campaign_controller.read_memory_table",
+            "project.research.campaign_controller.read_memory_table",
             return_value=pd.DataFrame(),
         ):
             result = ctrl._step_scan_states(mem)
@@ -143,7 +143,7 @@ class TestScanTriggerTypeSequencing:
         ctrl = _make_ctrl(tmp_path, scan_trigger_types=["TRANSITION"])
         mem = _empty_mem()
         with patch(
-            "project.pipelines.research.campaign_controller.read_memory_table",
+            "project.research.campaign_controller.read_memory_table",
             return_value=pd.DataFrame(),
         ):
             result = ctrl._step_scan_transitions(mem)
@@ -159,7 +159,7 @@ class TestScanTriggerTypeSequencing:
         ctrl = _make_ctrl(tmp_path)
         mem = _empty_mem()
         with patch(
-            "project.pipelines.research.campaign_controller.read_memory_table",
+            "project.research.campaign_controller.read_memory_table",
             return_value=pd.DataFrame(),
         ):
             result = ctrl._step_scan_states(mem)
@@ -173,7 +173,7 @@ class TestScanTriggerTypeSequencing:
             [{"event_type": "STATE_HIGH_VOL_REGIME", "trigger_type": "STATE"}]
         )
         with patch(
-            "project.pipelines.research.campaign_controller.read_memory_table",
+            "project.research.campaign_controller.read_memory_table",
             return_value=tested,
         ):
             result = ctrl._step_scan_states(mem)
@@ -184,7 +184,7 @@ class TestScanTriggerTypeSequencing:
         ctrl = _make_ctrl(tmp_path)
         mem = _empty_mem()
         with patch(
-            "project.pipelines.research.campaign_controller.read_memory_table",
+            "project.research.campaign_controller.read_memory_table",
             return_value=pd.DataFrame(),
         ):
             result = ctrl._step_scan_transitions(mem)
@@ -203,7 +203,7 @@ class TestScanTriggerTypeSequencing:
             ]
         )
         with patch(
-            "project.pipelines.research.campaign_controller.read_memory_table",
+            "project.research.campaign_controller.read_memory_table",
             return_value=tested,
         ):
             result = ctrl._step_scan_transitions(mem)
@@ -215,7 +215,7 @@ class TestScanTriggerTypeSequencing:
         ctrl = _make_ctrl(tmp_path)
         mem = _empty_mem()
         with patch(
-            "project.pipelines.research.campaign_controller.read_memory_table",
+            "project.research.campaign_controller.read_memory_table",
             return_value=pd.DataFrame(),
         ):
             result = ctrl._step_scan_states(mem)
@@ -247,7 +247,7 @@ class TestContextConditioning:
         ctrl = _make_ctrl(tmp_path, enable_context_conditioning=True)
         mem = _empty_mem()
         with patch(
-            "project.pipelines.research.campaign_controller.read_memory_table",
+            "project.research.campaign_controller.read_memory_table",
             return_value=pd.DataFrame(),
         ):
             result = ctrl._step_scan_events(mem)
@@ -258,7 +258,7 @@ class TestContextConditioning:
         ctrl = _make_ctrl(tmp_path, enable_context_conditioning=False)
         mem = _empty_mem()
         with patch(
-            "project.pipelines.research.campaign_controller.read_memory_table",
+            "project.research.campaign_controller.read_memory_table",
             return_value=pd.DataFrame(),
         ):
             result = ctrl._step_scan_events(mem)
@@ -269,7 +269,7 @@ class TestContextConditioning:
         ctrl = _make_ctrl(tmp_path, scan_event_date_scope=("2025-03-01", "2025-03-15"))
         mem = _empty_mem()
         with patch(
-            "project.pipelines.research.campaign_controller.read_memory_table",
+            "project.research.campaign_controller.read_memory_table",
             return_value=pd.DataFrame(),
         ):
             result = ctrl._step_scan_events(mem)
@@ -281,7 +281,7 @@ class TestContextConditioning:
         ctrl = _make_ctrl(tmp_path, enable_context_conditioning=True)
         mem = _empty_mem()
         with patch(
-            "project.pipelines.research.campaign_controller.read_memory_table",
+            "project.research.campaign_controller.read_memory_table",
             return_value=pd.DataFrame(),
         ):
             result = ctrl._step_scan_states(mem)
@@ -445,7 +445,7 @@ class TestSequenceSeeding:
             ("EVT_A", 3.5), ("EVT_B", 2.1), ("EVT_C", 1.8),
         ])
         with patch(
-            "project.pipelines.research.campaign_controller.read_memory_table",
+            "project.research.campaign_controller.read_memory_table",
             return_value=tested,
         ):
             pairs = ctrl._find_weak_signal_event_pairs()
@@ -457,7 +457,7 @@ class TestSequenceSeeding:
             ("EVT_POS", 3.5), ("EVT_NEG", -2.0),
         ])
         with patch(
-            "project.pipelines.research.campaign_controller.read_memory_table",
+            "project.research.campaign_controller.read_memory_table",
             return_value=tested,
         ):
             pairs = ctrl._find_weak_signal_event_pairs()
@@ -474,7 +474,7 @@ class TestSequenceSeeding:
              "gate_promo_statistical": "false", "trigger_type": "EVENT", "run_id": "r1"},
         ])
         with patch(
-            "project.pipelines.research.campaign_controller.read_memory_table",
+            "project.research.campaign_controller.read_memory_table",
             return_value=tested,
         ):
             pairs = ctrl._find_weak_signal_event_pairs()
@@ -488,7 +488,7 @@ class TestSequenceSeeding:
             (f"EVT_{i}", float(i + 1)) for i in range(6)
         ])
         with patch(
-            "project.pipelines.research.campaign_controller.read_memory_table",
+            "project.research.campaign_controller.read_memory_table",
             return_value=tested,
         ):
             pairs = ctrl._find_weak_signal_event_pairs()
@@ -501,7 +501,7 @@ class TestSequenceSeeding:
             ("EVT_A", 3.5), ("EVT_B", 2.1),
         ])
         with patch(
-            "project.pipelines.research.campaign_controller.read_memory_table",
+            "project.research.campaign_controller.read_memory_table",
             return_value=tested,
         ):
             result = ctrl._step_scan_sequences(mem)
@@ -516,7 +516,7 @@ class TestSequenceSeeding:
         ctrl = _make_ctrl(tmp_path)
         mem = _empty_mem()
         with patch(
-            "project.pipelines.research.campaign_controller.read_memory_table",
+            "project.research.campaign_controller.read_memory_table",
             return_value=pd.DataFrame(),
         ):
             result = ctrl._step_scan_sequences(mem)
@@ -549,7 +549,7 @@ class TestFeaturePredicateActivation:
         ctrl = _make_ctrl(tmp_path, scan_trigger_types=["FEATURE_PREDICATE"])
         mem = _empty_mem()
         with patch(
-            "project.pipelines.research.campaign_controller.read_memory_table",
+            "project.research.campaign_controller.read_memory_table",
             return_value=pd.DataFrame(),
         ):
             result = ctrl._step_scan_feature_predicates(mem)
@@ -563,7 +563,7 @@ class TestFeaturePredicateActivation:
         ctrl = _make_ctrl(tmp_path)
         mem = _empty_mem()
         with patch(
-            "project.pipelines.research.campaign_controller.read_memory_table",
+            "project.research.campaign_controller.read_memory_table",
             return_value=pd.DataFrame(),
         ):
             result = ctrl._step_scan_feature_predicates(mem)
@@ -575,7 +575,7 @@ class TestFeaturePredicateActivation:
         ctrl = _make_ctrl(tmp_path)
         mem = _empty_mem()
         with patch(
-            "project.pipelines.research.campaign_controller.read_memory_table",
+            "project.research.campaign_controller.read_memory_table",
             return_value=pd.DataFrame(),
         ):
             result = ctrl._step_scan_feature_predicates(mem)
@@ -594,7 +594,7 @@ class TestFeaturePredicateActivation:
             ]
         )
         with patch(
-            "project.pipelines.research.campaign_controller.read_memory_table",
+            "project.research.campaign_controller.read_memory_table",
             return_value=tested,
         ):
             result = ctrl._step_scan_feature_predicates(mem)

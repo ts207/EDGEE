@@ -11,12 +11,12 @@ import pytest
 def test_search_feature_frame_not_importable():
     """search_feature_frame was deleted — it must not be importable."""
     with pytest.raises(ModuleNotFoundError):
-        importlib.import_module("project.pipelines.research.search_feature_frame")
+        importlib.import_module("project.research.search_feature_frame")
 
 
 def test_search_engine_imports_search_feature_utils():
     """phase2_search_engine must import from search_feature_utils, not from the deleted module."""
-    import project.pipelines.research.phase2_search_engine as eng
+    import project.research.phase2_search_engine as eng
 
     source = open(eng.__file__).read()
     assert "search_feature_utils" in source, (

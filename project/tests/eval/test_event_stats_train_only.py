@@ -3,11 +3,11 @@ import numpy as np
 import pytest
 from unittest import mock
 from pathlib import Path
-from project.pipelines.research.compile_strategy_blueprints import _event_stats
+from project.research.compile_strategy_blueprints import _event_stats
 
 
-@mock.patch("project.pipelines.research.compile_strategy_blueprints.pd.read_parquet")
-@mock.patch("project.pipelines.research.compile_strategy_blueprints.Path.exists")
+@mock.patch("project.research.compile_strategy_blueprints.pd.read_parquet")
+@mock.patch("project.research.compile_strategy_blueprints.Path.exists")
 def test_event_stats_train_only(mock_exists, mock_read_parquet):
     # Mock data setup
     mock_exists.return_value = True

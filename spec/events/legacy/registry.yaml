@@ -1,3 +1,4 @@
+# DEPRECATED: Use event_registry_unified.yaml
 absorption_event:
   analyzers:
   - integrity

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pandas as pd
 
-from project.pipelines.research.validate_event_quality import (
+from project.research.validate_event_quality import (
     _compute_rerun_proxy_metrics,
     _compute_sensitivity,
 )

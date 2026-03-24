@@ -11,7 +11,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from project.pipelines.research.phase2_lambda_persistence import (
+from project.research.phase2_lambda_persistence import (
     _build_lambda_snapshot,
     save_lambda_state_json,
 )

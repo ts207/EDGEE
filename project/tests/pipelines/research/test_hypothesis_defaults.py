@@ -4,7 +4,7 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3] / "project"
 
-from project.pipelines.research._hypothesis_defaults import (
+from project.research._hypothesis_defaults import (
     extract_event_type,
     load_hypothesis_defaults,
     parse_symbols_filter,

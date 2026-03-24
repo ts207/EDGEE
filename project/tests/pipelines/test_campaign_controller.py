@@ -4,7 +4,7 @@ import json
 import sys
 import yaml
 from pathlib import Path
-from project.pipelines.research.campaign_controller import (
+from project.research.campaign_controller import (
     CampaignController,
     CampaignConfig,
     CampaignSummary,
@@ -114,7 +114,7 @@ def test_execute_pipeline_invokes_run_all(monkeypatch, test_env, tmp_path):
         captured["check"] = check
         captured["cwd"] = cwd
 
-    monkeypatch.setattr("project.pipelines.research.campaign_controller.subprocess.run", _fake_run)
+    monkeypatch.setattr("project.research.campaign_controller.subprocess.run", _fake_run)
 
     config_path = tmp_path / "experiment.yaml"
     config_path.write_text("program_id: test_campaign\n", encoding="utf-8")

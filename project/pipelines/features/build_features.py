@@ -745,6 +745,7 @@ def main() -> int:
     parser.add_argument("--end", default=None)
     parser.add_argument("--log_path", default=None)
     parser.add_argument("--baseline_run_id", default=None)
+    parser.add_argument("--skip_if_exists", type=int, default=0)
     args = parser.parse_args()
 
     run_id = args.run_id
@@ -780,6 +781,21 @@ def main() -> int:
 
     try:
         for symbol in symbols:
+            if args.skip_if_exists:
+                report_path = _feature_quality_report_path(
+                    data_root,
+                    run_id=run_id,
+                    market=market,
+                    symbol=symbol,
+                    timeframe=tf,
+                    feature_schema_version=feature_schema_version,
+                )
+                if report_path.exists():
+                    logging.info(f"Skipping {symbol} {tf} as quality report already exists: {report_path}")
+                    # We should still pop existing results into stats if we want manifest to be complete,
+                    # but for now simple skip is the MVP requested.
+                    continue
+
             # Load cleaned bars
             bars_paths = [
                 run_scoped_lake_path(

@@ -66,11 +66,6 @@ PHASE2_EVENT_CHAIN: List[Tuple[str, str, List[str]]] = [
         ["--event_type", "WICK_REVERSAL_PROXY", "--timeframe", "5m"],
     ),
     (
-        "ABSORPTION_EVENT",
-        "analyze_events.py",
-        ["--event_type", "ABSORPTION_EVENT", "--timeframe", "5m"],
-    ),
-    (
         "ABSORPTION_PROXY",
         "analyze_events.py",
         ["--event_type", "ABSORPTION_PROXY", "--timeframe", "5m"],
@@ -266,5 +261,25 @@ PHASE2_EVENT_CHAIN: List[Tuple[str, str, List[str]]] = [
         "POST_DELEVERAGING_REBOUND",
         "analyze_events.py",
         ["--event_type", "POST_DELEVERAGING_REBOUND", "--timeframe", "5m"],
+    ),
+    (
+        "SEQ_FND_EXTREME_THEN_BREAKOUT",
+        "analyze_events.py",
+        ["--event_type", "SEQ_FND_EXTREME_THEN_BREAKOUT", "--timeframe", "5m"],
+    ),
+    (
+        "SEQ_LIQ_VACUUM_THEN_DEPTH_RECOVERY",
+        "analyze_events.py",
+        ["--event_type", "SEQ_LIQ_VACUUM_THEN_DEPTH_RECOVERY", "--timeframe", "5m"],
+    ),
+    (
+        "SEQ_OI_SPIKEPOS_THEN_VOL_SPIKE",
+        "analyze_events.py",
+        ["--event_type", "SEQ_OI_SPIKEPOS_THEN_VOL_SPIKE", "--timeframe", "5m"],
+    ),
+    (
+        "SEQ_VOL_COMP_THEN_BREAKOUT",
+        "analyze_events.py",
+        ["--event_type", "SEQ_VOL_COMP_THEN_BREAKOUT", "--timeframe", "5m"],
     ),
 ]

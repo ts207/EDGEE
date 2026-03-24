@@ -11,7 +11,7 @@ import pandas as pd
 import numpy as np
 
 from project.core.config import get_data_root
-from project.pipelines.research.search_intelligence import update_search_intelligence
+from project.research.search_intelligence import update_search_intelligence
 from project.research.knowledge.memory import (
     build_failures_snapshot,
     build_tested_regions_snapshot,

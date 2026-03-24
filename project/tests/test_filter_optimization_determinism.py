@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from project.pipelines.research.local_symbolic_overlay import train_local_symbolic_filter
+from project.research.local_symbolic_overlay import train_local_symbolic_filter
 
 
 def test_filter_optimization_determinism():

@@ -4,7 +4,7 @@ import numpy as np
 import json
 import pytest
 from pathlib import Path
-from project.pipelines.research.run_event_quality_analysis import run_event_quality_analysis
+from project.research.run_event_quality_analysis import run_event_quality_analysis
 
 
 def _make_features(n_bars: int = 400) -> pd.DataFrame:

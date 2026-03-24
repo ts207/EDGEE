@@ -431,12 +431,77 @@ def compute_pnl_components(
 
 
 def compute_pnl(
+    target_position: pd.Series,
+    close: pd.Series,
+    cost_bps: float | pd.Series = 0.0,
+    *,
+    open_: pd.Series | None = None,
+    execution_mode: str = "close",
+    funding_rate: pd.Series | None = None,
+    borrow_rate: pd.Series | None = None,
+    capital_base: float | pd.Series = 1.0,
+) -> pd.Series:
+    """Primary PnL API.  Delegates to :func:`compute_pnl_ledger`.
+
+    Parameters
+    ----------
+    target_position:
+        Desired end-of-bar exposure (``+1`` long, ``-1`` short, ``0`` flat).
+    close:
+        Per-bar close prices aligned to ``target_position``.
+    cost_bps:
+        Round-trip transaction cost in basis points (scalar or per-bar Series).
+    open_:
+        Per-bar open prices; required when ``execution_mode='next_open'``.
+    execution_mode:
+        ``'close'`` (default) or ``'next_open'``.
+    funding_rate:
+        Optional per-bar funding rate (event-aligned by default).
+    borrow_rate:
+        Optional per-bar borrow/short-fee rate.
+    capital_base:
+        Notional capital used to compute ``equity_return``.
+
+    Returns
+    -------
+    pd.Series
+        Net PnL per bar (``ledger['net_pnl']``).
+    """
+    ledger = compute_pnl_ledger(
+        target_position=target_position,
+        close=close,
+        open_=open_,
+        execution_mode=execution_mode,
+        cost_bps=cost_bps,
+        funding_rate=funding_rate,
+        borrow_rate=borrow_rate,
+        capital_base=capital_base,
+    )
+    return ledger["net_pnl"]
+
+
+def compute_pnl_legacy(
     pos: pd.Series,
     ret: pd.Series,
     cost_bps: float | pd.Series,
     funding_rate: pd.Series | None = None,
     borrow_rate: pd.Series | None = None,
 ) -> pd.Series:
+    """Backward-compatible wrapper around :func:`compute_pnl_components`.
+
+    .. deprecated::
+        Use :func:`compute_pnl` (with ``target_position`` and ``close``) or
+        :func:`compute_pnl_ledger` directly.  This function cannot correctly
+        account for flip trades in ``next_open`` mode.
+    """
+    import warnings
+
+    warnings.warn(
+        "compute_pnl_legacy() is deprecated.  Use compute_pnl(target_position, close, cost_bps) "
+        "or compute_pnl_ledger() which correctly handles flip trades and next-open fills.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     components = compute_pnl_components(
         pos=pos,
         ret=ret,

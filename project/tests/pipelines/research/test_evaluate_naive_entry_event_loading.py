@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pandas as pd
 
-import project.pipelines.research.evaluate_naive_entry as evaluate_naive_entry
+import project.research.evaluate_naive_entry as evaluate_naive_entry
 
 
 def test_load_phase1_events_uses_registry_spec_paths_and_subtype_filter(monkeypatch, tmp_path):

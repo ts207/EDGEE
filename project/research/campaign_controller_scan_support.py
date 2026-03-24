@@ -15,7 +15,7 @@ _LOG = logging.getLogger(__name__)
 
 
 def _read_memory_table(*args: Any, **kwargs: Any) -> pd.DataFrame:
-    from project.pipelines.research import campaign_controller as _controller
+    from project.research import campaign_controller as _controller
 
     return _controller.read_memory_table(*args, **kwargs)
 

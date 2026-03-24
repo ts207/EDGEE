@@ -9,7 +9,7 @@ import yaml
 
 from project import PROJECT_ROOT
 from project.events.registry import load_milestone_event_registry
-from project.pipelines.research.approval_workflow_v2 import ApprovalDecision
+from project.research.approval_workflow_v2 import ApprovalDecision
 
 
 DEFAULT_REGISTRY_PATH = PROJECT_ROOT.parent / "spec" / "events" / "registry.yaml"

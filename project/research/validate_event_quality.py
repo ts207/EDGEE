@@ -477,7 +477,7 @@ def _compute_rerun_sensitivity(
     timeframe: str = "5m",
 ) -> Dict[str, Any]:
     """Best-effort true rerun of the mapped detector and comparison to the base event set."""
-    from project.pipelines.research.export_edge_candidates import PHASE2_EVENT_CHAIN
+    from project.research.export_edge_candidates import PHASE2_EVENT_CHAIN
     import subprocess
     import tempfile
 

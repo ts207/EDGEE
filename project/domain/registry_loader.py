@@ -32,65 +32,33 @@ def _event_spec_dir() -> Path:
     return resolve_relative_spec_path("spec/events", repo_root=PROJECT_ROOT.parent)
 
 
-def _load_runtime_event_rows() -> Dict[str, Dict[str, Any]]:
-    spec_dir = _event_spec_dir()
-    out: Dict[str, Dict[str, Any]] = {}
-    if not spec_dir.exists():
-        return out
-    for yaml_file in sorted(spec_dir.glob("*.yaml")):
-        if yaml_file.name.startswith("_"):
-            continue
-        payload = load_yaml_path(yaml_file)
-        if not isinstance(payload, dict) or not payload:
-            continue
-        if str(payload.get("kind", "")).strip().lower() in _SPECIAL_EVENT_SPEC_KINDS:
-            continue
-        event_type = str(payload.get("event_type", "")).strip().upper()
-        if not event_type:
-            continue
-        row = dict(payload)
-        row["_spec_path"] = str(yaml_file.resolve())
-        out[event_type] = row
-    return out
-
-
-def _merge_event_rows(
-    unified: Dict[str, Any], runtime_rows: Dict[str, Dict[str, Any]]
-) -> Dict[str, EventDefinition]:
+def _merge_event_rows(unified: Dict[str, Any]) -> Dict[str, EventDefinition]:
     defaults = unified.get("defaults", {})
     families = unified.get("families", {})
     unified_events = unified.get("events", {})
     out: Dict[str, EventDefinition] = {}
 
-    event_types = set(runtime_rows.keys())
+    event_types = set()
     if isinstance(unified_events, dict):
         event_types.update(str(k).strip().upper() for k in unified_events.keys())
 
     for event_type in sorted(event_types):
         unified_row = unified_events.get(event_type, {}) if isinstance(unified_events, dict) else {}
-        runtime_row = runtime_rows.get(event_type, {})
         row: Dict[str, Any] = {}
         if isinstance(defaults, dict):
             row.update(defaults)
-        family_name = (
-            str(unified_row.get("canonical_family") or runtime_row.get("canonical_family") or "")
-            .strip()
-            .upper()
-        )
+        family_name = str(unified_row.get("canonical_family", "")).strip().upper()
+        
         if (
             family_name
             and isinstance(families, dict)
             and isinstance(families.get(family_name), dict)
         ):
             row.update(families[family_name])
+        
         if isinstance(unified_row, dict):
             row.update(unified_row)
-        if isinstance(runtime_row, dict):
-            # runtime event files are authoritative for promoted/runtime-only event specs
-            for key, value in runtime_row.items():
-                if key.startswith("_"):
-                    continue
-                row.setdefault(key, value)
+            
         parameters = {}
         default_params = defaults.get("parameters", {}) if isinstance(defaults, dict) else {}
         family_params = {}
@@ -100,16 +68,17 @@ def _merge_event_rows(
             and isinstance(families.get(family_name), dict)
         ):
             family_params = families[family_name].get("parameters", {})
+            
         if isinstance(default_params, dict):
             parameters.update(default_params)
         if isinstance(family_params, dict):
             parameters.update(family_params)
         if isinstance(row.get("parameters"), dict):
             parameters.update(row["parameters"])
+            
         row["parameters"] = parameters
-        spec_path = str(runtime_row.get("_spec_path", "")) or str(
-            (_event_spec_dir() / f"{event_type}.yaml").resolve()
-        )
+        spec_path = str((_event_spec_dir() / f"{event_type}.yaml").resolve())
+        
         out[event_type] = EventDefinition(
             event_type=event_type,
             canonical_family=family_name or str(row.get("canonical_family", "")).strip().upper(),
@@ -119,9 +88,7 @@ def _merge_event_rows(
             parameters=dict(parameters),
             raw=dict(row),
             spec_path=spec_path,
-            source_kind="runtime_event_spec"
-            if event_type in runtime_rows and event_type not in (unified_events or {})
-            else "unified_registry",
+            source_kind="unified_registry",
         )
     return out
 
@@ -326,8 +293,7 @@ def compile_domain_registry() -> DomainRegistry:
         raise FileNotFoundError("Unified event registry is missing or empty")
     template_registry_payload = load_yaml_relative("spec/ontology/templates/template_registry.yaml")
     family_registry_payload = load_yaml_relative("spec/grammar/family_registry.yaml")
-    runtime_event_rows = _load_runtime_event_rows()
-    event_definitions = _merge_event_rows(unified, runtime_event_rows)
+    event_definitions = _merge_event_rows(unified)
     state_definitions = _load_states()
     template_operator_definitions = _load_operators(unified)
     context_state_map = _load_context_state_map()

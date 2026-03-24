@@ -31,7 +31,9 @@ def apply_statistical_gates(
     alpha = float(gate_spec.get("alpha", gate_spec.get("q_threshold", 0.05)))
     pvals = pd.to_numeric(out[p_col], errors="coerce").fillna(1.0).to_numpy(dtype=float)
     out["bh_q_value"] = bh_adjust(pvals)
-    out["passes_statistical_gate"] = (pvals <= alpha) & (out["bh_q_value"] <= alpha)
+    # Gate on BH q-value only — the BH procedure is designed to replace the raw
+    # threshold, not compound it.  ANDing both conditions inflates Type II errors.
+    out["passes_statistical_gate"] = out["bh_q_value"] <= alpha
     if "group_key" not in out.columns:
         group_cols = tuple(gate_spec.get("group_columns", ()))
         if group_cols:

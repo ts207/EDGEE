@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 
 from project.compilers.executable_strategy_spec import ExecutableStrategySpec
-from project.pipelines.research import compile_strategy_blueprints as compiler
+from project.research import compile_strategy_blueprints as compiler
 from project.strategy.dsl.schema import (
     Blueprint,
     EntrySpec,

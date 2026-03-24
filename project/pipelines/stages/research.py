@@ -5,11 +5,11 @@ from typing import Any, Dict, List, Mapping, Tuple
 
 from project.events.config import ComposedEventConfig, compose_event_config
 from project.pipelines.stages.utils import script_supports_flag
-from project.pipelines.research.registry_validation import (
+from project.research.registry_validation import (
     validate_agent_selections,
     filter_event_chain,
 )
-from project.pipelines.research.experiment_engine import build_experiment_plan
+from project.research.experiment_engine import build_experiment_plan
 
 _LOG = logging.getLogger(__name__)
 

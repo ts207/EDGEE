@@ -18,6 +18,8 @@ from project.engine.pnl import (
     compute_funding_pnl_event_aligned,
     compute_pnl,
     compute_pnl_components,
+    compute_pnl_legacy,
+    compute_pnl_ledger,
     compute_returns,
     compute_returns_next_open,
 )
@@ -279,11 +281,25 @@ def test_compute_pnl_components_event_aligned_funding():
 
 
 class TestComputePnl:
-    def test_matches_components_pnl(self):
+    def test_matches_ledger_net_pnl(self):
+        """compute_pnl() should delegate to compute_pnl_ledger() and return net_pnl."""
+        idx = _ts(4)
+        target_pos = pd.Series([0.0, 1.0, 1.0, 0.0], index=idx)
+        # close prices that would yield ~1%, 2%, -1% returns
+        close = pd.Series([100.0, 101.0, 103.0, 101.97], index=idx)
+        pnl = compute_pnl(target_pos, close, cost_bps=5.0)
+        ledger = compute_pnl_ledger(target_pos, close, cost_bps=5.0)
+        pd.testing.assert_series_equal(pnl, ledger["net_pnl"])
+
+    def test_legacy_matches_components_pnl(self):
+        """compute_pnl_legacy() should still delegate to compute_pnl_components."""
         idx = _ts(4)
         pos = pd.Series([0.0, 1.0, 1.0, 0.0], index=idx)
         ret = pd.Series([0.0, 0.01, 0.02, -0.01], index=idx)
-        pnl = compute_pnl(pos, ret, cost_bps=5.0)
+        import warnings
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            pnl = compute_pnl_legacy(pos, ret, cost_bps=5.0)
         components = compute_pnl_components(pos, ret, cost_bps=5.0)
         pd.testing.assert_series_equal(pnl, components["pnl"])
 

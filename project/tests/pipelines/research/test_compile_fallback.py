@@ -1,6 +1,6 @@
 import pytest
 import pandas as pd
-from project.pipelines.research.compile_strategy_blueprints import (
+from project.research.compile_strategy_blueprints import (
     _passes_fallback_gate,
     _passes_quality_floor,
     _choose_event_rows,

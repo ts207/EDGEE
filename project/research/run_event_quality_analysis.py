@@ -12,7 +12,7 @@ Usage (CLI):
         --output_dir data/reports/event_quality/my_run
 
 Usage (library):
-    from project.pipelines.research.run_event_quality_analysis import run_event_quality_analysis
+    from project.research.run_event_quality_analysis import run_event_quality_analysis
     summary = run_event_quality_analysis(features_df, output_dir=Path("..."))
 """
 

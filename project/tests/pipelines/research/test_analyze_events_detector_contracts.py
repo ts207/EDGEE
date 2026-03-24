@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pandas as pd
 
-from project.pipelines.research import analyze_events
+from project.research import analyze_events
 
 
 def test_analyze_events_uses_registry_event_stream_for_sequence_detectors(

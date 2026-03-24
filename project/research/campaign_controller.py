@@ -14,9 +14,9 @@ import pandas as pd
 import yaml
 
 from project.core.config import get_data_root
-from project.pipelines.research import campaign_controller_scan_support as _scan_support
-from project.pipelines.research.experiment_engine import build_experiment_plan, RegistryBundle
-from project.pipelines.research.search_intelligence import update_search_intelligence
+from project.research import campaign_controller_scan_support as _scan_support
+from project.research.experiment_engine import build_experiment_plan, RegistryBundle
+from project.research.search_intelligence import update_search_intelligence
 from project.research.knowledge.memory import memory_paths, read_memory_table
 from project.spec_registry.search_space import (
     load_event_priority_weights,
@@ -626,7 +626,7 @@ class CampaignController:
         block a campaign from starting.
         """
         try:
-            from project.pipelines.research.feature_mi_scan import run_feature_mi_scan
+            from project.research.feature_mi_scan import run_feature_mi_scan
             from project.research.phase2 import load_features
 
             symbols = [s.strip().upper() for s in self.config.mi_scan_symbols.split(",") if s.strip()]

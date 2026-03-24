@@ -47,6 +47,7 @@ def test_validate_event_payload_accepts_canonical_shape():
         "intensity": 2.5,
         "severity": 2,
         "episode_id": None,
+        "attribution_id": None,
         "detector_version": "v1",
         "event_version": "v1",
         "meta": {},

@@ -33,7 +33,7 @@ from project.research.search.bridge_adapter import (
 )
 from project.io.utils import ensure_dir, write_parquet
 from project.research.search.distributed_runner import run_distributed_search
-from project.pipelines.research._family_event_utils import load_features as load_features
+from project.research._family_event_utils import load_features as load_features
 from project.research.search.search_feature_utils import (
     normalize_search_feature_columns,
     prepare_search_features_for_symbol,
@@ -272,7 +272,7 @@ def run(
     # Load experiment plan if provided
     experiment_plan = None
     if experiment_config:
-        from project.pipelines.research.experiment_engine import build_experiment_plan
+        from project.research.experiment_engine import build_experiment_plan
 
         experiment_plan = build_experiment_plan(Path(experiment_config), Path(registry_root))
         log.info("Loaded experiment plan with %d hypotheses", len(experiment_plan.hypotheses))

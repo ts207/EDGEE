@@ -16,8 +16,6 @@ from project.spec_registry import load_event_spec
 class SessionOpenDetector(ThresholdDetector):
     event_type = "SESSION_OPEN_EVENT"
     required_columns = ("timestamp",)
-    default_hours_utc = (0, 8, 13)
-    default_intensity_scale = 60.0
 
     def prepare_features(self, df: pd.DataFrame, **params: Any) -> dict[str, pd.Series]:
         ts = pd.to_datetime(df["timestamp"], utc=True, errors="coerce")
@@ -29,7 +27,7 @@ class SessionOpenDetector(ThresholdDetector):
         ts = features["ts"]
         spec = load_event_spec(self.event_type)
         spec_params = spec.get("parameters", {}) if isinstance(spec, dict) else {}
-        hours = spec_params.get("hours_utc", list(self.default_hours_utc))
+        hours = spec_params["hours_utc"]
         return ((ts.dt.minute == 0) & ts.dt.hour.isin(hours)).fillna(False)
 
     def compute_intensity(
@@ -37,16 +35,16 @@ class SessionOpenDetector(ThresholdDetector):
     ) -> pd.Series:
         ts = features["ts"]
         mins = (ts.dt.minute.fillna(59)).astype(float)
-
-        intensity_scale = float(params.get("intensity_scale", self.default_intensity_scale))
+        spec = load_event_spec(self.event_type)
+        spec_params = spec.get("parameters", {}) if isinstance(spec, dict) else {}
+        val = params.get("intensity_scale", spec_params.get("intensity_scale", 60.0))
+        intensity_scale = float(val) if val is not None else 60.0
         return (intensity_scale - mins).clip(lower=0.0)
 
 
 class SessionCloseDetector(ThresholdDetector):
     event_type = "SESSION_CLOSE_EVENT"
     required_columns = ("timestamp",)
-    default_hours_utc = (7, 12, 23)
-    default_intensity_scale = 60.0
 
     def prepare_features(self, df: pd.DataFrame, **params: Any) -> dict[str, pd.Series]:
         ts = pd.to_datetime(df["timestamp"], utc=True, errors="coerce")
@@ -58,7 +56,7 @@ class SessionCloseDetector(ThresholdDetector):
         ts = features["ts"]
         spec = load_event_spec(self.event_type)
         spec_params = spec.get("parameters", {}) if isinstance(spec, dict) else {}
-        hours = spec_params.get("hours_utc", list(self.default_hours_utc))
+        hours = spec_params["hours_utc"]
         return ((ts.dt.minute >= 55) & ts.dt.hour.isin(hours)).fillna(False)
 
     def compute_intensity(
@@ -66,8 +64,10 @@ class SessionCloseDetector(ThresholdDetector):
     ) -> pd.Series:
         ts = features["ts"]
         mins_to_close = (59 - ts.dt.minute.fillna(0)).abs().astype(float)
-
-        intensity_scale = float(params.get("intensity_scale", self.default_intensity_scale))
+        spec = load_event_spec(self.event_type)
+        spec_params = spec.get("parameters", {}) if isinstance(spec, dict) else {}
+        val = params.get("intensity_scale", spec_params.get("intensity_scale", 60.0))
+        intensity_scale = float(val) if val is not None else 60.0
         return (intensity_scale - mins_to_close).clip(lower=0.0)
 
 
@@ -90,7 +90,7 @@ class FundingTimestampDetector(ThresholdDetector):
         ts = features["ts"]
         spec = load_event_spec(self.event_type)
         spec_params = spec.get("parameters", {}) if isinstance(spec, dict) else {}
-        hours = spec_params.get("hours_utc", [0, 8, 16])
+        hours = spec_params["hours_utc"]
         return ((ts.dt.minute == 0) & ts.dt.hour.isin(hours)).fillna(False)
 
     def compute_intensity(

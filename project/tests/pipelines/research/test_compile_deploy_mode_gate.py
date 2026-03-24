@@ -8,7 +8,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-import project.pipelines.research.compile_strategy_blueprints as compiler
+import project.research.compile_strategy_blueprints as compiler
 
 
 @dataclass

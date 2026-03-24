@@ -160,7 +160,7 @@ def build_agent_knob_rows() -> List[Dict[str, Any]]:
         "project.pipelines.pipeline_planning"
     ).build_parser
     build_memory_update_parser = importlib.import_module(
-        "project.pipelines.research.update_campaign_memory"
+        "project.research.update_campaign_memory"
     ).build_parser
     profile_promotion_defaults = importlib.import_module(
         "project.pipelines.stages.research"
@@ -207,7 +207,7 @@ def build_agent_knob_rows() -> List[Dict[str, Any]]:
             build_memory_update_parser(),
             scope="agent",
             group="campaign_memory_stage",
-            source_module="project.pipelines.research.update_campaign_memory",
+            source_module="project.research.update_campaign_memory",
             include_prefixes=(
                 "promising_top_k",
                 "avoid_top_k",

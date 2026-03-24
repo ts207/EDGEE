@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from project.events.canonical_audit import redundancy_report
-from project.pipelines.research.promotion_gates_v2 import evaluate_family_promotion
+from project.research.promotion_gates_v2 import evaluate_family_promotion
 
 
 @dataclass(frozen=True)

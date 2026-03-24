@@ -6,7 +6,7 @@ import pandas as pd
 
 from project.events.pit import validate_event_frame_pit, PITValidationError
 from project.events.validate import validate_event_frame_columns
-from project.pipelines.research.promotion_gates_v2 import (
+from project.research.promotion_gates_v2 import (
     PromotionDecision,
     evaluate_family_promotion,
 )

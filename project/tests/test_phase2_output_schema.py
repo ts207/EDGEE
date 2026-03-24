@@ -62,7 +62,7 @@ def _templates_from_verb_lexicon() -> set[str]:
 
 
 try:
-    from project.pipelines.research._hypothesis_defaults import load_hypothesis_defaults
+    from project.research._hypothesis_defaults import load_hypothesis_defaults
 
     _spec_defaults = load_hypothesis_defaults(project_root=PROJECT_ROOT)
     _RULE_TEMPLATE_ENUM = (

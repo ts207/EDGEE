@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 import pandas as pd
 
-import project.pipelines.research.generate_recommendations_checklist as checklist
+import project.research.generate_recommendations_checklist as checklist
 
 
 class _Args:

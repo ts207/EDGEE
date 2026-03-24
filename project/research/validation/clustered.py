@@ -4,7 +4,6 @@ from typing import Optional, Tuple
 
 import numpy as np
 import pandas as pd
-import statsmodels.api as sm
 from scipy import stats
 
 
@@ -38,11 +37,27 @@ def clustered_standard_error(
         stderr = float(vals.std(ddof=1) / np.sqrt(n)) if n > 1 else 0.0
         return max(0.0, stderr), int(max(1, cl.nunique() if cl is not None else n)), "naive"
 
-    X = np.ones((n, 1), dtype=float)
-    model = sm.OLS(vals.to_numpy(dtype=float), X)
-    fit = model.fit(cov_type="cluster", cov_kwds={"groups": cl.to_numpy()})
-    stderr = float(fit.bse[0]) if len(fit.bse) else 0.0
-    return max(0.0, stderr), int(cl.nunique()), "clustered"
+    # Intercept-only OLS: beta = mean(vals)
+    mean_val = vals.mean()
+    residuals = vals - mean_val
+    
+    # Square of sum of residuals for each cluster
+    cluster_sums = residuals.groupby(cl, observed=True).sum()
+    sum_sq_cluster_sums = (cluster_sums**2).sum()
+    
+    # Variance of the intercept estimator: (X'X)^-1 * (Sum_g X_g' u_g u_g' X_g) * (X'X)^-1
+    # X is a vector of ones, so X'X = n.
+    var_beta = sum_sq_cluster_sums / (n**2)
+    
+    # Scale for small sample adjustment (G / (G-1)) * ((n-1) / (n-k))
+    # where G is number of clusters, k=1 here.
+    g = cl.nunique()
+    if g > 1:
+        adjustment = (g / (g - 1)) * ((n - 1) / (max(1, n - 1)))
+        var_beta *= adjustment
+        
+    stderr = float(np.sqrt(var_beta))
+    return max(0.0, stderr), int(g), "clustered"
 
 
 def clustered_t_stat(estimate: float, stderr: float) -> float:

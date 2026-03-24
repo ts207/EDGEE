@@ -3,7 +3,7 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-from project.pipelines.research.holdout_integrity import (
+from project.research.holdout_integrity import (
     assert_holdout_split_integrity,
     assert_no_lookahead_join,
 )

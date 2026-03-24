@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pandas as pd
 
-import project.pipelines.research.update_edge_registry as update_edge_registry
+import project.research.update_edge_registry as update_edge_registry
 
 
 def _write_run_manifest(data_root: Path, run_id: str) -> None:

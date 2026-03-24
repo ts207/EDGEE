@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import logging
 import os
 from pathlib import Path
 from typing import Dict, Iterable, List, Sequence
+
+_LOG = logging.getLogger(__name__)
 
 import pandas as pd
 
@@ -40,7 +43,7 @@ def _read_phase1_events(data_root: Path, run_id: str, spec: EventRegistrySpec) -
 
     candidates: List[Path] = []
     for p in primary_candidates:
-        print(f"DEBUG: checking candidate path: {p}")
+        _LOG.debug("checking candidate path: %s", p)
         candidates.append(p)
         if p.suffix.lower() == ".csv":
             candidates.append(p.with_suffix(".parquet"))
@@ -50,7 +53,7 @@ def _read_phase1_events(data_root: Path, run_id: str, spec: EventRegistrySpec) -
     for path in candidates:
         if not path.exists():
             continue
-        print(f"DEBUG: Found valid path: {path}")
+        _LOG.debug("found valid path: %s", path)
         try:
             if path.suffix.lower() == ".parquet":
                 return pd.read_parquet(path)

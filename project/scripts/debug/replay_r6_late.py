@@ -13,15 +13,15 @@ RUN_DIR = Path("data/runs") / RUN_ID
 VENV_PYTHON = str(Path(".venv/bin/python"))
 
 MODULES = {
-    "bridge_evaluate_phase2": "project.pipelines.research.bridge_evaluate_phase2",
-    "export_edge_candidates": "project.pipelines.research.export_edge_candidates",
+    "bridge_evaluate_phase2": "project.research.bridge_evaluate_phase2",
+    "export_edge_candidates": "project.research.export_edge_candidates",
     "promote_candidates": "project.pipelines.research.promote_candidates",
-    "analyze_conditional_expectancy": "project.pipelines.research.analyze_conditional_expectancy",
-    "validate_expectancy_traps": "project.pipelines.research.validate_expectancy_traps",
-    "generate_recommendations_checklist": "project.pipelines.research.generate_recommendations_checklist",
-    "compile_strategy_blueprints": "project.pipelines.research.compile_strategy_blueprints",
-    "build_strategy_candidates": "project.pipelines.research.build_strategy_candidates",
-    "select_profitable_strategies": "project.pipelines.research.select_profitable_strategies",
+    "analyze_conditional_expectancy": "project.research.analyze_conditional_expectancy",
+    "validate_expectancy_traps": "project.research.validate_expectancy_traps",
+    "generate_recommendations_checklist": "project.research.generate_recommendations_checklist",
+    "compile_strategy_blueprints": "project.research.compile_strategy_blueprints",
+    "build_strategy_candidates": "project.research.build_strategy_candidates",
+    "select_profitable_strategies": "project.research.select_profitable_strategies",
 }
 
 

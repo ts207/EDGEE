@@ -163,7 +163,7 @@ class TestFrontierOrdering:
         return reg
 
     def test_high_quality_event_appears_first(self, tmp_path):
-        from project.pipelines.research.search_intelligence import _build_frontier
+        from project.research.search_intelligence import _build_frontier
 
         registries = self._make_registries({
             "LOW_EVENT":  {"enabled": True, "family": "F"},
@@ -191,7 +191,7 @@ class TestFrontierOrdering:
         assert untested[2] == "LOW_EVENT"
 
     def test_unannotated_events_use_default_weight(self, tmp_path):
-        from project.pipelines.research.search_intelligence import _build_frontier
+        from project.research.search_intelligence import _build_frontier
 
         registries = self._make_registries({
             "ANNOTATED":   {"enabled": True, "family": "F"},
@@ -216,7 +216,7 @@ class TestFrontierOrdering:
         assert untested[1] == "ANNOTATED"
 
     def test_no_quality_weights_falls_back_to_default(self, tmp_path):
-        from project.pipelines.research.search_intelligence import _build_frontier
+        from project.research.search_intelligence import _build_frontier
 
         registries = self._make_registries({
             "EVT_A": {"enabled": True, "family": "F"},
@@ -235,7 +235,7 @@ class TestFrontierOrdering:
         assert set(result["untested_registry_events"]) == {"EVT_A", "EVT_B"}
 
     def test_frontier_top_k_respected(self, tmp_path):
-        from project.pipelines.research.search_intelligence import _build_frontier
+        from project.research.search_intelligence import _build_frontier
 
         events = {f"EVT_{i}": {"enabled": True, "family": "F"} for i in range(10)}
         registries = self._make_registries(events)
@@ -261,7 +261,7 @@ class TestControllerUsesRegistry:
 
     def test_quality_weights_loaded_on_init(self, tmp_path):
         """Controller's _quality_weights should contain HIGH-annotated events."""
-        from project.pipelines.research.campaign_controller import (
+        from project.research.campaign_controller import (
             CampaignConfig,
             CampaignController,
         )
@@ -294,7 +294,7 @@ class TestControllerUsesRegistry:
 
     def test_shim_produces_same_output_as_loader(self, tmp_path):
         """_load_event_quality_weights shim must return identical results to the loader."""
-        from project.pipelines.research.campaign_controller import _load_event_quality_weights
+        from project.research.campaign_controller import _load_event_quality_weights
         from project.spec_registry.search_space import load_event_priority_weights
 
         content = (
@@ -325,8 +325,8 @@ class TestControllerUsesRegistry:
 
     def test_frontier_ordering_in_update_search_intelligence(self, tmp_path):
         """End-to-end: update_search_intelligence writes quality-ordered frontier."""
-        from project.pipelines.research.search_intelligence import update_search_intelligence
-        from project.pipelines.research.experiment_engine import RegistryBundle
+        from project.research.search_intelligence import update_search_intelligence
+        from project.research.experiment_engine import RegistryBundle
 
         # Write a minimal search_space.yaml with 2 annotated events
         ss_path = tmp_path / "spec" / "search_space.yaml"
@@ -350,12 +350,12 @@ class TestControllerUsesRegistry:
         }
 
         with patch(
-            "project.pipelines.research.search_intelligence.RegistryBundle",
+            "project.research.search_intelligence.RegistryBundle",
             return_value=mock_reg,
         ), patch(
-            "project.pipelines.research.search_intelligence.ensure_memory_store",
+            "project.research.search_intelligence.ensure_memory_store",
         ), patch(
-            "project.pipelines.research.search_intelligence.read_memory_table",
+            "project.research.search_intelligence.read_memory_table",
             return_value=pd.DataFrame(),
         ):
             result = update_search_intelligence(

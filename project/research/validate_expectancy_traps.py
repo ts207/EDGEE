@@ -32,7 +32,7 @@ from project.research.stats.expectancy import (
     tail_report,
     capacity_diagnostics,
 )
-from project.pipelines.research.expectancy_traps_support import (
+from project.research.expectancy_traps_support import (
     load_expectancy_payload,
     parse_horizons,
     pick_window_column,

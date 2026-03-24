@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 import yaml
 
-from project.pipelines.research import hypothesis_spec_translator as hst
+from project.research import hypothesis_spec_translator as hst
 
 
 def test_load_active_hypothesis_specs_filters_to_active(tmp_path):

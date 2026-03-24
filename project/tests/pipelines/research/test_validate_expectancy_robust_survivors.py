@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 from types import SimpleNamespace
 
-import project.pipelines.research.validate_expectancy_traps as traps
+import project.research.validate_expectancy_traps as traps
 
 
 def test_newey_west_t_stat_detects_positive_mean_signal():

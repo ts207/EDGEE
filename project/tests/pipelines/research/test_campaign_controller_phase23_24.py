@@ -21,12 +21,12 @@ from unittest.mock import MagicMock, patch
 import pandas as pd
 import pytest
 
-from project.pipelines.research.campaign_controller import (
+from project.research.campaign_controller import (
     CampaignConfig,
     CampaignController,
     _DEFAULT_QUALITY,
 )
-from project.pipelines.research.update_campaign_memory import mark_failures_superseded
+from project.research.update_campaign_memory import mark_failures_superseded
 
 
 # ---------------------------------------------------------------------------
@@ -105,7 +105,7 @@ class TestScanModeSingleFamily:
         mem = _empty_memory()
 
         with patch(
-            "project.pipelines.research.campaign_controller.read_memory_table",
+            "project.research.campaign_controller.read_memory_table",
             return_value=pd.DataFrame(),
         ):
             result = ctrl._step_scan_frontier(mem)
@@ -131,7 +131,7 @@ class TestScanModeSingleFamily:
         mem = _empty_memory()
 
         with patch(
-            "project.pipelines.research.campaign_controller.read_memory_table",
+            "project.research.campaign_controller.read_memory_table",
             return_value=pd.DataFrame(),
         ):
             result = ctrl._step_scan_frontier(mem)
@@ -150,7 +150,7 @@ class TestScanModeSingleFamily:
         mem["avoid_event_types"] = {"EVT_C1"}  # The only HIGH event is avoided
 
         with patch(
-            "project.pipelines.research.campaign_controller.read_memory_table",
+            "project.research.campaign_controller.read_memory_table",
             return_value=pd.DataFrame(),
         ):
             result = ctrl._step_scan_frontier(mem)
@@ -168,7 +168,7 @@ class TestScanModeSingleFamily:
         })
 
         with patch(
-            "project.pipelines.research.campaign_controller.read_memory_table",
+            "project.research.campaign_controller.read_memory_table",
             return_value=all_events_df,
         ):
             result = ctrl._step_scan_frontier(mem)
@@ -185,7 +185,7 @@ class TestScanModeSingleFamily:
         mem = _empty_memory()
 
         with patch(
-            "project.pipelines.research.campaign_controller.read_memory_table",
+            "project.research.campaign_controller.read_memory_table",
             return_value=pd.DataFrame(),
         ):
             result = ctrl._step_scan_frontier(mem)
@@ -197,7 +197,7 @@ class TestScanModeSingleFamily:
         ctrl = _make_controller(tmp_path, research_mode="scan")
         mem = _empty_memory()
         with patch(
-            "project.pipelines.research.campaign_controller.read_memory_table",
+            "project.research.campaign_controller.read_memory_table",
             return_value=pd.DataFrame(),
         ):
             result = ctrl._step_scan_frontier(mem)
@@ -223,7 +223,7 @@ class TestExploreModeCrossFamily:
         mem = _empty_memory()
 
         with patch(
-            "project.pipelines.research.campaign_controller.read_memory_table",
+            "project.research.campaign_controller.read_memory_table",
             return_value=pd.DataFrame(),
         ):
             result = ctrl._step_scan_frontier_cross_family(mem)
@@ -246,7 +246,7 @@ class TestExploreModeCrossFamily:
         mem = _empty_memory()
 
         with patch(
-            "project.pipelines.research.campaign_controller.read_memory_table",
+            "project.research.campaign_controller.read_memory_table",
             return_value=pd.DataFrame(),
         ):
             result = ctrl._step_scan_frontier_cross_family(mem)
@@ -259,7 +259,7 @@ class TestExploreModeCrossFamily:
         mem = _empty_memory()
 
         with patch(
-            "project.pipelines.research.campaign_controller.read_memory_table",
+            "project.research.campaign_controller.read_memory_table",
             return_value=pd.DataFrame(),
         ):
             result = ctrl._step_scan_frontier_cross_family(mem)
@@ -275,7 +275,7 @@ class TestExploreModeCrossFamily:
         tested_df = pd.DataFrame({"event_type": all_events})
 
         with patch(
-            "project.pipelines.research.campaign_controller.read_memory_table",
+            "project.research.campaign_controller.read_memory_table",
             return_value=tested_df,
         ):
             result = ctrl._step_scan_frontier_cross_family(mem)
@@ -292,7 +292,7 @@ class TestExploreModeCrossFamily:
 
         with patch.object(ctrl, "_read_memory", return_value=mem), \
              patch(
-                 "project.pipelines.research.campaign_controller.read_memory_table",
+                 "project.research.campaign_controller.read_memory_table",
                  return_value=pd.DataFrame(),
              ):
             result = ctrl._propose_next_request()
@@ -312,7 +312,7 @@ class TestExploreModeCrossFamily:
 
         with patch.object(ctrl, "_read_memory", return_value=mem), \
              patch(
-                 "project.pipelines.research.campaign_controller.read_memory_table",
+                 "project.research.campaign_controller.read_memory_table",
                  return_value=pd.DataFrame(),
              ):
             result = ctrl._propose_next_request()
@@ -333,7 +333,7 @@ class TestExploreModeCrossFamily:
 
         with patch.object(ctrl, "_read_memory", return_value=mem), \
              patch(
-                 "project.pipelines.research.campaign_controller.read_memory_table",
+                 "project.research.campaign_controller.read_memory_table",
                  return_value=pd.DataFrame(),
              ):
             result = ctrl._propose_next_request()
@@ -506,10 +506,10 @@ class TestReadMemorySupersededStages:
         })
 
         with patch(
-            "project.pipelines.research.campaign_controller.read_memory_table",
+            "project.research.campaign_controller.read_memory_table",
             return_value=failures_df,
         ), patch(
-            "project.pipelines.research.campaign_controller.memory_paths",
+            "project.research.campaign_controller.memory_paths",
         ) as mock_paths:
             mock_paths.return_value = MagicMock(
                 belief_state=tmp_path / "belief_state.json",
@@ -530,10 +530,10 @@ class TestReadMemorySupersededStages:
         })
 
         with patch(
-            "project.pipelines.research.campaign_controller.read_memory_table",
+            "project.research.campaign_controller.read_memory_table",
             return_value=failures_df,
         ), patch(
-            "project.pipelines.research.campaign_controller.memory_paths",
+            "project.research.campaign_controller.memory_paths",
         ) as mock_paths:
             mock_paths.return_value = MagicMock(
                 belief_state=tmp_path / "belief_state.json",
@@ -548,10 +548,10 @@ class TestReadMemorySupersededStages:
         ctrl = _make_controller(tmp_path)
 
         with patch(
-            "project.pipelines.research.campaign_controller.read_memory_table",
+            "project.research.campaign_controller.read_memory_table",
             side_effect=Exception("disk error"),
         ), patch(
-            "project.pipelines.research.campaign_controller.memory_paths",
+            "project.research.campaign_controller.memory_paths",
         ) as mock_paths:
             mock_paths.return_value = MagicMock(
                 belief_state=tmp_path / "belief_state.json",

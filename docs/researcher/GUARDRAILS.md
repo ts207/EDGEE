@@ -37,6 +37,13 @@ They do not prove live alpha.
 - Low-confidence mechanical issues should route to repair.
 - Don’t let one noisy failure region poison an entire family without cause.
 
+## Shrinkage Persistence
+
+Adaptive shrinkage $\lambda$ estimates are persisted across research sessions to stabilize pooling. To prevent stale estimates from anchoring current research:
+1.  **Lambda Decay:** Previous $\lambda$ estimates are discounted by a `lambda_decay_factor` (default 5%) at the start of each session.
+2.  **Smoothing:** Decayed estimates are combined with current raw estimates via an exponential moving average (`lambda_smoothing_alpha`).
+3.  **Shock Cap:** Updates to $\lambda$ are capped by `lambda_shock_cap_pct` to prevent localized noise from destabilizing the global pooling structure.
+
 ## Pre-run checklist
 
 - Proposal fully specified

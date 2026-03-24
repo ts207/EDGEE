@@ -31,7 +31,7 @@ from project.io.utils import (
     write_parquet,
 )
 from project.specs.manifest import start_manifest, finalize_manifest
-from project.pipelines.research._timeframes import TIMEFRAME_TO_NS
+from project.research._timeframes import TIMEFRAME_TO_NS
 
 
 def _load_bar_grid(run_id: str, symbol: str, timeframe: str) -> pd.DataFrame:

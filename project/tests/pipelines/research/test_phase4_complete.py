@@ -32,11 +32,11 @@ import pytest
 # ---------------------------------------------------------------------------
 # Phase 4.2 imports
 # ---------------------------------------------------------------------------
-from project.pipelines.research.phase2_search_engine import (
+from project.research.phase2_search_engine import (
     _write_regime_conditional_candidates,
     _REGIME_CANDIDATE_COLUMNS,
 )
-from project.pipelines.research.update_campaign_memory import (
+from project.research.update_campaign_memory import (
     _build_next_actions,
     _load_regime_conditional_candidates,
 )
@@ -53,7 +53,7 @@ from project.research.promotion.promotion_scoring import (
 # ---------------------------------------------------------------------------
 # Phase 4.4 imports
 # ---------------------------------------------------------------------------
-from project.pipelines.research.compile_strategy_blueprints import (
+from project.research.compile_strategy_blueprints import (
     _resolve_sizing_inputs,
     _check_marginal_contribution,
     _build_allocation_spec,

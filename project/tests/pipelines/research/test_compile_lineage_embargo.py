@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from project.pipelines.research.compile_strategy_blueprints import (
+from project.research.compile_strategy_blueprints import (
     _build_blueprint,
     _load_operator_registry,
 )

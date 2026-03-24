@@ -20,7 +20,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from project.pipelines.research.feature_mi_scan import (
+from project.research.feature_mi_scan import (
     run_feature_mi_scan,
     _select_feature_columns,
     _forward_log_returns,
@@ -29,7 +29,7 @@ from project.pipelines.research.feature_mi_scan import (
     DEFAULT_HORIZONS,
     _MI_TABLE_COLUMNS,
 )
-from project.pipelines.research.campaign_controller import (
+from project.research.campaign_controller import (
     CampaignConfig,
     CampaignController,
 )
@@ -471,7 +471,7 @@ class TestControllerMiIntegration:
             "promising_regions": [], "superseded_stages": set(),
         }
         with patch(
-            "project.pipelines.research.campaign_controller.read_memory_table",
+            "project.research.campaign_controller.read_memory_table",
             return_value=pd.DataFrame(),
         ), patch.object(ctrl, "_load_search_space_predicates", return_value=few_static):
             result = ctrl._step_scan_feature_predicates(mem)
@@ -504,7 +504,7 @@ class TestControllerMiIntegration:
             "promising_regions": [], "superseded_stages": set(),
         }
         with patch(
-            "project.pipelines.research.campaign_controller.read_memory_table",
+            "project.research.campaign_controller.read_memory_table",
             return_value=pd.DataFrame(),
         ):
             result = ctrl._step_scan_feature_predicates(mem)
@@ -536,7 +536,7 @@ class TestControllerMiIntegration:
             "promising_regions": [], "superseded_stages": set(),
         }
         with patch(
-            "project.pipelines.research.campaign_controller.read_memory_table",
+            "project.research.campaign_controller.read_memory_table",
             return_value=pd.DataFrame(),
         ):
             result = ctrl._step_scan_feature_predicates(mem)
@@ -559,7 +559,7 @@ class TestControllerMiIntegration:
             "promising_regions": [], "superseded_stages": set(),
         }
         with patch(
-            "project.pipelines.research.campaign_controller.read_memory_table",
+            "project.research.campaign_controller.read_memory_table",
             return_value=pd.DataFrame(),
         ):
             result = ctrl._step_scan_feature_predicates(mem)

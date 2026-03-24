@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pandas as pd
 
-import project.pipelines.research.analyze_conditional_expectancy as expectancy
+import project.research.analyze_conditional_expectancy as expectancy
 
 
 def test_analyze_conditional_expectancy_writes_payload_from_edge_registry(monkeypatch, tmp_path):

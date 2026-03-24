@@ -116,18 +116,28 @@ def _load_symbol_timestamps(
     return pd.Series(dtype="datetime64[ns, UTC]")
 
 
-_MILESTONE_REGISTRY_PATH = PROJECT_ROOT.parent / "spec" / "events" / "registry.yaml"
+_UNIFIED_REGISTRY_PATH = PROJECT_ROOT.parent / "spec" / "events" / "event_registry_unified.yaml"
+_LEGACY_REGISTRY_PATH = PROJECT_ROOT.parent / "spec" / "events" / "registry.yaml"
+_MILESTONE_REGISTRY_PATH = _UNIFIED_REGISTRY_PATH
 
 
 @functools.lru_cache(maxsize=1)
 def load_milestone_event_registry() -> dict[str, dict]:
-    if not _MILESTONE_REGISTRY_PATH.exists():
+    path = _UNIFIED_REGISTRY_PATH if _UNIFIED_REGISTRY_PATH.exists() else _LEGACY_REGISTRY_PATH
+    if not path.exists():
         return {}
-    payload = yaml.safe_load(_MILESTONE_REGISTRY_PATH.read_text(encoding="utf-8")) or {}
+    
+    payload = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     if not isinstance(payload, dict):
         return {}
+    
+    # Unified registry nests event definitions under 'events'
+    events_payload = payload.get("events", payload) if path == _UNIFIED_REGISTRY_PATH else payload
+    if not isinstance(events_payload, dict):
+        return {}
+
     out: dict[str, dict] = {}
-    for raw_key, value in payload.items():
+    for raw_key, value in events_payload.items():
         if isinstance(value, dict):
             row = dict(value)
             event_type = str(row.get("event_type") or raw_key).strip().upper()

@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pandas as pd
 
-import project.pipelines.research.update_campaign_memory as update_campaign_memory
+import project.research.update_campaign_memory as update_campaign_memory
 
 
 def _write_run_manifest(data_root: Path, run_id: str, *, program_id: str) -> None:

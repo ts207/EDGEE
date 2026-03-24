@@ -4,7 +4,7 @@ import pytest
 
 import pandas as pd
 
-import project.pipelines.research.summarize_discovery_quality as summarize_discovery_quality
+import project.research.summarize_discovery_quality as summarize_discovery_quality
 
 
 def test_overlay_kill_count_from_bridge_fail_reasons(tmp_path, monkeypatch):

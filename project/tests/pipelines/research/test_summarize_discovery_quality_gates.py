@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pandas as pd
 
-import project.pipelines.research.summarize_discovery_quality as summarize_discovery_quality
+import project.research.summarize_discovery_quality as summarize_discovery_quality
 
 
 def test_gate_pass_series_prefers_gate_phase2_final_when_present():

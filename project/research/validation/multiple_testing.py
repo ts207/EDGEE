@@ -10,11 +10,6 @@ import pandas as pd
 # Benjamini-Hochberg FDR correction in the codebase.  BY and Holm are not
 # present in core/stats, so they continue to use statsmodels.
 from project.core.stats import bh_adjust as _canonical_bh_adjust
-try:
-    from statsmodels.stats.multitest import multipletests as _multipletests
-    _HAS_STATSMODELS = True
-except ImportError:  # pragma: no cover
-    _HAS_STATSMODELS = False
 
 
 def assign_test_families(
@@ -37,22 +32,41 @@ def assign_test_families(
 
 def _adjust(p_values: Iterable[float], method: str) -> np.ndarray:
     arr = np.asarray(list(p_values), dtype=float)
-    if arr.size == 0:
+    n = len(arr)
+    if n == 0:
         return arr
     arr = np.where(np.isfinite(arr), np.clip(arr, 0.0, 1.0), 1.0)
+    
     if method == "bh":
-        # Use the single canonical BH implementation from core.stats to avoid
-        # divergence between the two previously-parallel implementations.
         return _canonical_bh_adjust(arr)
-    if not _HAS_STATSMODELS:
-        raise ImportError(
-            f"statsmodels is required for correction method {method!r}. "
-            "Install it or use method='bh'."
-        )
+    
     if method == "by":
-        return _multipletests(arr, method="fdr_by")[1]
+        # Benjamini-Yekutieli (BY) adjustment
+        # q = p * (m/i) * sum(1/j for j in 1..m)
+        cm = np.sum(1.0 / np.arange(1, n + 1))
+        idx = np.argsort(arr)
+        sorted_p = arr[idx]
+        adj = np.zeros(n)
+        min_p = 1.0
+        for i in range(n - 1, -1, -1):
+            q = sorted_p[i] * cm * n / (i + 1)
+            min_p = min(min_p, q)
+            adj[idx[i]] = min_p
+        return np.clip(adj, 0.0, 1.0)
+    
     if method == "holm":
-        return _multipletests(arr, method="holm")[1]
+        # Holm-Bonferroni adjustment
+        # q = p * (m - i + 1)
+        idx = np.argsort(arr)
+        sorted_p = arr[idx]
+        adj = np.zeros(n)
+        max_p = 0.0
+        for i in range(n):
+            q = sorted_p[i] * (n - i)
+            max_p = max(max_p, q)
+            adj[idx[i]] = max_p
+        return np.clip(adj, 0.0, 1.0)
+        
     raise ValueError(f"Unsupported correction method: {method}")
 
 

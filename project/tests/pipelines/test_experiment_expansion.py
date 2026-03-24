@@ -1,7 +1,7 @@
 import pytest
 from pathlib import Path
 import yaml
-from project.pipelines.research.experiment_engine import build_experiment_plan
+from project.research.experiment_engine import build_experiment_plan
 
 
 @pytest.fixture

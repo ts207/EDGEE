@@ -9,7 +9,7 @@ import yaml
 
 from project.core.constants import HORIZON_BARS_BY_TIMEFRAME
 from project.domain.compiled_registry import get_domain_registry
-from project.pipelines.research.condition_key_contract import (
+from project.research.condition_key_contract import (
     format_available_key_sample,
     missing_condition_keys,
     normalize_condition_keys,

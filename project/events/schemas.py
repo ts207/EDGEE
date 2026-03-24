@@ -31,6 +31,7 @@ class EventRecord:
     severity: int
 
     episode_id: Optional[str] = None
+    attribution_id: Optional[str] = None
     detector_version: str = "v1"
     event_version: str = "v1"
     meta: Dict[str, Any] = field(default_factory=dict)

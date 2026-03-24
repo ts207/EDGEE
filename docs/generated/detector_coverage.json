@@ -2,21 +2,6 @@
   "detectors": [
     {
       "class_name": "AbsorptionProxyDetector",
-      "event_type": "ABSORPTION_EVENT",
-      "family": "canonical_proxy",
-      "maturity_tier": "proxy",
-      "module": "project.events.families.canonical_proxy",
-      "path": "project/events/families/canonical_proxy.py",
-      "registered": true,
-      "required_columns": [
-        "timestamp",
-        "close",
-        "high",
-        "low"
-      ]
-    },
-    {
-      "class_name": "AbsorptionProxyDetector",
       "event_type": "ABSORPTION_PROXY",
       "family": "canonical_proxy",
       "maturity_tier": "proxy",
@@ -684,6 +669,42 @@
       ]
     },
     {
+      "class_name": "",
+      "event_type": "SEQ_FND_EXTREME_THEN_BREAKOUT",
+      "family": "",
+      "maturity_tier": "missing",
+      "module": "",
+      "registered": false,
+      "required_columns": []
+    },
+    {
+      "class_name": "",
+      "event_type": "SEQ_LIQ_VACUUM_THEN_DEPTH_RECOVERY",
+      "family": "",
+      "maturity_tier": "missing",
+      "module": "",
+      "registered": false,
+      "required_columns": []
+    },
+    {
+      "class_name": "",
+      "event_type": "SEQ_OI_SPIKEPOS_THEN_VOL_SPIKE",
+      "family": "",
+      "maturity_tier": "missing",
+      "module": "",
+      "registered": false,
+      "required_columns": []
+    },
+    {
+      "class_name": "",
+      "event_type": "SEQ_VOL_COMP_THEN_BREAKOUT",
+      "family": "",
+      "maturity_tier": "missing",
+      "module": "",
+      "registered": false,
+      "required_columns": []
+    },
+    {
       "class_name": "SessionCloseDetector",
       "event_type": "SESSION_CLOSE_EVENT",
       "family": "temporal",
@@ -949,6 +970,30 @@
   ],
   "issues": [
     {
+      "check_id": "detector_missing",
+      "message": "Active event spec has no registered detector: SEQ_FND_EXTREME_THEN_BREAKOUT",
+      "path": "",
+      "severity": "error"
+    },
+    {
+      "check_id": "detector_missing",
+      "message": "Active event spec has no registered detector: SEQ_LIQ_VACUUM_THEN_DEPTH_RECOVERY",
+      "path": "",
+      "severity": "error"
+    },
+    {
+      "check_id": "detector_missing",
+      "message": "Active event spec has no registered detector: SEQ_OI_SPIKEPOS_THEN_VOL_SPIKE",
+      "path": "",
+      "severity": "error"
+    },
+    {
+      "check_id": "detector_missing",
+      "message": "Active event spec has no registered detector: SEQ_VOL_COMP_THEN_BREAKOUT",
+      "path": "",
+      "severity": "error"
+    },
+    {
       "check_id": "detector_hardcoded_params",
       "message": "Detector implementation has hardcoded numerical thresholds: CROSS_VENUE_DESYNC",
       "path": "project/events/families/basis.py",
@@ -965,22 +1010,35 @@
       "message": "Detector implementation has hardcoded numerical thresholds: PRICE_VOL_IMBALANCE_PROXY",
       "path": "project/events/families/canonical_proxy.py",
       "severity": "warning"
+    },
+    {
+      "check_id": "detector_hardcoded_params",
+      "message": "Detector implementation has hardcoded numerical thresholds: SESSION_CLOSE_EVENT",
+      "path": "project/events/families/temporal.py",
+      "severity": "warning"
+    },
+    {
+      "check_id": "detector_hardcoded_params",
+      "message": "Detector implementation has hardcoded numerical thresholds: SESSION_OPEN_EVENT",
+      "path": "project/events/families/temporal.py",
+      "severity": "warning"
     }
   ],
   "summary": {
-    "active_event_count": 66,
-    "error_count": 0,
-    "issue_count": 3,
+    "active_event_count": 69,
+    "error_count": 4,
+    "issue_count": 9,
     "maturity_counts": {
+      "missing": 4,
       "production": 6,
-      "proxy": 11,
+      "proxy": 10,
       "specialized": 3,
       "standard": 46
     },
-    "registered_detector_entry_count": 67,
-    "registered_event_count": 66,
+    "registered_detector_entry_count": 66,
+    "registered_event_count": 69,
     "schema_version": "detector_coverage_audit_v2",
-    "status": "passed",
-    "warning_count": 3
+    "status": "failed",
+    "warning_count": 5
   }
 }

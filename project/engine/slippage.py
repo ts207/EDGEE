@@ -11,6 +11,14 @@ from project.engine.fills import OrderUrgency, ExecutionProfile
 _LOG = logging.getLogger(__name__)
 
 
+def calibrate_passive_slippage() -> float:
+    """
+    Returns the calibrated adverse selection cost for passive fills.
+    Fixed at 0.2 bps until the TOB-based calibration pipeline is automated.
+    """
+    return 0.2
+
+
 def calculate_slippage_bps(
     order_size: float,
     spread_bps: float,
@@ -29,7 +37,7 @@ def calculate_slippage_bps(
     if urgency == OrderUrgency.AGGRESSIVE:
         base_slippage = spread_bps * 0.5
     elif urgency == OrderUrgency.PASSIVE:
-        base_slippage = 0.0  # Ideal passive
+        base_slippage = calibrate_passive_slippage()  # Adverse selection calibrated default
     elif urgency == OrderUrgency.DELAYED_AGGRESSIVE:
         base_slippage = spread_bps * 0.7  # Delayed often means worse price
     else:

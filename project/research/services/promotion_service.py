@@ -530,7 +530,7 @@ def _hydrate_edge_candidates_from_phase2(
 ) -> pd.DataFrame:
     if not run_symbols:
         return pd.DataFrame()
-    export_module = importlib.import_module("project.pipelines.research.export_edge_candidates")
+    export_module = importlib.import_module("project.research.export_edge_candidates")
     rows = export_module._collect_phase2_candidates(run_id, run_symbols=run_symbols)
     candidates_df = pd.DataFrame(rows)
     if candidates_df.empty:

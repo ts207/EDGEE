@@ -16,6 +16,9 @@ except ModuleNotFoundError:  # pragma: no cover - environment-specific fallback
 # rather than to this module itself.
 stats = scipy_stats
 
+import logging
+_LOG = logging.getLogger(__name__)
+
 
 def calculate_kendalls_tau(x: np.ndarray | pd.Series, y: np.ndarray | pd.Series) -> float:
     """
@@ -55,7 +58,8 @@ def test_cointegration(x: pd.Series, y: pd.Series) -> float:
 
         _stat, _pvalue, _crit = coint(xa, ya)
         return _approx_coint_pvalue(float(_stat), n=len(aligned))
-    except Exception:
+    except Exception as e:
+        _LOG.warning("statsmodels.tsa.stattools.coint failed or missing; using finite-sample ADF fallback. Error: %s", e)
         pass
 
     X = np.column_stack([np.ones(len(xa)), xa])
@@ -83,10 +87,11 @@ def test_cointegration(x: pd.Series, y: pd.Series) -> float:
     try:
         cov = sample_var * np.linalg.inv(xtx)
         gamma_se = float(np.sqrt(max(cov[1, 1], 0.0)))
-    except np.linalg.LinAlgError:
-        gamma_se = float("nan")
+    except Exception as e:
+        _LOG.error("Cointegration fallback calculation failed: %s. Returning conservative p=1.0", e)
+        return 1.0
 
-    t_stat = gamma_val / gamma_se if gamma_se and np.isfinite(gamma_se) and gamma_se > 0 else 0.0
+    t_stat = gamma_val / gamma_se if (gamma_se and np.isfinite(gamma_se) and gamma_se > 0) else 0.0
 
     # MacKinnon (1994) approximate p-values for cointegration (N=2, constant, no trend)
     return _approx_coint_pvalue(t_stat, n=len(resid))

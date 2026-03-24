@@ -11,7 +11,7 @@ from project import PROJECT_ROOT
 REPO_ROOT = PROJECT_ROOT.parent
 DATA_ROOT = get_data_root()
 
-from project.pipelines.research.template_regression import build_run_summary, compare_summaries  # noqa: E402
+from project.research.template_regression import build_run_summary, compare_summaries  # noqa: E402
 
 
 def main() -> int:

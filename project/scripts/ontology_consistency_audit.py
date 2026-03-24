@@ -165,7 +165,7 @@ def run_audit(repo_root: Path) -> Dict[str, Any]:
     project_root = repo_root / "project"
     spec_paths = ontology_spec_paths(repo_root)
     spec_events_dir = repo_root / "spec" / "events"
-    research_root = project_root / "pipelines" / "research"
+    research_root = project_root / "research"
 
     taxonomy = _load_yaml(spec_paths["taxonomy"])
     canonical = _load_yaml(spec_paths["canonical_event_registry"])

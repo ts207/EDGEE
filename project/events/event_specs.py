@@ -28,48 +28,59 @@ class EventRegistrySpec:
 
 
 def _load_event_specs() -> Dict[str, EventRegistrySpec]:
-    spec_dir = resolve_relative_spec_path("spec/events", repo_root=PROJECT_ROOT.parent)
-    if not spec_dir.exists():
+    from project.spec_registry import load_unified_event_registry
+    unified = load_unified_event_registry()
+    if not unified:
         return {}
 
-    required = {"event_type", "reports_dir", "events_file", "signal_column"}
+    events_payload = unified.get("events", {})
+    if not isinstance(events_payload, dict):
+        return {}
+
+    defaults = unified.get("defaults", {})
+    default_params = defaults.get("parameters", {}) if isinstance(defaults, dict) else {}
+    families = unified.get("families", {})
+
     specs = {}
-    for yaml_file in sorted(spec_dir.glob("*.yaml")):
-        if yaml_file.name.startswith("_"):
+    for event_type, row in events_payload.items():
+        if not isinstance(row, dict):
             continue
-        data = load_yaml_path(yaml_file)
-        if not isinstance(data, dict) or not data:
+        if bool(row.get("deprecated", False)) or not bool(row.get("active", True)):
             continue
-        if bool(data.get("deprecated", False)) or not bool(data.get("active", True)):
-            continue
-        if data.get("kind") in {
-            "canonical_event_registry",
-            "event_config_defaults",
-            "event_family_defaults",
-            "event_unified_registry",
-        }:
-            continue
-        if "event_type" not in data:
-            continue
-        missing = required - set(data.keys())
-        if missing:
-            raise ValueError(f"Malformed spec {yaml_file.name} — missing registry fields")
-        parameters = data.get("parameters", {})
-        if not isinstance(parameters, dict):
-            parameters = {}
+
+        family_name = str(row.get("canonical_family", "")).strip().upper()
+        family_params = {}
+        if family_name and isinstance(families, dict):
+            family_info = families.get(family_name)
+            if isinstance(family_info, dict):
+                family_params = family_info.get("parameters", {})
+
+        parameters = {}
+        if isinstance(default_params, dict):
+            parameters.update(default_params)
+        if isinstance(family_params, dict):
+            parameters.update(family_params)
+        if isinstance(row.get("parameters"), dict):
+            parameters.update(row["parameters"])
 
         def _canon_param(name: str, default: int | str | Sequence[str] | bool):
-            if name in data:
-                return data.get(name, default)
+            if name in row:
+                return row.get(name, default)
             if name in parameters:
                 return parameters.get(name, default)
+            if isinstance(defaults, dict) and name in defaults:
+                return defaults.get(name, default)
             return default
 
+        reports_dir = str(row.get("reports_dir", event_type.lower()))
+        events_file = str(row.get("events_file", f"{event_type.lower()}_events.parquet"))
+        signal_column = str(row.get("signal_column", f"{event_type.lower()}_event"))
+
         spec = EventRegistrySpec(
-            event_type=data["event_type"],
-            reports_dir=data["reports_dir"],
-            events_file=data["events_file"],
-            signal_column=data["signal_column"],
+            event_type=event_type,
+            reports_dir=reports_dir,
+            events_file=events_file,
+            signal_column=signal_column,
             merge_gap_bars=int(_canon_param("merge_gap_bars", 1)),
             cooldown_bars=int(_canon_param("cooldown_bars", 0)),
             anchor_rule=str(_canon_param("anchor_rule", "max_intensity")),

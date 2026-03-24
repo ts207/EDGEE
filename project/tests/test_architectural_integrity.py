@@ -93,7 +93,7 @@ ALLOWED_DEPENDENCIES = {
         "project.compilers",
         "project.portfolio",
     ],
-    "project.pipelines": ["*"],  # Pipelines can import anything below
+    "project.pipelines": ["project.research", "project.engine", "project.events"],
 }
 
 
@@ -509,8 +509,18 @@ def test_architecture_metrics_and_checklist_exist() -> None:
         "project.strategy_dsl_importers",
         "project.strategy_templates_importers",
         "run_all_coordinator_lines",
+        "module_coupling_count",
+        "cross_boundary_import_count",
+        "circular_dependency_count",
+        "test_coverage_ratio",
     ):
-        assert key in metrics["metrics"]
+        assert key in metrics["metrics"], f"Missing metric snapshot: {key}"
+
+    # Assert thresholds for Phase 4 metrics
+    # module_coupling_count should not increase 
+    assert metrics["metrics"]["module_coupling_count"] <= 2450
+    assert metrics["metrics"]["cross_boundary_import_count"] <= 1750
+    assert metrics["metrics"]["circular_dependency_count"] <= 5
 
     checklist_text = checklist_path.read_text(encoding="utf-8")
     for needle in (

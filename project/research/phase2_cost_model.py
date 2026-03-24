@@ -7,7 +7,7 @@ from typing import Dict, Tuple
 import pandas as pd
 
 from project.core.execution_costs import resolve_execution_costs
-from project.pipelines.research.cost_calibration import ToBRegimeCostCalibrator
+from project.research.cost_calibration import ToBRegimeCostCalibrator
 
 
 def _resolve_phase2_costs(

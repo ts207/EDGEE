@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from project.pipelines.research.dynamic_exit import compute_dynamic_exit_heuristics
+from project.research.dynamic_exit import compute_dynamic_exit_heuristics
 
 
 def test_dynamic_exit_bounded_output():

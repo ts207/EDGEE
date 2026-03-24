@@ -12,24 +12,24 @@ sys.path.insert(0, str(Path(__file__).parents[2]))
 
 
 def test_stage_is_importable():
-    import project.pipelines.research.phase2_search_engine as stage
+    import project.research.phase2_search_engine as stage
 
     assert stage is not None
 
 
 def test_stage_has_main():
-    import project.pipelines.research.phase2_search_engine as stage
+    import project.research.phase2_search_engine as stage
 
     assert callable(stage.main)
 
 
 def test_stage_exits_zero_with_empty_features(tmp_path):
     """Stage should handle empty feature DataFrame gracefully."""
-    import project.pipelines.research.phase2_search_engine as stage
+    import project.research.phase2_search_engine as stage
 
     empty_features = pd.DataFrame()
     with patch(
-        "project.pipelines.research.phase2_search_engine.load_features", return_value=empty_features
+        "project.research.phase2_search_engine.load_features", return_value=empty_features
     ):
         result = stage.run(
             run_id="test_run",
@@ -42,7 +42,7 @@ def test_stage_exits_zero_with_empty_features(tmp_path):
 
 def test_stage_writes_output_parquet(tmp_path):
     """Stage should write a parquet file even when no candidates pass gates."""
-    import project.pipelines.research.phase2_search_engine as stage
+    import project.research.phase2_search_engine as stage
     import numpy as np
 
     n = 100
@@ -56,11 +56,11 @@ def test_stage_writes_output_parquet(tmp_path):
 
     with (
         patch(
-            "project.pipelines.research.phase2_search_engine.load_features", return_value=features
+            "project.research.phase2_search_engine.load_features", return_value=features
         ),
         patch("project.events.event_flags.load_registry_flags", return_value=pd.DataFrame()),
         patch(
-            "project.pipelines.research.phase2_search_engine.generate_hypotheses_with_audit",
+            "project.research.phase2_search_engine.generate_hypotheses_with_audit",
             return_value=(
                 [],
                 {
@@ -70,7 +70,7 @@ def test_stage_writes_output_parquet(tmp_path):
             ),
         ),
         patch(
-            "project.pipelines.research.phase2_search_engine.run_distributed_search",
+            "project.research.phase2_search_engine.run_distributed_search",
             return_value=pd.DataFrame(),
         ),
     ):
@@ -100,7 +100,7 @@ def test_stage_writes_output_parquet(tmp_path):
 
 
 def test_stage_normalizes_nested_audit_columns_before_parquet(tmp_path):
-    import project.pipelines.research.phase2_search_engine as stage
+    import project.research.phase2_search_engine as stage
     import numpy as np
 
     features = pd.DataFrame(
@@ -112,11 +112,11 @@ def test_stage_normalizes_nested_audit_columns_before_parquet(tmp_path):
 
     with (
         patch(
-            "project.pipelines.research.phase2_search_engine.load_features", return_value=features
+            "project.research.phase2_search_engine.load_features", return_value=features
         ),
         patch("project.events.event_flags.load_registry_flags", return_value=pd.DataFrame()),
         patch(
-            "project.pipelines.research.phase2_search_engine.generate_hypotheses_with_audit",
+            "project.research.phase2_search_engine.generate_hypotheses_with_audit",
             return_value=(
                 [],
                 {
@@ -139,7 +139,7 @@ def test_stage_normalizes_nested_audit_columns_before_parquet(tmp_path):
             ),
         ),
         patch(
-            "project.pipelines.research.phase2_search_engine.run_distributed_search",
+            "project.research.phase2_search_engine.run_distributed_search",
             return_value=pd.DataFrame(),
         ),
     ):
@@ -158,7 +158,7 @@ def test_stage_normalizes_nested_audit_columns_before_parquet(tmp_path):
 
 
 def test_search_engine_normalizes_market_context_state_aliases():
-    import project.pipelines.research.phase2_search_engine as stage
+    import project.research.phase2_search_engine as stage
 
     features = pd.DataFrame(
         {
@@ -220,17 +220,17 @@ def test_search_engine_applies_multiplicity(tmp_path, monkeypatch):
         }
 
     monkeypatch.setattr(
-        "project.pipelines.research.phase2_search_engine.generate_hypotheses_with_audit",
+        "project.research.phase2_search_engine.generate_hypotheses_with_audit",
         mock_generate,
     )
     monkeypatch.setattr(
-        "project.pipelines.research.phase2_search_engine.load_features", lambda *a, **kw: features
+        "project.research.phase2_search_engine.load_features", lambda *a, **kw: features
     )
     monkeypatch.setattr(
         "project.events.event_flags.load_registry_flags", lambda *a, **kw: pd.DataFrame()
     )
 
-    from project.pipelines.research.phase2_search_engine import run
+    from project.research.phase2_search_engine import run
 
     out_dir = tmp_path / "output"
     rc = run("test_run", "BTCUSDT", tmp_path, out_dir)
@@ -250,7 +250,7 @@ def test_search_engine_applies_multiplicity(tmp_path, monkeypatch):
 def test_search_engine_synthetic_profile_resolves_search_spec_and_min_n(tmp_path, monkeypatch):
     import pandas as pd
     import numpy as np
-    import project.pipelines.research.phase2_search_engine as stage
+    import project.research.phase2_search_engine as stage
 
     features = pd.DataFrame(
         {
@@ -296,7 +296,7 @@ def test_search_engine_synthetic_profile_resolves_search_spec_and_min_n(tmp_path
 def test_search_engine_passes_search_budget_to_generator(tmp_path, monkeypatch):
     import pandas as pd
     import numpy as np
-    import project.pipelines.research.phase2_search_engine as stage
+    import project.research.phase2_search_engine as stage
 
     features = pd.DataFrame(
         {
@@ -338,7 +338,7 @@ def test_search_engine_passes_search_budget_to_generator(tmp_path, monkeypatch):
 
 
 def test_search_engine_run_uses_explicit_registry_root(tmp_path, monkeypatch):
-    import project.pipelines.research.phase2_search_engine as stage
+    import project.research.phase2_search_engine as stage
 
     features = pd.DataFrame(
         {
@@ -370,7 +370,7 @@ def test_search_engine_run_uses_explicit_registry_root(tmp_path, monkeypatch):
     )
     monkeypatch.setattr(stage, "run_distributed_search", lambda *a, **kw: pd.DataFrame())
     monkeypatch.setattr(
-        "project.pipelines.research.experiment_engine.build_experiment_plan",
+        "project.research.experiment_engine.build_experiment_plan",
         _mock_build_experiment_plan,
     )
 
@@ -389,7 +389,7 @@ def test_search_engine_run_uses_explicit_registry_root(tmp_path, monkeypatch):
 
 
 def test_search_engine_passes_timeframe_and_data_root_to_feature_loader(tmp_path, monkeypatch):
-    import project.pipelines.research.phase2_search_engine as stage
+    import project.research.phase2_search_engine as stage
 
     captured: dict[str, object] = {}
     features = pd.DataFrame(
@@ -442,7 +442,7 @@ def test_search_engine_passes_timeframe_and_data_root_to_feature_loader(tmp_path
 
 
 def test_search_engine_passes_merged_features_to_generation_feasibility(tmp_path, monkeypatch):
-    import project.pipelines.research.phase2_search_engine as stage
+    import project.research.phase2_search_engine as stage
 
     captured: dict[str, object] = {}
     features = pd.DataFrame(
@@ -480,7 +480,7 @@ def test_search_engine_passes_merged_features_to_generation_feasibility(tmp_path
 
 
 def test_search_engine_aggregates_multi_symbol_candidates_and_diagnostics(tmp_path, monkeypatch):
-    import project.pipelines.research.phase2_search_engine as stage
+    import project.research.phase2_search_engine as stage
 
     features = pd.DataFrame(
         {
@@ -550,7 +550,7 @@ def test_search_engine_aggregates_multi_symbol_candidates_and_diagnostics(tmp_pa
 
 
 def test_search_engine_assigns_split_labels_before_evaluation(tmp_path, monkeypatch):
-    import project.pipelines.research.phase2_search_engine as stage
+    import project.research.phase2_search_engine as stage
 
     features = pd.DataFrame(
         {

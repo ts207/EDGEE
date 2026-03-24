@@ -10,7 +10,7 @@ import project.specs.manifest as manifest_spec
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3] / "project"
 
-import project.pipelines.research.export_edge_candidates as export_edge_candidates
+import project.research.export_edge_candidates as export_edge_candidates
 
 
 def test_export_chain_includes_declared_subtype_families():

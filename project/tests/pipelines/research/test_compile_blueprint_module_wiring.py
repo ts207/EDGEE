@@ -5,7 +5,7 @@ import sys
 
 import pandas as pd
 
-from project.pipelines.research import compile_strategy_blueprints as compiler
+from project.research import compile_strategy_blueprints as compiler
 from project.strategy.dsl.schema import (
     Blueprint,
     EntrySpec,

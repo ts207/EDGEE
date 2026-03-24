@@ -11,7 +11,7 @@ import pandas as pd
 import yaml
 
 from project.domain.hypotheses import HypothesisSpec
-from project.pipelines.research.experiment_engine_schema import (
+from project.research.experiment_engine_schema import (
     AgentExperimentRequest,
     ContextSelection,
     EvaluationConfig,
@@ -23,7 +23,7 @@ from project.pipelines.research.experiment_engine_schema import (
     TriggerSpace,
     ValidatedExperimentPlan,
 )
-from project.pipelines.research.experiment_engine_validators import (
+from project.research.experiment_engine_validators import (
     _validate_campaign_status,
     _validate_contexts,
     _validate_event_trigger,

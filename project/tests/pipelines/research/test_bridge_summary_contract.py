@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pandas as pd
 
-from project.pipelines.research.bridge_evaluate_phase2 import (
+from project.research.bridge_evaluate_phase2 import (
     _bridge_summary_count_fields,
     _build_bridge_summary_payload,
     _filter_candidates_for_symbol,

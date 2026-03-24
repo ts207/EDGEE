@@ -282,12 +282,11 @@ _DETECTORS = {
     "WICK_REVERSAL_PROXY": WickReversalProxyDetector,
     "ABSORPTION_PROXY": AbsorptionProxyDetector,
     "DEPTH_STRESS_PROXY": DepthStressProxyDetector,
-    # Canonical alias names — same detector classes
     "ORDERFLOW_IMBALANCE_SHOCK": PriceVolImbalanceProxyDetector,
     "SWEEP_STOPRUN": WickReversalProxyDetector,
-    "ABSORPTION_EVENT": AbsorptionProxyDetector,
     "DEPTH_COLLAPSE": DepthStressProxyDetector,
 }
+
 
 for et, cls in _DETECTORS.items():
     register_detector(et, cls)

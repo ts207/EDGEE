@@ -1,3 +1,4 @@
+# DEPRECATED: Use event_registry_unified.yaml
 version: 1
 kind: canonical_event_registry
 families:

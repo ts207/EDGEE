@@ -103,6 +103,7 @@ def _estimate_adaptive_lambda(
     previous_lambda_by_parent: Optional[Dict[Tuple[Any, ...], float]] = None,
     lambda_smoothing_alpha: float = 0.1,
     lambda_shock_cap_pct: float = 0.5,
+    lambda_decay_factor: float = 0.0,
 ) -> pd.DataFrame:
     if units_df.empty:
         return pd.DataFrame(
@@ -173,7 +174,10 @@ def _estimate_adaptive_lambda(
             key_tuple = tuple(parent_payload[c] for c in parent_cols)
             prev_val = previous_lambda_by_parent.get(key_tuple)
             if prev_val is not None and float(prev_val) > 0.0:
-                lam_prev = float(prev_val)
+                # Apply cross-session decay to the previous estimate (Item 10)
+                decay = max(0.0, min(1.0, float(lambda_decay_factor)))
+                lam_prev = float(prev_val) * (1.0 - decay)
+
                 alpha = max(0.0, min(1.0, float(lambda_smoothing_alpha)))
                 smoothed = ((1.0 - alpha) * lam_prev) + (alpha * lam_raw)
                 cap = max(0.0, float(lambda_shock_cap_pct))
@@ -267,6 +271,7 @@ def _apply_hierarchical_shrinkage(
     previous_lambda_maps: Optional[Dict[str, Dict[Tuple[Any, ...], float]]] = None,
     lambda_smoothing_alpha: float = 0.1,
     lambda_shock_cap_pct: float = 0.5,
+    lambda_decay_factor: float = 0.05,
     train_only_lambda: bool = False,
     split_col: Optional[str] = None,
     run_mode: str = "exploratory",  # Added run_mode
@@ -467,6 +472,7 @@ def _apply_hierarchical_shrinkage(
         previous_lambda_by_parent=(previous_lambda_maps or {}).get("family"),
         lambda_smoothing_alpha=float(lambda_smoothing_alpha),
         lambda_shock_cap_pct=float(lambda_shock_cap_pct),
+        lambda_decay_factor=float(lambda_decay_factor),
     )
     out = out.merge(
         lambda_family_df[
@@ -534,6 +540,7 @@ def _apply_hierarchical_shrinkage(
         previous_lambda_by_parent=(previous_lambda_maps or {}).get("event"),
         lambda_smoothing_alpha=float(lambda_smoothing_alpha),
         lambda_shock_cap_pct=float(lambda_shock_cap_pct),
+        lambda_decay_factor=float(lambda_decay_factor),
     )
     out = out.merge(
         lambda_event_df[
@@ -602,6 +609,7 @@ def _apply_hierarchical_shrinkage(
         previous_lambda_by_parent=(previous_lambda_maps or {}).get("state"),
         lambda_smoothing_alpha=float(lambda_smoothing_alpha),
         lambda_shock_cap_pct=float(lambda_shock_cap_pct),
+        lambda_decay_factor=float(lambda_decay_factor),
     )
     out = out.merge(
         lambda_state_df[
@@ -670,6 +678,7 @@ def _apply_hierarchical_shrinkage(
         previous_lambda_by_parent=None,
         lambda_smoothing_alpha=float(lambda_smoothing_alpha),
         lambda_shock_cap_pct=float(lambda_shock_cap_pct),
+        lambda_decay_factor=float(lambda_decay_factor),
     )
 
     out = out.merge(

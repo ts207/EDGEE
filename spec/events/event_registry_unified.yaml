@@ -6,10 +6,11 @@ metadata:
     event_defaults: spec/events/_defaults.yaml
     event_family_defaults: spec/events/_families.yaml
     event_specs_dir: spec/events
-    canonical_event_registry: spec/events/canonical_event_registry.yaml
+    canonical_event_registry: spec/events/legacy/canonical_event_registry.yaml
+    legacy_registry: spec/events/legacy/registry.yaml
     template_registry: spec/templates/event_template_registry.yaml
   notes: Single event-centric schema for phase1+phase2 composition. Legacy specs retained
-    for compatibility and drift checks.
+    in spec/events/legacy for migration tooling only.
 defaults:
   parameters:
     merge_gap_bars: 1
@@ -135,27 +136,9 @@ families:
     parameters: {}
 events:
   ABSORPTION_EVENT:
-    canonical_family: LIQUIDITY_DISLOCATION
-    reports_dir: liquidity_dislocation
-    events_file: liquidity_dislocation_events.parquet
-    signal_column: absorption_event
-    parameters:
-      canonical_family: LIQUIDITY_DISLOCATION
-      lookback_window: 288
-      z_threshold: 3.0
-      cooldown_bars: 12
-      merge_gap_bars: 0
-      min_volume_quantile: 0.2
-    templates:
-    - mean_reversion
-    - continuation
-    - stop_run_repair
-    - overshoot_repair
-    - only_if_liquidity
-    - slippage_aware_filter
-    horizons:
-    - 15m
-    max_candidates_per_run: 600
+    alias_for: ABSORPTION_PROXY
+    active: false
+    notes: "Legacy dual registrations merged into ABSORPTION_PROXY per Item 13/14."
   ABSORPTION_PROXY:
     canonical_family: ABSORPTION_PROXY
     reports_dir: liquidity_dislocation
@@ -857,6 +840,7 @@ events:
     signal_column: funding_timestamp_event
     parameters:
       canonical_family: TEMPORAL_STRUCTURE
+      hours_utc: [0, 8, 16]
       event_spacing_bars: 288
       cooldown_bars: 12
       merge_gap_bars: 0
@@ -1394,6 +1378,8 @@ events:
     signal_column: session_close_event
     parameters:
       canonical_family: TEMPORAL_STRUCTURE
+      hours_utc: [7, 12, 23]
+      intensity_scale: 60.0
       event_spacing_bars: 288
       cooldown_bars: 12
       merge_gap_bars: 0
@@ -1411,6 +1397,8 @@ events:
     signal_column: session_open_event
     parameters:
       canonical_family: TEMPORAL_STRUCTURE
+      hours_utc: [0, 8, 13]
+      intensity_scale: 60.0
       event_spacing_bars: 288
       cooldown_bars: 12
       merge_gap_bars: 0

@@ -4,7 +4,7 @@ import json
 
 import pandas as pd
 
-import project.pipelines.research.generate_negative_control_summary as stage
+import project.research.generate_negative_control_summary as stage
 
 
 def test_generate_negative_control_summary_aggregates_control_rates(monkeypatch, tmp_path):

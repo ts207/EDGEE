@@ -19,7 +19,7 @@ def run_generic_detector_task(
     out_dir: Optional[Path] = None,
 ) -> int:
     """Thin compatibility wrapper around the canonical analyze_events entrypoint."""
-    from project.pipelines.research.analyze_events import main as analyze_events_main
+    from project.research.analyze_events import main as analyze_events_main
     from project.core.config import get_data_root
 
     data_root = get_data_root()

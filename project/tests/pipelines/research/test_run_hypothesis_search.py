@@ -6,7 +6,7 @@ import sys
 import numpy as np
 import pandas as pd
 
-import project.pipelines.research.run_hypothesis_search as rhs
+import project.research.run_hypothesis_search as rhs
 from project.domain.hypotheses import HypothesisSpec, TriggerSpec
 
 

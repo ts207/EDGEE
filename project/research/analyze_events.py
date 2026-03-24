@@ -16,7 +16,7 @@ from project.events.config import compose_event_config
 from project.events.detectors.sequence import EventSequenceDetector
 from project.events.detectors.registry import get_detector, load_all_detectors
 from project.events.event_repository import load_registry_events
-from project.pipelines.research._family_event_utils import (
+from project.research._family_event_utils import (
     load_features,
     merge_event_csv,
     safe_severity_quantiles,

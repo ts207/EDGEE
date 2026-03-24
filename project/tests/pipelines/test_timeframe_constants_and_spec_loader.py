@@ -14,7 +14,7 @@ from project.core.constants import (
     HORIZON_BARS_BY_TIMEFRAME,
 )
 from project.research.services.phase2_support import horizon_to_bars
-from project.pipelines.research import validate_event_quality
+from project.research import validate_event_quality
 
 
 def test_runner_uses_canonical_bars_per_year_map():

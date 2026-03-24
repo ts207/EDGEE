@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 from project.eval.robustness import simulate_parameter_perturbation
-from project.pipelines.research.promote_blueprints import _fragility_gate
+from project.research.promote_blueprints import _fragility_gate
 
 
 def test_fragility_gate_passes_stable_strategy():

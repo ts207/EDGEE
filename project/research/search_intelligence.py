@@ -9,7 +9,7 @@ from typing import Any, Dict
 import pandas as pd
 
 from project.core.config import get_data_root
-from project.pipelines.research.experiment_engine import RegistryBundle
+from project.research.experiment_engine import RegistryBundle
 from project.research.knowledge.memory import (
     ensure_memory_store,
     read_memory_table,

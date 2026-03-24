@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from project.pipelines.research import phase2_spec_registry as p2_spec
+from project.research import phase2_spec_registry as p2_spec
 from project.specs.gates import load_gates_spec, resolve_phase2_gate_params, select_phase2_gate_spec
 
 

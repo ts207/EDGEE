@@ -13,7 +13,7 @@ from project import PROJECT_ROOT
 from project.io.utils import ensure_dir, read_parquet, write_parquet
 from project.specs.manifest import finalize_manifest, start_manifest
 from project.specs.utils import get_spec_hashes
-from project.pipelines.research.evaluate_naive_entry import _condition_mask, _load_phase1_events
+from project.research.evaluate_naive_entry import _condition_mask, _load_phase1_events
 from project.research.utils.decision_safety import fail_closed_bool
 
 

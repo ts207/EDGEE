@@ -1,7 +1,7 @@
 import pytest
 import yaml
 from pathlib import Path
-from project.pipelines.research.experiment_engine import (
+from project.research.experiment_engine import (
     RegistryBundle,
     load_agent_experiment_config,
     validate_agent_request,

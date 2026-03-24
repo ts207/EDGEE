@@ -2,8 +2,8 @@ import pytest
 from pathlib import Path
 import yaml
 import pandas as pd
-from project.pipelines.research.experiment_engine import build_experiment_plan
-from project.pipelines.research.experiment_engine_validators import _ordered_run_ids
+from project.research.experiment_engine import build_experiment_plan
+from project.research.experiment_engine_validators import _ordered_run_ids
 
 
 @pytest.fixture

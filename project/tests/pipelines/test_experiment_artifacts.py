@@ -4,7 +4,7 @@ from pathlib import Path
 import yaml
 import json
 import hashlib
-from project.pipelines.research.experiment_engine import (
+from project.research.experiment_engine import (
     build_experiment_plan,
     export_experiment_artifacts,
 )

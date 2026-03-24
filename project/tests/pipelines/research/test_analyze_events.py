@@ -14,9 +14,9 @@ class TestAnalyzeEventsMain:
     def test_main_exits_nonzero_when_no_detector(self, tmp_path, monkeypatch, capsys):
         """main() must exit non-zero and log ERROR when detector is not registered."""
         import types
-        from project.pipelines.research.analyze_events import main
+        from project.research.analyze_events import main
         import project.events.detectors.registry as reg
-        import project.pipelines.research.analyze_events as ae_mod
+        import project.research.analyze_events as ae_mod
 
         # Patch get_detector to return None for any event type
         monkeypatch.setattr(reg, "get_detector", lambda etype: None)
@@ -46,14 +46,14 @@ class TestAnalyzeEventsMain:
 
     def test_main_function_is_importable(self):
         """analyze_events.main must be importable."""
-        from project.pipelines.research.analyze_events import main
+        from project.research.analyze_events import main
 
         assert callable(main)
 
     def test_main_accepts_standard_args(self, tmp_path):
         """main() must accept --event_type, --run_id, --symbols, --data_root args."""
         import inspect
-        from project.pipelines.research import analyze_events
+        from project.research import analyze_events
 
         # The script must have a main() accepting argv
         assert hasattr(analyze_events, "main")

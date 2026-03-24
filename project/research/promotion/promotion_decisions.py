@@ -17,9 +17,12 @@ from project.research.promotion.promotion_decision_support import (
     _evaluate_market_execution_and_stability,
     _quiet_int,
     _restore_boolean_compat_gates,
+    evaluate_sensitivity_gate,
 )
+from project.research.promotion.promotion_eligibility import _ReasonRecorder
 from project.research.promotion.promotion_result_support import _assemble_promotion_result
 from project.research.promotion.promotion_thresholds import _build_bundle_policy
+from project.research.utils.decision_safety import coerce_numeric_nan, finite_le
 from project.research.validation.evidence_bundle import (
     build_evidence_bundle,
     evaluate_promotion_bundle,
@@ -61,10 +64,6 @@ def evaluate_row(
     data_root: Path | None = None,
 ) -> Dict[str, Any]:
     try:
-        from project.research.promotion.promotion_eligibility import _ReasonRecorder
-        from project.research.utils.decision_safety import coerce_numeric_nan, finite_le
-        from project.research.promotion.promotion_decision_support import evaluate_sensitivity_gate
-
         reasons = _ReasonRecorder.create()
         event_type = str(row.get("event_type", row.get("event", ""))).strip() or "UNKNOWN_EVENT"
 
