@@ -245,7 +245,8 @@ class BreakoutTriggerDetector(VolatilityBase):
         breakout_dist = pd.concat([breakout_dist_up, breakout_dist_down], axis=1).max(axis=1)
 
         window = int(params.get("threshold_window", 2880))
-        ret_q80 = lagged_rolling_quantile(ret_abs, window=window, quantile=0.80, min_periods=288)
+        min_periods = max(window // 10, 1)
+        ret_q80 = lagged_rolling_quantile(ret_abs, window=window, quantile=float(params.get("ret_quantile", 0.80)), min_periods=min_periods)
 
         exp_q = float(params.get("expansion_quantile", 0.85))
         breakout_q85 = lagged_rolling_quantile(

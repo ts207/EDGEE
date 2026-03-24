@@ -22,11 +22,13 @@ class VolRegimeShiftDetector(TransitionDetector):
         rv_96 = df["rv_96"].ffill()
         window = int(params.get("lookback_window", 2880))
         min_periods = max(window // 10, 1)
+        window = int(params.get("lookback_window", 2880))
+        min_periods = max(window // 10, 1)
         rv_low_th = lagged_rolling_quantile(
-            rv_96, window=window, quantile=0.33, min_periods=min_periods
+            rv_96, window=window, quantile=float(params.get("rv_low_quantile", 0.33)), min_periods=min_periods
         )
         rv_high_th = lagged_rolling_quantile(
-            rv_96, window=window, quantile=0.66, min_periods=min_periods
+            rv_96, window=window, quantile=float(params.get("rv_high_quantile", 0.66)), min_periods=min_periods
         )
         return {"rv_96": rv_96, "rv_low_th": rv_low_th, "rv_high_th": rv_high_th}
 
@@ -59,15 +61,18 @@ class TrendToChopDetector(TransitionDetector):
     def prepare_features(self, df: pd.DataFrame, **params: Any) -> dict[str, pd.Series]:
         close = df["close"]
         rv_96 = df["rv_96"].ffill()
-        trend_abs = close.pct_change(96).abs()
+        trend_window = int(params.get("trend_window", 96))
+        trend_abs = close.pct_change(trend_window).abs()
+        window = int(params.get("lookback_window", 2880))
+        min_periods = max(window // 10, 1)
         trend_hi = lagged_rolling_quantile(
-            trend_abs, window=2880, quantile=0.70, min_periods=max(2880 // 10, 1)
+            trend_abs, window=window, quantile=float(params.get("trend_hi_quantile", 0.70)), min_periods=min_periods
         )
         trend_lo = lagged_rolling_quantile(
-            trend_abs, window=2880, quantile=0.35, min_periods=max(2880 // 10, 1)
+            trend_abs, window=window, quantile=float(params.get("trend_lo_quantile", 0.35)), min_periods=min_periods
         )
         rv_lo = lagged_rolling_quantile(
-            rv_96, window=2880, quantile=0.35, min_periods=max(2880 // 10, 1)
+            rv_96, window=window, quantile=float(params.get("rv_lo_quantile", 0.35)), min_periods=min_periods
         )
         return {
             "trend_abs": trend_abs,
@@ -99,15 +104,18 @@ class ChopToTrendDetector(TransitionDetector):
     def prepare_features(self, df: pd.DataFrame, **params: Any) -> dict[str, pd.Series]:
         close = df["close"]
         rv_96 = df["rv_96"].ffill()
-        trend_abs = close.pct_change(96).abs()
+        trend_window = int(params.get("trend_window", 96))
+        trend_abs = close.pct_change(trend_window).abs()
+        window = int(params.get("lookback_window", 2880))
+        min_periods = max(window // 10, 1)
         trend_hi = lagged_rolling_quantile(
-            trend_abs, window=2880, quantile=0.70, min_periods=max(2880 // 10, 1)
+            trend_abs, window=window, quantile=float(params.get("trend_hi_quantile", 0.70)), min_periods=min_periods
         )
         trend_lo = lagged_rolling_quantile(
-            trend_abs, window=2880, quantile=0.35, min_periods=max(2880 // 10, 1)
+            trend_abs, window=window, quantile=float(params.get("trend_lo_quantile", 0.35)), min_periods=min_periods
         )
         rv_hi = lagged_rolling_quantile(
-            rv_96, window=2880, quantile=0.70, min_periods=max(2880 // 10, 1)
+            rv_96, window=window, quantile=float(params.get("rv_hi_quantile", 0.70)), min_periods=min_periods
         )
         return {
             "trend_abs": trend_abs,
@@ -145,11 +153,13 @@ class CorrelationBreakdownDetector(CompositeDetector):
         )
         basis_abs = basis_z.abs()
         spread_abs = spread_z.abs()
+        window = int(params.get("lookback_window", 2880))
+        min_periods = max(window // 10, 1)
         basis_hi = lagged_rolling_quantile(
-            basis_abs, window=2880, quantile=0.92, min_periods=max(2880 // 10, 1)
+            basis_abs, window=window, quantile=float(params.get("basis_hi_quantile", 0.92)), min_periods=min_periods
         )
         spread_hi = lagged_rolling_quantile(
-            spread_abs, window=2880, quantile=0.80, min_periods=max(2880 // 10, 1)
+            spread_abs, window=window, quantile=float(params.get("spread_hi_quantile", 0.80)), min_periods=min_periods
         )
         return {
             "ret_1": ret_1,
@@ -187,14 +197,16 @@ class BetaSpikeDetector(CompositeDetector):
             "basis_zscore", df.get("cross_exchange_spread_z", pd.Series(0.0, index=df.index))
         )
         basis_abs = basis_z.abs()
+        window = int(params.get("regime_window", 2880))
+        min_periods = max(window // 10, 1)
         ret_tail = lagged_rolling_quantile(
-            ret_abs, window=2880, quantile=0.99, min_periods=max(2880 // 10, 1)
+            ret_abs, window=window, quantile=float(params.get("ret_quantile", 0.99)), min_periods=min_periods
         )
         basis_med_hi = lagged_rolling_quantile(
-            basis_abs, window=2880, quantile=0.85, min_periods=max(2880 // 10, 1)
+            basis_abs, window=window, quantile=float(params.get("basis_quantile", 0.85)), min_periods=min_periods
         )
         rv_hi = lagged_rolling_quantile(
-            rv_96, window=2880, quantile=0.70, min_periods=max(2880 // 10, 1)
+            rv_96, window=window, quantile=float(params.get("rv_quantile", 0.70)), min_periods=min_periods
         )
         return {
             "ret_abs": ret_abs,

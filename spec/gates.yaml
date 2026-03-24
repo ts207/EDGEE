@@ -11,11 +11,11 @@ gate_v1_phase2:
   min_sample_size: 50
   # Regime-stratified ESS gate (HP-102). Recommended stricter config: min_regimes=3.
   regime_ess_min_per_regime: 1.0
-  regime_ess_min_regimes: 1
+  regime_ess_min_regimes: 2
   # Multi-timeframe expectancy consensus gate (HP-104).
   timeframe_consensus_timeframes: ["1m", "5m", "15m"]
   timeframe_consensus_min_ratio: 0.0
-  timeframe_consensus_min_timeframes: 1
+  timeframe_consensus_min_timeframes: 2
   # Multiplicity diagnostics (HP-103).
   multiplicity_enable_cluster_adjusted: true
   multiplicity_cluster_threshold: 0.85
@@ -134,6 +134,11 @@ gate_v1_bridge:
   micro_max_sweep_pressure: 2.5
   micro_max_abs_imbalance: 0.90
   micro_min_feature_coverage: 0.25
+  dynamic_cost_adjustment:
+    LIQUIDITY_DISLOCATION:
+      multiplier: "spread_pct_at_event / median_spread_pct"
+      target: "slippage_bps_per_fill"
+
 
 shrinkage_parameters:
   # Direction semantics are resolved from template_verb_lexicon side_policy.

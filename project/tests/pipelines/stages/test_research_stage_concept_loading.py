@@ -45,7 +45,6 @@ event_definition:
         run_bridge_eval_phase2=0,
         run_promote=0,
         run_compile_blueprints=0,
-        run_nautilus_check=0,
         run_discovery_quality_summary=0,
     )
     stages = build_research_stages(

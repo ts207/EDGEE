@@ -37,6 +37,9 @@ detector:
     ...
 ```
 
+> [!IMPORTANT]
+> **Parameter Decoupling Rule:** All detector logic in Python (`project/events/families/`) **must** dynamically fetch thresholds, windows, and quantiles from this YAML `parameters` block using `params.get("key", default)`. Hardcoding numerical thresholds directly in Python event subclasses is strictly forbidden to prevent configuration drift.
+
 ### Complete Event Catalog by Family
 
 **LIQUIDITY_DISLOCATION (34 events)**

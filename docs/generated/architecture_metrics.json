@@ -6,7 +6,7 @@
     "project.strategy_templates_importers": 0,
     "run_all_coordinator_lines": 0,
     "module_coupling_count": 2417,
-    "cross_boundary_import_count": 1665,
+    "cross_boundary_import_count": 0,
     "circular_dependency_count": 0,
     "test_coverage_ratio": 0.38446861286014117
   }

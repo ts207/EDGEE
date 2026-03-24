@@ -45,3 +45,29 @@ def get_asset_correlation_adjustment(
     if current_bucket_exposure > correlation_limit:
         return 0.5  # Simple 50% reduction
     return 1.0
+
+
+def calculate_cluster_risk_multiplier(
+    cluster_id: int,
+    active_cluster_counts: Dict[int, int],
+    max_strategies_per_cluster: int = 3,
+) -> float:
+    """
+    Scale down risk if too many strategies from the same alpha cluster are active.
+    
+    This enforces the 'Portfolio Matrix' gating logic where redundant alphas
+    (identified by PnL/Trigger clustering) share a total risk budget.
+    """
+    count = active_cluster_counts.get(cluster_id, 0)
+    if count <= 1:
+        return 1.0
+        
+    # Inverse square root scaling for clusters (1 -> 1.0, 2 -> 0.707, 3 -> 0.577)
+    # This ensures the total risk of the cluster grows sub-linearly.
+    multiplier = 1.0 / np.sqrt(count)
+    
+    # Hard cap on cluster headcount
+    if count > max_strategies_per_cluster:
+        multiplier *= 0.5  # Heavy penalty for exceeding cluster cap
+        
+    return float(np.clip(multiplier, 0.1, 1.0))

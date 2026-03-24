@@ -51,7 +51,7 @@ states:
   - mean_reversion
 - state_id: POST_ABSORPTION_STATE
   family: LIQUIDITY_DISLOCATION
-  source_event_type: ABSORPTION_EVENT
+  source_event_type: ABSORPTION_PROXY
   activation_rule: absorption_imbalance >= threshold
   decay_rule: exit when imbalance mean-reverts to baseline
   features_required:
@@ -716,8 +716,6 @@ states:
   decay_rule: "regime transitions to neutral or bull"
   allowed_templates:
   - continuation
-  - reversal
-  - breakout
 - state_id: BULL_TREND_REGIME
   family: REGIME_CONTEXT
   source_event_type: TREND_EXHAUSTION_TRIGGER
@@ -727,8 +725,6 @@ states:
   decay_rule: "regime transitions to neutral or bear"
   allowed_templates:
   - continuation
-  - reversal
-  - breakout
 - state_id: CHOP_REGIME
   family: REGIME_CONTEXT
   source_event_type: TREND_EXHAUSTION_TRIGGER
@@ -738,8 +734,6 @@ states:
   decay_rule: "regime transitions to directional trend"
   allowed_templates:
   - continuation
-  - reversal
-  - breakout
 - state_id: MS_CONTEXT_STATE_CODE
   family: MICROSTRUCTURE_CONTEXT
   source_event_type: LIQUIDITY_STRESS_DIRECT
@@ -749,19 +743,15 @@ states:
   decay_rule: "composite code returns to neutral baseline"
   allowed_templates:
   - continuation
-  - reversal
-  - breakout
 - state_id: MS_FUNDING_STATE
   family: MICROSTRUCTURE_CONTEXT
-  source_event_type: FUNDING_RATE_EXTREME
+  source_event_type: FUNDING_EXTREME_ONSET
   state_scope: source_only
   min_events: 1
   activation_rule: "funding rate in stressed or extreme regime"
   decay_rule: "funding rate normalizes to baseline range"
   allowed_templates:
   - continuation
-  - reversal
-  - breakout
 - state_id: MS_LIQ_STATE
   family: MICROSTRUCTURE_CONTEXT
   source_event_type: LIQUIDITY_STRESS_DIRECT
@@ -771,19 +761,15 @@ states:
   decay_rule: "liquidity context normalizes"
   allowed_templates:
   - continuation
-  - reversal
-  - breakout
 - state_id: MS_OI_STATE
   family: MICROSTRUCTURE_CONTEXT
-  source_event_type: OI_SURGE
+  source_event_type: OI_SPIKE_POSITIVE
   state_scope: source_only
   min_events: 1
   activation_rule: "open interest in elevated or compressed regime"
   decay_rule: "open interest normalizes"
   allowed_templates:
   - continuation
-  - reversal
-  - breakout
 - state_id: MS_SPREAD_STATE
   family: MICROSTRUCTURE_CONTEXT
   source_event_type: LIQUIDITY_STRESS_DIRECT
@@ -793,8 +779,6 @@ states:
   decay_rule: "spread normalizes to baseline"
   allowed_templates:
   - continuation
-  - reversal
-  - breakout
 - state_id: MS_TREND_STATE
   family: MICROSTRUCTURE_CONTEXT
   source_event_type: TREND_EXHAUSTION_TRIGGER
@@ -804,8 +788,6 @@ states:
   decay_rule: "trend context returns to neutral"
   allowed_templates:
   - continuation
-  - reversal
-  - breakout
 - state_id: MS_VOL_STATE
   family: MICROSTRUCTURE_CONTEXT
   source_event_type: VOL_SHOCK
@@ -815,8 +797,6 @@ states:
   decay_rule: "volatility normalizes"
   allowed_templates:
   - continuation
-  - reversal
-  - breakout
 
 - state_id: LOW_LIQUIDITY_STATE
   family: LIQUIDITY_DISLOCATION
@@ -846,4 +826,61 @@ states:
   allowed_templates:
   - mean_reversion
   - overshoot_repair
+  - tail_risk_avoid
+
+- state_id: FEE_REGIME_STATE
+  family: EXECUTION_FRICTION
+  source_event_type: FEE_REGIME_CHANGE_EVENT
+  activation_rule: fee regime transition detected
+  decay_rule: fee regime normalizes
+  features_required:
+  - fee_bps
+  allowed_templates:
+  - tail_risk_avoid
+  - slippage_aware_filter
+
+- state_id: OI_CONTRACTION_STATE
+  family: POSITIONING_EXTREMES
+  source_event_type: OI_SPIKE_NEGATIVE
+  activation_rule: oi contraction detected
+  decay_rule: oi normalizes
+  features_required:
+  - oi_notional
+  - rv_96
+  allowed_templates:
+  - momentum_fade
+  - mean_reversion
+
+- state_id: POST_CASCADE_RECOVERY_STATE
+  family: POSITIONING_EXTREMES
+  source_event_type: LIQUIDATION_EXHAUSTION_REVERSAL
+  activation_rule: post cascade recovery detected
+  decay_rule: recovery normalizes
+  features_required:
+  - liquidation_notional
+  - spread_bps
+  allowed_templates:
+  - mean_reversion
+  - continuation
+
+- state_id: FUNDING_FLIP_STATE
+  family: POSITIONING_EXTREMES
+  source_event_type: FUNDING_FLIP
+  activation_rule: funding rate sign flip
+  decay_rule: funding persistence achieved
+  features_required:
+  - funding_rate_scaled
+  allowed_templates:
+  - reversal_or_squeeze
+  - trend_continuation
+
+- state_id: BETA_SPIKE_STATE
+  family: REGIME_TRANSITION
+  source_event_type: BETA_SPIKE_EVENT
+  activation_rule: beta spike detected
+  decay_rule: beta normalizes
+  features_required:
+  - beta
+  allowed_templates:
+  - only_if_regime
   - tail_risk_avoid

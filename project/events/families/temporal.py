@@ -186,14 +186,14 @@ class SpreadRegimeWideningDetector(ThresholdDetector):
         spread_q85 = lagged_rolling_quantile(
             spread,
             window=lookback_window,
-            quantile=0.85,
+            quantile=float(params.get("spread_quantile", 0.85)),
             min_periods=min_periods,
         )
         accel = spread_avg - spread_avg.shift(trend_window // 2 or 1)
         accel_q75 = lagged_rolling_quantile(
             accel.abs(),
             window=lookback_window,
-            quantile=0.75,
+            quantile=float(params.get("accel_quantile", 0.75)),
             min_periods=min_periods,
         )
         volume_low_q = lagged_rolling_quantile(
@@ -272,14 +272,14 @@ class SlippageSpikeDetector(ThresholdDetector):
         slip_q99 = lagged_rolling_quantile(
             slippage,
             window=lookback_window,
-            quantile=0.99,
+            quantile=float(params.get("slip_quantile", 0.99)),
             min_periods=min_periods,
         )
         slippage_ratio = slippage / spread_proxy.replace(0.0, np.nan)
         ratio_q90 = lagged_rolling_quantile(
             slippage_ratio,
             window=lookback_window,
-            quantile=0.90,
+            quantile=float(params.get("ratio_quantile", 0.90)),
             min_periods=min_periods,
         )
         return {
@@ -328,7 +328,7 @@ class FeeRegimeChangeDetector(ThresholdDetector):
             fee_q95 = lagged_rolling_quantile(
                 fee_change,
                 window=lookback_window,
-                quantile=0.95,
+                quantile=float(params.get("fee_change_quantile", 0.95)),
                 min_periods=min_periods,
             )
             persistent_shift = fee.shift(2).notna() & (fee == fee.shift(1)) & (fee != fee.shift(2))
@@ -405,13 +405,13 @@ class CopulaPairsTradingDetector(ThresholdDetector):
         z_q95 = lagged_rolling_quantile(
             zscore_abs,
             window=lookback_window,
-            quantile=0.95,
+            quantile=float(params.get("z_quantile", 0.95)),
             min_periods=min_periods,
         )
         spread_q75 = lagged_rolling_quantile(
             spread_proxy,
             window=lookback_window,
-            quantile=0.75,
+            quantile=float(params.get("spread_quantile", 0.75)),
             min_periods=min_periods,
         )
         return {

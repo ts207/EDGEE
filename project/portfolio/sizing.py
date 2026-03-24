@@ -10,6 +10,7 @@ from project.core.execution_costs import estimate_transaction_cost_bps
 from project.portfolio.risk_budget import (
     calculate_portfolio_risk_multiplier,
     get_asset_correlation_adjustment,
+    calculate_cluster_risk_multiplier,
 )
 
 
@@ -54,6 +55,7 @@ def calculate_target_notional(
     portfolio_state: Dict[str, Any],
     symbol: str,
     asset_bucket: str = "default",
+    cluster_id: int | None = None,
     expected_cost_bps: float = 0.0,
     *,
     concentration_cap_pct: float = 0.05,
@@ -107,9 +109,17 @@ def calculate_target_notional(
 
     vol_adj = _resolve_volatility_adjustment(vol_regime, portfolio_state)
 
+    # Cluster-level risk scaling (Portfolio Matrix)
+    cluster_adj = 1.0
+    if cluster_id is not None:
+        cluster_adj = calculate_cluster_risk_multiplier(
+            cluster_id=cluster_id,
+            active_cluster_counts=portfolio_state.get("active_cluster_counts", {}),
+        )
+
     # Final target
     target_notional = min(
-        base_notional * risk_mult * corr_adj * vol_adj,
+        base_notional * risk_mult * corr_adj * vol_adj * cluster_adj,
         liquidity_cap,
         concentration_cap,
     )
@@ -139,6 +149,7 @@ def calculate_execution_aware_target_notional(
     market_data: Dict[str, Any],
     execution_cost_config: Dict[str, Any] | None = None,
     asset_bucket: str = "default",
+    cluster_id: int | None = None,
 ) -> Dict[str, Any]:
     """
     Size a trade using expected edge net of execution costs resolved from the
@@ -157,6 +168,7 @@ def calculate_execution_aware_target_notional(
         portfolio_state=portfolio_state,
         symbol=symbol,
         asset_bucket=asset_bucket,
+        cluster_id=cluster_id,
         expected_cost_bps=0.0,
     )
 
@@ -201,6 +213,7 @@ def calculate_execution_aware_target_notional(
         portfolio_state=portfolio_state,
         symbol=symbol,
         asset_bucket=asset_bucket,
+        cluster_id=cluster_id,
         expected_cost_bps=expected_cost_bps,
     )
     resolved["estimated_execution_cost_bps"] = expected_cost_bps

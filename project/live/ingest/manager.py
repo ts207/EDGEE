@@ -18,6 +18,7 @@ class LiveDataManager:
         self,
         symbols: List[str],
         on_reconnect_exhausted: Optional[Callable[[], None]] = None,
+        rest_client: Any | None = None,
     ):
         self.symbols = [s.lower() for s in symbols]
         self.kline_queue: asyncio.Queue = asyncio.Queue(maxsize=10000)
@@ -29,6 +30,7 @@ class LiveDataManager:
             self._on_message,
             on_reconnect_exhausted=on_reconnect_exhausted,
         )
+        self.rest_client = rest_client
 
     def _build_streams(self) -> List[str]:
         streams = []
@@ -54,7 +56,38 @@ class LiveDataManager:
     async def start(self):
         _LOG.info("Starting Live Data Manager...")
         self._loop = asyncio.get_running_loop()
+        
+        if self.rest_client:
+            await self.backfill()
+            
         await self.client.connect()
+
+    async def backfill(self):
+        """Perform a conservative REST backfill for all symbols/timeframes."""
+        if not self.rest_client:
+            return
+            
+        _LOG.info("Performing initial REST backfill...")
+        for symbol in self.symbols:
+            try:
+                # Backfill 1m klines (100 bars)
+                klines = await self.rest_client.get_klines(symbol, "1m", limit=100)
+                for k in klines:
+                    # Construct a kline event object similar to what parse_kline_event produces
+                    event = {
+                        "symbol": symbol.upper(),
+                        "timeframe": "1m",
+                        "open": float(k[1]),
+                        "high": float(k[2]),
+                        "low": float(k[3]),
+                        "close": float(k[4]),
+                        "volume": float(k[5]),
+                        "is_final": True,
+                        "timestamp": pd.to_datetime(k[0], unit="ms", utc=True),
+                    }
+                    self.kline_queue.put_nowait(event)
+            except Exception as e:
+                _LOG.error(f"Failed to backfill {symbol}: {e}")
 
     async def stop(self):
         _LOG.info("Stopping Live Data Manager...")

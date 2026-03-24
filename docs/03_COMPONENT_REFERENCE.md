@@ -194,9 +194,7 @@
 
 | Module | Role |
 |---|---|
-| `strategy/compiler/` | Blueprint → Nautilus translation layer |
-| `compilers/nautilus/core.py` | Nautilus-specific compilation |
-| `compilers/nautilus/mappers/` | Field mappers for Nautilus trader format |
+| `strategy/compiler/` | Blueprint → Executable strategy translation layer |
 | `compilers/executable_strategy_spec.py` | Executable strategy spec data class |
 
 ### Runtime

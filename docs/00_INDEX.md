@@ -85,7 +85,7 @@ PIPELINE (8 stages)
   phase1_analysis     → 74 event detectors → episode files (per family .parquet)
   phase2_discovery    → hypothesis scoring, FDR control → scored candidates
   promotion           → E1/V1/P3 gate → edge registry + campaign memory
-  strategy_packaging  → Blueprints → Nautilus compiler → live engine
+  strategy_packaging  → Blueprints → Executable strategy specs → live engine
 
 RESEARCH PRIMITIVES
   74 event types      across 9 canonical families
@@ -107,7 +107,6 @@ LIVE ENGINE
 
 TECH STACK
   Python 3.11+        pandas, numpy, numba, pyarrow, pydantic, scikit-learn
-  Optional            nautilus-trader (live execution)
   Storage             Parquet (all artifacts)
   CI                  3-tier GitHub Actions + Pyright + Ruff
 

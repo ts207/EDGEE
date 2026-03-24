@@ -38,12 +38,12 @@ class BasisDislocationDetector(DislocationDetector):
 
         logret = np.log(close_perp / close_perp.shift(1))
         rv_proxy = logret.rolling(96, min_periods=24).std()
-        vol_factor = rolling_vol_regime_factor(rv_proxy, window=2880)
+        vol_factor = rolling_vol_regime_factor(rv_proxy, window=lookback_window)
 
         # Adaptive threshold based on rolling quantile of absolute Z-score
         dynamic_th = dynamic_quantile_floor(
             basis_zscore.abs(),
-            window=2880,
+            window=lookback_window,
             quantile=float(params.get("anchor_quantile", params.get("threshold_quantile", 0.99))),
             floor=float(params.get("z_threshold", params.get("threshold", self.threshold))),
         )
@@ -145,9 +145,10 @@ class FndDislocDetector(BasisDislocationDetector):
         funding = pd.to_numeric(df["funding_rate_scaled"], errors="coerce")
         funding_abs = funding.abs()
         threshold_bps = float(params.get("threshold_bps", 2.0))
+        lookback_window = int(params.get("lookback_window", 2880))
         funding_q95 = dynamic_quantile_floor(
             funding_abs,
-            window=2880,
+            window=lookback_window,
             quantile=float(params.get("funding_quantile", 0.90)),
             floor=threshold_bps / 10_000.0,
         )
@@ -192,9 +193,10 @@ class SpotPerpBasisShockDetector(BasisDislocationDetector):
     def prepare_features(self, df: pd.DataFrame, **params: Any) -> dict[str, pd.Series]:
         features = super().prepare_features(df, **params)
         shock_change = features["basis_zscore"].diff().abs()
+        lookback_window = int(params.get("lookback_window", 2880))
         shock_q90 = dynamic_quantile_floor(
             shock_change,
-            window=2880,
+            window=lookback_window,
             quantile=float(params.get("shock_change_quantile", 0.90)),
             floor=float(params.get("shock_change_floor", 0.75)),
         )

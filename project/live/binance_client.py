@@ -108,6 +108,21 @@ class BinanceFuturesClient:
         """GET /fapi/v2/account"""
         return await self._request("GET", "/fapi/v2/account", signed=True)
 
+    async def get_klines(
+        self, symbol: str, interval: str, limit: int = 500
+    ) -> List[List[Any]]:
+        """GET /fapi/v1/klines"""
+        params = {"symbol": symbol.upper(), "interval": interval, "limit": limit}
+        return await self._request("GET", "/fapi/v1/klines", params=params)
+
+    async def get_tickers(self, symbol: str | None = None) -> List[Dict[str, Any]]:
+        """GET /fapi/v1/ticker/bookTicker"""
+        params = {}
+        if symbol:
+            params["symbol"] = symbol.upper()
+        res = await self._request("GET", "/fapi/v1/ticker/bookTicker", params=params)
+        return [res] if isinstance(res, dict) else res
+
     async def cancel_all_open_orders(self, symbol: str) -> Any:
         """DELETE /fapi/v1/allOpenOrders"""
         return await self._request(
@@ -128,6 +143,30 @@ class BinanceFuturesClient:
             "side": side.upper(),
             "type": "MARKET",
             "quantity": quantity,
+            "reduceOnly": "true" if reduce_only else "false",
+        }
+        if new_client_order_id:
+            params["newClientOrderId"] = str(new_client_order_id)
+        return await self._request("POST", "/fapi/v1/order", params=params, signed=True)
+
+    async def create_limit_order(
+        self,
+        symbol: str,
+        side: str,
+        quantity: float,
+        price: float,
+        time_in_force: str = "GTC",
+        reduce_only: bool = False,
+        new_client_order_id: str | None = None,
+    ) -> Any:
+        """POST /fapi/v1/order"""
+        params = {
+            "symbol": symbol.upper(),
+            "side": side.upper(),
+            "type": "LIMIT",
+            "quantity": quantity,
+            "price": price,
+            "timeInForce": time_in_force.upper(),
             "reduceOnly": "true" if reduce_only else "false",
         }
         if new_client_order_id:

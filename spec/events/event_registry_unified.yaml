@@ -35,17 +35,11 @@ defaults:
   - severity_bucket
   max_candidates_per_run: 1000
 families:
-  ABSORPTION_PROXY:
-    parameters: {}
-  DEPTH_STRESS_PROXY:
-    parameters: {}
   EXECUTION_FRICTION:
     parameters: {}
     templates:
     - slippage_aware_filter
     - tail_risk_avoid
-  FLOW_EXHAUSTION_PROXY:
-    parameters: {}
   FORCED_FLOW_AND_EXHAUSTION:
     parameters: {}
     templates:
@@ -64,8 +58,6 @@ families:
     - lead_lag_follow
     - divergence_continuation
     - basis_convergence
-  LIQUIDATION_EXHAUSTION_REVERSAL:
-    parameters: {}
   LIQUIDITY_DISLOCATION:
     parameters: {}
     templates:
@@ -76,10 +68,6 @@ families:
     - only_if_liquidity
     - slippage_aware_filter
     - liquidity_replenishment
-  LIQUIDITY_STRESS_DIRECT:
-    parameters: {}
-  LIQUIDITY_STRESS_PROXY:
-    parameters: {}
   POSITIONING_EXTREMES:
     parameters: {}
     templates:
@@ -91,8 +79,6 @@ families:
     - only_if_funding
     - only_if_oi
     - tail_risk_avoid
-  PRICE_VOL_IMBALANCE_PROXY:
-    parameters: {}
   REGIME_TRANSITION:
     parameters: {}
     templates:
@@ -132,27 +118,10 @@ families:
     - pullback_entry
     - only_if_regime
     - structural_regime_shift
-  WICK_REVERSAL_PROXY:
-    parameters: {}
-events:
   ABSORPTION_EVENT:
     alias_for: ABSORPTION_PROXY
     active: false
     notes: "Legacy dual registrations merged into ABSORPTION_PROXY per Item 13/14."
-  ABSORPTION_PROXY:
-    canonical_family: ABSORPTION_PROXY
-    reports_dir: liquidity_dislocation
-    events_file: liquidity_dislocation_events.parquet
-    signal_column: absorption_proxy_event
-    parameters:
-      canonical_family: LIQUIDITY_DISLOCATION
-      window: 288
-      spread_quantile: 0.965
-      rv_quantile: 0.9
-      imbalance_abs_quantile: 0.25
-      min_history_bars: 288
-      cooldown_bars: 96
-      merge_gap_bars: 0
   BAND_BREAK:
     canonical_family: STATISTICAL_DISLOCATION
     reports_dir: statistical_dislocation
@@ -455,20 +424,6 @@ events:
     horizons:
     - 15m
     max_candidates_per_run: 600
-  DEPTH_STRESS_PROXY:
-    canonical_family: DEPTH_STRESS_PROXY
-    reports_dir: liquidity_dislocation
-    events_file: liquidity_dislocation_events.parquet
-    signal_column: depth_stress_proxy_event
-    parameters:
-      canonical_family: LIQUIDITY_DISLOCATION
-      window: 288
-      spread_quantile: 0.99
-      rv_quantile: 0.9
-      depth_quantile: 0.93
-      min_history_bars: 288
-      cooldown_bars: 96
-      merge_gap_bars: 0
   FAILED_CONTINUATION:
     canonical_family: FORCED_FLOW_AND_EXHAUSTION
     reports_dir: forced_flow_and_exhaustion
@@ -530,17 +485,6 @@ events:
     - 5m
     - 15m
     max_candidates_per_run: 300
-  FLOW_EXHAUSTION_PROXY:
-    canonical_family: FLOW_EXHAUSTION_PROXY
-    reports_dir: forced_flow_and_exhaustion
-    events_file: forced_flow_and_exhaustion_events.parquet
-    signal_column: flow_exhaustion_proxy_event
-    parameters:
-      canonical_family: FORCED_FLOW_AND_EXHAUSTION
-      lookback_window: 288
-      z_threshold: 3.0
-      cooldown_bars: 12
-      merge_gap_bars: 0
   FND_DISLOC:
     canonical_family: STATISTICAL_DISLOCATION
     reports_dir: funding_dislocation
@@ -939,25 +883,6 @@ events:
     - 15m
     - 60m
     max_candidates_per_run: 300
-  LIQUIDATION_EXHAUSTION_REVERSAL:
-    canonical_family: LIQUIDATION_EXHAUSTION_REVERSAL
-    reports_dir: forced_flow_and_exhaustion
-    events_file: forced_flow_and_exhaustion_events.parquet
-    signal_column: liquidation_exhaustion_reversal_event
-    parameters:
-      notes:
-      - This detector is evaluated on bar features and depends on a prior forced-flow
-        cluster being present in recent history.
-      canonical_family: FORCED_FLOW_AND_EXHAUSTION
-      rebound_window_bars: 12
-      rebound_window: 6
-      rebound_return_min: 0.001
-      rv_peak_decay_ratio: 1.01
-      liq_cooldown_ratio: 0.55
-      liquidation_cooldown_abs_max: 100000.0
-      post_cluster_lookback: 48
-      cooldown_bars: 24
-      merge_gap_bars: 0
   LIQUIDITY_GAP_PRINT:
     canonical_family: LIQUIDITY_DISLOCATION
     reports_dir: liquidity_dislocation
@@ -1000,26 +925,6 @@ events:
     horizons:
     - 15m
     max_candidates_per_run: 600
-  LIQUIDITY_STRESS_DIRECT:
-    canonical_family: LIQUIDITY_STRESS_DIRECT
-    reports_dir: liquidity_shock
-    events_file: liquidity_shock_events.parquet
-    signal_column: liquidity_stress_direct_event
-    parameters:
-      canonical_family: LIQUIDITY_DISLOCATION
-      depth_collapse_th: 0.5
-      spread_spike_th: 3.0
-      median_window: 288
-  LIQUIDITY_STRESS_PROXY:
-    canonical_family: LIQUIDITY_STRESS_PROXY
-    reports_dir: liquidity_shock
-    events_file: liquidity_shock_events.parquet
-    signal_column: liquidity_stress_proxy_event
-    parameters:
-      canonical_family: LIQUIDITY_DISLOCATION
-      depth_collapse_th: 0.5
-      spread_spike_th: 3.0
-      median_window: 288
   LIQUIDITY_VACUUM:
     canonical_family: LIQUIDITY_DISLOCATION
     reports_dir: liquidity_vacuum
@@ -1272,20 +1177,6 @@ events:
       liq_cooldown_ratio: 0.55
       liquidation_cooldown_abs_max: 100000.0
       post_cluster_lookback: 48
-      cooldown_bars: 24
-      merge_gap_bars: 0
-  PRICE_VOL_IMBALANCE_PROXY:
-    canonical_family: PRICE_VOL_IMBALANCE_PROXY
-    reports_dir: liquidity_dislocation
-    events_file: liquidity_dislocation_events.parquet
-    signal_column: price_vol_imbalance_proxy_event
-    parameters:
-      canonical_family: LIQUIDITY_DISLOCATION
-      ret_quantile: 0.995
-      rv_quantile: 0.9
-      volume_quantile: 0.9
-      min_history_bars: 288
-      min_spacing: 24
       cooldown_bars: 24
       merge_gap_bars: 0
   PULLBACK_PIVOT:
@@ -1799,18 +1690,6 @@ events:
     horizons:
     - 60m
     max_candidates_per_run: 500
-  WICK_REVERSAL_PROXY:
-    canonical_family: WICK_REVERSAL_PROXY
-    reports_dir: liquidity_dislocation
-    events_file: liquidity_dislocation_events.parquet
-    signal_column: wick_reversal_proxy_event
-    parameters:
-      canonical_family: LIQUIDITY_DISLOCATION
-      lookback_window: 288
-      z_threshold: 3.0
-      cooldown_bars: 12
-      merge_gap_bars: 0
-      min_volume_quantile: 0.2
   ZSCORE_STRETCH:
     canonical_family: STATISTICAL_DISLOCATION
     reports_dir: statistical_dislocation

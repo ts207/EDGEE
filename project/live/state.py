@@ -26,6 +26,7 @@ class PositionState:
     liquidation_price: Optional[float] = None
     leverage: float = 1.0
     margin_type: str = "ISOLATED"
+    cluster_id: Optional[int] = None
     update_time: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
     def __post_init__(self):
@@ -119,6 +120,7 @@ class LiveStateStore:
                             else None,
                             leverage=float(p.get("leverage", 1.0) or 1.0),
                             margin_type=str(p.get("margin_type", "ISOLATED")),
+                            cluster_id=p.get("cluster_id"),
                         )
                         self.account.update_position(pos)
                 for symbol in list(self.account.positions):
@@ -213,6 +215,7 @@ class LiveStateStore:
                         "liquidation_price": pos.liquidation_price,
                         "leverage": float(pos.leverage),
                         "margin_type": pos.margin_type,
+                        "cluster_id": pos.cluster_id,
                         "update_time": pos.update_time.isoformat(),
                     }
                     for pos in self.account.positions.values()
@@ -254,6 +257,7 @@ class LiveStateStore:
                 ),
                 leverage=float(raw.get("leverage", 1.0)),
                 margin_type=str(raw.get("margin_type", "ISOLATED")),
+                cluster_id=raw.get("cluster_id"),
             )
             update_time = raw.get("update_time")
             if update_time:

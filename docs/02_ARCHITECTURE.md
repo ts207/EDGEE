@@ -66,7 +66,7 @@ Each stage declares its input and output artifact tokens. Tokens are canonical s
 project/
 ├── apps/          Pipeline app manifests
 ├── artifacts/     Baseline artifact snapshots (frozen reference state)
-├── compilers/     Nautilus strategy compiler (backtest → live translation)
+├── compilers/     Strategy compiler (backtest → live translation)
 ├── configs/       Runtime configs, experiment registries, venue configs
 ├── contracts/     Stage and artifact contracts (pipeline_registry.py)
 ├── core/          Shared infrastructure: feature registry, config, timeframes, exceptions
@@ -84,7 +84,6 @@ project/
 ├── portfolio/     Portfolio-level aggregation
 ├── reliability/   Smoke tests and reliability CLI
 ├── research/      Discovery, promotion, evaluation, knowledge, agent I/O
-├── runtime/       Nautilus runtime integration
 ├── schemas/       Shared Pydantic/Pandera schemas
 ├── scripts/       Operator and maintenance entry points
 ├── spec_registry/ YAML spec loaders
@@ -205,7 +204,7 @@ Blueprint
 └── SymbolScopeSpec  (which instruments)
 ```
 
-Blueprints are compiled to Nautilus Trader-compatible execution specs via `project/compilers/nautilus/`.
+Blueprints are compiled to executable strategy specs via `project/strategy/compiler/`.
 
 ---
 

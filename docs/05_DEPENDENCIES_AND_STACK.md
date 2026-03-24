@@ -31,17 +31,13 @@
 
 | Group | Package | Role |
 |---|---|---|
-| `[nautilus]` | `nautilus-trader` | Live trading execution engine integration |
 | `[dev]` | `pyright==1.1.350` | Static type checking |
 
 ### Installation
 
 ```bash
-# Standard research (no live trading)
+# Standard research
 pip install -e .
-
-# With Nautilus live execution
-pip install -e ".[nautilus]"
 ```
 
 ---

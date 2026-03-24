@@ -30,12 +30,6 @@ Each stage produces versioned, manifest-tracked artifacts. A run is only trustwo
 pip install -e .
 ```
 
-With Nautilus Trader live execution support:
-
-```bash
-pip install -e ".[nautilus]"
-```
-
 ---
 
 ## Quickstart

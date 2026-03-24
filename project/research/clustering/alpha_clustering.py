@@ -5,13 +5,19 @@ from typing import Dict, List, Tuple
 
 
 def cluster_hypotheses(
-    pnl_df: pd.DataFrame, eps: float = 0.3, min_samples: int = 1
-) -> Dict[str, List[str]]:
+    pnl_df: pd.DataFrame, 
+    eps: float = 0.3, 
+    min_samples: int = 1,
+    metric: str = "correlation",
+    trigger_df: pd.DataFrame | None = None,
+) -> Dict[int, List[str]]:
     """
     Group redundant hypotheses using DBSCAN.
 
     pnl_df: hypothesis_ids as columns, signal_ts as index
-    eps: max distance (1-corr) to be considered in same cluster
+    eps: max distance (1-sim) to be considered in same cluster
+    metric: 'correlation' or 'jaccard'
+    trigger_df: optional binary frame for jaccard overlap
     """
     if pnl_df.empty:
         return {}
@@ -25,10 +31,15 @@ def cluster_hypotheses(
     # DBSCAN on the precomputed distance matrix
     from project.research.clustering.pnl_similarity import (
         calculate_similarity_matrix,
+        calculate_trigger_overlap,
         compute_distance_matrix,
     )
 
-    sim = calculate_similarity_matrix(pnl_df)
+    if metric == "jaccard" and trigger_df is not None:
+        sim = calculate_trigger_overlap(trigger_df)
+    else:
+        sim = calculate_similarity_matrix(pnl_df)
+        
     dist = compute_distance_matrix(sim)
 
     clustering = DBSCAN(eps=eps, min_samples=min_samples, metric="precomputed")

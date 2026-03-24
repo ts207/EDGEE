@@ -127,10 +127,7 @@ make_funding_artifact_token(timeframe)     # → "raw.perp.funding_{tf}"
 │  build_strategy_candidates   → candidate strategy set                       │
 │  select_profitable_strategies → filtered profitable set                     │
 │          ↓                                                                   │
-│  [Nautilus Compiler]                                                         │
-│  compilers/nautilus/core.py  → Nautilus-compatible execution specs           │
-│          ↓                                                                   │
-│  Live Engine                                                                 │
+│  Live Engine (Native)                                                        │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 

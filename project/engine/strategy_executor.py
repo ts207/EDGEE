@@ -68,6 +68,7 @@ def build_live_order_metadata(
         "expected_cost_bps": float(row.get("expected_cost_bps", 0.0) or 0.0),
         "expected_net_edge_bps": float(row.get("expected_net_edge_bps", 0.0) or 0.0),
         "realized_fee_bps": float(realized_fee_bps),
+        "cluster_id": row.get("cluster_id") if not pd.isna(row.get("cluster_id")) else None,
     }
     if payload["expected_entry_price"] <= 0.0:
         return {}
@@ -179,6 +180,7 @@ def _resolve_execution_aware_scale(
         "target_vol": float(params.get("target_vol", 0.1)),
         "current_vol": float(params.get("current_vol", params.get("target_vol", 0.1))),
         "bucket_exposures": dict(params.get("bucket_exposures", {})),
+        "active_cluster_counts": dict(params.get("active_cluster_counts", {})),
     }
     sizing = calculate_execution_aware_target_notional(
         event_score=float(params["event_score"]),
@@ -189,6 +191,7 @@ def _resolve_execution_aware_scale(
         portfolio_state=portfolio_state,
         symbol=symbol,
         asset_bucket=str(params.get("asset_bucket", "default")),
+        cluster_id=params.get("cluster_id"),
         market_data=market_data,
         execution_cost_config=dict(params.get("execution_model", {})),
     )
@@ -455,6 +458,7 @@ def calculate_strategy_returns(
             "equity_return": ledger["equity_return"].values,
             "entry_reason": [entry_reason_map.get(t, "") for t in timestamp_index],
             "exit_signal_reason": [exit_reason_map.get(t, "") for t in timestamp_index],
+            "cluster_id": params.get("cluster_id"),
         }
     )
 

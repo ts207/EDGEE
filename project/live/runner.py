@@ -13,10 +13,13 @@ from project.live.oms import (
     OrderStatus,
     OrderSubmissionFailed,
     build_live_order_from_strategy_result,
+    BinanceFuturesClient,
 )
 from project.live.state import LiveStateStore
 from project.live.execution_attribution import summarize_execution_attribution_by
 from project.live.health_checks import DataHealthMonitor
+from project.portfolio.incubation import IncubationLedger
+from project import PROJECT_ROOT
 
 _LOG = logging.getLogger(__name__)
 
@@ -55,9 +58,10 @@ class LiveEngineRunner:
             data_manager = LiveDataManager(
                 symbols,
                 on_reconnect_exhausted=self._on_ws_reconnect_exhausted,
+                rest_client=self.rest_client,
             )
         self.data_manager = data_manager
-        self.order_manager = order_manager or OrderManager()
+        self.order_manager = order_manager or OrderManager(exchange_client=self.rest_client)
         self.execution_quality_report_path = (
             Path(execution_quality_report_path)
             if execution_quality_report_path is not None
@@ -78,6 +82,18 @@ class LiveEngineRunner:
         self.reconcile_at_startup = bool(reconcile_at_startup)
         self.account_snapshot_fetcher = account_snapshot_fetcher
         self.account_sync_failure_count = 0
+        
+        # Phase 5: Incubation Ledger
+        self.incubation_ledger = IncubationLedger(
+            PROJECT_ROOT / "project" / "live" / "incubation_ledger.json"
+        )
+        
+        # Phase 3: Native REST Client for Initialization & Recovery
+        self.rest_client = BinanceFuturesClient(
+            api_key="", # To be provided by environment/caller
+            api_secret="",
+        )
+        
         self._running = False
         self._tasks: List[asyncio.Task] = []
         self._kill_switch_task: asyncio.Task | None = None
@@ -239,6 +255,13 @@ class LiveEngineRunner:
         )
         if order is None:
             return None
+            
+        # Phase 5: Graduation Check
+        strategy_id = order.metadata.get("strategy")
+        if strategy_id and not self.incubation_ledger.is_graduated(strategy_id):
+            _LOG.info(f"Strategy {strategy_id} is still in incubation. Forcing PAPER mode.")
+            order.metadata["is_paper"] = True
+            
         degradation = self._assess_execution_degradation(order)
         order.metadata["execution_degradation_action"] = str(degradation["action"])
         order.metadata["execution_degradation_sample_count"] = float(degradation["sample_count"])
@@ -263,6 +286,28 @@ class LiveEngineRunner:
                 self.execution_degradation_throttle_scale
             )
         return order, None
+
+    def _get_portfolio_state_for_sizing(self) -> Dict[str, Any]:
+        """
+        Produce a portfolio state snapshot suitable for the sizer, 
+        including active cluster counts for the 'Portfolio Matrix' gate.
+        """
+        with self.state_store._lock:
+            acc = self.state_store.account
+            cluster_counts: Dict[int, int] = {}
+            for pos in acc.positions.values():
+                if pos.cluster_id is not None:
+                    cluster_counts[pos.cluster_id] = cluster_counts.get(pos.cluster_id, 0) + 1
+            
+            return {
+                "portfolio_value": float(acc.wallet_balance + acc.total_unrealized_pnl),
+                "gross_exposure": float(sum(abs(p.quantity * p.mark_price) for p in acc.positions.values())),
+                "max_gross_leverage": 1.0, # Placeholder or from config
+                "target_vol": 0.1, # Placeholder
+                "current_vol": 0.1, # Placeholder
+                "bucket_exposures": {},
+                "active_cluster_counts": cluster_counts,
+            }
 
     def on_order_fill(self, client_order_id: str, fill_qty: float, fill_price: float) -> None:
         self.order_manager.on_fill(client_order_id, fill_qty=fill_qty, fill_price=fill_price)

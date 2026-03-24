@@ -24,11 +24,13 @@ class IndexComponentDivergenceDetector(CompositeDetector):
             "basis_zscore", df.get("cross_exchange_spread_z", pd.Series(0.0, index=df.index))
         )
         basis_abs = basis_z.abs()
+        window = int(params.get("threshold_window", 2880))
+        min_periods = max(window // 10, 1)
         basis_q93 = lagged_rolling_quantile(
-            basis_abs, window=2880, quantile=0.93, min_periods=max(2880 // 10, 1)
+            basis_abs, window=window, quantile=float(params.get("basis_quantile", 0.93)), min_periods=min_periods
         )
         ret_q75 = lagged_rolling_quantile(
-            ret_abs, window=2880, quantile=0.75, min_periods=max(2880 // 10, 1)
+            ret_abs, window=window, quantile=float(params.get("ret_quantile", 0.75)), min_periods=min_periods
         )
         return {
             "basis_abs": basis_abs,
@@ -60,8 +62,10 @@ class LeadLagBreakDetector(ThresholdDetector):
             "basis_zscore", df.get("cross_exchange_spread_z", pd.Series(0.0, index=df.index))
         )
         basis_diff_abs = basis_z.diff().abs()
+        window = int(params.get("threshold_window", 2880))
+        min_periods = max(window // 10, 1)
         basis_diff_q99 = lagged_rolling_quantile(
-            basis_diff_abs, window=2880, quantile=0.99, min_periods=max(2880 // 10, 1)
+            basis_diff_abs, window=window, quantile=float(params.get("basis_diff_quantile", 0.99)), min_periods=min_periods
         )
         return {"basis_diff_abs": basis_diff_abs, "basis_diff_q99": basis_diff_q99}
 

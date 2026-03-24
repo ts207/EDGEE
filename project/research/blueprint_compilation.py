@@ -279,6 +279,8 @@ def _evaluation_from_row(
         cost_model={
             "fees_bps": float(fees_bps),
             "slippage_bps": float(slippage_bps),
+            "slippage_model": str(row.get("slippage_model", "fixed")),
+            "impact_scaling": bool(row.get("impact_scaling", False)),
             "funding_included": True,
         },
         robustness_flags={

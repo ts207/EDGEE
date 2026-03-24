@@ -127,6 +127,8 @@ families:
     templates:
     - mean_reversion
     - continuation
+    - tail_risk_avoid
+    - only_if_no_news_window
   EXECUTION_FRICTION:
     templates:
     - slippage_aware_filter

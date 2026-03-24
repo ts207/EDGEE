@@ -56,6 +56,7 @@ triggers:
     # Information desync family
     - SPOT_PERP_BASIS_SHOCK
     - LEAD_LAG_BREAK
+    - CROSS_VENUE_DESYNC
 
     # Temporal family
     - SESSION_OPEN_EVENT
@@ -150,3 +151,8 @@ entry_lags:
 # Cost profiles (maps to cost model in configs/fees.yaml)
 cost_profiles:
   - standard
+
+# Cross-family state conditioning intersections
+conditioning_intersections:
+  - CROWDING_STATE + HIGH_VOL_REGIME
+  - STRETCHED_STATE + LOW_FRICTION_STATE

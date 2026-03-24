@@ -214,10 +214,18 @@ class DeleveragingWaveDetector(ThresholdDetector):
         rv_96 = pd.to_numeric(df["rv_96"], errors="coerce").ffill().astype(float)
         from project.events.thresholding import rolling_mean_std_zscore
 
-        rv_z = rolling_mean_std_zscore(rv_96, window=288)
+        rv_window = int(params.get("rv_window", 288))
+        lookback_window = int(params.get("lookback_window", 2880))
+        min_periods = max(lookback_window // 10, 1)
 
-        oi_q01 = lagged_rolling_quantile(oi_delta_1h, window=2880, quantile=0.01, min_periods=288)
-        rv_q90 = lagged_rolling_quantile(rv_z, window=2880, quantile=0.90, min_periods=288)
+        rv_z = rolling_mean_std_zscore(rv_96, window=rv_window)
+
+        oi_q01 = lagged_rolling_quantile(
+            oi_delta_1h, window=lookback_window, quantile=float(params.get("oi_quantile", 0.01)), min_periods=min_periods
+        )
+        rv_q90 = lagged_rolling_quantile(
+            rv_z, window=lookback_window, quantile=float(params.get("rv_quantile", 0.90)), min_periods=min_periods
+        )
         canonical_oi_decel = state_at_most(
             df,
             "ms_oi_state",
