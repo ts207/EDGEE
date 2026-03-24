@@ -1,8 +1,8 @@
-# EDGEE
+# Edge
 
 A research platform for event-driven alpha discovery in crypto markets.
 
-EDGEE turns market observations into explicit, testable hypotheses, runs them through a structured pipeline, and gates any result on mechanical, statistical, and deployment-readiness checks before it can be promoted. The goal is reproducible, cost-aware, narrowly attributed research — not output volume.
+Edge turns market observations into explicit, testable hypotheses, runs them through a structured pipeline, and gates any result on mechanical, statistical, and deployment-readiness checks before it can be promoted. The goal is reproducible, cost-aware, narrowly attributed research — not output volume.
 
 ---
 
@@ -30,11 +30,6 @@ Each stage produces versioned, manifest-tracked artifacts. A run is only trustwo
 pip install -e .
 ```
 
-With Nautilus Trader live execution support:
-
-```bash
-pip install -e ".[nautilus]"
-```
 
 ---
 
@@ -195,17 +190,7 @@ The 9 canonical event families (`LIQUIDITY_DISLOCATION`, `VOLATILITY_TRANSITION`
 
 ---
 
-## Documentation
 
-The docs are split by role.
-
-**Researchers** — start with [`docs/researcher/ONBOARDING.md`](docs/researcher/ONBOARDING.md)
-
-**Developers** — start with [`docs/developer/ONBOARDING.md`](docs/developer/ONBOARDING.md)
-
-**The full map** — [`docs/README.md`](docs/README.md)
-
----
 
 ## Agent / Autonomous Controller Quickstart
 
