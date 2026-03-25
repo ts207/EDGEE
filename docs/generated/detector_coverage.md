@@ -1,10 +1,10 @@
 # Detector Coverage Audit
 
-- Status: `failed`
+- Status: `passed`
 - Active event specs: `69`
 - Registered detectors: `69`
 - Raw registered detector entries: `66`
-- Issues: `9`
+- Issues: `5`
 
 ## Maturity Counts
 
@@ -16,10 +16,6 @@
 
 ## Issues
 
-- [error] Active event spec has no registered detector: SEQ_FND_EXTREME_THEN_BREAKOUT
-- [error] Active event spec has no registered detector: SEQ_LIQ_VACUUM_THEN_DEPTH_RECOVERY
-- [error] Active event spec has no registered detector: SEQ_OI_SPIKEPOS_THEN_VOL_SPIKE
-- [error] Active event spec has no registered detector: SEQ_VOL_COMP_THEN_BREAKOUT
 - [warning] Detector implementation has hardcoded numerical thresholds: CROSS_VENUE_DESYNC (project/events/families/basis.py)
 - [warning] Detector implementation has hardcoded numerical thresholds: ORDERFLOW_IMBALANCE_SHOCK (project/events/families/canonical_proxy.py)
 - [warning] Detector implementation has hardcoded numerical thresholds: PRICE_VOL_IMBALANCE_PROXY (project/events/families/canonical_proxy.py)

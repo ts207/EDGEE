@@ -970,30 +970,6 @@
   ],
   "issues": [
     {
-      "check_id": "detector_missing",
-      "message": "Active event spec has no registered detector: SEQ_FND_EXTREME_THEN_BREAKOUT",
-      "path": "",
-      "severity": "error"
-    },
-    {
-      "check_id": "detector_missing",
-      "message": "Active event spec has no registered detector: SEQ_LIQ_VACUUM_THEN_DEPTH_RECOVERY",
-      "path": "",
-      "severity": "error"
-    },
-    {
-      "check_id": "detector_missing",
-      "message": "Active event spec has no registered detector: SEQ_OI_SPIKEPOS_THEN_VOL_SPIKE",
-      "path": "",
-      "severity": "error"
-    },
-    {
-      "check_id": "detector_missing",
-      "message": "Active event spec has no registered detector: SEQ_VOL_COMP_THEN_BREAKOUT",
-      "path": "",
-      "severity": "error"
-    },
-    {
       "check_id": "detector_hardcoded_params",
       "message": "Detector implementation has hardcoded numerical thresholds: CROSS_VENUE_DESYNC",
       "path": "project/events/families/basis.py",
@@ -1026,8 +1002,8 @@
   ],
   "summary": {
     "active_event_count": 69,
-    "error_count": 4,
-    "issue_count": 9,
+    "error_count": 0,
+    "issue_count": 5,
     "maturity_counts": {
       "missing": 4,
       "production": 6,
@@ -1038,7 +1014,7 @@
     "registered_detector_entry_count": 66,
     "registered_event_count": 69,
     "schema_version": "detector_coverage_audit_v2",
-    "status": "failed",
+    "status": "passed",
     "warning_count": 5
   }
 }

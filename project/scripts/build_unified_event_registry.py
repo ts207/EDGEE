@@ -97,6 +97,10 @@ def build_unified_registry(repo_root: Path) -> Dict[str, Any]:
         token = str(event_type).strip().upper()
         if not token or not isinstance(row, dict):
             continue
+        if not bool(row.get("active", True)) or bool(row.get("deprecated", False)):
+            if token in event_rows:
+                del event_rows[token]
+            continue
         base = event_rows.setdefault(
             token,
             {
@@ -123,6 +127,10 @@ def build_unified_registry(repo_root: Path) -> Dict[str, Any]:
         ):
             if key in row:
                 base[key] = row.get(key)
+        if "parameters" in row and isinstance(row["parameters"], dict):
+            base.setdefault("parameters", {}).update(row["parameters"])
+        if "synthetic_coverage" in row:
+            base.setdefault("parameters", {})["synthetic_coverage"] = row["synthetic_coverage"]
 
     family_rows: Dict[str, Dict[str, Any]] = {}
     legacy_family_rows = event_family_defaults.get("families", {})

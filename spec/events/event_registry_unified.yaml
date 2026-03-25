@@ -6,11 +6,10 @@ metadata:
     event_defaults: spec/events/_defaults.yaml
     event_family_defaults: spec/events/_families.yaml
     event_specs_dir: spec/events
-    canonical_event_registry: spec/events/legacy/canonical_event_registry.yaml
-    legacy_registry: spec/events/legacy/registry.yaml
+    canonical_event_registry: spec/events/canonical_event_registry.yaml
     template_registry: spec/templates/event_template_registry.yaml
   notes: Single event-centric schema for phase1+phase2 composition. Legacy specs retained
-    in spec/events/legacy for migration tooling only.
+    for compatibility and drift checks.
 defaults:
   parameters:
     merge_gap_bars: 1
@@ -35,11 +34,17 @@ defaults:
   - severity_bucket
   max_candidates_per_run: 1000
 families:
+  ABSORPTION_PROXY:
+    parameters: {}
+  DEPTH_STRESS_PROXY:
+    parameters: {}
   EXECUTION_FRICTION:
     parameters: {}
     templates:
     - slippage_aware_filter
     - tail_risk_avoid
+  FLOW_EXHAUSTION_PROXY:
+    parameters: {}
   FORCED_FLOW_AND_EXHAUSTION:
     parameters: {}
     templates:
@@ -58,6 +63,8 @@ families:
     - lead_lag_follow
     - divergence_continuation
     - basis_convergence
+  LIQUIDATION_EXHAUSTION_REVERSAL:
+    parameters: {}
   LIQUIDITY_DISLOCATION:
     parameters: {}
     templates:
@@ -68,6 +75,10 @@ families:
     - only_if_liquidity
     - slippage_aware_filter
     - liquidity_replenishment
+  LIQUIDITY_STRESS_DIRECT:
+    parameters: {}
+  LIQUIDITY_STRESS_PROXY:
+    parameters: {}
   POSITIONING_EXTREMES:
     parameters: {}
     templates:
@@ -79,6 +90,10 @@ families:
     - only_if_funding
     - only_if_oi
     - tail_risk_avoid
+  POST_DELEVERAGING_REBOUND:
+    parameters: {}
+  PRICE_VOL_IMBALANCE_PROXY:
+    parameters: {}
   REGIME_TRANSITION:
     parameters: {}
     templates:
@@ -88,6 +103,14 @@ families:
     - drawdown_filter
     - tail_risk_avoid
     - structural_regime_shift
+  SEQ_FND_EXTREME_THEN_BREAKOUT:
+    parameters: {}
+  SEQ_LIQ_VACUUM_THEN_DEPTH_RECOVERY:
+    parameters: {}
+  SEQ_OI_SPIKEPOS_THEN_VOL_SPIKE:
+    parameters: {}
+  SEQ_VOL_COMP_THEN_BREAKOUT:
+    parameters: {}
   STATISTICAL_DISLOCATION:
     parameters: {}
     templates:
@@ -99,6 +122,8 @@ families:
     templates:
     - mean_reversion
     - continuation
+    - tail_risk_avoid
+    - only_if_no_news_window
   TREND_STRUCTURE:
     parameters: {}
     templates:
@@ -118,16 +143,31 @@ families:
     - pullback_entry
     - only_if_regime
     - structural_regime_shift
-  ABSORPTION_EVENT:
-    alias_for: ABSORPTION_PROXY
-    active: false
-    notes: "Legacy dual registrations merged into ABSORPTION_PROXY per Item 13/14."
+  WICK_REVERSAL_PROXY:
+    parameters: {}
+events:
+  ABSORPTION_PROXY:
+    canonical_family: ABSORPTION_PROXY
+    reports_dir: liquidity_dislocation
+    events_file: liquidity_dislocation_events.parquet
+    signal_column: absorption_proxy_event
+    parameters:
+      synthetic_coverage: covered
+      canonical_family: LIQUIDITY_DISLOCATION
+      window: 288
+      spread_quantile: 0.965
+      rv_quantile: 0.9
+      imbalance_abs_quantile: 0.25
+      min_history_bars: 288
+      cooldown_bars: 96
+      merge_gap_bars: 0
   BAND_BREAK:
     canonical_family: STATISTICAL_DISLOCATION
     reports_dir: statistical_dislocation
     events_file: statistical_dislocation_events.parquet
     signal_column: band_break_event
     parameters:
+      synthetic_coverage: uncovered
       canonical_family: STATISTICAL_DISLOCATION
       lookback_window: 288
       band_z_threshold: 3.0
@@ -147,6 +187,7 @@ families:
     events_file: basis_dislocation_events.parquet
     signal_column: basis_dislocation_event
     parameters:
+      synthetic_coverage: covered
       canonical_family: STATISTICAL_DISLOCATION
       z_threshold: 3.0
       lookback_window: 288
@@ -165,6 +206,7 @@ families:
     events_file: regime_transition_events.parquet
     signal_column: beta_spike_event
     parameters:
+      synthetic_coverage: uncovered
       canonical_family: REGIME_TRANSITION
       regime_window: 288
       transition_z_threshold: 2.5
@@ -185,6 +227,7 @@ families:
     events_file: volatility_transition_events.parquet
     signal_column: breakout_trigger_event
     parameters:
+      synthetic_coverage: covered
       canonical_family: VOLATILITY_TRANSITION
       vol_lookback_window: 288
       compression_ratio_max: 0.8
@@ -209,6 +252,7 @@ families:
     events_file: regime_transition_events.parquet
     signal_column: chop_to_trend_shift_event
     parameters:
+      synthetic_coverage: uncovered
       canonical_family: REGIME_TRANSITION
       regime_window: 288
       transition_z_threshold: 2.5
@@ -229,6 +273,7 @@ families:
     events_file: forced_flow_and_exhaustion_events.parquet
     signal_column: climax_volume_bar_event
     parameters:
+      synthetic_coverage: covered
       canonical_family: FORCED_FLOW_AND_EXHAUSTION
       liquidation_spike_z_threshold: 3.0
       cascade_window_bars: 12
@@ -250,6 +295,7 @@ families:
     events_file: copula_pairs_events.parquet
     signal_column: copula_pairs_trading_event
     parameters:
+      synthetic_coverage: uncovered
       canonical_family: STATISTICAL_DISLOCATION
       alpha1: 0.05
       alpha2: 0.95
@@ -269,6 +315,7 @@ families:
     events_file: regime_transition_events.parquet
     signal_column: correlation_breakdown_event
     parameters:
+      synthetic_coverage: uncovered
       canonical_family: REGIME_TRANSITION
       regime_window: 288
       transition_z_threshold: 2.5
@@ -289,6 +336,7 @@ families:
     events_file: cross_venue_desync_events.parquet
     signal_column: cross_venue_desync_event
     parameters:
+      synthetic_coverage: covered
       canonical_family: INFORMATION_DESYNC
       detector_contract: true
       detector:
@@ -384,6 +432,7 @@ families:
     events_file: positioning_extremes_events.parquet
     signal_column: deleveraging_wave_event
     parameters:
+      synthetic_coverage: covered
       canonical_family: POSITIONING_EXTREMES
       funding_extreme_quantile: 0.99
       oi_change_z_threshold: 3.0
@@ -408,6 +457,7 @@ families:
     events_file: liquidity_dislocation_events.parquet
     signal_column: depth_collapse_event
     parameters:
+      synthetic_coverage: uncovered
       canonical_family: LIQUIDITY_DISLOCATION
       lookback_window: 288
       z_threshold: 3.0
@@ -424,12 +474,28 @@ families:
     horizons:
     - 15m
     max_candidates_per_run: 600
+  DEPTH_STRESS_PROXY:
+    canonical_family: DEPTH_STRESS_PROXY
+    reports_dir: liquidity_dislocation
+    events_file: liquidity_dislocation_events.parquet
+    signal_column: depth_stress_proxy_event
+    parameters:
+      synthetic_coverage: covered
+      canonical_family: LIQUIDITY_DISLOCATION
+      window: 288
+      spread_quantile: 0.99
+      rv_quantile: 0.9
+      depth_quantile: 0.93
+      min_history_bars: 288
+      cooldown_bars: 96
+      merge_gap_bars: 0
   FAILED_CONTINUATION:
     canonical_family: FORCED_FLOW_AND_EXHAUSTION
     reports_dir: forced_flow_and_exhaustion
     events_file: forced_flow_and_exhaustion_events.parquet
     signal_column: failed_continuation_event
     parameters:
+      synthetic_coverage: covered
       canonical_family: FORCED_FLOW_AND_EXHAUSTION
       liquidation_spike_z_threshold: 3.0
       cascade_window_bars: 12
@@ -451,6 +517,7 @@ families:
     events_file: trend_structure_events.parquet
     signal_column: false_breakout_event
     parameters:
+      synthetic_coverage: covered
       canonical_family: TREND_STRUCTURE
       trend_window: 288
       breakout_z_threshold: 2.5
@@ -473,6 +540,7 @@ families:
     events_file: execution_friction_events.parquet
     signal_column: fee_regime_change_event
     parameters:
+      synthetic_coverage: uncovered
       canonical_family: EXECUTION_FRICTION
       spread_z_threshold: 3.0
       slippage_z_threshold: 3.0
@@ -485,12 +553,25 @@ families:
     - 5m
     - 15m
     max_candidates_per_run: 300
+  FLOW_EXHAUSTION_PROXY:
+    canonical_family: FLOW_EXHAUSTION_PROXY
+    reports_dir: forced_flow_and_exhaustion
+    events_file: forced_flow_and_exhaustion_events.parquet
+    signal_column: flow_exhaustion_proxy_event
+    parameters:
+      synthetic_coverage: uncovered
+      canonical_family: FORCED_FLOW_AND_EXHAUSTION
+      lookback_window: 288
+      z_threshold: 3.0
+      cooldown_bars: 12
+      merge_gap_bars: 0
   FND_DISLOC:
     canonical_family: STATISTICAL_DISLOCATION
     reports_dir: funding_dislocation
     events_file: funding_dislocation_events.parquet
     signal_column: funding_dislocation_event
     parameters:
+      synthetic_coverage: covered
       notes:
       - '`threshold_bps` is expressed in basis points and is converted against decimal
         `funding_rate_scaled` values at runtime.'
@@ -513,6 +594,7 @@ families:
     events_file: directional_exhaustion_after_forced_flow_events.parquet
     signal_column: forced_flow_exhaustion_event
     parameters:
+      synthetic_coverage: uncovered
       canonical_family: FORCED_FLOW_AND_EXHAUSTION
       window_end: 32
       anchor_mode: taker_imbalance
@@ -533,6 +615,7 @@ families:
     events_file: funding_episode_events.parquet
     signal_column: funding_extreme_onset_event
     parameters:
+      synthetic_coverage: uncovered
       canonical_family: POSITIONING_EXTREMES
       detector_contract: true
       detector:
@@ -657,6 +740,7 @@ families:
     events_file: positioning_extremes_events.parquet
     signal_column: funding_flip_event
     parameters:
+      synthetic_coverage: covered
       canonical_family: POSITIONING_EXTREMES
       funding_extreme_quantile: 0.99
       oi_change_z_threshold: 3.0
@@ -684,6 +768,7 @@ families:
     events_file: funding_episode_events.parquet
     signal_column: funding_normalization_event
     parameters:
+      synthetic_coverage: uncovered
       canonical_family: POSITIONING_EXTREMES
       funding_pct_window: 2880
       extreme_pct: 95.0
@@ -733,6 +818,7 @@ families:
     events_file: funding_episode_events.parquet
     signal_column: funding_persistence_event
     parameters:
+      synthetic_coverage: uncovered
       canonical_family: POSITIONING_EXTREMES
       funding_pct_window: 2880
       extreme_pct: 95.0
@@ -783,8 +869,8 @@ families:
     events_file: temporal_structure_events.parquet
     signal_column: funding_timestamp_event
     parameters:
+      synthetic_coverage: uncovered
       canonical_family: TEMPORAL_STRUCTURE
-      hours_utc: [0, 8, 16]
       event_spacing_bars: 288
       cooldown_bars: 12
       merge_gap_bars: 0
@@ -801,6 +887,7 @@ families:
     events_file: statistical_dislocation_events.parquet
     signal_column: gap_overshoot_event
     parameters:
+      synthetic_coverage: uncovered
       canonical_family: STATISTICAL_DISLOCATION
       lookback_window: 288
       band_z_threshold: 3.0
@@ -820,6 +907,7 @@ families:
     events_file: information_desync_events.parquet
     signal_column: index_component_divergence_event
     parameters:
+      synthetic_coverage: uncovered
       canonical_family: INFORMATION_DESYNC
       desync_z_threshold: 3.0
       lead_lag_window: 60
@@ -842,6 +930,7 @@ families:
     events_file: information_desync_events.parquet
     signal_column: lead_lag_break_event
     parameters:
+      synthetic_coverage: uncovered
       canonical_family: INFORMATION_DESYNC
       desync_z_threshold: 3.0
       lead_lag_window: 60
@@ -864,6 +953,7 @@ families:
     events_file: liquidation_cascade_events.parquet
     signal_column: liquidation_cascade_event
     parameters:
+      synthetic_coverage: uncovered
       canonical_family: POSITIONING_EXTREMES
       liq_multiplier: 3.0
       median_window: 288
@@ -883,12 +973,33 @@ families:
     - 15m
     - 60m
     max_candidates_per_run: 300
+  LIQUIDATION_EXHAUSTION_REVERSAL:
+    canonical_family: LIQUIDATION_EXHAUSTION_REVERSAL
+    reports_dir: forced_flow_and_exhaustion
+    events_file: forced_flow_and_exhaustion_events.parquet
+    signal_column: liquidation_exhaustion_reversal_event
+    parameters:
+      synthetic_coverage: covered
+      notes:
+      - This detector is evaluated on bar features and depends on a prior forced-flow
+        cluster being present in recent history.
+      canonical_family: FORCED_FLOW_AND_EXHAUSTION
+      rebound_window_bars: 12
+      rebound_window: 6
+      rebound_return_min: 0.001
+      rv_peak_decay_ratio: 1.01
+      liq_cooldown_ratio: 0.55
+      liquidation_cooldown_abs_max: 100000.0
+      post_cluster_lookback: 48
+      cooldown_bars: 24
+      merge_gap_bars: 0
   LIQUIDITY_GAP_PRINT:
     canonical_family: LIQUIDITY_DISLOCATION
     reports_dir: liquidity_dislocation
     events_file: liquidity_dislocation_events.parquet
     signal_column: liquidity_gap_print_event
     parameters:
+      synthetic_coverage: uncovered
       canonical_family: LIQUIDITY_DISLOCATION
       lookback_window: 288
       z_threshold: 3.0
@@ -911,6 +1022,7 @@ families:
     events_file: liquidity_shock_events.parquet
     signal_column: liquidity_shock_event
     parameters:
+      synthetic_coverage: uncovered
       canonical_family: LIQUIDITY_DISLOCATION
       depth_collapse_th: 0.5
       spread_spike_th: 3.0
@@ -925,12 +1037,35 @@ families:
     horizons:
     - 15m
     max_candidates_per_run: 600
+  LIQUIDITY_STRESS_DIRECT:
+    canonical_family: LIQUIDITY_STRESS_DIRECT
+    reports_dir: liquidity_shock
+    events_file: liquidity_shock_events.parquet
+    signal_column: liquidity_stress_direct_event
+    parameters:
+      synthetic_coverage: covered
+      canonical_family: LIQUIDITY_DISLOCATION
+      depth_collapse_th: 0.5
+      spread_spike_th: 3.0
+      median_window: 288
+  LIQUIDITY_STRESS_PROXY:
+    canonical_family: LIQUIDITY_STRESS_PROXY
+    reports_dir: liquidity_shock
+    events_file: liquidity_shock_events.parquet
+    signal_column: liquidity_stress_proxy_event
+    parameters:
+      synthetic_coverage: covered
+      canonical_family: LIQUIDITY_DISLOCATION
+      depth_collapse_th: 0.5
+      spread_spike_th: 3.0
+      median_window: 288
   LIQUIDITY_VACUUM:
     canonical_family: LIQUIDITY_DISLOCATION
     reports_dir: liquidity_vacuum
     events_file: liquidity_vacuum_events.parquet
     signal_column: liquidity_vacuum_event
     parameters:
+      synthetic_coverage: uncovered
       canonical_family: LIQUIDITY_DISLOCATION
       detector_contract: true
       detector:
@@ -1037,6 +1172,7 @@ families:
     events_file: forced_flow_and_exhaustion_events.parquet
     signal_column: momentum_divergence_trigger_event
     parameters:
+      synthetic_coverage: covered
       canonical_family: FORCED_FLOW_AND_EXHAUSTION
       slow_trend_quantile: 0.7
       max_trend_persistence_bars: 72
@@ -1060,6 +1196,7 @@ families:
     events_file: oi_shock_events.parquet
     signal_column: oi_flush_event
     parameters:
+      synthetic_coverage: uncovered
       canonical_family: POSITIONING_EXTREMES
       oi_window: 96
       spike_z_th: 2.5
@@ -1083,6 +1220,7 @@ families:
     events_file: oi_shock_events.parquet
     signal_column: oi_spike_neg_event
     parameters:
+      synthetic_coverage: uncovered
       canonical_family: POSITIONING_EXTREMES
       oi_window: 96
       spike_z_th: 2.5
@@ -1106,6 +1244,7 @@ families:
     events_file: oi_shock_events.parquet
     signal_column: oi_spike_pos_event
     parameters:
+      synthetic_coverage: uncovered
       canonical_family: POSITIONING_EXTREMES
       oi_window: 96
       spike_z_th: 2.5
@@ -1128,6 +1267,7 @@ families:
     events_file: liquidity_dislocation_events.parquet
     signal_column: orderflow_imbalance_shock_event
     parameters:
+      synthetic_coverage: uncovered
       canonical_family: LIQUIDITY_DISLOCATION
       lookback_window: 288
       z_threshold: 3.0
@@ -1150,6 +1290,7 @@ families:
     events_file: statistical_dislocation_events.parquet
     signal_column: overshoot_after_shock_event
     parameters:
+      synthetic_coverage: uncovered
       canonical_family: STATISTICAL_DISLOCATION
       lookback_window: 288
       band_z_threshold: 3.0
@@ -1164,11 +1305,12 @@ families:
     - 60m
     max_candidates_per_run: 350
   POST_DELEVERAGING_REBOUND:
-    canonical_family: FORCED_FLOW_AND_EXHAUSTION
+    canonical_family: POST_DELEVERAGING_REBOUND
     reports_dir: forced_flow_and_exhaustion
     events_file: forced_flow_and_exhaustion_events.parquet
     signal_column: post_deleveraging_rebound_event
     parameters:
+      synthetic_coverage: uncovered
       canonical_family: FORCED_FLOW_AND_EXHAUSTION
       rebound_window_bars: 12
       rebound_window: 6
@@ -1179,12 +1321,28 @@ families:
       post_cluster_lookback: 48
       cooldown_bars: 24
       merge_gap_bars: 0
+  PRICE_VOL_IMBALANCE_PROXY:
+    canonical_family: PRICE_VOL_IMBALANCE_PROXY
+    reports_dir: liquidity_dislocation
+    events_file: liquidity_dislocation_events.parquet
+    signal_column: price_vol_imbalance_proxy_event
+    parameters:
+      synthetic_coverage: covered
+      canonical_family: LIQUIDITY_DISLOCATION
+      ret_quantile: 0.995
+      rv_quantile: 0.9
+      volume_quantile: 0.9
+      min_history_bars: 288
+      min_spacing: 24
+      cooldown_bars: 24
+      merge_gap_bars: 0
   PULLBACK_PIVOT:
     canonical_family: TREND_STRUCTURE
     reports_dir: trend_structure
     events_file: trend_structure_events.parquet
     signal_column: pullback_pivot_event
     parameters:
+      synthetic_coverage: uncovered
       canonical_family: TREND_STRUCTURE
       trend_window: 288
       breakout_z_threshold: 2.5
@@ -1207,6 +1365,7 @@ families:
     events_file: trend_structure_events.parquet
     signal_column: range_breakout_event
     parameters:
+      synthetic_coverage: uncovered
       canonical_family: TREND_STRUCTURE
       trend_window: 288
       breakout_z_threshold: 2.5
@@ -1229,6 +1388,7 @@ families:
     events_file: volatility_transition_events.parquet
     signal_column: range_compression_end_event
     parameters:
+      synthetic_coverage: uncovered
       canonical_family: VOLATILITY_TRANSITION
       vol_lookback_window: 288
       compression_quantile: 0.1
@@ -1251,6 +1411,7 @@ families:
     events_file: temporal_structure_events.parquet
     signal_column: scheduled_news_window_event
     parameters:
+      synthetic_coverage: uncovered
       canonical_family: TEMPORAL_STRUCTURE
       event_spacing_bars: 288
       cooldown_bars: 12
@@ -1262,15 +1423,54 @@ families:
     - 5m
     - 15m
     max_candidates_per_run: 300
+  SEQ_FND_EXTREME_THEN_BREAKOUT:
+    canonical_family: SEQ_FND_EXTREME_THEN_BREAKOUT
+    reports_dir: event_sequences
+    events_file: event_sequences.parquet
+    signal_column: seq_fnd_extreme_then_breakout_event
+    parameters:
+      synthetic_coverage: covered
+      canonical_family: POSITIONING_EXTREMES
+      max_gap_bars: 96
+      cooldown_bars: 24
+  SEQ_LIQ_VACUUM_THEN_DEPTH_RECOVERY:
+    canonical_family: SEQ_LIQ_VACUUM_THEN_DEPTH_RECOVERY
+    reports_dir: event_sequences
+    events_file: event_sequences.parquet
+    signal_column: seq_liq_vacuum_then_depth_recovery_event
+    parameters:
+      synthetic_coverage: covered
+      canonical_family: LIQUIDITY_DISLOCATION
+      max_gap_bars: 48
+      cooldown_bars: 24
+  SEQ_OI_SPIKEPOS_THEN_VOL_SPIKE:
+    canonical_family: SEQ_OI_SPIKEPOS_THEN_VOL_SPIKE
+    reports_dir: event_sequences
+    events_file: event_sequences.parquet
+    signal_column: seq_oi_spikepos_then_vol_spike_event
+    parameters:
+      synthetic_coverage: covered
+      canonical_family: POSITIONING_EXTREMES
+      max_gap_bars: 48
+      cooldown_bars: 24
+  SEQ_VOL_COMP_THEN_BREAKOUT:
+    canonical_family: SEQ_VOL_COMP_THEN_BREAKOUT
+    reports_dir: event_sequences
+    events_file: event_sequences.parquet
+    signal_column: seq_vol_comp_then_breakout_event
+    parameters:
+      synthetic_coverage: covered
+      canonical_family: VOLATILITY_TRANSITION
+      max_gap_bars: 48
+      cooldown_bars: 24
   SESSION_CLOSE_EVENT:
     canonical_family: TEMPORAL_STRUCTURE
     reports_dir: temporal_structure
     events_file: temporal_structure_events.parquet
     signal_column: session_close_event
     parameters:
+      synthetic_coverage: uncovered
       canonical_family: TEMPORAL_STRUCTURE
-      hours_utc: [7, 12, 23]
-      intensity_scale: 60.0
       event_spacing_bars: 288
       cooldown_bars: 12
       merge_gap_bars: 0
@@ -1287,9 +1487,8 @@ families:
     events_file: temporal_structure_events.parquet
     signal_column: session_open_event
     parameters:
+      synthetic_coverage: uncovered
       canonical_family: TEMPORAL_STRUCTURE
-      hours_utc: [0, 8, 13]
-      intensity_scale: 60.0
       event_spacing_bars: 288
       cooldown_bars: 12
       merge_gap_bars: 0
@@ -1306,6 +1505,7 @@ families:
     events_file: execution_friction_events.parquet
     signal_column: slippage_spike_event
     parameters:
+      synthetic_coverage: uncovered
       canonical_family: EXECUTION_FRICTION
       spread_z_threshold: 3.0
       slippage_z_threshold: 3.0
@@ -1324,6 +1524,7 @@ families:
     events_file: information_desync_events.parquet
     signal_column: spot_perp_basis_shock_event
     parameters:
+      synthetic_coverage: covered
       canonical_family: INFORMATION_DESYNC
       desync_z_threshold: 3.0
       lead_lag_window: 60
@@ -1346,6 +1547,7 @@ families:
     events_file: liquidity_dislocation_events.parquet
     signal_column: spread_blowout_event
     parameters:
+      synthetic_coverage: uncovered
       canonical_family: LIQUIDITY_DISLOCATION
       lookback_window: 288
       z_threshold: 3.0
@@ -1368,6 +1570,7 @@ families:
     events_file: execution_friction_events.parquet
     signal_column: spread_regime_widening_event
     parameters:
+      synthetic_coverage: covered
       canonical_family: EXECUTION_FRICTION
       trend_window: 24
       lookback_window: 2880
@@ -1389,6 +1592,7 @@ families:
     events_file: trend_structure_events.parquet
     signal_column: support_resistance_break_event
     parameters:
+      synthetic_coverage: uncovered
       canonical_family: TREND_STRUCTURE
       trend_window: 288
       breakout_z_threshold: 2.5
@@ -1411,6 +1615,7 @@ families:
     events_file: liquidity_dislocation_events.parquet
     signal_column: sweep_stoprun_event
     parameters:
+      synthetic_coverage: uncovered
       canonical_family: LIQUIDITY_DISLOCATION
       lookback_window: 288
       z_threshold: 3.0
@@ -1433,6 +1638,7 @@ families:
     events_file: trend_structure_events.parquet
     signal_column: trend_acceleration_event
     parameters:
+      synthetic_coverage: covered
       canonical_family: TREND_STRUCTURE
       trend_window: 96
       breakout_z_threshold: 2.5
@@ -1456,6 +1662,7 @@ families:
     events_file: trend_structure_events.parquet
     signal_column: trend_deceleration_event
     parameters:
+      synthetic_coverage: uncovered
       canonical_family: TREND_STRUCTURE
       trend_window: 288
       breakout_z_threshold: 2.5
@@ -1478,6 +1685,7 @@ families:
     events_file: forced_flow_and_exhaustion_events.parquet
     signal_column: trend_exhaustion_trigger_event
     parameters:
+      synthetic_coverage: covered
       canonical_family: FORCED_FLOW_AND_EXHAUSTION
       trend_window: 96
       min_trend_duration_bars: 72
@@ -1501,6 +1709,7 @@ families:
     events_file: regime_transition_events.parquet
     signal_column: trend_to_chop_shift_event
     parameters:
+      synthetic_coverage: uncovered
       canonical_family: REGIME_TRANSITION
       regime_window: 288
       transition_z_threshold: 2.5
@@ -1521,6 +1730,7 @@ families:
     events_file: volatility_transition_events.parquet
     signal_column: vol_cluster_shift_event
     parameters:
+      synthetic_coverage: uncovered
       canonical_family: VOLATILITY_TRANSITION
       vol_lookback_window: 288
       compression_quantile: 0.1
@@ -1543,6 +1753,7 @@ families:
     events_file: regime_transition_events.parquet
     signal_column: vol_regime_shift_event
     parameters:
+      synthetic_coverage: uncovered
       canonical_family: REGIME_TRANSITION
       regime_window: 288
       transition_z_threshold: 2.5
@@ -1563,6 +1774,7 @@ families:
     events_file: volatility_transition_events.parquet
     signal_column: vol_relaxation_start_event
     parameters:
+      synthetic_coverage: uncovered
       canonical_family: VOLATILITY_TRANSITION
       vol_lookback_window: 288
       compression_quantile: 0.1
@@ -1585,6 +1797,7 @@ families:
     events_file: vol_shock_relaxation_events.parquet
     signal_column: vol_shock_relaxation_event
     parameters:
+      synthetic_coverage: uncovered
       canonical_family: VOLATILITY_TRANSITION
       detector_contract: true
       detector:
@@ -1675,6 +1888,7 @@ families:
     events_file: volatility_transition_events.parquet
     signal_column: vol_spike_event
     parameters:
+      synthetic_coverage: uncovered
       canonical_family: VOLATILITY_TRANSITION
       merge_gap_bars: 1
       cooldown_bars: 6
@@ -1690,12 +1904,26 @@ families:
     horizons:
     - 60m
     max_candidates_per_run: 500
+  WICK_REVERSAL_PROXY:
+    canonical_family: WICK_REVERSAL_PROXY
+    reports_dir: liquidity_dislocation
+    events_file: liquidity_dislocation_events.parquet
+    signal_column: wick_reversal_proxy_event
+    parameters:
+      synthetic_coverage: uncovered
+      canonical_family: LIQUIDITY_DISLOCATION
+      lookback_window: 288
+      z_threshold: 3.0
+      cooldown_bars: 12
+      merge_gap_bars: 0
+      min_volume_quantile: 0.2
   ZSCORE_STRETCH:
     canonical_family: STATISTICAL_DISLOCATION
     reports_dir: statistical_dislocation
     events_file: statistical_dislocation_events.parquet
     signal_column: zscore_stretch_event
     parameters:
+      synthetic_coverage: uncovered
       canonical_family: STATISTICAL_DISLOCATION
       lookback_window: 288
       band_z_threshold: 3.0
@@ -1709,38 +1937,3 @@ families:
     - 15m
     - 60m
     max_candidates_per_run: 350
-    parameters:
-      max_gap_bars: 24
-      cooldown_bars: 12
-  SEQ_FND_EXTREME_THEN_BREAKOUT:
-    canonical_family: POSITIONING_EXTREMES
-    reports_dir: event_sequences
-    events_file: event_sequences.parquet
-    signal_column: seq_fnd_extreme_then_breakout_event
-    parameters:
-      max_gap_bars: 96
-      cooldown_bars: 24
-  SEQ_OI_SPIKEPOS_THEN_VOL_SPIKE:
-    canonical_family: POSITIONING_EXTREMES
-    reports_dir: event_sequences
-    events_file: event_sequences.parquet
-    signal_column: seq_oi_spikepos_then_vol_spike_event
-    parameters:
-      max_gap_bars: 48
-      cooldown_bars: 24
-  SEQ_VOL_COMP_THEN_BREAKOUT:
-    canonical_family: VOLATILITY_TRANSITION
-    reports_dir: event_sequences
-    events_file: event_sequences.parquet
-    signal_column: seq_vol_comp_then_breakout_event
-    parameters:
-      max_gap_bars: 48
-      cooldown_bars: 24
-  SEQ_LIQ_VACUUM_THEN_DEPTH_RECOVERY:
-    canonical_family: LIQUIDITY_DISLOCATION
-    reports_dir: event_sequences
-    events_file: event_sequences.parquet
-    signal_column: seq_liq_vacuum_then_depth_recovery_event
-    parameters:
-      max_gap_bars: 48
-      cooldown_bars: 24

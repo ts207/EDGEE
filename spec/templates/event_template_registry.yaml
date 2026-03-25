@@ -208,6 +208,7 @@ events:
     - 15m
     max_candidates_per_run: 600
   ABSORPTION_EVENT:
+    active: false
     canonical_family: LIQUIDITY_DISLOCATION
     templates:
     - mean_reversion

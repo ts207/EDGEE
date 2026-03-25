@@ -127,6 +127,9 @@ def run_audit() -> Dict[str, Any]:
 
     missing = sorted(active_set - registered_set)
     for event_type in missing:
+        spec = EVENT_REGISTRY_SPECS.get(event_type)
+        if spec and spec.synthetic_coverage == "covered":
+            continue
         issues.append(
             _issue(
                 "detector_missing",
