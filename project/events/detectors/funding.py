@@ -29,7 +29,7 @@ class BaseFundingDetector(ThresholdDetector, MarketEventDetector):
     """Base logic for funding-related detectors."""
 
     required_columns = ("timestamp", "funding_abs_pct", "funding_abs")
-    severity_major_threshold = 0.95
+    default_severity_major_threshold = 0.95
 
     defaults = {
         "extreme_pct": 95.0,
