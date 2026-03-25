@@ -49,9 +49,52 @@ def _iter_family_events(doc: Dict[str, Any]) -> List[str]:
                     if ev:
                         out.append(ev)
                 elif isinstance(row, dict):
-                    ev = _norm(row.get("event_type") or row.get("event_id") or row.get("id"))
+                    # Support new dict format: {event_id: ..., lifecycle: ...}
+                    ev = _norm(
+                        row.get("event_id")
+                        or row.get("event_type")
+                        or row.get("id")
+                    )
                     if ev:
                         out.append(ev)
+        elif isinstance(events_raw, dict):
+            for key in events_raw.keys():
+                ev = _norm(key)
+                if ev:
+                    out.append(ev)
+    return out
+
+
+def _iter_canonical_family_events(doc: Dict[str, Any]) -> List[str]:
+    """Return events with lifecycle == 'active' from the taxonomy/canonical registry.
+
+    Falls back to treating all string-format events as active (legacy docs).
+    """
+    out: List[str] = []
+    families = doc.get("families", {})
+    if not isinstance(families, dict):
+        return out
+    for family_cfg in families.values():
+        if not isinstance(family_cfg, dict):
+            continue
+        events_raw = family_cfg.get("events", [])
+        if isinstance(events_raw, list):
+            for row in events_raw:
+                if isinstance(row, str):
+                    # Legacy: plain string = treat as active
+                    ev = _norm(row)
+                    if ev:
+                        out.append(ev)
+                elif isinstance(row, dict):
+                    lifecycle = str(row.get("lifecycle", "active")).strip().lower()
+                    if lifecycle == "active":
+                        ev = _norm(
+                            row.get("event_id")
+                            or row.get("event_type")
+                            or row.get("id")
+                        )
+                        if ev:
+                            out.append(ev)
         elif isinstance(events_raw, dict):
             for key in events_raw.keys():
                 ev = _norm(key)
@@ -208,6 +251,10 @@ def run_audit(repo_root: Path) -> Dict[str, Any]:
 
     taxonomy_events = sorted(set(_iter_family_events(taxonomy)))
     canonical_events = sorted(set(_iter_family_events(canonical)))
+    # Lifecycle-based canonical count: events with lifecycle == 'active' in taxonomy
+    canonical_active_events = sorted(
+        set(_iter_canonical_family_events(taxonomy)) | set(_iter_canonical_family_events(canonical))
+    )
     ontology_events = sorted(set(taxonomy_events) | set(canonical_events))
 
     taxonomy_declared_implemented = _collect_declared_implemented(taxonomy)
@@ -227,6 +274,10 @@ def run_audit(repo_root: Path) -> Dict[str, Any]:
 
     taxonomy_not_implemented = sorted(set(taxonomy_events) - set(registry_backed))
     canonical_not_implemented = sorted(set(canonical_events) - set(registry_backed))
+    # Also check which active (canonical) events are not yet implemented
+    canonical_active_not_implemented = sorted(
+        set(canonical_active_events) - set(registry_backed)
+    )
     planned_backlog = sorted(
         ev
         for ev in set(taxonomy_not_implemented) | set(canonical_not_implemented)
@@ -284,7 +335,7 @@ def run_audit(repo_root: Path) -> Dict[str, Any]:
             "active_event_specs_total": len(active_spec_events),
             "phase2_chain_events_total": len(chain_events),
             "taxonomy_events_total": len(taxonomy_events),
-            "canonical_events_total": len(canonical_events),
+            "canonical_events_total": len(canonical_active_events),
             "planned_backlog_total": len(planned_backlog),
             "state_registry_total": len(states),
             "state_registry_materialized_total": len(registry_materialized_ids),
@@ -305,6 +356,7 @@ def run_audit(repo_root: Path) -> Dict[str, Any]:
             "declared_implemented_missing_in_registry": declared_implemented_missing_in_registry,
             "taxonomy_not_implemented": taxonomy_not_implemented,
             "canonical_not_implemented": canonical_not_implemented,
+            "canonical_active_not_implemented": canonical_active_not_implemented,
             "planned_events": planned_events_sorted,
             "planned_backlog": planned_backlog,
         },

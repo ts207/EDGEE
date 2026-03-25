@@ -897,9 +897,32 @@ class FailedContinuationDetector(ThresholdDetector):
         return sparsify_mask(onset, min_spacing=spacing)
 
 
+
+class ForcedFlowExhaustionDetector(FlowExhaustionDetector):
+    """Dedicated detector for FORCED_FLOW_EXHAUSTION.
+
+    Inherits all logic from FlowExhaustionDetector but has its own event_type,
+    signal_column, and tighter defaults reflecting that forced deleveraging events
+    require higher evidence thresholds than a proxy signal.
+
+    This separation allows FORCED_FLOW_EXHAUSTION and FLOW_EXHAUSTION_PROXY to be
+    independently parameterized, calibrated, and disabled.
+    """
+
+    event_type = "FORCED_FLOW_EXHAUSTION"
+    # Stricter defaults — forced flows carry a stronger prior on liquidation
+    defaults = {
+        **FlowExhaustionDetector.defaults,
+        "oi_drop_quantile": 0.88,
+        "liquidation_quantile": 0.92,
+        "return_quantile": 0.80,
+        "min_spacing": 32,
+    }
+
+
 EXHAUSTION_DETECTORS = {
     "FLOW_EXHAUSTION_PROXY": FlowExhaustionDetector,
-    "FORCED_FLOW_EXHAUSTION": FlowExhaustionDetector,
+    "FORCED_FLOW_EXHAUSTION": ForcedFlowExhaustionDetector,
     "POST_DELEVERAGING_REBOUND": PostDeleveragingReboundDetector,
     "TREND_EXHAUSTION_TRIGGER": TrendExhaustionDetector,
     "MOMENTUM_DIVERGENCE_TRIGGER": MomentumDivergenceDetector,
@@ -913,6 +936,7 @@ __all__ = [
     "EXHAUSTION_DETECTORS",
     "FailedContinuationDetector",
     "FlowExhaustionDetector",
+    "ForcedFlowExhaustionDetector",
     "MomentumDivergenceDetector",
     "PostDeleveragingReboundDetector",
     "TrendExhaustionDetector",

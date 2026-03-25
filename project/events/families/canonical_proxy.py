@@ -291,14 +291,57 @@ class DepthStressProxyDetector(_CanonicalProxyBase):
         ) / 2.0
 
 
+class DepthCollapseDetector(DepthStressProxyDetector):
+    """Dedicated detector for DEPTH_COLLAPSE.
+
+    Inherits depth-stress logic from DepthStressProxyDetector but has its own
+    event_type, allowing it to be independently parameterized.
+    DEPTH_COLLAPSE targets abrupt order-book vacuum events (higher depth_quantile,
+    lower spread requirement) versus the proxy's more conservative thresholds.
+    """
+
+    event_type = "DEPTH_COLLAPSE"
+    DEFAULT_SPREAD_QUANTILE = 0.95  # Less restrictive than proxy (0.99)
+    DEFAULT_RV_QUANTILE = 0.85
+    DEFAULT_DEPTH_QUANTILE = 0.97  # More restrictive — true collapse requires severe depth depletion
+
+
+class SweepStopRunDetector(WickReversalProxyDetector):
+    """Dedicated detector for SWEEP_STOPRUN.
+
+    Inherits wick-reversal logic from WickReversalProxyDetector but has its own
+    event_type, allowing it to be independently parameterized.
+    SWEEP_STOPRUN emphasizes directional intent (larger wick) over generic reversal.
+    """
+
+    event_type = "SWEEP_STOPRUN"
+    DEFAULT_WICK_QUANTILE = 0.98  # Stricter — stop-run sweeps require exceptional wick
+    DEFAULT_RET_QUANTILE = 0.85   # Slightly looser — return size less critical than wick shape
+
+
+class OrderflowImbalanceShockDetector(PriceVolImbalanceProxyDetector):
+    """Dedicated detector for ORDERFLOW_IMBALANCE_SHOCK.
+
+    Inherits price-vol imbalance logic from PriceVolImbalanceProxyDetector but has
+    its own event_type, allowing it to be independently parameterized.
+    ORDERFLOW_IMBALANCE_SHOCK specifically targets demand/supply shock events where
+    the imbalance is extreme, prioritizing volume and return thresholds.
+    """
+
+    event_type = "ORDERFLOW_IMBALANCE_SHOCK"
+    DEFAULT_RET_QUANTILE = 0.998  # Tighter — shock requires extreme return
+    DEFAULT_RV_QUANTILE = 0.92
+    DEFAULT_VOL_QUANTILE = 0.92
+
+
 _DETECTORS = {
     "PRICE_VOL_IMBALANCE_PROXY": PriceVolImbalanceProxyDetector,
     "WICK_REVERSAL_PROXY": WickReversalProxyDetector,
     "ABSORPTION_PROXY": AbsorptionProxyDetector,
     "DEPTH_STRESS_PROXY": DepthStressProxyDetector,
-    "ORDERFLOW_IMBALANCE_SHOCK": PriceVolImbalanceProxyDetector,
-    "SWEEP_STOPRUN": WickReversalProxyDetector,
-    "DEPTH_COLLAPSE": DepthStressProxyDetector,
+    "ORDERFLOW_IMBALANCE_SHOCK": OrderflowImbalanceShockDetector,
+    "SWEEP_STOPRUN": SweepStopRunDetector,
+    "DEPTH_COLLAPSE": DepthCollapseDetector,
 }
 
 
