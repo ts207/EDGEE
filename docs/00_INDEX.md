@@ -1,4 +1,4 @@
-# EDGEE — Documentation Index
+# Edge — Documentation Index
 
 This document set fully deconstructs the EDGEE research platform from its source repository. It is organized for three reader types: researchers, engineers, and operators.
 

@@ -1,4 +1,4 @@
-# EDGEE — Research Concepts, Hypotheses & Backlog
+# Edge — Research Concepts, Hypotheses & Backlog
 
 ## Research Concept Framework
 

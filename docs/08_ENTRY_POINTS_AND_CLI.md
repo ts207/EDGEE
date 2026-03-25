@@ -1,4 +1,4 @@
-# EDGEE — Entry Points & CLI Reference
+# Edge — Entry Points & CLI Reference
 
 ## Installed CLI Commands
 

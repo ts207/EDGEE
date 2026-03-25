@@ -1,4 +1,4 @@
-# EDGEE — Testing, Quality Gates & CI
+# Edge — Testing, Quality Gates & CI
 
 ## Test Suite Overview
 

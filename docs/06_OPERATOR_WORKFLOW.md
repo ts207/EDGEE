@@ -1,4 +1,4 @@
-# EDGEE — Operator & Research Workflow Guide
+# Edge — Operator & Research Workflow Guide
 
 ## Roles
 

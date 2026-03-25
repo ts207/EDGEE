@@ -1,4 +1,4 @@
-# EDGEE — Data Flow & Contracts
+# Edge — Data Flow & Contracts
 
 ## Artifact Token System
 

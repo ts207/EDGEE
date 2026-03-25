@@ -1,4 +1,4 @@
-# EDGEE — Component Reference
+# Edge — Component Reference
 
 ## Pipelines Layer (`project/pipelines/`)
 

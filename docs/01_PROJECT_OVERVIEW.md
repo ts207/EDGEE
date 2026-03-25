@@ -1,4 +1,4 @@
-# EDGEE — Project Overview
+# Edge — Project Overview
 
 ## What It Is
 
@@ -74,7 +74,7 @@ A good run is **not** the run with the best headline metric. A good run leaves b
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    EDGEE Research Platform                   │
+│                    Edge Research Platform                   │
 │                                                             │
 │  Data Sources (Binance UM Perp + Spot)                      │
 │       │                                                      │

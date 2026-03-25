@@ -1,4 +1,4 @@
-# EDGEE — Dependencies & Technical Stack
+# Edge — Dependencies & Technical Stack
 
 ## Python Version Requirement
 

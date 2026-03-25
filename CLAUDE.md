@@ -208,9 +208,3 @@ If those disagree, the disagreement is a first-class finding.
 
 ## Continue Reading
 
-For the full operator doc set, continue with:
-
-1. [docs/RESEARCH_OPERATOR_PLAYBOOK.md](./docs/RESEARCH_OPERATOR_PLAYBOOK.md)
-2. [docs/AUTONOMOUS_RESEARCH_LOOP.md](./docs/AUTONOMOUS_RESEARCH_LOOP.md)
-3. [docs/EXPERIMENT_PROTOCOL.md](./docs/EXPERIMENT_PROTOCOL.md)
-4. [docs/ARTIFACTS_AND_CONTRACTS.md](./docs/ARTIFACTS_AND_CONTRACTS.md)

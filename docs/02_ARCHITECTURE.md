@@ -1,4 +1,4 @@
-# EDGEE — Architecture Reference
+# Edge — Architecture Reference
 
 ## Pipeline Stages
 

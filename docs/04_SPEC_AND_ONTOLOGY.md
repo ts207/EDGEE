@@ -1,4 +1,4 @@
-# EDGEE — Spec & Ontology Reference
+# Edge — Spec & Ontology Reference
 
 ## Overview
 
