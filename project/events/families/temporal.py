@@ -16,6 +16,8 @@ from project.spec_registry import load_event_spec
 class SessionOpenDetector(ThresholdDetector):
     event_type = "SESSION_OPEN_EVENT"
     required_columns = ("timestamp",)
+    DEFAULT_HOURS = (0,)
+    DEFAULT_MINUTE = 0
 
     def prepare_features(self, df: pd.DataFrame, **params: Any) -> dict[str, pd.Series]:
         ts = pd.to_datetime(df["timestamp"], utc=True, errors="coerce")
@@ -27,8 +29,11 @@ class SessionOpenDetector(ThresholdDetector):
         ts = features["ts"]
         spec = load_event_spec(self.event_type)
         spec_params = spec.get("parameters", {}) if isinstance(spec, dict) else {}
-        hours = spec_params["hours_utc"]
-        return ((ts.dt.minute == 0) & ts.dt.hour.isin(hours)).fillna(False)
+        
+        hours = params.get("hours_utc", spec_params.get("hours_utc", self.DEFAULT_HOURS))
+        minute = params.get("minute_open", spec_params.get("minute_open", self.DEFAULT_MINUTE))
+        
+        return ((ts.dt.minute == minute) & ts.dt.hour.isin(hours)).fillna(False)
 
     def compute_intensity(
         self, df: pd.DataFrame, *, features: dict[str, pd.Series], **params: Any
@@ -45,6 +50,8 @@ class SessionOpenDetector(ThresholdDetector):
 class SessionCloseDetector(ThresholdDetector):
     event_type = "SESSION_CLOSE_EVENT"
     required_columns = ("timestamp",)
+    DEFAULT_HOURS = (0,)
+    DEFAULT_MINUTE_START = 55
 
     def prepare_features(self, df: pd.DataFrame, **params: Any) -> dict[str, pd.Series]:
         ts = pd.to_datetime(df["timestamp"], utc=True, errors="coerce")
@@ -56,8 +63,11 @@ class SessionCloseDetector(ThresholdDetector):
         ts = features["ts"]
         spec = load_event_spec(self.event_type)
         spec_params = spec.get("parameters", {}) if isinstance(spec, dict) else {}
-        hours = spec_params["hours_utc"]
-        return ((ts.dt.minute >= 55) & ts.dt.hour.isin(hours)).fillna(False)
+        
+        hours = params.get("hours_utc", spec_params.get("hours_utc", self.DEFAULT_HOURS))
+        minute_start = params.get("minute_close_start", spec_params.get("minute_close_start", self.DEFAULT_MINUTE_START))
+        
+        return ((ts.dt.minute >= minute_start) & ts.dt.hour.isin(hours)).fillna(False)
 
     def compute_intensity(
         self, df: pd.DataFrame, *, features: dict[str, pd.Series], **params: Any

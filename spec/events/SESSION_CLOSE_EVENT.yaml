@@ -8,4 +8,6 @@ parameters:
   cooldown_bars: 12
   merge_gap_bars: 0
   intensity_scale: 60
+  hours_utc: [0, 8, 16]
+  minute_close_start: 55
 canonical_family: TEMPORAL_STRUCTURE

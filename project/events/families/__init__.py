@@ -33,6 +33,7 @@ from project.events.families.statistical import (
     analyze_statistical_family,
 )
 from project.events.families.exhaustion import detect_exhaustion_family, analyze_exhaustion_family
+from project.events.families.sequence import detect_sequence_family, analyze_sequence_family
 
 __all__ = [
     "BasisDislocationDetector",
@@ -69,4 +70,6 @@ __all__ = [
     "analyze_statistical_family",
     "detect_exhaustion_family",
     "analyze_exhaustion_family",
+    "detect_sequence_family",
+    "analyze_sequence_family",
 ]

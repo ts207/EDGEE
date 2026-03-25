@@ -12,6 +12,8 @@ parameters:
   anchor_quantile: 0.99
   revert_z: 0.5
   basis_lookback: 96
+  persistence_bars: 2
+  min_basis_bps: 5.0
 
 detector:
   signal_definition: >

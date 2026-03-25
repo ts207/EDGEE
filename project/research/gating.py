@@ -56,6 +56,15 @@ def one_sided_p_from_t(t_stat: float, df: int) -> float:
     return float(stats.t.sf(t_stat, df=df))
 
 
+def two_sided_p_from_t(t_stat: float, df: int) -> float:
+    """
+    DEPRECATED: Now aliased to one_sided_p_from_t to ensure all directional hypotheses
+    are gated correctly in the research pipeline. Large negative t-stats will now
+    receive high p-values (approaching 1.0) rather than low p-values.
+    """
+    return one_sided_p_from_t(t_stat, df=df)
+
+
 def horizon_to_bars(horizon: str) -> int:
     return HORIZON_BARS_BY_TIMEFRAME.get(horizon.lower().strip(), 12)
 

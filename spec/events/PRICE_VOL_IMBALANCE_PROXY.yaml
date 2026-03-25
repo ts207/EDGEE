@@ -1,5 +1,3 @@
-version: 1
-kind: event
 event_type: PRICE_VOL_IMBALANCE_PROXY
 maturity: standard
 synthetic_coverage: covered
@@ -13,6 +11,9 @@ parameters:
   ret_quantile: 0.995
   rv_quantile: 0.9
   volume_quantile: 0.9
+  ret_window: 288
+  rv_window: 288
+  vol_window: 288
   min_history_bars: 288
   min_spacing: 24
   cooldown_bars: 24
