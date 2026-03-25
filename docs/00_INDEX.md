@@ -24,30 +24,39 @@ This document set fully deconstructs the EDGEE research platform from its source
 ## Quick Navigation by Task
 
 ### "I want to run a discovery experiment"
+
 → Start with **Doc 6** (Operator Workflow), specifically the 7-step research loop.
 
 ### "I want to understand what events exist and how they're defined"
+
 → **Doc 4** (Spec & Ontology), Section 1 (Events).
 
 ### "I want to add a new event detector"
+
 → **Doc 3** (Component Reference), Events Layer section. Then **Doc 4** to understand the YAML spec format.
 
 ### "I want to understand the full data flow"
+
 → **Doc 7** (Data Flow & Contracts). The ASCII diagram shows every stage.
 
 ### "I want to understand what a 'good' research result looks like"
+
 → **Doc 6** (Workflow), Step 6 (Evaluate Output) — the three evaluation layers.
 
 ### "I want to deploy the live engine"
+
 → **Doc 5** (Stack), Deployment section. Plus `deploy/systemd/` and `deploy/env/` in the repo.
 
 ### "I want to know what gates a hypothesis must pass"
+
 → **Doc 4**, Sections 5 (Gates). Plus **Doc 10** (Testing), Quality Gate Hierarchy section.
 
 ### "CI is failing — what does it check?"
+
 → **Doc 10** (Testing), CI Gate Tiers section.
 
 ### "I want to understand the research philosophy and discipline"
+
 → **Doc 1** (Overview), especially "Operating Principles" and "What a Good Run Looks Like".
 
 ---

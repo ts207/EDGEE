@@ -13,7 +13,7 @@ The design philosophy is: *reproducible, cost-aware, narrowly attributed researc
 The platform is built around **hypotheses**, not detectors and not strategies. A hypothesis specifies:
 
 | Field | Description |
-|---|---|
+| --- | --- |
 | `event` | The market event type being tested (e.g., `VOL_SHOCK`, `BASIS_DISLOC`) |
 | `canonical_family` | The high-level event family it belongs to |
 | `template` | The strategy template to apply (e.g., `mean_reversion`, `continuation`) |
@@ -32,7 +32,7 @@ This is what gets evaluated, stored in memory, and gated in promotion — not ag
 All events belong to one of 9 canonical families. Templates are only legal for their matching family.
 
 | Family | Description |
-|---|---|
+| --- | --- |
 | `LIQUIDITY_DISLOCATION` | Sudden breakdown in market depth or spread abnormality (34 events) |
 | `POSITIONING_EXTREMES` | Extreme open interest, funding, or leverage positioning (29 events) |
 | `FORCED_FLOW_AND_EXHAUSTION` | Liquidation cascades and exhaustion reversals (22 events) |
@@ -109,7 +109,7 @@ A good run is **not** the run with the best headline metric. A good run leaves b
 ## Project Stats
 
 | Metric | Value |
-|---|---|
+| --- | --- |
 | Python source files | 1,153 |
 | Total files in repo | 1,722 |
 | Test files | 407 |

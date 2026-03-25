@@ -23,6 +23,7 @@ Registered in `pyproject.toml` `[project.scripts]`:
 The primary entry point. All flags:
 
 ### Required
+
 ```
 --run_id         <str>    Unique identifier for this run
 --symbols        <str>    Comma-separated symbols, e.g. BTCUSDT,ETHUSDT
@@ -31,16 +32,19 @@ The primary entry point. All flags:
 ```
 
 ### Planning
+
 ```
 --plan_only      <0|1>    Plan and print the run without executing [default: 0]
 ```
 
 ### Timeframes
+
 ```
 --timeframes     <str>    Comma-separated timeframes [default: 5m]
 ```
 
 ### Phase 2 Controls
+
 ```
 --run_phase2_conditional  <0|1>  Run phase 2 hypothesis evaluation [default: 1]
 --phase2_event_type       <str>  Filter to single event type (targeted runs)
@@ -48,6 +52,7 @@ The primary entry point. All flags:
 ```
 
 ### Pipeline Stage Switches
+
 ```
 --run_edge_candidate_universe  <0|1>  Run edge candidate universe [default: 1]
 --run_strategy_builder         <0|1>  Build strategy candidates [default: 1]
@@ -254,6 +259,7 @@ ontology-consistency-audit --output docs/generated/ontology_audit.json --check
 ```
 
 Checks that:
+
 - All events in `spec/events/` have a matching family in `spec/grammar/family_registry.yaml`
 - All templates used in events are legal for their family
 - State specs are consistent with state registry

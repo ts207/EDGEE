@@ -30,7 +30,6 @@ Each stage produces versioned, manifest-tracked artifacts. A run is only trustwo
 pip install -e .
 ```
 
-
 ---
 
 ## Quickstart
@@ -189,8 +188,6 @@ A hypothesis specifies an event, a canonical family, a template, a context, a si
 The 9 canonical event families (`LIQUIDITY_DISLOCATION`, `VOLATILITY_TRANSITION`, `POSITIONING_EXTREMES`, `FORCED_FLOW_AND_EXHAUSTION`, `TREND_STRUCTURE`, `STATISTICAL_DISLOCATION`, `REGIME_TRANSITION`, `INFORMATION_DESYNC`, `TEMPORAL_STRUCTURE`) constrain which templates are legal for each event type.
 
 ---
-
-
 
 ## Agent / Autonomous Controller Quickstart
 

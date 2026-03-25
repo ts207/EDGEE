@@ -140,6 +140,7 @@ Defined in `project/contracts/pipeline_registry.py`:
 ### `StageFamilyContract`
 
 Groups related stages under one owner:
+
 ```python
 @dataclass(frozen=True)
 class StageFamilyContract:
@@ -151,6 +152,7 @@ class StageFamilyContract:
 ### `StageArtifactContract`
 
 Declares inputs and outputs for one stage:
+
 ```python
 @dataclass(frozen=True)
 class StageArtifactContract:
@@ -186,6 +188,7 @@ If any of these disagree with each other, the **disagreement is a first-class fi
 ### Manifest Fields
 
 Key fields in the run manifest:
+
 - `run_id` — unique run identifier
 - `config_digest` — hash of effective config at run time
 - `data_fingerprint` — hash of input data state
@@ -228,6 +231,7 @@ Blueprint: cost_config_digest locked at compile time
 ```
 
 Default costs (from `spec/cost_model.yaml`):
+
 - Fee: 4.0 bps per side
 - Slippage: 2.0 bps per fill
 - Round-trip total: **12.0 bps**

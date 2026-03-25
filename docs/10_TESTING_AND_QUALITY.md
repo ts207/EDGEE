@@ -59,6 +59,7 @@ Named regressions for previously-found bugs:
 ### Event Tests (`tests/events/`)
 
 Unit tests for each event detector family. Validates:
+
 - Detector fires on synthetic data with known signals
 - Detector does not fire on negative controls
 - Parameter boundaries are respected
@@ -67,6 +68,7 @@ Unit tests for each event detector family. Validates:
 ### Feature Tests (`tests/features/`)
 
 Validates feature computation:
+
 - Point-in-time correctness (no look-ahead)
 - Correct formula application
 - Null handling and edge cases
@@ -163,6 +165,7 @@ make minimum-green-gate
 ```
 
 Runs:
+
 1. `python -m compileall -q project project/tests`
 2. `pytest project/tests/architecture`
 3. `python project/scripts/spec_qa_linter.py`
@@ -184,6 +187,7 @@ The pipeline enforces quality gates at three levels:
 ### Gate E1 — Event Detection Quality
 
 Applied in Phase 1 analysis. Rejects events that:
+
 - Fire too rarely (`< 1.0` per 10k bars)
 - Fire too frequently (`> 500` per 10k bars)
 - Have a low join rate to hypothesis frames (`< 0.99`)
@@ -217,6 +221,7 @@ Applied in the promotion stage. Two tiers:
 The platform uses **Pandera** (v0.19.3) throughout for DataFrame schema enforcement. Every stage output that is consumed by another stage is validated against a `pandera.DataFrameSchema` before being written to disk.
 
 Key validated schemas:
+
 - OHLCV input schema (timestamp, open, high, low, close, volume)
 - Feature frame schema (typed columns per feature family)
 - Event episode schema (event_type, timestamp, symbol, signal columns)

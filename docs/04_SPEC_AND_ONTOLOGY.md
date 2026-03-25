@@ -97,7 +97,7 @@ provenance:
 
 ### Feature Catalog- ?are detectors and other modules using these features effectively and correctly?
 
-| Feature | Family | Description 
+| Feature | Family | Description
 |---|---|---|
 | `amihud` | microstructure | Amihud illiquidity ratio (abs return / dollar volume) |
 | `atr` | volatility | Average True Range |
@@ -347,13 +347,15 @@ The firewall (`spec/runtime/firewall.yaml`) enforces that alpha computations can
 The hypothesis search space defines which triggers, templates, contexts, horizons, and directions are valid combinations for Phase 2 discovery.
 
 **Trigger types:**
+
 - `events` — discrete market events (44 listed in search space)  ?why these counts are different
 - `states` — regime/structural states
 - `transitions` — state → state transitions
 - `feature_predicates` — continuous feature conditions
 
 **Notable annotations in search space:**  ?explain
-- `[QUALITY: HIGH]` — `LIQUIDATION_CASCADE` (IG 0.000467)    
+
+- `[QUALITY: HIGH]` — `LIQUIDATION_CASCADE` (IG 0.000467)
 - `[QUALITY: MODERATE]` — `OVERSHOOT_AFTER_SHOCK` (IG 0.000226)
 - `[QUALITY: LOW]` — `LIQUIDITY_VACUUM` (IG 0.000134)
 

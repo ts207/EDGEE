@@ -147,6 +147,7 @@ Kill Switch (project.live.kill_switch, project.spec/grammar/kill_switch_config.y
 ```
 
 **WebSocket streams per symbol:**
+
 - `{symbol}@kline_1m`
 - `{symbol}@kline_5m`
 - `{symbol}@bookTicker`
@@ -225,6 +226,7 @@ Automated agent workflows (via GitHub Actions): Codex PR review, Gemini triage/i
 Every run produces a **manifest** that must reconcile for the run to be trusted.
 
 **Read order for artifact trust:**
+
 1. Top-level run manifest
 2. Stage manifests
 3. Stage logs
@@ -232,6 +234,7 @@ Every run produces a **manifest** that must reconcile for the run to be trusted.
 5. Generated diagnostics (in `docs/generated/`)
 
 **Machine-owned artifacts** (do not hand-edit):
+
 - `docs/generated/architecture_metrics.json`
 - `docs/generated/detector_coverage.json` + `.md`
 - `docs/generated/ontology_audit.json`

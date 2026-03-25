@@ -54,6 +54,7 @@ pip install -e .
 ## Tooling
 
 ### Linting & Formatting
+
 - **Ruff** — linter + formatter, configured in `pyproject.toml`:
   - `line-length: 100`
   - `target-version: py311`
@@ -61,9 +62,11 @@ pip install -e .
   - Excluded: `data/`, `.venv/`, `MEMORY/`, `.agents/`
 
 ### Type Checking
+
 - **Pyright** v1.1.350 — run on `project/` package. Checked in Tier 1 CI gate.
 
 ### Testing
+
 - **pytest** 8.2.2
   - Config in `pytest.ini`
   - 407 test files
@@ -72,6 +75,7 @@ pip install -e .
   - `make test-fast` — excludes slow tests
 
 ### Build System
+
 - **setuptools** ≥ 69 + **wheel**
 - Package discovery: `where=["."]`, `include=["project*"]`
 
@@ -80,9 +84,11 @@ pip install -e .
 ## Data Layer
 
 ### Storage Format
+
 All pipeline artifacts are stored as **Parquet files** (via PyArrow). No SQL database.
 
 ### Data Root
+
 Configured at runtime via `project.core.config.get_data_root()`. Default: `data/` directory at project root.
 
 ```
@@ -95,11 +101,14 @@ data/
 ```
 
 ### Data Sources
+
 All market data ingested from **Binance** via:
+
 - REST API (historical OHLCV, funding rates, OI, liquidations)
 - WebSocket (live klines at 1m and 5m, book ticker)
 
 Supported instruments:
+
 - Binance USDⓈ-M Perpetuals (UM)
 - Binance Spot
 
@@ -147,6 +156,7 @@ Three service templates in `deploy/systemd/`:
 | `edge-live-engine-production.service` | Production env | Production mode |
 
 **Service configuration:**
+
 ```ini
 [Service]
 WorkingDirectory=/opt/edge

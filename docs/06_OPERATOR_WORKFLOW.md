@@ -62,7 +62,8 @@ directions: [long, short]
 entry_lags: [0, 1, 2]
 ```
 
-**Rules:**  ?review rules optimize and should be flexible 
+**Rules:**  ?review rules optimize and should be flexible
+
 - One event family or narrow trigger set per run
 - One template family per run
 - One primary context family per run
@@ -135,6 +136,7 @@ make discover-target SYMBOLS=BTCUSDT EVENT=VOL_SHOCK    ?what does it discover a
 ```bash
 make discover-edges      ?what does it discover and test exactly
 ```
+
 ```
 
 ### Promotion Pass
@@ -168,6 +170,7 @@ A run must be evaluated on **three layers**:
 ### Layer 2 — Statistical Quality
 
 Check at minimum:
+
 - `split_counts` (train / validation / test event counts)
 - `q_value` (must be ≤ 0.05 for Gate V1)
 - `after_cost_expectancy_bps` (must be > 0.1 bps)
@@ -241,6 +244,7 @@ make clean-all-data  # Wipe data/lake and reports
 Synthetic data is used for **calibration and infrastructure validation only** — not as evidence of live profitability.
 
 **Appropriate uses:**
+
 - Detector truth recovery after code changes
 - Infrastructure validation (pipeline mechanics)
 - Negative-control testing
@@ -267,6 +271,7 @@ python3 -m project.scripts.validate_synthetic_detector_truth \
 ```
 
 **Synthetic rules:**
+
 - Freeze the synthetic profile before evaluating outcomes
 - Keep the manifest and truth map with the run
 - Rerun truth validation after any detector or generator edits

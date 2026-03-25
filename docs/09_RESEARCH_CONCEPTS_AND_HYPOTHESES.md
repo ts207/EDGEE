@@ -67,6 +67,7 @@ The most prominent pre-registered hypothesis in the repo:
 **Status:** active
 
 **Measurement basis:**
+
 - After-cost only (fees + slippage + funding carry deducted)
 - Per-group scope: (symbol, event_type, rule_template, horizon)
 - Baseline: unconditional entries, min 500 events
@@ -159,6 +160,7 @@ Pre-configured proposal examples for common use cases:
 The authoritative runtime template configuration (~17KB). Defines for each event type which templates are active, their parameter bounds, and their conditions.
 
 **Template categories:**
+
 - **Mean reversion:** `mean_reversion`, `overshoot_repair`, `stop_run_repair`
 - **Trend-following:** `continuation`, `trend_continuation`, `breakout_followthrough`
 - **Volatility:** `volatility_expansion_follow`, `structural_regime_shift`
@@ -172,6 +174,7 @@ The authoritative runtime template configuration (~17KB). Defines for each event
 ## Hypothesis Verb Lexicon (`spec/hypotheses/template_verb_lexicon.yaml`)
 
 A structured vocabulary (~12KB) that maps template types to their:
+
 - Entry verb (what the strategy does at event time)
 - Exit verb (how the strategy exits)
 - Context requirements (what regime conditions are required)
