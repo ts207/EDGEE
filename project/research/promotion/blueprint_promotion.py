@@ -10,12 +10,29 @@ from project.eval.robustness import simulate_parameter_perturbation
 def calculate_stressed_pnl(frame: pd.DataFrame) -> Dict[str, float]:
     if frame.empty:
         return {"train": 0.0, "validation": 0.0, "test": 0.0}
-    gross = pd.to_numeric(frame.get("gross_pnl"), errors="coerce").fillna(
-        pd.to_numeric(frame.get("pnl"), errors="coerce").fillna(0.0)
-    )
-    trading_cost = pd.to_numeric(frame.get("trading_cost"), errors="coerce").fillna(0.0)
-    funding = pd.to_numeric(frame.get("funding_pnl"), errors="coerce").fillna(0.0)
-    borrow = pd.to_numeric(frame.get("borrow_cost"), errors="coerce").fillna(0.0)
+    gross_raw = frame.get("gross_pnl")
+    if gross_raw is None:
+        gross_raw = frame.get("pnl")
+    if gross_raw is None:
+        gross_raw = pd.Series(0.0, index=frame.index)
+        
+    gross = pd.to_numeric(gross_raw, errors="coerce").fillna(0.0)
+    
+    trading_cost_raw = frame.get("trading_cost")
+    if trading_cost_raw is None:
+        trading_cost_raw = pd.Series(0.0, index=frame.index)
+    trading_cost = pd.to_numeric(trading_cost_raw, errors="coerce").fillna(0.0)
+    
+    funding_pnl_raw = frame.get("funding_pnl")
+    if funding_pnl_raw is None:
+        funding_pnl_raw = pd.Series(0.0, index=frame.index)
+    funding = pd.to_numeric(funding_pnl_raw, errors="coerce").fillna(0.0)
+    
+    borrow_cost_raw = frame.get("borrow_cost")
+    if borrow_cost_raw is None:
+        borrow_cost_raw = pd.Series(0.0, index=frame.index)
+    borrow = pd.to_numeric(borrow_cost_raw, errors="coerce").fillna(0.0)
+    
     stressed = gross - (2.0 * trading_cost) + funding - borrow
     out = {}
     for split in ("train", "validation", "test"):
@@ -28,10 +45,18 @@ def calculate_realized_cost_ratio(frame: pd.DataFrame) -> Dict[str, Dict[str, fl
     splits = ("train", "validation", "test")
     if frame.empty:
         return {s: {"realized_cost_ratio": 0.0} for s in splits}
-    gross = pd.to_numeric(frame.get("gross_pnl"), errors="coerce").fillna(
-        pd.to_numeric(frame.get("pnl"), errors="coerce").fillna(0.0)
-    )
-    trading_cost = pd.to_numeric(frame.get("trading_cost"), errors="coerce").fillna(0.0)
+    gross_raw = frame.get("gross_pnl")
+    if gross_raw is None:
+        gross_raw = frame.get("pnl")
+    if gross_raw is None:
+        gross_raw = pd.Series(0.0, index=frame.index)
+        
+    gross = pd.to_numeric(gross_raw, errors="coerce").fillna(0.0)
+    
+    trading_cost_raw = frame.get("trading_cost")
+    if trading_cost_raw is None:
+        trading_cost_raw = pd.Series(0.0, index=frame.index)
+    trading_cost = pd.to_numeric(trading_cost_raw, errors="coerce").fillna(0.0)
     out = {}
     eps = 1e-12
     for split in splits:

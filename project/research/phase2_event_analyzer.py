@@ -43,7 +43,7 @@ def _first_existing(df: pd.DataFrame, candidates: List[str]) -> str | None:
 
 
 def _numeric_non_negative(df: pd.DataFrame, col: str | None, n: int) -> pd.Series:
-    if col is None:
+    if col is None or col not in df.columns:
         return pd.Series(0.0, index=df.index)
     out = pd.to_numeric(df[col], errors="coerce").fillna(0.0).astype(float).clip(lower=0.0)
     if len(out) != n:
@@ -52,7 +52,7 @@ def _numeric_non_negative(df: pd.DataFrame, col: str | None, n: int) -> pd.Serie
 
 
 def _numeric_any(df: pd.DataFrame, col: str | None, n: int, default: float = np.nan) -> pd.Series:
-    if col is None:
+    if col is None or col not in df.columns:
         return pd.Series(default, index=df.index)
     out = pd.to_numeric(df[col], errors="coerce").astype(float)
     if len(out) != n:

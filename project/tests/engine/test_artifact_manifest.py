@@ -110,12 +110,17 @@ def test_run_engine_writes_versioned_manifest_and_inventory(
         run_id="manifest_test",
         symbols=["BTCUSDT"],
         strategies=["s1"],
-        params={"max_portfolio_gross": 1.0, "portfolio_max_exposure": 10.0},
+        params={
+            "max_portfolio_gross": 1.0,
+            "portfolio_max_exposure": 10.0,
+            "max_strategy_gross": 1.0,
+            "max_symbol_gross": 0.5,
+            "max_new_exposure_per_bar": 2.0,
+        },
         cost_bps=2.5,
         data_root=tmp_path,
         memory_efficient=False,
     )
-
     manifest_path = result["manifest_path"]
     assert manifest_path.exists()
 
