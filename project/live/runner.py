@@ -13,8 +13,8 @@ from project.live.oms import (
     OrderStatus,
     OrderSubmissionFailed,
     build_live_order_from_strategy_result,
-    BinanceFuturesClient,
 )
+from project.live.binance_client import BinanceFuturesClient
 from project.live.state import LiveStateStore
 from project.live.execution_attribution import summarize_execution_attribution_by
 from project.live.health_checks import DataHealthMonitor

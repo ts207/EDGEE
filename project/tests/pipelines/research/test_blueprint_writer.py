@@ -4,7 +4,7 @@ import json
 
 import yaml
 
-from project.research import blueprint_writer as writer
+from project.research.helpers import writer
 from project.strategy.dsl.schema import (
     Blueprint,
     EntrySpec,

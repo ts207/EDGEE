@@ -1,6 +1,7 @@
 version: 1
 kind: event
 event_type: WICK_REVERSAL_PROXY
+maturity: standard
 synthetic_coverage: uncovered
 active: true
 status: validated

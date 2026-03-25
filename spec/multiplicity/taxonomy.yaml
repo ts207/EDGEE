@@ -24,29 +24,32 @@ families:
       - event_id: "LIQUIDITY_SHOCK"
         lifecycle: active
       - event_id: "DEPTH_COLLAPSE"
-        lifecycle: experimental
+        lifecycle: active
+        maturity: standard
       - event_id: "SPREAD_BLOWOUT"
         lifecycle: active
       - event_id: "ORDERFLOW_IMBALANCE_SHOCK"
-        lifecycle: experimental
+        lifecycle: active
+        maturity: standard
       - event_id: "SWEEP_STOPRUN"
-        lifecycle: experimental
+        lifecycle: active
+        maturity: standard
       - event_id: "ABSORPTION_EVENT"
         lifecycle: deprecated
         deprecation_note: "Superseded by ABSORPTION_PROXY."
       - event_id: "ABSORPTION_PROXY"
-        lifecycle: experimental
-        maturity: proxy
+        lifecycle: active
+        maturity: standard
       - event_id: "DEPTH_STRESS_PROXY"
-        lifecycle: experimental
-        maturity: proxy
+        lifecycle: active
+        maturity: standard
       - event_id: "LIQUIDITY_GAP_PRINT"
         lifecycle: experimental
       - event_id: "LIQUIDITY_STRESS_DIRECT"
         lifecycle: active
       - event_id: "LIQUIDITY_STRESS_PROXY"
-        lifecycle: experimental
-        maturity: proxy
+        lifecycle: active
+        maturity: standard
     states:
       - "LOW_LIQUIDITY_STATE"
       - "REFILL_LAG_STATE"
@@ -165,6 +168,7 @@ families:
     events:
       - event_id: "FORCED_FLOW_EXHAUSTION"
         lifecycle: active
+        maturity: standard
       - event_id: "TREND_EXHAUSTION_TRIGGER"
         lifecycle: active
       - event_id: "MOMENTUM_DIVERGENCE_TRIGGER"
@@ -174,8 +178,8 @@ families:
       - event_id: "FAILED_CONTINUATION"
         lifecycle: active
       - event_id: "FLOW_EXHAUSTION_PROXY"
-        lifecycle: experimental
-        maturity: proxy
+        lifecycle: active
+        maturity: standard
     states:
       - "POST_FORCED_FLOW_STATE"
       - "EXHAUSTION_STATE"
@@ -252,8 +256,8 @@ families:
       - event_id: "COPULA_PAIRS_TRADING"
         lifecycle: experimental
       - event_id: "PRICE_VOL_IMBALANCE_PROXY"
-        lifecycle: experimental
-        maturity: proxy
+        lifecycle: active
+        maturity: standard
     states:
       - "STRETCHED_STATE"
       - "OVERSHOOT_STATE"
@@ -364,8 +368,8 @@ families:
       - event_id: "FEE_REGIME_CHANGE_EVENT"
         lifecycle: active
       - event_id: "WICK_REVERSAL_PROXY"
-        lifecycle: experimental
-        maturity: proxy
+        lifecycle: active
+        maturity: standard
     states:
       - "HIGH_FRICTION_STATE"
       - "LOW_FRICTION_STATE"

@@ -1,7 +1,7 @@
 {
   "counts": {
     "active_event_specs_total": 69,
-    "canonical_events_total": 51,
+    "canonical_events_total": 60,
     "implemented_events_total": 69,
     "materialized_state_ids_unregistered_total": 0,
     "phase2_chain_events_total": 69,
