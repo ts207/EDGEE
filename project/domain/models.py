@@ -53,10 +53,16 @@ class DomainRegistry:
     interaction_definitions: tuple[Dict[str, Any], ...] = ()
 
     def has_event(self, event_type: str) -> bool:
-        return str(event_type).strip().upper() in self.event_definitions
+        from project.events.event_aliases import resolve_event_alias
+
+        normalized = resolve_event_alias(str(event_type).strip().upper())
+        return normalized in self.event_definitions
 
     def get_event(self, event_type: str) -> EventDefinition | None:
-        return self.event_definitions.get(str(event_type).strip().upper())
+        from project.events.event_aliases import resolve_event_alias
+
+        normalized = resolve_event_alias(str(event_type).strip().upper())
+        return self.event_definitions.get(normalized)
 
     def has_state(self, state_id: str) -> bool:
         return str(state_id).strip().upper() in self.state_definitions
