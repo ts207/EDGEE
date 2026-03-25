@@ -61,7 +61,6 @@ class EventSequenceDetector(BaseEventDetector):
                     "DEPTH_RECOVERY": "DEPTH_COLLAPSE", # Placeholder/Proxy
                     "OI_SPIKEPOS": "OI_SPIKE_POSITIVE",
                     "VOL_COMP": "RANGE_COMPRESSION_END",
-                    "BREAKOUT": "BREAKOUT_TRIGGER",
                 }
                 if self.anchor_event is None:
                     self.anchor_event = mapping.get(parts[0], parts[0])

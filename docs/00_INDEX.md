@@ -91,13 +91,13 @@ PIPELINE (8 stages)
   clean               → clean.perp.* + clean.spot.* + basis state + TOB aggs
   build_features      → features.perp.v2 + features.spot.v2 (34 feature families)
   build_market_context → regime labels, microstructure context
-  phase1_analysis     → 74 event detectors → episode files (per family .parquet)
+  phase1_analysis     → 69 event detectors → episode files (per family .parquet)
   phase2_discovery    → hypothesis scoring, FDR control → scored candidates
   promotion           → E1/V1/P3 gate → edge registry + campaign memory
   strategy_packaging  → Blueprints → Executable strategy specs → live engine
 
 RESEARCH PRIMITIVES
-  74 event types      across 9 canonical families
+  69 active event specs across 9 canonical families
   34 feature families  from microstructure to ML signals
   19 market states    tied to source events and families
   Legal templates     per family (7–8 templates each)

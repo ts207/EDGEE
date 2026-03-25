@@ -33,15 +33,15 @@ All events belong to one of 9 canonical families. Templates are only legal for t
 
 | Family | Description |
 | --- | --- |
-| `LIQUIDITY_DISLOCATION` | Sudden breakdown in market depth or spread abnormality (34 events) |
-| `POSITIONING_EXTREMES` | Extreme open interest, funding, or leverage positioning (29 events) |
-| `FORCED_FLOW_AND_EXHAUSTION` | Liquidation cascades and exhaustion reversals (22 events) |
-| `STATISTICAL_DISLOCATION` | Z-score stretches, basis dislocations, band breaks (21 events) |
-| `VOLATILITY_TRANSITION` | Regime shifts in realized/implied volatility (19 events) |
-| `TREND_STRUCTURE` | Breakouts, pullbacks, momentum divergence, trend acceleration (18 events) |
-| `REGIME_TRANSITION` | Macro or microstructure regime changes (15 events) |
-| `TEMPORAL_STRUCTURE` | Session-based, scheduled, or time-of-day effects (12 events) |
-| `INFORMATION_DESYNC` | Cross-venue lead-lag breaks, index divergence, desync (12 events) |
+| `LIQUIDITY_DISLOCATION` | Sudden breakdown in market depth or spread abnormality |
+| `POSITIONING_EXTREMES` | Extreme open interest, funding, or leverage positioning |
+| `FORCED_FLOW_AND_EXHAUSTION` | Liquidation cascades and exhaustion reversals |
+| `STATISTICAL_DISLOCATION` | Z-score stretches, basis dislocations, band breaks |
+| `VOLATILITY_TRANSITION` | Regime shifts in realized/implied volatility |
+| `TREND_STRUCTURE` | Breakouts, pullbacks, momentum divergence, trend acceleration |
+| `REGIME_TRANSITION` | Macro or microstructure regime changes |
+| `TEMPORAL_STRUCTURE` | Session-based, scheduled, or time-of-day effects |
+| `INFORMATION_DESYNC` | Cross-venue lead-lag breaks, index divergence, desync |
 
 ---
 
@@ -91,7 +91,7 @@ A good run is **not** the run with the best headline metric. A good run leaves b
 │  [build_market_context] → regime labels, microstructure     │
 │       │                                                      │
 │       ▼                                                      │
-│  [phase1_analysis] → 74 event detectors → event episodes    │
+│  [phase1_analysis] → 69 event detectors → event episodes    │
 │       │                                                      │
 │       ▼                                                      │
 │  [phase2_discovery] → hypothesis scoring, FDR control       │
@@ -106,14 +106,12 @@ A good run is **not** the run with the best headline metric. A good run leaves b
 
 ---
 
-## Project Stats
-
-| Metric | Value |
+## Project Stats | Metric | Value |
 | --- | --- |
 | Python source files | 1,153 |
 | Total files in repo | 1,722 |
 | Test files | 407 |
-| Event types (spec) | 74 |
+| Event types (spec) | 69 |
 | Feature definitions | 34 |
 | Market states | 19 |
 | Module coupling count | 2,417 |

@@ -164,12 +164,7 @@ class CrossVenueDesyncDetector(BasisDislocationDetector):
     ) -> pd.Series:
         threshold = self.compute_threshold(df, features=features, **params)
         persistent = (features["persistent_shock"] >= threshold).fillna(False)
-        
-        # Basis absolute floor (from base class logic)
-        min_bps = float(params.get("min_basis_bps", self.DEFAULT_MIN_BPS))
-        bps_mask = (features["basis_bps"].abs() >= min_bps).fillna(False)
-        
-        return (persistent & bps_mask).fillna(False)
+        return persistent
 
 
 class VolShockDetector(BasisDislocationDetector):

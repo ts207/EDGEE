@@ -203,9 +203,11 @@ Defines instrument pairs for copula-based statistical arbitrage strategies:
 
 ```
 BTCUSDT,ETHUSDT
+BTCUSDT,SOLUSDT
+ETHUSDT,SOLUSDT
 ```
 
-Used by `COPULA_PAIRS_TRADING` event detector.
+Used by `COPULA_PAIRS_TRADING` event detector and the copula pair loader.
 
 ---
 

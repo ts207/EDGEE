@@ -10,14 +10,13 @@ from project.features.context_guards import state_at_least
 from project.features.rolling_thresholds import lagged_rolling_quantile
 from project.events.shared import EVENT_COLUMNS, emit_event, format_event_id
 from project.research.analyzers import run_analyzer_suite
+from project.core.copula_pairs import copula_pair_universe, copula_partners, load_copula_pairs
 from project.spec_registry import load_event_spec
 
 
 class SessionOpenDetector(ThresholdDetector):
     event_type = "SESSION_OPEN_EVENT"
     required_columns = ("timestamp",)
-    DEFAULT_HOURS = (0,)
-    DEFAULT_MINUTE = 0
 
     def prepare_features(self, df: pd.DataFrame, **params: Any) -> dict[str, pd.Series]:
         ts = pd.to_datetime(df["timestamp"], utc=True, errors="coerce")
@@ -29,11 +28,8 @@ class SessionOpenDetector(ThresholdDetector):
         ts = features["ts"]
         spec = load_event_spec(self.event_type)
         spec_params = spec.get("parameters", {}) if isinstance(spec, dict) else {}
-        
-        hours = params.get("hours_utc", spec_params.get("hours_utc", self.DEFAULT_HOURS))
-        minute = params.get("minute_open", spec_params.get("minute_open", self.DEFAULT_MINUTE))
-        
-        return ((ts.dt.minute == minute) & ts.dt.hour.isin(hours)).fillna(False)
+        hours = spec_params["hours_utc"]
+        return ((ts.dt.minute == 0) & ts.dt.hour.isin(hours)).fillna(False)
 
     def compute_intensity(
         self, df: pd.DataFrame, *, features: dict[str, pd.Series], **params: Any
@@ -50,8 +46,6 @@ class SessionOpenDetector(ThresholdDetector):
 class SessionCloseDetector(ThresholdDetector):
     event_type = "SESSION_CLOSE_EVENT"
     required_columns = ("timestamp",)
-    DEFAULT_HOURS = (0,)
-    DEFAULT_MINUTE_START = 55
 
     def prepare_features(self, df: pd.DataFrame, **params: Any) -> dict[str, pd.Series]:
         ts = pd.to_datetime(df["timestamp"], utc=True, errors="coerce")
@@ -63,11 +57,8 @@ class SessionCloseDetector(ThresholdDetector):
         ts = features["ts"]
         spec = load_event_spec(self.event_type)
         spec_params = spec.get("parameters", {}) if isinstance(spec, dict) else {}
-        
-        hours = params.get("hours_utc", spec_params.get("hours_utc", self.DEFAULT_HOURS))
-        minute_start = params.get("minute_close_start", spec_params.get("minute_close_start", self.DEFAULT_MINUTE_START))
-        
-        return ((ts.dt.minute >= minute_start) & ts.dt.hour.isin(hours)).fillna(False)
+        hours = spec_params["hours_utc"]
+        return ((ts.dt.minute >= 55) & ts.dt.hour.isin(hours)).fillna(False)
 
     def compute_intensity(
         self, df: pd.DataFrame, *, features: dict[str, pd.Series], **params: Any
@@ -379,82 +370,162 @@ class FeeRegimeChangeDetector(ThresholdDetector):
         )
 
 
+
 class CopulaPairsTradingDetector(ThresholdDetector):
-    """Detects mean-reversion pairs dislocations with elevated spread z-score and reversal onset."""
+    """Detects mean-reversion pairs dislocations with pair-universe gating.
+
+    The detector prefers explicit pair-close data when present, but it still
+    accepts the legacy `pairs_zscore` signal and a proxy spread z-score fallback.
+    That keeps it compatible with older synthetic fixtures while remaining tied
+    to the explicit copula universe.
+    """
 
     event_type = "COPULA_PAIRS_TRADING"
     required_columns = ("timestamp", "close")
+    signal_profile = "pair_reversion"
+    min_spacing = 12
+    DEFAULT_Z_QUANTILE = 0.90
+    DEFAULT_SPREAD_QUANTILE = 0.75
+    DEFAULT_PAIR_WINDOW = 96
+    DEFAULT_FALLBACK_WINDOW = 96
 
     def prepare_features(self, df: pd.DataFrame, **params: Any) -> dict[str, pd.Series]:
         close = pd.to_numeric(df["close"], errors="coerce").astype(float)
-        ret = close.pct_change(1)
-        zscore_col = "pairs_zscore" if "pairs_zscore" in df.columns else None
+        ret = close.pct_change(1).fillna(0.0)
+        spread_proxy = pd.to_numeric(
+            df.get("spread_zscore", pd.Series(0.0, index=df.index)), errors="coerce"
+        ).abs().astype(float)
 
         trend_window = int(params.get("trend_window", 96))
+        pair_window = int(params.get("pair_window", trend_window))
+        lookback_window = int(params.get("lookback_window", 2880))
+        min_periods = int(params.get("min_periods", 48))
 
-        if zscore_col:
-            zscore = pd.to_numeric(df[zscore_col], errors="coerce").astype(float)
+        pair_close_col = next((c for c in ("pair_close", "paired_close", "close_pair") if c in df.columns), None)
+        pairs_zscore_col = "pairs_zscore" if "pairs_zscore" in df.columns else None
+
+        if pairs_zscore_col is not None:
+            zscore = pd.to_numeric(df[pairs_zscore_col], errors="coerce").astype(float)
+            zscore_source = "pairs_zscore"
+        elif pair_close_col is not None:
+            pair_close = pd.to_numeric(df[pair_close_col], errors="coerce").astype(float)
+            pair_spread = close - pair_close
+            pair_spread_mean = pair_spread.rolling(pair_window, min_periods=12).mean()
+            pair_spread_std = pair_spread.rolling(pair_window, min_periods=12).std().replace(0.0, np.nan)
+            zscore = (pair_spread - pair_spread_mean) / pair_spread_std
+            zscore_source = "pair_spread"
         else:
             zscore = (ret - ret.rolling(trend_window, min_periods=12).mean()) / (
                 ret.rolling(trend_window, min_periods=12).std().replace(0.0, np.nan)
             )
+            zscore_source = "return_zscore"
+
         zscore_abs = zscore.abs()
-        zscore_delta = zscore.diff(1)
-        mean_reversion = ((zscore.shift(1) > 0) & (zscore_delta < 0)) | (
-            (zscore.shift(1) < 0) & (zscore_delta > 0)
-        )
-        spread_proxy = (
-            pd.to_numeric(df.get("spread_zscore", pd.Series(0.0, index=df.index)), errors="coerce")
-            .abs()
-            .astype(float)
-        )
+        pair_reversal = ((zscore.shift(1) > 0) & (zscore.diff() < 0)) | ((zscore.shift(1) < 0) & (zscore.diff() > 0))
+        if zscore_source == "pair_spread":
+            pair_reversal = pair_reversal | (spread_proxy.diff().fillna(0.0) > 0)
 
-        lookback_window = int(params.get("lookback_window", 2880))
-        min_periods = int(params.get("min_periods", 288))
-
+        pair_dispersion = zscore_abs.rolling(pair_window, min_periods=12).std().fillna(0.0)
         z_q95 = lagged_rolling_quantile(
             zscore_abs,
             window=lookback_window,
-            quantile=float(params.get("z_quantile", 0.95)),
+            quantile=float(params.get("z_quantile", self.DEFAULT_Z_QUANTILE)),
             min_periods=min_periods,
         )
         spread_q75 = lagged_rolling_quantile(
             spread_proxy,
             window=lookback_window,
-            quantile=float(params.get("spread_quantile", 0.75)),
+            quantile=float(params.get("spread_quantile", self.DEFAULT_SPREAD_QUANTILE)),
             min_periods=min_periods,
         )
+        dispersion_q = lagged_rolling_quantile(
+            pair_dispersion.abs().fillna(0.0),
+            window=lookback_window,
+            quantile=float(params.get("pair_dispersion_quantile", 0.65)),
+            min_periods=min_periods,
+        )
+
+        pair_universe = load_copula_pairs()
+        symbol_value = ""
+        for candidate in ("symbol", "base_symbol", "asset_symbol"):
+            if candidate in df.columns and not df.empty:
+                symbol_value = str(df[candidate].iloc[0]).strip().upper()
+                break
+        symbol_value = str(params.get("symbol", symbol_value)).strip().upper()
+        partners = copula_partners(symbol_value) if symbol_value else []
+        in_universe = symbol_value in copula_pair_universe() if symbol_value else True
+
+        pair_strength = (
+            zscore_abs.fillna(0.0)
+            * (1.0 + spread_proxy.fillna(0.0))
+            * (1.0 + pair_dispersion.fillna(0.0))
+        )
+
         return {
             "zscore": zscore,
             "zscore_abs": zscore_abs,
             "z_q95": z_q95,
-            "mean_reversion": mean_reversion.fillna(False),
+            "mean_reversion": pair_reversal.fillna(False),
             "spread_proxy": spread_proxy,
             "spread_q75": spread_q75,
+            "pair_dispersion": pair_dispersion,
+            "dispersion_q": dispersion_q,
+            "pair_strength": pair_strength,
+            "pair_universe_size": pd.Series(len(pair_universe), index=df.index, dtype=float),
+            "partner_count": pd.Series(len(partners), index=df.index, dtype=float),
+            "pair_in_universe": pd.Series(bool(in_universe), index=df.index, dtype=bool),
+            "has_pair_spread": pd.Series(bool(pair_close_col is not None), index=df.index, dtype=bool),
+            "signal_profile": pd.Series("pair_reversion", index=df.index, dtype=object),
         }
 
     def compute_raw_mask(
         self, df: pd.DataFrame, *, features: dict[str, pd.Series], **params: Any
     ) -> pd.Series:
-        return (
+        del df, params
+        pair_gate = features.get("pair_in_universe")
+        if pair_gate is None:
+            pair_gate = pd.Series(True, index=features["zscore_abs"].index)
+        dislocation_gate = (
             (features["zscore_abs"] >= features["z_q95"]).fillna(False)
-            & features["mean_reversion"]
-            & (features["spread_proxy"] >= features["spread_q75"]).fillna(False)
+            | (features["spread_proxy"] >= features["spread_q75"]).fillna(False)
+        )
+        confirmation_gate = (
+            features["mean_reversion"].fillna(False)
+            | (features["spread_proxy"].diff().fillna(0.0) >= 0.0)
+        )
+        return (
+            pair_gate.fillna(False)
+            & features["pair_in_universe"].fillna(False)
+            & dislocation_gate
+            & confirmation_gate
         ).fillna(False)
 
     def compute_intensity(
         self, df: pd.DataFrame, *, features: dict[str, pd.Series], **params: Any
     ) -> pd.Series:
+        del df, params
+        pair_weight = 1.0 + features.get("partner_count", pd.Series(0.0, index=features["zscore_abs"].index)).fillna(0.0) * 0.05
         return (
-            features["zscore_abs"].fillna(0.0) * (1.0 + features["spread_proxy"].fillna(0.0))
+            features["pair_strength"].fillna(0.0)
+            * (1.0 + pair_weight * 0.1)
         ).clip(lower=0.0)
 
     def compute_direction(self, idx: int, features: dict[str, pd.Series], **params: Any) -> str:
         del params
-        zscore = float(
-            features["zscore"].iloc[idx] if not pd.isna(features["zscore"].iloc[idx]) else 0.0
-        )
+        zscore = float(features["zscore"].iloc[idx] if not pd.isna(features["zscore"].iloc[idx]) else 0.0)
         return "down" if zscore > 0 else "up" if zscore < 0 else "non_directional"
+
+    def compute_metadata(
+        self, idx: int, features: dict[str, pd.Series], **params: Any
+    ) -> dict[str, Any]:
+        del idx, params
+        return {
+            "signal_profile": "pair_reversion",
+            "pair_universe_size": int(features["pair_universe_size"].iloc[0]),
+            "partner_count": int(features["partner_count"].iloc[0]),
+            "pair_in_universe": bool(features["pair_in_universe"].iloc[0]),
+            "has_pair_spread": bool(features["has_pair_spread"].iloc[0]),
+        }
 
 
 from project.events.detectors.registry import get_detector, register_family_detectors

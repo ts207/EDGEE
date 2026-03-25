@@ -8,7 +8,7 @@ All research primitives in EDGEE are defined declaratively in `spec/` as YAML fi
 
 ## 1. Events (`spec/events/`)
 
-74 event types are defined, each assigned to one of 9 canonical families.
+69 active event specs are currently registered, each assigned to one of 9 canonical families. The ontology audit currently reconciles 69 implemented events, 60 canonical entries, and 70 taxonomy entries, with `ABSORPTION_EVENT` remaining as the single planned backlog item.
 
 ### Event YAML Schema
 
@@ -42,31 +42,33 @@ detector:
 
 ### Complete Event Catalog by Family
 
-**LIQUIDITY_DISLOCATION (34 events)**
+The family list below is maintained for navigation; exact counts are tracked in the generated ontology audit to avoid doc drift.
+
+**LIQUIDITY_DISLOCATION**
 `ABSORPTION_PROXY`, `DEPTH_COLLAPSE`, `DEPTH_STRESS_PROXY`, `LIQUIDITY_GAP_PRINT`, `LIQUIDITY_SHOCK`, `LIQUIDITY_STRESS_DIRECT`, `LIQUIDITY_STRESS_PROXY`, `LIQUIDITY_VACUUM`, `SPREAD_BLOWOUT`, `SPREAD_REGIME_WIDENING_EVENT`, `SWEEP_STOPRUN`, and others.
 
-**POSITIONING_EXTREMES (29 events)**
+**POSITIONING_EXTREMES**
 `FUNDING_EXTREME_ONSET`, `FUNDING_FLIP`, `FUNDING_NORMALIZATION_TRIGGER`, `FUNDING_PERSISTENCE_TRIGGER`, `FUNDING_TIMESTAMP_EVENT`, `LIQUIDATION_CASCADE`, `OI_FLUSH`, `OI_SPIKE_NEGATIVE`, `OI_SPIKE_POSITIVE`, `POST_DELEVERAGING_REBOUND`, and others.
 
-**FORCED_FLOW_AND_EXHAUSTION (22 events)**
+**FORCED_FLOW_AND_EXHAUSTION**
 `CLIMAX_VOLUME_BAR`, `DELEVERAGING_WAVE`, `FLOW_EXHAUSTION_PROXY`, `FORCED_FLOW_EXHAUSTION`, `MOMENTUM_DIVERGENCE_TRIGGER`, `TREND_EXHAUSTION_TRIGGER`, `WICK_REVERSAL_PROXY`, and others.
 
-**STATISTICAL_DISLOCATION (21 events)**
+**STATISTICAL_DISLOCATION**
 `BAND_BREAK`, `BASIS_DISLOC`, `FND_DISLOC`, `GAP_OVERSHOOT`, `OVERSHOOT_AFTER_SHOCK`, `PRICE_VOL_IMBALANCE_PROXY`, `ZSCORE_STRETCH`, and others.
 
-**VOLATILITY_TRANSITION (19 events)**
+**VOLATILITY_TRANSITION**
 `BREAKOUT_TRIGGER`, `RANGE_COMPRESSION_END`, `SLIPPAGE_SPIKE_EVENT`, `VOL_CLUSTER_SHIFT`, `VOL_REGIME_SHIFT_EVENT`, `VOL_RELAXATION_START`, `VOL_SHOCK`, `VOL_SPIKE`, and others.
 
-**TREND_STRUCTURE (18 events)**
+**TREND_STRUCTURE**
 `CHOP_TO_TREND_SHIFT`, `FAILED_CONTINUATION`, `FALSE_BREAKOUT`, `PULLBACK_PIVOT`, `RANGE_BREAKOUT`, `SUPPORT_RESISTANCE_BREAK`, `TREND_ACCELERATION`, `TREND_DECELERATION`, `TREND_TO_CHOP_SHIFT`, and others.
 
-**REGIME_TRANSITION (15 events)**
+**REGIME_TRANSITION**
 `BETA_SPIKE_EVENT`, `CORRELATION_BREAKDOWN_EVENT`, and others.
 
-**INFORMATION_DESYNC (12 events)**
+**INFORMATION_DESYNC**
 `CROSS_VENUE_DESYNC`, `INDEX_COMPONENT_DIVERGENCE`, `LEAD_LAG_BREAK`, `SPOT_PERP_BASIS_SHOCK`, and others.
 
-**TEMPORAL_STRUCTURE (12 events)**
+**TEMPORAL_STRUCTURE**
 `FEE_REGIME_CHANGE_EVENT`, `NO_FEE_IMPACT`, `SCHEDULED_NEWS_WINDOW_EVENT`, `SESSION_CLOSE_EVENT`, `SESSION_OPEN_EVENT`, and others.
 
 ---
@@ -95,9 +97,7 @@ provenance:
   claim_id: ["CL_0075", ...]
 ```
 
-### Feature Catalog- ?are detectors and other modules using these features effectively and correctly?
-
-| Feature | Family | Description
+### Feature Catalog- ?are detectors and other modules using these features effectively and correctly? | Feature | Family | Description
 |---|---|---|
 | `amihud` | microstructure | Amihud illiquidity ratio (abs return / dollar volume) |
 | `atr` | volatility | Average True Range |
@@ -158,9 +158,7 @@ allowed_templates:
   - continuation
 ```
 
-### State Catalog
-
-| State | Source Event | Family |
+### State Catalog | State | Source Event | Family |
 |---|---|---|
 | `AFTERSHOCK_STATE` | Post-shock periods | VOLATILITY_TRANSITION |
 | `CHOP_STATE` | Range-bound, no trending | REGIME_TRANSITION |
@@ -188,9 +186,7 @@ allowed_templates:
 
 ### Allowed Templates Per Family (`family_registry.yaml`)
 
-Templates constrain what strategy shapes are legal for each event family:
-
-| Family | Allowed Templates |
+Templates constrain what strategy shapes are legal for each event family: | Family | Allowed Templates |
 |---|---|
 | LIQUIDITY_DISLOCATION | `mean_reversion`, `continuation`, `stop_run_repair`, `overshoot_repair`, `only_if_liquidity`, `slippage_aware_filter`, `liquidity_replenishment` |
 | VOLATILITY_TRANSITION | `mean_reversion`, `continuation`, `trend_continuation`, `volatility_expansion_follow`, `pullback_entry`, `only_if_regime`, `structural_regime_shift` |
@@ -205,9 +201,7 @@ Templates constrain what strategy shapes are legal for each event family:
 
 ### Named Event Sequences (`sequence_registry.yaml`)  ?explain the logic and instructions as it is most important alpha source
 
-Multi-event temporal patterns that can be used as composite triggers:
-
-| Sequence | Events (ordered) | Max Gaps (bars) | Mode |
+Multi-event temporal patterns that can be used as composite triggers: | Sequence | Events (ordered) | Max Gaps (bars) | Mode |
 |---|---|---|---|
 | `crowding_unwind` | `FUNDING_EXTREME_ONSET` → `OI_FLUSH` → `LIQUIDATION_CASCADE` | [6, 12] | ordered_strict |
 | `compression_breakout` | `RANGE_COMPRESSION_END` → `BREAKOUT_TRIGGER` → `FALSE_BREAKOUT` | [12, 6] | ordered_strict |
@@ -217,18 +211,14 @@ Multi-event temporal patterns that can be used as composite triggers:
 
 ## 5. Promotion Gates (`spec/gates.yaml`)
 
-### Gate E1 — Event Quality Gate
-
-| Criterion | Value |
+### Gate E1 — Event Quality Gate | Criterion | Value |
 |---|---|
 | Min prevalence per 10k bars | 1.0 |
 | Max prevalence per 10k bars | 500.0 |
 | Min join rate | 0.99 |
 | Max 5-bar clustering | 0.20 |
 
-### Gate V1 — Phase 2 Statistical Gate
-
-| Criterion | Value |
+### Gate V1 — Phase 2 Statistical Gate | Criterion | Value |
 |---|---|
 | Max q-value (FDR) | 0.05 |
 | Min after-cost expectancy | 0.1 bps |
@@ -241,9 +231,7 @@ Multi-event temporal patterns that can be used as composite triggers:
 
 ### Promotion Confirmatory Gates (P3)
 
-**Deployable tier:**
-
-| Criterion | Value |
+**Deployable tier:** | Criterion | Value |
 |---|---|
 | Max q-value | 0.05 |
 | Min OOS ESS | 50 |
@@ -257,9 +245,7 @@ Multi-event temporal patterns that can be used as composite triggers:
 | Min ESS per regime | 20 |
 | Require regime stability | true |
 
-**Shadow tier:**  ?how this tier is used
-
-| Criterion | Value |
+**Shadow tier:**  ?how this tier is used | Criterion | Value |
 |---|---|
 | Max q-value | 0.10 |
 | Min OOS ESS | 20 |
@@ -289,9 +275,7 @@ defaults:
 
 ---
 
-## 7. Cost Model (`spec/cost_model.yaml`)
-
-| Parameter | Default |
+## 7. Cost Model (`spec/cost_model.yaml`) | Parameter | Default |
 |---|---|
 | Fee (per side) | 4.0 bps |
 | Slippage (per fill) | 2.0 bps |
@@ -301,9 +285,7 @@ defaults:
 
 ## 8. Blueprint Policies (`spec/blueprint_policies.yaml`)
 
-Governs stop/target calibration and position sizing defaults:
-
-| Parameter | Value |
+Governs stop/target calibration and position sizing defaults: | Parameter | Value |
 |---|---|
 | Time stop range | 4–192 bars |
 | Stop percentile | 75th |
@@ -319,9 +301,7 @@ Governs stop/target calibration and position sizing defaults:
 
 ## 9. Runtime Lanes (`spec/runtime/lanes.yaml`)
 
-The live engine runs two processing lanes with strict causal separation:
-
-| Lane | Cadence | Purpose | Alpha | Execution |
+The live engine runs two processing lanes with strict causal separation: | Lane | Cadence | Purpose | Alpha | Execution |
 |---|---|---|---|---|
 | `alpha_5s` | 5 seconds | Alpha signal computation | ✓ | ✗ |  ?explain the alpha signal computation
 | `exec_1s` | 1 second | Order management | ✗ | ✓ |
@@ -330,9 +310,7 @@ The firewall (`spec/runtime/firewall.yaml`) enforces that alpha computations can
 
 ---
 
-## 10. Runtime Firewall (`spec/runtime/firewall.yaml`)
-
-| Role | Allowed Provenance | Can See Exec State |
+## 10. Runtime Firewall (`spec/runtime/firewall.yaml`) | Role | Allowed Provenance | Can See Exec State |
 |---|---|---|
 | `alpha` | market, calendar, quality | No |
 | `events` | market, calendar, quality | No |
