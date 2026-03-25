@@ -25,9 +25,24 @@ class BasisDislocationDetector(DislocationDetector):
     min_spacing = 24
     timeframe_minutes = 5
     default_severity = "moderate"
+    DEFAULT_THRESHOLD = 3.5
+    DEFAULT_LOOKBACK = 288
+    DEFAULT_QUANTILE = 0.99
+    DEFAULT_MIN_BPS = 5.0
+    VOL_LIMIT_HIGH = 1.2
+    VOL_LIMIT_LOW = 0.8
+    VOL_MIN_SCALE = 0.8
+    VOL_MAX_SCALE = 1.5
+    DEFAULT_THRESHOLD_BPS = 2.0
+    FUNDING_QUANTILE_DEFAULT = 0.9
+    STRESS_STATE_VAL = 2.0
+    CONFIDENCE_DEFAULT = 0.55
+    ENTROPY_DEFAULT = 0.9
+    EXTREME_Z_TH = 5.0
+    MAJOR_Z_TH = 4.0
 
     def prepare_features(self, df: pd.DataFrame, **params: Any) -> dict[str, pd.Series]:
-        lookback_window = int(params.get("lookback_window", params.get("basis_lookback", 288)))
+        lookback_window = int(params.get("lookback_window", params.get("basis_lookback", self.DEFAULT_LOOKBACK)))
         min_periods = int(params.get("min_periods", max(24, lookback_window // 10)))
         close_perp = pd.to_numeric(df["close_perp"], errors="coerce")
         close_spot = pd.to_numeric(df["close_spot"], errors="coerce").replace(0.0, np.nan)
@@ -44,12 +59,12 @@ class BasisDislocationDetector(DislocationDetector):
         dynamic_th = dynamic_quantile_floor(
             basis_zscore.abs(),
             window=lookback_window,
-            quantile=float(params.get("anchor_quantile", params.get("threshold_quantile", 0.99))),
-            floor=float(params.get("z_threshold", params.get("threshold", self.threshold))),
+            quantile=float(params.get("anchor_quantile", params.get("threshold_quantile", self.DEFAULT_QUANTILE))),
+            floor=float(params.get("z_threshold", params.get("threshold", self.DEFAULT_THRESHOLD))),
         )
         # Apply vol factor if requested
         if bool(params.get("vol_scaled_threshold", False)):
-            dynamic_th = dynamic_th * vol_factor.clip(0.8, 1.5)
+            dynamic_th = dynamic_th * vol_factor.clip(self.VOL_MIN_SCALE, self.VOL_MAX_SCALE)
 
         return {
             "basis_bps": basis_bps,
@@ -58,7 +73,7 @@ class BasisDislocationDetector(DislocationDetector):
             "vol_factor": vol_factor,
             "dynamic_th": dynamic_th,
             "vol_regime": vol_factor.map(
-                lambda x: "high" if x > 1.2 else "low" if x < 0.8 else "mid"
+                lambda x: "high" if x > self.VOL_LIMIT_HIGH else "low" if x < self.VOL_LIMIT_LOW else "mid"
             ),
         }
 
@@ -66,6 +81,22 @@ class BasisDislocationDetector(DislocationDetector):
         self, df: pd.DataFrame, *, features: dict[str, pd.Series], **params: Any
     ) -> pd.Series:
         return features["dynamic_th"]
+
+    def compute_raw_mask(
+        self, df: pd.DataFrame, *, features: dict[str, pd.Series], **params: Any
+    ) -> pd.Series:
+        """Compute raw event mask with absolute basis floor to filter noise."""
+        threshold = self.compute_threshold(df, features=features, **params)
+        intensity = self.compute_intensity(df, features=features, **params)
+        
+        # Basis z-score must exceed dynamic threshold
+        z_mask = (intensity >= threshold).fillna(False)
+        
+        # Absolute basis floor
+        min_bps = float(params.get("min_basis_bps", self.DEFAULT_MIN_BPS))
+        bps_mask = (features["basis_bps"].abs() >= min_bps).fillna(False)
+        
+        return (z_mask & bps_mask).fillna(False)
 
     def compute_intensity(
         self, df: pd.DataFrame, *, features: dict[str, pd.Series], **params: Any
@@ -79,8 +110,8 @@ class BasisDislocationDetector(DislocationDetector):
     def compute_severity(
         self, idx: int, intensity: float, features: Mapping[str, pd.Series], **params: Any
     ) -> str:
-        z = float(pd.to_numeric(features["basis_zscore"], errors="coerce").iloc[idx])
-        return "extreme" if abs(z) >= 5.0 else "major" if abs(z) >= 4.0 else "moderate"
+        z = float(intensity)
+        return "extreme" if abs(z) >= self.EXTREME_Z_TH else "major" if abs(z) >= self.MAJOR_Z_TH else "moderate"
 
     def compute_metadata(
         self, idx: int, features: Mapping[str, pd.Series], **params: Any
@@ -107,10 +138,11 @@ class BasisDislocationDetector(DislocationDetector):
 class CrossVenueDesyncDetector(BasisDislocationDetector):
     event_type = "CROSS_VENUE_DESYNC"
     required_columns = ("timestamp", "close_perp", "close_spot")
+    PERSISTENCE_BARS_DEFAULT = 2
 
     def prepare_features(self, df: pd.DataFrame, **params: Any) -> dict[str, pd.Series]:
         # Accept older column aliases, but prefer the canonical dual-market feature names.
-        # Audit 4.5: Defensively handle renaming to avoid overwriting existing canonical columns.
+        # handle renaming to avoid overwriting existing canonical columns.
         work = df.copy()
         if "close_spot" not in work.columns and "close" in work.columns:
             work = work.rename(columns={"close": "close_spot"})
@@ -135,6 +167,13 @@ class CrossVenueDesyncDetector(BasisDislocationDetector):
         return persistent
 
 
+class VolShockDetector(BasisDislocationDetector):
+    event_type = "VOL_SHOCK"
+    z_threshold = 3.0
+    SHOCK_Q_DEFAULT = 0.9
+    SHOCK_FLOOR_DEFAULT = 0.75
+
+
 class FndDislocDetector(BasisDislocationDetector):
     event_type = "FND_DISLOC"
 
@@ -149,8 +188,8 @@ class FndDislocDetector(BasisDislocationDetector):
         funding_q95 = dynamic_quantile_floor(
             funding_abs,
             window=lookback_window,
-            quantile=float(params.get("funding_quantile", 0.90)),
-            floor=threshold_bps / 10_000.0,
+            quantile=float(params.get("funding_quantile", self.FUNDING_QUANTILE_DEFAULT)),
+            floor=threshold_bps / 10000,
         )
         features.update(
             {
@@ -161,9 +200,9 @@ class FndDislocDetector(BasisDislocationDetector):
                 "canonical_funding_extreme": state_at_least(
                     df,
                     "ms_funding_state",
-                    2.0,
-                    min_confidence=float(params.get("context_min_confidence", 0.55)),
-                    max_entropy=float(params.get("context_max_entropy", 0.90)),
+                    self.STRESS_STATE_VAL,
+                    min_confidence=float(params.get("context_min_confidence", self.CONFIDENCE_DEFAULT)),
+                    max_entropy=float(params.get("context_max_entropy", self.ENTROPY_DEFAULT)),
                 ),
             }
         )
@@ -181,10 +220,14 @@ class FndDislocDetector(BasisDislocationDetector):
         alignment_window = int(params.get("alignment_window", 5))
         basis_active = basis_mask.rolling(window=alignment_window, min_periods=1).max().astype(bool)
 
+        # Apply absolute basis floor even in funding dislocation
+        min_bps = float(params.get("min_basis_bps", self.DEFAULT_MIN_BPS))
+        bps_mask = (features["basis_bps"].abs() >= min_bps).fillna(False)
+        
         sign_align = np.sign(features["basis_bps"].fillna(0.0)) == features["funding_sign"].fillna(
             0.0
         )
-        return (basis_active & funding_extreme & sign_align).fillna(False)
+        return (basis_active & funding_extreme & sign_align & bps_mask).fillna(False)
 
 
 class SpotPerpBasisShockDetector(BasisDislocationDetector):
@@ -192,13 +235,17 @@ class SpotPerpBasisShockDetector(BasisDislocationDetector):
 
     def prepare_features(self, df: pd.DataFrame, **params: Any) -> dict[str, pd.Series]:
         features = super().prepare_features(df, **params)
+        basis_z = features["basis_zscore"]
+        
+        shock_q = float(params.get("shock_change_quantile", self.SHOCK_Q_DEFAULT))
+        shock_floor = float(params.get("shock_change_floor", self.SHOCK_FLOOR_DEFAULT))
         shock_change = features["basis_zscore"].diff().abs()
         lookback_window = int(params.get("lookback_window", 2880))
         shock_q90 = dynamic_quantile_floor(
             shock_change,
             window=lookback_window,
-            quantile=float(params.get("shock_change_quantile", 0.90)),
-            floor=float(params.get("shock_change_floor", 0.75)),
+            quantile=shock_q,
+            floor=shock_floor,
         )
         features.update({"shock_change": shock_change, "shock_q90": shock_q90})
         return features
@@ -270,7 +317,7 @@ def detect_basis_family(
     )
     if not events.empty:
         events["timestamp"] = events["signal_ts"]
-        # Audit 3.7: Correct semantic mapping for severity and intensity
+        # Correct semantic mapping for severity and intensity
         if "severity" not in events.columns and "event_score" in events.columns:
             events["severity"] = events["event_score"]
 

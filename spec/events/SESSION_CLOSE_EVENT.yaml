@@ -7,4 +7,5 @@ parameters:
   event_spacing_bars: 288
   cooldown_bars: 12
   merge_gap_bars: 0
+  intensity_scale: 60
 canonical_family: TEMPORAL_STRUCTURE

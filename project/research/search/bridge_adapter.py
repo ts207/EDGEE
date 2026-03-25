@@ -13,7 +13,7 @@ import logging
 import pandas as pd
 import numpy as np
 
-from project.research.gating import two_sided_p_from_t
+from project.research.gating import one_sided_p_from_t
 from project.spec_validation import get_event_family, resolve_execution_templates
 
 log = logging.getLogger(__name__)
@@ -121,7 +121,7 @@ def hypotheses_to_bridge_candidates(
     # A candidate is "tradable" if it passes t-stat, n, OOS score,
     # and survives at least 50% of stress scenarios.
     out["gate_bridge_tradable"] = (
-        (out["t_stat"].abs() >= 2.0)
+        (out["t_stat"] >= 2.0)
         & (out["gate_after_cost_stressed_positive"])
         & (out["gate_oos_validation"])
         & (out["stress_test_survival"] >= 0.5)
@@ -135,7 +135,7 @@ def hypotheses_to_bridge_candidates(
 
     # Derive p-values from t-statistics
     out["p_value"] = [
-        two_sided_p_from_t(float(row["t_stat"]), max(1, int(row["n"]) - 1))
+        one_sided_p_from_t(float(row["t_stat"]), max(1, int(row["n"]) - 1))
         for _, row in filtered.iterrows()
     ]
     out["p_value_for_fdr"] = out["p_value"]
@@ -202,7 +202,7 @@ def split_bridge_candidates(
 
     valid_mask = metrics_df["valid"].fillna(False)
     min_n_mask = pd.to_numeric(metrics_df["n"], errors="coerce").fillna(0) >= int(min_n)
-    min_t_mask = pd.to_numeric(metrics_df["t_stat"], errors="coerce").abs().fillna(0.0) >= float(
+    min_t_mask = pd.to_numeric(metrics_df["t_stat"], errors="coerce").fillna(0.0) >= float(
         min_t_stat
     )
     pass_mask = valid_mask & min_n_mask & min_t_mask
@@ -219,9 +219,9 @@ def split_bridge_candidates(
             else:
                 if int(pd.to_numeric(row.get("n", 0), errors="coerce") or 0) < int(min_n):
                     row_reasons.append("min_sample_size")
-                if abs(
-                    float(pd.to_numeric(row.get("t_stat", 0.0), errors="coerce") or 0.0)
-                ) < float(min_t_stat):
+                if float(pd.to_numeric(row.get("t_stat", 0.0), errors="coerce") or 0.0) < float(
+                    min_t_stat
+                ):
                     row_reasons.append("min_t_stat")
             if not row_reasons:
                 row_reasons = ["filtered_out"]

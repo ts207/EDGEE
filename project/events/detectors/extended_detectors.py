@@ -32,3 +32,9 @@ class LiquidationExhaustionReversalDetector(PostDeleveragingReboundDetector):
 
 
 register_detector("LIQUIDATION_EXHAUSTION_REVERSAL", LiquidationExhaustionReversalDetector)
+
+# Register Sequence Event Detectors
+register_detector("SEQ_FND_EXTREME_THEN_BREAKOUT", EventSequenceDetector)
+register_detector("SEQ_LIQ_VACUUM_THEN_DEPTH_RECOVERY", EventSequenceDetector)
+register_detector("SEQ_OI_SPIKEPOS_THEN_VOL_SPIKE", EventSequenceDetector)
+register_detector("SEQ_VOL_COMP_THEN_BREAKOUT", EventSequenceDetector)

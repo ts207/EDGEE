@@ -338,6 +338,8 @@ class SpreadBlowoutDetector(ThresholdDetector):
 class OrderflowImbalanceDetector(CompositeDetector):
     event_type = "ORDERFLOW_IMBALANCE_SHOCK"
     required_columns = ("timestamp", "close", "rv_96")
+    DEFAULT_RET_QUANTILE = 0.99
+    DEFAULT_RV_QUANTILE = 0.7
 
     def prepare_features(self, df: pd.DataFrame, **params: Any) -> dict[str, pd.Series]:
         ret_abs = df["close"].pct_change(1).abs()
@@ -347,8 +349,8 @@ class OrderflowImbalanceDetector(CompositeDetector):
         rv_z = rolling_mean_std_zscore(rv_96, window=lookback)
 
         threshold_window = int(params.get("threshold_window", 2880))
-        q_ret = float(params.get("ret_quantile", 0.99))
-        q_rv = float(params.get("rv_quantile", 0.70))
+        q_ret = float(params.get("ret_quantile", self.DEFAULT_RET_QUANTILE))
+        q_rv = float(params.get("rv_quantile", self.DEFAULT_RV_QUANTILE))
 
         ret_q99 = lagged_rolling_quantile(
             ret_abs,

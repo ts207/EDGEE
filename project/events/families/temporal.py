@@ -37,8 +37,8 @@ class SessionOpenDetector(ThresholdDetector):
         mins = (ts.dt.minute.fillna(59)).astype(float)
         spec = load_event_spec(self.event_type)
         spec_params = spec.get("parameters", {}) if isinstance(spec, dict) else {}
-        val = params.get("intensity_scale", spec_params.get("intensity_scale", 60.0))
-        intensity_scale = float(val) if val is not None else 60.0
+        val = params.get("intensity_scale", spec_params.get("intensity_scale", 60))
+        intensity_scale = float(val) if val is not None else float(60)
         return (intensity_scale - mins).clip(lower=0.0)
 
 
@@ -66,8 +66,8 @@ class SessionCloseDetector(ThresholdDetector):
         mins_to_close = (59 - ts.dt.minute.fillna(0)).abs().astype(float)
         spec = load_event_spec(self.event_type)
         spec_params = spec.get("parameters", {}) if isinstance(spec, dict) else {}
-        val = params.get("intensity_scale", spec_params.get("intensity_scale", 60.0))
-        intensity_scale = float(val) if val is not None else 60.0
+        val = params.get("intensity_scale", spec_params.get("intensity_scale", 60))
+        intensity_scale = float(val) if val is not None else float(60)
         return (intensity_scale - mins_to_close).clip(lower=0.0)
 
 

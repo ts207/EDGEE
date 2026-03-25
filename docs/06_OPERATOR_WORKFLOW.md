@@ -300,27 +300,40 @@ PYTHONPATH=. python3 project/scripts/show_promotion_readiness.py \
 
 ## Maintenance Scripts (Operator)
 
-Run these after any structural change to regenerate machine-owned artifacts:
+Run these after any structural change to synchronize the event registry and regenerate machine-owned artifacts.
+
+### 1. Synchronize Event Registry
+If you have added, deleted, or modified individual event YAML files in `spec/events/`, you **must** rebuild the unified registry first:
 
 ```bash
-# Regenerate system map
-python3 -m project.scripts.build_system_map --check
+# Authoritative sync of spec/events/event_registry_unified.yaml
+PYTHONPATH=. python3 project/scripts/build_unified_event_registry.py
+```
 
-# Regenerate detector coverage audit
-python3 -m project.scripts.detector_coverage_audit \
-  --md-out docs/generated/detector_coverage.md \
-  --json-out docs/generated/detector_coverage.json \
-  --check
+### 2. Regenerate All Artifacts
+Use the all-in-one script to regenerate the System Map, Detector Coverage, and Ontology Audit:
 
-# Regenerate ontology audit
-python3 -m project.scripts.ontology_consistency_audit \
-  --output docs/generated/ontology_audit.json --check
+```bash
+# Recommended for full artifact updates
+bash project/scripts/regenerate_artifacts.sh
+```
 
+### 3. Individual Maintenance Commands
+You can also run specific audits or metrics manually:
+
+```bash
 # Regenerate architecture metrics
-python3 -m project.scripts.build_architecture_metrics --check
+PYTHONPATH=. python3 project/scripts/build_architecture_metrics.py --check
 
-# Lint all YAML specs
-python3 project/scripts/spec_qa_linter.py
+# Lint all YAML specs for governance compliance
+PYTHONPATH=. python3 project/scripts/spec_qa_linter.py
+```
+
+### 4. Minimum Green Gate
+To run the full suite of stabilization and governance checks (including tests and regressions):
+
+```bash
+make minimum-green-gate
 ```
 
 ---

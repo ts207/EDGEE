@@ -19,14 +19,16 @@ class _CanonicalProxyBase(ThresholdDetector):
     timeframe_minutes = 5
     default_severity = "moderate"
     min_spacing = 6
+    EXTREME_THRESHOLD = 4.0
+    MAJOR_THRESHOLD = 2.5
 
     def compute_severity(
         self, idx: int, intensity: float, features: dict[str, pd.Series], **params: Any
     ) -> str:
         del idx, features, params
-        if intensity >= 4.0:
+        if intensity >= self.EXTREME_THRESHOLD:
             return "extreme"
-        if intensity >= 2.5:
+        if intensity >= self.MAJOR_THRESHOLD:
             return "major"
         return "moderate"
 
@@ -53,6 +55,10 @@ class PriceVolImbalanceProxyDetector(_CanonicalProxyBase):
     source_event_type = "ORDERFLOW_IMBALANCE_SHOCK"
     required_columns = _CanonicalProxyBase.required_columns + ("volume", "rv_96")
     min_spacing = 24
+    
+    DEFAULT_RET_QUANTILE = 0.995
+    DEFAULT_RV_QUANTILE = 0.9
+    DEFAULT_VOL_QUANTILE = 0.9
 
     def prepare_features(self, df: pd.DataFrame, **params: Any) -> dict[str, pd.Series]:
         close = pd.to_numeric(df["close"], errors="coerce").astype(float)
@@ -67,17 +73,17 @@ class PriceVolImbalanceProxyDetector(_CanonicalProxyBase):
         rv_z = rolling_mean_std_zscore(rv.ffill(), window=rv_window)
         ret_q = rolling_quantile_threshold(
             ret_abs,
-            quantile=float(params.get("ret_quantile", 0.995)),
+            quantile=float(params.get("ret_quantile", self.DEFAULT_RET_QUANTILE)),
             window=ret_window,
         )
         rv_q = rolling_quantile_threshold(
             rv_z,
-            quantile=float(params.get("rv_quantile", 0.9)),
+            quantile=float(params.get("rv_quantile", self.DEFAULT_RV_QUANTILE)),
             window=rv_window,
         )
         vol_q = rolling_quantile_threshold(
             volume,
-            quantile=float(params.get("volume_quantile", 0.9)),
+            quantile=float(params.get("volume_quantile", self.DEFAULT_VOL_QUANTILE)),
             window=vol_window,
         )
         history_ready = pd.Series(
@@ -87,7 +93,7 @@ class PriceVolImbalanceProxyDetector(_CanonicalProxyBase):
             (ret_abs / ret_q.replace(0.0, np.nan)).fillna(0.0)
             + (rv_z / rv_q.replace(0.0, np.nan)).fillna(0.0)
             + (volume / vol_q.replace(0.0, np.nan)).fillna(0.0)
-        ) / 3.0
+        ) / 3
         return {
             "signal": signal,
             "ret_abs": ret_abs,
@@ -120,6 +126,8 @@ class PriceVolImbalanceProxyDetector(_CanonicalProxyBase):
 class WickReversalProxyDetector(_CanonicalProxyBase):
     event_type = "WICK_REVERSAL_PROXY"
     source_event_type = "SWEEP_STOPRUN"
+    DEFAULT_WICK_QUANTILE = 0.97
+    DEFAULT_RET_QUANTILE = 0.9
 
     def prepare_features(self, df: pd.DataFrame, **params: Any) -> dict[str, pd.Series]:
         close = pd.to_numeric(df["close"], errors="coerce").replace(0.0, np.nan).astype(float)
@@ -131,13 +139,13 @@ class WickReversalProxyDetector(_CanonicalProxyBase):
         wick = ((wick_up + wick_down) / close).abs().astype(float)
         wick_q = rolling_quantile_threshold(
             wick,
-            quantile=float(params.get("wick_quantile", 0.97)),
+            quantile=float(params.get("wick_quantile", self.DEFAULT_WICK_QUANTILE)),
             window=int(params.get("window", 288)),
         )
         ret_abs = close.pct_change(1).abs()
         ret_q = rolling_quantile_threshold(
             ret_abs,
-            quantile=float(params.get("ret_quantile", 0.9)),
+            quantile=float(params.get("ret_quantile", self.DEFAULT_RET_QUANTILE)),
             window=int(params.get("window", 288)),
         )
         return {"wick": wick, "wick_q": wick_q, "ret_abs": ret_abs, "ret_q": ret_q}
@@ -163,6 +171,9 @@ class AbsorptionProxyDetector(_CanonicalProxyBase):
     event_type = "ABSORPTION_PROXY"
     source_event_type = "ABSORPTION_EVENT"
     min_spacing = 96
+    DEFAULT_SPREAD_QUANTILE = 0.965
+    DEFAULT_RV_QUANTILE = 0.9
+    DEFAULT_IMBALANCE_QUANTILE = 0.25
 
     def prepare_features(self, df: pd.DataFrame, **params: Any) -> dict[str, pd.Series]:
         _require_columns(
@@ -174,15 +185,15 @@ class AbsorptionProxyDetector(_CanonicalProxyBase):
         window = int(params.get("window", 288))
         min_history_bars = int(params.get("min_history_bars", 288))
         spread_hi = rolling_quantile_threshold(
-            spread.ffill(), quantile=float(params.get("spread_quantile", 0.965)), window=window
+            spread.ffill(), quantile=float(params.get("spread_quantile", self.DEFAULT_SPREAD_QUANTILE)), window=window
         )
         rv_z = rolling_mean_std_zscore(rv.ffill(), window=window)
         rv_hi = rolling_quantile_threshold(
-            rv_z.ffill(), quantile=float(params.get("rv_quantile", 0.90)), window=window
+            rv_z.ffill(), quantile=float(params.get("rv_quantile", self.DEFAULT_RV_QUANTILE)), window=window
         )
         imbalance_low = rolling_quantile_threshold(
             imbalance_abs.ffill(),
-            quantile=float(params.get("imbalance_abs_quantile", 0.25)),
+            quantile=float(params.get("imbalance_abs_quantile", self.DEFAULT_IMBALANCE_QUANTILE)),
             window=window,
         )
         history_ready = pd.Series(
@@ -221,6 +232,9 @@ class DepthStressProxyDetector(_CanonicalProxyBase):
     event_type = "DEPTH_STRESS_PROXY"
     source_event_type = "DEPTH_COLLAPSE"
     min_spacing = 96
+    DEFAULT_SPREAD_QUANTILE = 0.99
+    DEFAULT_RV_QUANTILE = 0.9
+    DEFAULT_DEPTH_QUANTILE = 0.93
 
     def prepare_features(self, df: pd.DataFrame, **params: Any) -> dict[str, pd.Series]:
         _require_columns(
@@ -234,15 +248,15 @@ class DepthStressProxyDetector(_CanonicalProxyBase):
         window = int(params.get("window", 288))
         min_history_bars = int(params.get("min_history_bars", 288))
         spread_q = rolling_quantile_threshold(
-            spread.ffill(), quantile=float(params.get("spread_quantile", 0.99)), window=window
+            spread.ffill(), quantile=float(params.get("spread_quantile", self.DEFAULT_SPREAD_QUANTILE)), window=window
         )
         rv_z = rolling_mean_std_zscore(rv.ffill(), window=window)
         rv_q = rolling_quantile_threshold(
-            rv_z.ffill(), quantile=float(params.get("rv_quantile", 0.90)), window=window
+            rv_z.ffill(), quantile=float(params.get("rv_quantile", self.DEFAULT_RV_QUANTILE)), window=window
         )
         depth_q = rolling_quantile_threshold(
             depth_depletion.ffill(),
-            quantile=float(params.get("depth_quantile", 0.93)),
+            quantile=float(params.get("depth_quantile", self.DEFAULT_DEPTH_QUANTILE)),
             window=window,
         )
         history_ready = pd.Series(

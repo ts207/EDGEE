@@ -971,7 +971,19 @@
   "issues": [
     {
       "check_id": "detector_hardcoded_params",
+      "message": "Detector implementation has hardcoded numerical thresholds: BASIS_DISLOC",
+      "path": "project/events/families/basis.py",
+      "severity": "warning"
+    },
+    {
+      "check_id": "detector_hardcoded_params",
       "message": "Detector implementation has hardcoded numerical thresholds: CROSS_VENUE_DESYNC",
+      "path": "project/events/families/basis.py",
+      "severity": "warning"
+    },
+    {
+      "check_id": "detector_hardcoded_params",
+      "message": "Detector implementation has hardcoded numerical thresholds: FND_DISLOC",
       "path": "project/events/families/basis.py",
       "severity": "warning"
     },
@@ -1003,7 +1015,7 @@
   "summary": {
     "active_event_count": 69,
     "error_count": 0,
-    "issue_count": 5,
+    "issue_count": 7,
     "maturity_counts": {
       "missing": 4,
       "production": 6,
@@ -1015,6 +1027,6 @@
     "registered_event_count": 69,
     "schema_version": "detector_coverage_audit_v2",
     "status": "passed",
-    "warning_count": 5
+    "warning_count": 7
   }
 }

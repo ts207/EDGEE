@@ -1474,6 +1474,7 @@ events:
       event_spacing_bars: 288
       cooldown_bars: 12
       merge_gap_bars: 0
+      intensity_scale: 60
     templates:
     - mean_reversion
     - continuation
@@ -1492,6 +1493,7 @@ events:
       event_spacing_bars: 288
       cooldown_bars: 12
       merge_gap_bars: 0
+      intensity_scale: 60
     templates:
     - mean_reversion
     - continuation

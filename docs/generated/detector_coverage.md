@@ -3,24 +3,19 @@
 - Status: `passed`
 - Active event specs: `69`
 - Registered detectors: `69`
-- Raw registered detector entries: `66`
-- Issues: `5`
+- Raw registered detector entries: `70`
+- Issues: `0`
 
 ## Maturity Counts
 
-- `missing`: 4
 - `production`: 6
 - `proxy`: 10
 - `specialized`: 3
-- `standard`: 46
+- `standard`: 50
 
 ## Issues
 
-- [warning] Detector implementation has hardcoded numerical thresholds: CROSS_VENUE_DESYNC (project/events/families/basis.py)
-- [warning] Detector implementation has hardcoded numerical thresholds: ORDERFLOW_IMBALANCE_SHOCK (project/events/families/canonical_proxy.py)
-- [warning] Detector implementation has hardcoded numerical thresholds: PRICE_VOL_IMBALANCE_PROXY (project/events/families/canonical_proxy.py)
-- [warning] Detector implementation has hardcoded numerical thresholds: SESSION_CLOSE_EVENT (project/events/families/temporal.py)
-- [warning] Detector implementation has hardcoded numerical thresholds: SESSION_OPEN_EVENT (project/events/families/temporal.py)
+- None
 
 ## Detector Inventory
 
@@ -70,10 +65,10 @@
 - `RANGE_BREAKOUT`: `standard` via `RangeBreakoutDetector`
 - `RANGE_COMPRESSION_END`: `standard` via `RangeCompressionDetector`
 - `SCHEDULED_NEWS_WINDOW_EVENT`: `standard` via `ScheduledNewsDetector`
-- `SEQ_FND_EXTREME_THEN_BREAKOUT`: `missing` via `missing`
-- `SEQ_LIQ_VACUUM_THEN_DEPTH_RECOVERY`: `missing` via `missing`
-- `SEQ_OI_SPIKEPOS_THEN_VOL_SPIKE`: `missing` via `missing`
-- `SEQ_VOL_COMP_THEN_BREAKOUT`: `missing` via `missing`
+- `SEQ_FND_EXTREME_THEN_BREAKOUT`: `standard` via `EventSequenceDetector`
+- `SEQ_LIQ_VACUUM_THEN_DEPTH_RECOVERY`: `standard` via `EventSequenceDetector`
+- `SEQ_OI_SPIKEPOS_THEN_VOL_SPIKE`: `standard` via `EventSequenceDetector`
+- `SEQ_VOL_COMP_THEN_BREAKOUT`: `standard` via `EventSequenceDetector`
 - `SESSION_CLOSE_EVENT`: `standard` via `SessionCloseDetector`
 - `SESSION_OPEN_EVENT`: `standard` via `SessionOpenDetector`
 - `SLIPPAGE_SPIKE_EVENT`: `standard` via `SlippageSpikeDetector`
