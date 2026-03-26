@@ -237,6 +237,8 @@ class FndDislocDetector(BasisDislocationDetector):
 
 class SpotPerpBasisShockDetector(BasisDislocationDetector):
     event_type = "SPOT_PERP_BASIS_SHOCK"
+    SHOCK_Q_DEFAULT = 0.9
+    SHOCK_FLOOR_DEFAULT = 0.75
 
     def prepare_features(self, df: pd.DataFrame, **params: Any) -> dict[str, pd.Series]:
         features = super().prepare_features(df, **params)

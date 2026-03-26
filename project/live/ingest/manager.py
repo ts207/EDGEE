@@ -85,7 +85,7 @@ class LiveDataManager:
                         "is_final": True,
                         "timestamp": pd.to_datetime(k[0], unit="ms", utc=True),
                     }
-                    self.kline_queue.put_nowait(event)
+                    self._enqueue_threadsafe(self.kline_queue, event, "Kline")
             except Exception as e:
                 _LOG.error(f"Failed to backfill {symbol}: {e}")
 

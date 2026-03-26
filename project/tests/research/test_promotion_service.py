@@ -1,0 +1,203 @@
+from __future__ import annotations
+
+import json
+from pathlib import Path
+from types import SimpleNamespace
+
+import pandas as pd
+
+from project.research.services import promotion_service as svc
+
+
+def test_promotion_rejection_classification_and_annotations() -> None:
+    audit_df = pd.DataFrame(
+        [
+            {
+                "candidate_id": "c1",
+                "promotion_fail_reason_primary": "spec hash mismatch",
+                "promotion_fail_gate_primary": "contract_gate",
+                "reject_reason": "",
+                "promotion_metrics_trace": json.dumps({"contract": {"passed": False}}),
+            },
+            {
+                "candidate_id": "c2",
+                "promotion_fail_reason_primary": "low expectancy after_cost",
+                "promotion_fail_gate_primary": "economics_gate",
+                "reject_reason": "turnover",
+                "promotion_metrics_trace": json.dumps({"economics": {"passed": False}, "stability": {"passed": False}}),
+            },
+        ]
+    )
+    annotated = svc._annotate_promotion_audit_decisions(audit_df)
+    assert list(annotated["rejection_classification"]) == ["contract_failure", "weak_economics"]
+    assert list(annotated["recommended_next_action"]) == ["repair_pipeline", "stop_or_reframe"]
+    assert annotated.loc[0, "failed_gate_count"] == 1
+    assert annotated.loc[1, "failed_gate_count"] == 2
+
+    diagnostics = svc._build_promotion_decision_diagnostics(
+        annotated.assign(promotion_decision=["rejected", "rejected"])
+    )
+    assert diagnostics["candidates_total"] == 2
+    assert diagnostics["rejected_count"] == 2
+    assert diagnostics["primary_fail_gate_counts"]["contract_gate"] == 1
+    assert diagnostics["failed_stage_counts"]["economics"] == 1
+
+
+def test_resolve_promotion_policy_switches_by_profile(monkeypatch, tmp_path: Path) -> None:
+    contract = SimpleNamespace(
+        min_net_expectancy_bps=3.0,
+        max_fee_plus_slippage_bps=7.0,
+        max_daily_turnover_multiple=2.0,
+        require_retail_viability=True,
+        require_low_capital_contract=True,
+        min_trade_count=20,
+    )
+    base_config = svc.PromotionConfig(
+        run_id="run-1",
+        symbols="BTCUSDT",
+        out_dir=tmp_path / "out",
+        max_q_value=0.05,
+        min_events=5,
+        min_stability_score=0.5,
+        min_sign_consistency=0.5,
+        min_cost_survival_ratio=0.5,
+        max_negative_control_pass_rate=0.25,
+        min_tob_coverage=0.5,
+        require_hypothesis_audit=True,
+        allow_missing_negative_controls=False,
+        require_multiplicity_diagnostics=True,
+        min_dsr=1.0,
+        max_overlap_ratio=0.5,
+        max_profile_correlation=0.5,
+        allow_discovery_promotion=False,
+        program_id="prog-1",
+        retail_profile="capital_constrained",
+        objective_name="retail_profitability",
+        objective_spec=None,
+        retail_profiles_spec=None,
+        promotion_profile="auto",
+    )
+
+    research = svc._resolve_promotion_policy(
+        config=base_config,
+        contract=contract,
+        source_run_mode="research",
+        project_root=tmp_path,
+    )
+    assert research.promotion_profile == "research"
+    assert research.base_min_events == 5
+    assert research.dynamic_min_events == {}
+    assert research.min_net_expectancy_bps == 1.5
+    assert research.require_retail_viability is False
+
+    monkeypatch.setattr(svc, "_load_dynamic_min_events_by_event", lambda root: {"BASIS_DISLOC": 25})
+    deploy = svc._resolve_promotion_policy(
+        config=base_config,
+        contract=contract,
+        source_run_mode="production",
+        project_root=tmp_path,
+    )
+    assert deploy.promotion_profile == "deploy"
+    assert deploy.base_min_events == 20
+    assert deploy.dynamic_min_events["BASIS_DISLOC"] == 25
+    assert deploy.require_retail_viability is True
+
+
+def test_execute_promotion_success_path(monkeypatch, tmp_path: Path) -> None:
+    candidates_df = pd.DataFrame(
+        {
+            "candidate_id": ["cand-1"],
+            "event_type": ["BASIS_DISLOC"],
+            "confirmatory_locked": [True],
+            "frozen_spec_hash": ["spec-hash"],
+            "symbol": ["BTCUSDT"],
+        }
+    )
+    audit_df = pd.DataFrame(
+        {
+            "candidate_id": ["cand-1"],
+            "event_type": ["BASIS_DISLOC"],
+            "promotion_decision": ["promoted"],
+            "promotion_track": ["deploy"],
+            "rank_score": [1.0],
+            "rejection_reasons": [""],
+            "policy_version": ["v1"],
+            "bundle_version": ["1"],
+            "is_reduced_evidence": [False],
+            "promotion_metrics_trace": [json.dumps({"economics": {"passed": True, "observed": {"x": 1}, "thresholds": {"y": 2}}})],
+            "evidence_bundle_json": [json.dumps({"candidate_id": "cand-1", "event_type": "BASIS_DISLOC", "promotion_decision": "promoted"})],
+        }
+    )
+    promoted_df = pd.DataFrame({"candidate_id": ["cand-1"], "event_type": ["BASIS_DISLOC"]})
+    writes = {}
+
+    monkeypatch.setattr(svc, "load_run_manifest", lambda run_id: {
+        "run_mode": "production",
+        "discovery_profile": "standard",
+        "confirmatory_rerun_run_id": "rerun-1",
+        "candidate_origin_run_id": "origin-1",
+        "program_id": "prog-1",
+        "symbols": "BTCUSDT",
+    })
+    monkeypatch.setattr(svc, "resolve_objective_profile_contract", lambda **kwargs: SimpleNamespace(
+        min_net_expectancy_bps=3.0,
+        max_fee_plus_slippage_bps=7.0,
+        max_daily_turnover_multiple=2.0,
+        require_retail_viability=True,
+        require_low_capital_contract=True,
+        min_trade_count=10,
+    ))
+    monkeypatch.setattr(svc, "ontology_spec_hash", lambda root: "spec-hash")
+    monkeypatch.setattr(svc, "_load_gates_spec", lambda root: {})
+    monkeypatch.setattr(svc, "_load_hypothesis_index", lambda **kwargs: {})
+    monkeypatch.setattr(svc, "_load_negative_control_summary", lambda run_id: {})
+    monkeypatch.setattr(svc, "_hydrate_edge_candidates_from_phase2", lambda **kwargs: candidates_df.copy())
+    monkeypatch.setattr(svc, "promote_candidates", lambda **kwargs: (audit_df.copy(), promoted_df.copy(), {"seed": 1}))
+    monkeypatch.setattr(svc, "build_promotion_statistical_audit", lambda **kwargs: audit_df.copy())
+    monkeypatch.setattr(svc, "stabilize_promoted_output_schema", lambda **kwargs: promoted_df.copy())
+    monkeypatch.setattr(svc, "serialize_evidence_bundles", lambda bundles, path: writes.setdefault("bundles", list(bundles)))
+    monkeypatch.setattr(svc, "bundle_to_flat_record", lambda bundle: dict(bundle))
+    monkeypatch.setattr(svc, "write_promotion_reports", lambda **kwargs: writes.update(kwargs))
+    monkeypatch.setattr(svc, "start_manifest", lambda *args, **kwargs: {"status": "started"})
+    monkeypatch.setattr(svc, "finalize_manifest", lambda manifest, status, **kwargs: manifest.update({"status": status, **kwargs}))
+
+    config = svc.PromotionConfig(
+        run_id="run-1",
+        symbols="BTCUSDT",
+        out_dir=tmp_path / "out",
+        max_q_value=0.05,
+        min_events=5,
+        min_stability_score=0.5,
+        min_sign_consistency=0.5,
+        min_cost_survival_ratio=0.5,
+        max_negative_control_pass_rate=0.25,
+        min_tob_coverage=0.5,
+        require_hypothesis_audit=True,
+        allow_missing_negative_controls=False,
+        require_multiplicity_diagnostics=True,
+        min_dsr=1.0,
+        max_overlap_ratio=0.5,
+        max_profile_correlation=0.5,
+        allow_discovery_promotion=False,
+        program_id="prog-1",
+        retail_profile="capital_constrained",
+        objective_name="retail_profitability",
+        objective_spec=None,
+        retail_profiles_spec=None,
+        promotion_profile="auto",
+    )
+
+    result = svc.execute_promotion(config)
+    assert result.exit_code == 0
+    assert result.diagnostics["decision_summary"]["promoted_count"] == 1
+    assert list(result.audit_df["rejection_classification"]) == ["unclassified"]
+    assert writes["evidence_bundle_summary"].shape[0] == 1
+
+
+
+def test_trace_helpers_and_scope_classification() -> None:
+    assert svc._trace_payload('{"a": {"passed": false}}') == {"a": {"passed": False}}
+    assert svc._failed_stages_from_trace({"x": {"passed": False}, "y": {"passed": True}}) == ["x"]
+    row = {"reject_reason": "placebo | overlap", "weakest_fail_stage": ""}
+    assert svc._classify_rejection(row, []) == "scope_mismatch"
+    assert svc._recommended_next_action_for_rejection("scope_mismatch") == "narrow_scope"

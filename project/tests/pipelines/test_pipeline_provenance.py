@@ -1,0 +1,103 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+from project.pipelines import pipeline_provenance as prov
+
+
+def test_config_digest_is_order_independent(tmp_path: Path) -> None:
+    a = tmp_path / "a.yaml"
+    b = tmp_path / "b.yaml"
+    a.write_text("alpha: 1\n", encoding="utf-8")
+    b.write_text("beta: 2\n", encoding="utf-8")
+
+    digest1 = prov.config_digest([str(a), str(b)])
+    digest2 = prov.config_digest([str(b), str(a)])
+    assert digest1 == digest2
+
+    b.write_text("beta: 3\n", encoding="utf-8")
+    digest3 = prov.config_digest([str(a), str(b)])
+    assert digest3 != digest1
+
+
+def test_data_fingerprint_is_deterministic_and_sensitive_to_file_changes(tmp_path: Path, monkeypatch) -> None:
+    project_root = tmp_path / "project"
+    data_root = tmp_path / "data"
+    (data_root / "lake" / "raw" / "binance" / "perp" / "BTCUSDT").mkdir(parents=True)
+    (data_root / "lake" / "raw" / "binance" / "spot" / "BTCUSDT").mkdir(parents=True)
+    perps = data_root / "lake" / "raw" / "binance" / "perp" / "BTCUSDT" / "sample.csv"
+    spots = data_root / "lake" / "raw" / "binance" / "spot" / "BTCUSDT" / "sample.csv"
+    perps.write_text("x\n1\n", encoding="utf-8")
+    spots.write_text("x\n2\n", encoding="utf-8")
+
+    monkeypatch.setattr(prov, "feature_schema_metadata", lambda: ("v-test", "hash-test"))
+    digest1, payload1 = prov.data_fingerprint(["btcusdt"], "run-1", project_root=project_root, data_root=data_root)
+    digest2, payload2 = prov.data_fingerprint(["BTCUSDT"], "run-1", project_root=project_root, data_root=data_root)
+    assert digest1 == digest2
+    assert payload1["lake"]["file_count"] == 2
+    assert payload1["feature_schema"]["version"] == "v-test"
+    assert payload1["manifest_hash"] == payload2["manifest_hash"]
+    assert payload1["lake"] == payload2["lake"]
+    assert payload1["feature_schema"] == payload2["feature_schema"]
+
+    perps.write_text("x\n9\n", encoding="utf-8")
+    digest3, _ = prov.data_fingerprint(["BTCUSDT"], "run-1", project_root=project_root, data_root=data_root)
+    assert digest3 != digest1
+
+
+def test_manifest_roundtrip_and_resume_resolution(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr(prov, "_get_data_root", lambda: tmp_path)
+    manifest = {"run_id": "run-1", "value": 7}
+    prov.write_run_manifest("run-1", manifest)
+    assert prov.read_run_manifest("run-1") == manifest
+
+    manifest_path = tmp_path / "runs" / "run-1" / "run_manifest.json"
+    manifest_path.write_text(
+        '{"ontology_spec_hash":"abc","effective_config_hash":"cfg","failed_stage_instance":"stage2"}',
+        encoding="utf-8",
+    )
+    existing, ontology_hash, resume_from_index = prov.resolve_existing_manifest_state(
+        existing_manifest_path=manifest_path,
+        ontology_hash="abc",
+        effective_config_hash="cfg",
+        allow_ontology_hash_mismatch=False,
+        planned_stage_instances=["stage1", "stage2", "stage3"],
+        resume_from_failed_stage=True,
+    )
+    assert ontology_hash == "abc"
+    assert existing["failed_stage_instance"] == "stage2"
+    assert resume_from_index == 1
+
+
+
+def test_lineage_and_metadata_helpers(tmp_path: Path, monkeypatch) -> None:
+    manifest = {"run_id": "run-1", "emit_run_hash": True, "payload": 3}
+    prov.maybe_emit_run_hash(manifest)
+
+    manifest2 = {"run_id": "run-2"}
+    prov.refresh_runtime_lineage_fields(
+        manifest2,
+        determinism_replay_checks_requested=True,
+        oms_replay_checks_requested=True,
+    )
+    assert manifest2["determinism_status"] == "requested"
+    assert manifest2["oms_replay_status"] == "requested"
+    assert "runtime_lineage_refreshed_at" in manifest2
+
+    objective_path = tmp_path / "objective.yaml"
+    objective_path.write_text("objective:\n  name: sample\n  min_net_expectancy_bps: 2.5\n", encoding="utf-8")
+    objective, objective_hash, resolved_path = prov.objective_spec_metadata("ignored", str(objective_path))
+    assert objective["name"] == "sample"
+    assert objective_hash != "unknown_hash"
+    assert resolved_path == str(objective_path)
+
+    retail_path = tmp_path / "retail_profiles.yaml"
+    retail_path.write_text(
+        "profiles:\n  sample:\n    max_position_usd: 1000\n",
+        encoding="utf-8",
+    )
+    profile, profile_hash, resolved_path = prov.retail_profile_metadata("sample", str(retail_path))
+    assert profile["id"] == "sample"
+    assert profile["max_position_usd"] == 1000
+    assert profile_hash != "unknown_hash"
+    assert resolved_path == str(retail_path)
