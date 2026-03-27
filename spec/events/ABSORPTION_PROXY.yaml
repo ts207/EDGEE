@@ -27,4 +27,4 @@ expected_behavior:
   - Spread compresses back to baseline
   disabled_regimes:
   - 'SPREAD_BLOWOUT active: spread elevated, unreliable signal'
-cluster_id: untagged
+cluster_id: liquidity_stress

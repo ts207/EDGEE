@@ -24,4 +24,4 @@ expected_behavior:
   - Momentum diverges further
   disabled_regimes:
   - 'Low volume: flow signals unreliable'
-cluster_id: untagged
+cluster_id: exhaustion

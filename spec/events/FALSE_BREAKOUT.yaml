@@ -18,4 +18,4 @@ expected_behavior:
   - Range expands significantly beyond breakout level
   disabled_regimes:
   - 'Chop regime: no clear trend direction'
-cluster_id: untagged
+cluster_id: trend_momentum

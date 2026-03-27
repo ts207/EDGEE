@@ -7,3 +7,4 @@ parameters:
   op: confirm
   max_gap_bars: 6
 canonical_family: LIQUIDITY_DISLOCATION
+cluster_id: liquidity_stress

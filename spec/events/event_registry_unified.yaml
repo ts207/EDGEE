@@ -97,14 +97,47 @@ families:
     - tail_risk_avoid
     - structural_regime_shift
   SEQ_FND_EXTREME_THEN_BREAKOUT:
-    parameters: {}
+    canonical_family: POSITIONING_EXTREMES
+    templates:
+    - reversal_or_squeeze
+    - mean_reversion
+    horizons:
+    - 60m
+    max_candidates_per_run: 500
   SEQ_LIQ_VACUUM_THEN_DEPTH_RECOVERY:
-    parameters: {}
+    canonical_family: LIQUIDITY_DISLOCATION
+    templates:
+    - mean_reversion
+    - continuation
+    horizons:
+    - 15m
+    max_candidates_per_run: 500
   SEQ_OI_SPIKEPOS_THEN_VOL_SPIKE:
-    parameters: {}
+    canonical_family: POSITIONING_EXTREMES
+    templates:
+    - reversal_or_squeeze
+    - mean_reversion
+    horizons:
+    - 60m
+    max_candidates_per_run: 500
   SEQ_VOL_COMP_THEN_BREAKOUT:
-    parameters: {}
-  STATISTICAL_DISLOCATION:
+    canonical_family: VOLATILITY_TRANSITION
+    templates:
+    - mean_reversion
+    - continuation
+    - trend_continuation
+    horizons:
+    - 60m
+    max_candidates_per_run: 500
+  INT_DEPTH_VACUUM_CONFIRM:
+    canonical_family: LIQUIDITY_DISLOCATION
+    templates:
+    - mean_reversion
+    - continuation
+    horizons:
+    - 15m
+    max_candidates_per_run: 500
+  SESSION_CLOSE_EVENT:
     parameters: {}
     templates:
     - mean_reversion
@@ -223,10 +256,10 @@ events:
       synthetic_coverage: covered
       canonical_family: VOLATILITY_TRANSITION
       vol_lookback_window: 288
-      compression_ratio_max: 0.8
+      compression_ratio_max: 0.95
       compression_window: 6
-      min_breakout_distance: 0.0025
-      expansion_quantile: 0.85
+      min_breakout_distance: 0.0005
+      expansion_quantile: 0.70
       cooldown_bars: 12
       merge_gap_bars: 0
     templates:
@@ -457,6 +490,8 @@ events:
       cooldown_bars: 12
       merge_gap_bars: 0
       min_volume_quantile: 0.2
+      spread_quantile: 0.70
+      rv_quantile: 0.50
     templates:
     - mean_reversion
     - continuation
@@ -940,6 +975,14 @@ events:
     - 15m
     - 60m
     max_candidates_per_run: 500
+  INT_DEPTH_VACUUM_CONFIRM:
+    canonical_family: LIQUIDITY_DISLOCATION
+    templates:
+    - mean_reversion
+    - continuation
+    horizons:
+    - 15m
+    max_candidates_per_run: 500
   LIQUIDATION_CASCADE:
     canonical_family: POSITIONING_EXTREMES
     reports_dir: liquidation_cascade
@@ -1147,7 +1190,8 @@ events:
       merge_gap_bars: 2
       cooldown_bars: 12
       anchor_rule: max_intensity
-      min_occurrences: 3
+      min_occurrences: 1
+      shock_quantile: 0.90
     templates:
     - mean_reversion
     - stop_run_repair
@@ -1417,45 +1461,38 @@ events:
     - 15m
     max_candidates_per_run: 300
   SEQ_FND_EXTREME_THEN_BREAKOUT:
-    canonical_family: SEQ_FND_EXTREME_THEN_BREAKOUT
-    reports_dir: event_sequences
-    events_file: event_sequences.parquet
-    signal_column: seq_fnd_extreme_then_breakout_event
-    parameters:
-      synthetic_coverage: covered
-      canonical_family: POSITIONING_EXTREMES
-      max_gap_bars: 96
-      cooldown_bars: 24
+    canonical_family: POSITIONING_EXTREMES
+    templates:
+    - reversal_or_squeeze
+    - mean_reversion
+    horizons:
+    - 60m
+    max_candidates_per_run: 500
   SEQ_LIQ_VACUUM_THEN_DEPTH_RECOVERY:
-    canonical_family: SEQ_LIQ_VACUUM_THEN_DEPTH_RECOVERY
-    reports_dir: event_sequences
-    events_file: event_sequences.parquet
-    signal_column: seq_liq_vacuum_then_depth_recovery_event
-    parameters:
-      synthetic_coverage: covered
-      canonical_family: LIQUIDITY_DISLOCATION
-      max_gap_bars: 48
-      cooldown_bars: 24
+    canonical_family: LIQUIDITY_DISLOCATION
+    templates:
+    - mean_reversion
+    - continuation
+    horizons:
+    - 15m
+    max_candidates_per_run: 500
   SEQ_OI_SPIKEPOS_THEN_VOL_SPIKE:
-    canonical_family: SEQ_OI_SPIKEPOS_THEN_VOL_SPIKE
-    reports_dir: event_sequences
-    events_file: event_sequences.parquet
-    signal_column: seq_oi_spikepos_then_vol_spike_event
-    parameters:
-      synthetic_coverage: covered
-      canonical_family: POSITIONING_EXTREMES
-      max_gap_bars: 48
-      cooldown_bars: 24
+    canonical_family: POSITIONING_EXTREMES
+    templates:
+    - reversal_or_squeeze
+    - mean_reversion
+    horizons:
+    - 60m
+    max_candidates_per_run: 500
   SEQ_VOL_COMP_THEN_BREAKOUT:
-    canonical_family: SEQ_VOL_COMP_THEN_BREAKOUT
-    reports_dir: event_sequences
-    events_file: event_sequences.parquet
-    signal_column: seq_vol_comp_then_breakout_event
-    parameters:
-      synthetic_coverage: covered
-      canonical_family: VOLATILITY_TRANSITION
-      max_gap_bars: 48
-      cooldown_bars: 24
+    canonical_family: VOLATILITY_TRANSITION
+    templates:
+    - mean_reversion
+    - continuation
+    - trend_continuation
+    horizons:
+    - 60m
+    max_candidates_per_run: 500
   SESSION_CLOSE_EVENT:
     canonical_family: TEMPORAL_STRUCTURE
     reports_dir: temporal_structure

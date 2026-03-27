@@ -24,7 +24,7 @@ def load_ontology_events() -> Dict[str, Dict[str, Any]]:
     for event_dir in event_dirs:
         if not event_dir.exists():
             continue
-        for p in event_dir.glob("*.yaml"):
+        for p in event_dir.rglob("*.yaml"):
             spec = load_yaml(p)
             if not isinstance(spec, dict):
                 continue

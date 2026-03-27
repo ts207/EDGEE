@@ -9,7 +9,9 @@ from project.events.detectors.threshold import ThresholdDetector
 from project.events.detectors.composite import CompositeDetector
 from project.events.shared import EVENT_COLUMNS, emit_event, format_event_id
 from project.research.analyzers import run_analyzer_suite
-from project.events.detectors.registry import register_detector
+from project.events.detectors.registry import register_detector, get_detector
+from project.events.detectors.interaction import EventInteractionDetector
+from project.spec_validation import load_ontology_events
 
 
 class CrossAssetInteractionDetector(CompositeDetector):
@@ -47,6 +49,38 @@ _DETECTORS = {
     "CROSS_ASSET_INTERACTION": CrossAssetInteractionDetector,
 }
 
+# Auto-load interaction events from spec/events/interaction/
+try:
+    all_specs = load_ontology_events()
+    for et, spec in all_specs.items():
+        if et.startswith("INT_"):
+            params = spec.get("parameters", {})
+            class_name = f"InteractionDetector_{et}"
+            
+            # Create a closure-safe dynamic class
+            def make_detector_cls(name, left, right, o, l):
+                class DynamicInteractionDetector(EventInteractionDetector):
+                    def __init__(self, *args, **kwargs):
+                        super().__init__(
+                            interaction_name=name,
+                            left_id=left,
+                            right_id=right,
+                            op=o,
+                            lag=l
+                        )
+                return DynamicInteractionDetector
+            
+            _DETECTORS[et] = make_detector_cls(
+                et,
+                params.get("left_event", ""),
+                params.get("right_event", ""),
+                params.get("op", "confirm"),
+                int(params.get("max_gap_bars", 6))
+            )
+except Exception as e:
+    import logging
+    logging.getLogger(__name__).warning(f"Failed to auto-load interaction events: {e}")
+
 for et, cls in _DETECTORS.items():
     register_detector(et, cls)
 
@@ -54,8 +88,7 @@ for et, cls in _DETECTORS.items():
 def detect_interaction_family(
     df: pd.DataFrame, symbol: str, event_type: str = "CROSS_ASSET_INTERACTION", **params: Any
 ) -> pd.DataFrame:
-    from project.events.detectors.registry import get_detector
-    detector = get_detector(event_type)
-    if detector is None:
+    detector_cls = _DETECTORS.get(event_type)
+    if detector_cls is None:
         raise ValueError(f"Unknown interaction event type: {event_type}")
-    return detector.detect(df, symbol=symbol, **params)
+    return detector_cls().detect(df, symbol=symbol, **params)

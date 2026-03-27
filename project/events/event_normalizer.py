@@ -145,6 +145,14 @@ def normalize_phase1_events(
     out["exit_ts"] = out["exit_ts"].where(out["exit_ts"].notna(), out["enter_ts"])
     out["exit_ts"] = out["exit_ts"].where(out["exit_ts"] >= out["enter_ts"], out["enter_ts"])
 
+    if "direction" in out.columns:
+        out["direction"] = out["direction"].fillna(_DIRECTION_DEFAULT).astype(str).str.lower().str.strip()
+    
+    if "evt_signal_intensity" not in out.columns and "event_score" in out.columns:
+        out["evt_signal_intensity"] = out["event_score"]
+    elif "evt_signal_intensity" not in out.columns:
+        out["evt_signal_intensity"] = 0.0
+
     if "symbol" not in out.columns:
         out["symbol"] = "ALL"
     out["symbol"] = out["symbol"].fillna("ALL").astype(str).str.upper().replace("", "ALL")
@@ -253,6 +261,7 @@ def normalize_registry_events_frame(events: pd.DataFrame) -> pd.DataFrame:
     out["symbol"] = out["symbol"].fillna("ALL").astype(str).str.upper().replace("", "ALL")
     out["event_id"] = out["event_id"].fillna("").astype(str)
     out["features_at_event"] = out["features_at_event"].fillna("{}").astype(str)
+    out["evt_signal_intensity"] = pd.to_numeric(out.get("evt_signal_intensity"), errors="coerce").astype(float).fillna(out.get("event_score", 0.0))
     for col in ("direction",):
         out[col] = out[col].fillna(_DIRECTION_DEFAULT).astype(str)
     for col in ("sign",):

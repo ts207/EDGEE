@@ -8,7 +8,7 @@ detector_contract: true
 parameters:
   window_end: 32
   anchor_mode: basis_shock
-  anchor_quantile: 0.99
+  anchor_quantile: 0.995
   revert_z: 0.5
   basis_lookback: 96
   persistence_bars: 2

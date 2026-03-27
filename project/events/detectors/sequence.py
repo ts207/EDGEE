@@ -58,16 +58,18 @@ class EventSequenceDetector(BaseEventDetector):
                 mapping = {
                     "FND_EXTREME": "FND_DISLOC",
                     "LIQ_VACUUM": "LIQUIDITY_VACUUM",
-                    "DEPTH_RECOVERY": "DEPTH_COLLAPSE", # Placeholder/Proxy
+                    "DEPTH_RECOVERY": "VOL_RELAXATION_START", # Better proxy for recovery than collapse
                     "OI_SPIKEPOS": "OI_SPIKE_POSITIVE",
                     "VOL_COMP": "RANGE_COMPRESSION_END",
+                    "BREAKOUT": "BREAKOUT_TRIGGER",
+                    "EXHAUST": "FORCED_FLOW_EXHAUSTION",
                 }
                 if self.anchor_event is None:
                     self.anchor_event = mapping.get(parts[0], parts[0])
                 if self.trigger_event is None:
                     self.trigger_event = mapping.get(parts[1], parts[1])
 
-        self.max_window = int(params.get("max_gap_bars", params.get("max_window", self.max_window)))
+        self.max_window = int(params.get("max_gap_bars", params.get("sequence_window", self.max_window)))
         self._spec_resolved = True
 
     def _ensure_detectors(self):
@@ -99,12 +101,17 @@ class EventSequenceDetector(BaseEventDetector):
         anchor_mask = self._anchor_detector.compute_raw_mask(df, features=anchor_features, **merged_params)
         trigger_mask = self._trigger_detector.compute_raw_mask(df, features=trigger_features, **merged_params)
         
-        return {
+        # Namespace features to avoid collisions (e.g. 'close', 'rv_96')
+        features = {
             "anchor_mask": anchor_mask,
             "trigger_mask": trigger_mask,
-            **anchor_features,
-            **trigger_features,
         }
+        for k, v in anchor_features.items():
+            features[f"anchor_{k}"] = v
+        for k, v in trigger_features.items():
+            features[f"trigger_{k}"] = v
+            
+        return features
 
     def compute_raw_mask(
         self, df: pd.DataFrame, *, features: Mapping[str, pd.Series], **params: Any
@@ -112,7 +119,7 @@ class EventSequenceDetector(BaseEventDetector):
         anchor_mask = features["anchor_mask"].fillna(False).astype(bool)
         trigger_mask = features["trigger_mask"].fillna(False).astype(bool)
         
-        window = int(params.get("sequence_window", self.max_window))
+        window = int(params.get("max_gap_bars", params.get("sequence_window", self.max_window)))
         
         # Sequence logic: A occurs at t, B occurs at t+k where 1 <= k <= window
         any_prior_anchor = anchor_mask.shift(1).rolling(window=window, min_periods=1).max().fillna(0).astype(bool)
@@ -124,11 +131,16 @@ class EventSequenceDetector(BaseEventDetector):
     ) -> pd.Series:
         # Intensity is the average of both intensities at their respective times
         self._ensure_detectors()
-        a_intensity = self._anchor_detector.compute_intensity(df, features=features, **params)
-        t_intensity = self._trigger_detector.compute_intensity(df, features=features, **params)
+        
+        # Reconstruct namespaced features for individual detectors
+        anchor_raw_features = {k.replace("anchor_", ""): v for k, v in features.items() if k.startswith("anchor_")}
+        trigger_raw_features = {k.replace("trigger_", ""): v for k, v in features.items() if k.startswith("trigger_")}
+        
+        a_intensity = self._anchor_detector.compute_intensity(df, features=anchor_raw_features, **params)
+        t_intensity = self._trigger_detector.compute_intensity(df, features=trigger_raw_features, **params)
         
         # Shift anchor intensity forward to match trigger time (approximate/ma)
-        window = int(params.get("sequence_window", self.max_window))
+        window = int(params.get("max_gap_bars", params.get("sequence_window", self.max_window)))
         a_intensity_recent = a_intensity.shift(1).rolling(window=window, min_periods=1).max()
         
         return (a_intensity_recent.fillna(0.0) + t_intensity.fillna(0.0)) / 2.0
@@ -136,4 +148,5 @@ class EventSequenceDetector(BaseEventDetector):
     def compute_direction(self, idx: int, features: Mapping[str, pd.Series], **params: Any) -> str:
         # Direction follows the trigger event
         self._ensure_detectors()
-        return self._trigger_detector.compute_direction(idx, features, **params)
+        trigger_raw_features = {k.replace("trigger_", ""): v for k, v in features.items() if k.startswith("trigger_")}
+        return self._trigger_detector.compute_direction(idx, trigger_raw_features, **params)

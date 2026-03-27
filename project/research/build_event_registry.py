@@ -23,6 +23,8 @@ from project.events.registry import (
     write_event_registry_artifacts,
     registry_contract_check,
 )
+from project.events.scoring import score_event_frame
+from project.events.arbitration import arbitrate_events
 from project.specs.manifest import finalize_manifest, start_manifest
 from project.schemas.data_contracts import EventRegistrySchema
 
@@ -113,6 +115,19 @@ def main() -> int:
             selected_event_types=selected_event_types,
         )
         logging.info(f"Merged total events: {len(events)}")
+
+        if not events.empty:
+            logging.info("Scoring event quality")
+            events = score_event_frame(events)
+            
+            logging.info("Applying event arbitration")
+            arb_result = arbitrate_events(events)
+            events = arb_result.events
+            if not arb_result.composite_events.empty:
+                logging.info(f"Adding {len(arb_result.composite_events)} composite events")
+                events = pd.concat([events, arb_result.composite_events], ignore_index=True)
+            if not arb_result.suppressed.empty:
+                logging.info(f"Suppressed {len(arb_result.suppressed)} events via arbitration")
 
         if args.event_type == "all":
             logging.info("Building event flags for all event types")

@@ -34,12 +34,32 @@ def load_event_frame(*, data_root: Path, run_id: str, event_type: str) -> pd.Dat
     spec = EVENT_REGISTRY_SPECS.get(str(event_type).strip().upper())
     if spec is None:
         return pd.DataFrame()
+    
+    # Try the standard report path first
     report_dir = Path(data_root) / "reports" / spec.reports_dir / run_id
     report_path = report_dir / spec.events_file
     csv_path = report_path.with_suffix(".csv")
     source_path = report_path if report_path.exists() else csv_path
+    
+    # Try event-type specific files (e.g., climax_volume_bar_edge_events.parquet)
     if not source_path.exists():
+        event_type_lower = str(event_type).strip().lower().replace("_", "_")
+        for pattern in [f"{event_type_lower}_events.parquet", f"{event_type_lower}_edge_events.parquet"]:
+            alt_path = report_dir / pattern
+            if alt_path.exists():
+                source_path = alt_path
+                break
+    
+    if not source_path.exists():
+        # Fallback: look in the run's events directory
+        events_path = Path(data_root) / "events" / run_id / "events.parquet"
+        if events_path.exists():
+            frame = read_parquet(events_path)
+            if "event_type" in frame.columns:
+                frame = frame[frame["event_type"].astype(str).str.upper() == str(event_type).strip().upper()].copy()
+            return frame.reset_index(drop=True) if not frame.empty else pd.DataFrame()
         return pd.DataFrame()
+    
     frame = read_parquet(source_path)
     if frame.empty:
         return frame

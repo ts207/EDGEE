@@ -18,6 +18,8 @@ DETECTOR_FAMILY_MODULES: Tuple[str, ...] = (
     "project.events.families.trend",
     "project.events.families.statistical",
     "project.events.families.exhaustion",
+    "project.events.families.sequence",
+    "project.events.families.interaction",
     "project.events.detectors.extended_detectors",
 )
 

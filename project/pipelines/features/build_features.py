@@ -142,7 +142,7 @@ def _load_spot_close_reference(
     timeframe: str = "5m",
 ) -> pd.DataFrame:
     bars_dataset = bars_dataset_name(timeframe)
-    # Use consistent lake path logic
+    # Use consistent lake path logic - try cleaned first, then raw spot
     candidates = [
         run_scoped_lake_path(data_root, run_id, "cleaned", "spot", symbol, bars_dataset),
         data_root / "lake" / "cleaned" / "spot" / symbol / bars_dataset,
@@ -157,6 +157,23 @@ def _load_spot_close_reference(
                     return df[["timestamp", "close"]].rename(columns={"close": "spot_close"})
         except Exception:
             pass
+    
+    # Fallback: try loading from raw spot OHLCV data
+    raw_candidates = [
+        data_root / "lake" / "runs" / run_id / "raw" / "binance" / "spot" / symbol / ("ohlcv_" + timeframe),
+        data_root / "lake" / "raw" / "binance" / "spot" / symbol / ("ohlcv_" + timeframe),
+    ]
+    raw_dir = choose_partition_dir(raw_candidates)
+    if raw_dir:
+        try:
+            files = list_parquet_files(raw_dir)
+            if files:
+                df = read_parquet(files)
+                if "timestamp" in df.columns and "close" in df.columns:
+                    return df[["timestamp", "close"]].rename(columns={"close": "spot_close"})
+        except Exception:
+            pass
+    
     return pd.DataFrame(columns=["timestamp", "spot_close"])
 
 

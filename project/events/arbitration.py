@@ -135,7 +135,57 @@ def arbitrate_events(
             columns=["_arb_prio"]
         )
 
+    # Implement composite event emission
+    composite_rows: List[Dict[str, Any]] = []
+    for comp in compat_spec.get("composite_events", []):
+        name = comp["name"]
+        required = comp["required"]
+        window = comp.get("co_occur_window_bars", 24)
+        
+        for sym in symbols:
+            sym_df = out[out["symbol"] == sym].copy()
+            if sym_df.empty:
+                continue
+                
+            # Find occurrences where all required events are within window
+            # Simplified approach: for each event of first type, look for others
+            first_type = required[0]
+            others = required[1:]
+            
+            first_events = sym_df[sym_df["event_type"] == first_type]
+            for _, f_evt in first_events.iterrows():
+                f_ts = f_evt["timestamp"]
+                
+                match = True
+                matched_evts = [f_evt]
+                for other_type in others:
+                    # Look for other_type within [f_ts - window*5m, f_ts + window*5m] 
+                    # (assuming 5m timeframe, but we can use indices if available or just timestamp diff)
+                    # For simplicity, we'll use timestamp diff in minutes assuming 5m bars
+                    other_matches = sym_df[
+                        (sym_df["event_type"] == other_type) &
+                        (sym_df["timestamp"].between(f_ts - window * 300, f_ts + window * 300))
+                    ]
+                    if other_matches.empty:
+                        match = False
+                        break
+                    matched_evts.append(other_matches.iloc[0])
+                
+                if match:
+                    # Emit composite event at the latest timestamp of the matched group
+                    latest_ts = max(e["timestamp"] for e in matched_evts)
+                    composite_rows.append({
+                        "event_type": name,
+                        "symbol": sym,
+                        "timestamp": latest_ts,
+                        "enter_ts": latest_ts,
+                        "exit_ts": latest_ts,
+                        "event_tradeability_score": sum(e.get("event_tradeability_score", 0.5) for e in matched_evts) / len(matched_evts),
+                        "composite_source": ",".join(required),
+                    })
+
+    composite_df = pd.DataFrame(composite_rows) if composite_rows else pd.DataFrame()
     suppressed_df = (
         pd.concat(suppressed_rows, ignore_index=True) if suppressed_rows else pd.DataFrame()
     )
-    return ArbitrationResult(events=out, suppressed=suppressed_df)
+    return ArbitrationResult(events=out, suppressed=suppressed_df, composite_events=composite_df)

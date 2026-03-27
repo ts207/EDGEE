@@ -126,12 +126,24 @@ def _combine_analyzer_results(
     return combined
 
 
-def _load_basis_features(run_id: str, symbol: str, timeframe: str) -> pd.DataFrame:
-    perp = load_features(run_id, symbol, timeframe=timeframe, market="perp")
-    spot = load_features(run_id, symbol, timeframe=timeframe, market="spot")
-    if perp.empty or spot.empty:
+def _load_basis_features(run_id: str, symbol: str, timeframe: str, data_root: Path | None = None) -> pd.DataFrame:
+    perp = load_features(run_id, symbol, timeframe=timeframe, market="perp", data_root=data_root)
+    if perp.empty:
         return pd.DataFrame()
-
+    
+    # Use spot_close from perp features if available, otherwise fall back to spot features
+    if "spot_close" in perp.columns and perp["spot_close"].notna().any():
+        # Rename columns for detector compatibility
+        result = perp.copy()
+        result["close_perp"] = result["close"]
+        result["close_spot"] = result["spot_close"]
+        return result
+    
+    # Fallback: try loading spot features
+    spot = load_features(run_id, symbol, timeframe=timeframe, market="spot", data_root=data_root)
+    if spot.empty:
+        return pd.DataFrame()
+    
     # Merge for basis detection
     merged = pd.merge(
         perp[["timestamp", "close"]].rename(columns={"close": "close_perp"}),
@@ -152,14 +164,9 @@ def _load_detector_input(
     run_id: str,
     symbol: str,
     timeframe: str,
+    data_root: Path | None = None,
 ) -> pd.DataFrame:
-    data_root = get_data_root()
-    if isinstance(detector, EventSequenceDetector) or str(event_type).startswith("SEQ_"):
-        return load_registry_events(
-            data_root=data_root,
-            run_id=run_id,
-            symbols=[symbol],
-        )
+    data_root = data_root or get_data_root()
     if event_type in (
         "BASIS_DISLOC",
         "BASIS_SNAPBACK",
@@ -168,8 +175,8 @@ def _load_detector_input(
         "FND_DISLOC",
         "SPOT_PERP_BASIS_SHOCK",
     ):
-        return _load_basis_features(run_id, symbol, timeframe)
-    return load_features(run_id=run_id, symbol=symbol, timeframe=timeframe)
+        return _load_basis_features(run_id, symbol, timeframe, data_root=data_root)
+    return load_features(run_id=run_id, symbol=symbol, timeframe=timeframe, data_root=data_root)
 
 
 def main(argv: List[str] | None = None) -> int:
@@ -181,7 +188,11 @@ def main(argv: List[str] | None = None) -> int:
     parser.add_argument("--timeframe", default="5m")
     parser.add_argument("--out_dir", default=None)
     parser.add_argument("--log_path", default=None)
+    parser.add_argument("--data_root", default=None, help="Override data root directory")
     args, unknown = parser.parse_known_args(argv)
+
+    # Allow overriding data root for custom artifact locations
+    data_root_override = Path(args.data_root) if args.data_root else None
 
     if args.log_path:
         logging.basicConfig(filename=args.log_path, level=logging.INFO)
@@ -206,6 +217,9 @@ def main(argv: List[str] | None = None) -> int:
     if not detector:
         _LOG.error("No detector found for event_type: %s", event_type)
         return 1
+    
+    # Ensure detector instance knows its own event type (important for polymorphic detectors)
+    detector.event_type = event_type
 
     stage_name = os.getenv(
         "BACKTEST_STAGE_INSTANCE_ID", f"analyze_events__{event_type}_{args.timeframe}"
@@ -227,6 +241,7 @@ def main(argv: List[str] | None = None) -> int:
                 run_id=str(args.run_id),
                 symbol=symbol,
                 timeframe=str(args.timeframe),
+                data_root=data_root_override,
             )
 
             if features.empty:
