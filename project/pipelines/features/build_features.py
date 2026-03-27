@@ -618,7 +618,9 @@ def _ensure_feature_contract_columns(frame: pd.DataFrame, *, timeframe: str) -> 
         if feat in out.columns and len(out) > 5:
             # Audit Pattern B: Heuristic check — a lagged rolling indicator MUST
             # start with at least one NaN if correctly shifted.
-            if pd.notna(out[feat].iloc[0]):
+            # We allow 0.0 because many indicators use .fillna(0.0) after .shift(1)
+            first_val = out[feat].iloc[0]
+            if pd.notna(first_val) and first_val != 0.0:
                 logging.warning(
                     f"PIT Violation Risk: Feature '{feat}' is not NaN at index 0. "
                     "It may be missing a .shift(1) lag."
