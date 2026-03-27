@@ -71,5 +71,7 @@ class ThresholdDetector(BaseEventDetector):
         self, df: pd.DataFrame, *, features: Mapping[str, pd.Series], **params: Any
     ) -> list[int]:
         mask = self.compute_raw_mask(df, features=features, **params)
-        spacing = int(params.get("min_spacing", self.min_spacing))
+        spacing = int(
+            params.get("min_spacing", params.get("cooldown_bars", self.min_spacing))
+        )
         return sparsify_mask(mask, min_spacing=spacing)

@@ -106,8 +106,14 @@ def _random_entry_events(events_df: pd.DataFrame, features_df: Optional[pd.DataF
 
 
 def _placebo_pass(observed_frame: pd.DataFrame, placebo_frame: pd.DataFrame) -> bool:
-    observed = pd.to_numeric(observed_frame.get("forward_return"), errors="coerce").dropna()
-    placebo = pd.to_numeric(placebo_frame.get("forward_return"), errors="coerce").dropna()
+    if not isinstance(observed_frame, pd.DataFrame) or not isinstance(placebo_frame, pd.DataFrame):
+        return False
+    obs_val = observed_frame.get("forward_return")
+    plc_val = placebo_frame.get("forward_return")
+    if obs_val is None or plc_val is None:
+        return False
+    observed = pd.to_numeric(obs_val, errors="coerce").dropna()
+    placebo = pd.to_numeric(plc_val, errors="coerce").dropna()
     if observed.empty or placebo.empty:
         return False
     observed_mean = float(observed.mean())

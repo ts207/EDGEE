@@ -21,6 +21,9 @@ defaults:
   - continuation
   - trend_continuation
   - pullback_entry
+  - cross_asset_mean_reversion
+  - lead_lag_continuation
+  - relative_value_basket
   horizons:
   - 5m
   - 15m
@@ -36,6 +39,8 @@ defaults:
 families:
   ABSORPTION_PROXY:
     parameters: {}
+  CROSS_ASSET_INTERACTION:
+    parameters: {}
   DEPTH_STRESS_PROXY:
     parameters: {}
   EXECUTION_FRICTION:
@@ -47,6 +52,13 @@ families:
     parameters: {}
   FORCED_FLOW_AND_EXHAUSTION:
     parameters: {}
+    templates:
+    - mean_reversion
+    - exhaustion_reversal
+    - momentum_fade
+    - range_reversion
+    - only_if_trend
+    - drawdown_filter
   INFORMATION_DESYNC:
     parameters: {}
     templates:
@@ -56,6 +68,9 @@ families:
     - lead_lag_follow
     - divergence_continuation
     - basis_convergence
+    - cross_asset_mean_reversion
+    - lead_lag_continuation
+    - relative_value_basket
   LIQUIDATION_EXHAUSTION_REVERSAL:
     parameters: {}
   LIQUIDITY_DISLOCATION:
@@ -72,6 +87,8 @@ families:
     parameters: {}
   LIQUIDITY_STRESS_PROXY:
     parameters: {}
+  ORDERFLOW:
+    parameters: {}
   POSITIONING_EXTREMES:
     parameters: {}
     templates:
@@ -85,6 +102,8 @@ families:
     - tail_risk_avoid
   POST_DELEVERAGING_REBOUND:
     parameters: {}
+  PRICE_ACTION:
+    parameters: {}
   PRICE_VOL_IMBALANCE_PROXY:
     parameters: {}
   REGIME_TRANSITION:
@@ -97,47 +116,14 @@ families:
     - tail_risk_avoid
     - structural_regime_shift
   SEQ_FND_EXTREME_THEN_BREAKOUT:
-    canonical_family: POSITIONING_EXTREMES
-    templates:
-    - reversal_or_squeeze
-    - mean_reversion
-    horizons:
-    - 60m
-    max_candidates_per_run: 500
+    parameters: {}
   SEQ_LIQ_VACUUM_THEN_DEPTH_RECOVERY:
-    canonical_family: LIQUIDITY_DISLOCATION
-    templates:
-    - mean_reversion
-    - continuation
-    horizons:
-    - 15m
-    max_candidates_per_run: 500
+    parameters: {}
   SEQ_OI_SPIKEPOS_THEN_VOL_SPIKE:
-    canonical_family: POSITIONING_EXTREMES
-    templates:
-    - reversal_or_squeeze
-    - mean_reversion
-    horizons:
-    - 60m
-    max_candidates_per_run: 500
+    parameters: {}
   SEQ_VOL_COMP_THEN_BREAKOUT:
-    canonical_family: VOLATILITY_TRANSITION
-    templates:
-    - mean_reversion
-    - continuation
-    - trend_continuation
-    horizons:
-    - 60m
-    max_candidates_per_run: 500
-  INT_DEPTH_VACUUM_CONFIRM:
-    canonical_family: LIQUIDITY_DISLOCATION
-    templates:
-    - mean_reversion
-    - continuation
-    horizons:
-    - 15m
-    max_candidates_per_run: 500
-  SESSION_CLOSE_EVENT:
+    parameters: {}
+  STATISTICAL_DISLOCATION:
     parameters: {}
     templates:
     - mean_reversion
@@ -178,8 +164,19 @@ events:
     events_file: liquidity_dislocation_events.parquet
     signal_column: absorption_proxy_event
     parameters:
+      maturity: standard
       synthetic_coverage: covered
       canonical_family: LIQUIDITY_DISLOCATION
+      trigger: Detector triggers on absorption proxy pattern
+      confirmation: Post-detection price action confirms signal validity
+      expected_behavior:
+        holding_horizon_bars: 1-12
+        invalidation_conditions:
+        - Volume returns above median within 1-2 bars
+        - Spread compresses back to baseline
+        disabled_regimes:
+        - 'SPREAD_BLOWOUT active: spread elevated, unreliable signal'
+      cluster_id: liquidity_stress
       window: 288
       spread_quantile: 0.965
       rv_quantile: 0.9
@@ -193,8 +190,18 @@ events:
     events_file: statistical_dislocation_events.parquet
     signal_column: band_break_event
     parameters:
-      synthetic_coverage: uncovered
+      synthetic_coverage: covered
       canonical_family: STATISTICAL_DISLOCATION
+      trigger: Detector triggers on band break pattern
+      confirmation: Post-detection price action confirms signal validity
+      expected_behavior:
+        holding_horizon_bars: 6-36
+        invalidation_conditions:
+        - Basis normalizes within horizon
+        - Z-score returns to mean
+        disabled_regimes:
+        - 'Low basis volatility: z-score undefined'
+      cluster_id: statistical_stretch
       lookback_window: 288
       band_z_threshold: 3.0
       cooldown_bars: 12
@@ -215,9 +222,20 @@ events:
     parameters:
       synthetic_coverage: covered
       canonical_family: STATISTICAL_DISLOCATION
-      z_threshold: 3.0
+      trigger: Detector triggers on basis disloc pattern
+      confirmation: Post-detection price action confirms signal validity
+      expected_behavior:
+        holding_horizon_bars: 6-36
+        invalidation_conditions:
+        - Basis normalizes within horizon
+        - Z-score returns to mean
+        disabled_regimes:
+        - 'Low basis volatility: z-score undefined'
+      cluster_id: basis_dislocation
+      z_threshold: 5.0
       lookback_window: 288
       cooldown_bars: 12
+      min_basis_bps: 10.0
     templates:
     - mean_reversion
     - overshoot_repair
@@ -232,8 +250,18 @@ events:
     events_file: regime_transition_events.parquet
     signal_column: beta_spike_event
     parameters:
-      synthetic_coverage: uncovered
+      synthetic_coverage: covered
       canonical_family: REGIME_TRANSITION
+      trigger: Detector triggers on beta spike event pattern
+      confirmation: Post-detection price action confirms signal validity
+      expected_behavior:
+        holding_horizon_bars: 12-72
+        invalidation_conditions:
+        - Regime reverts to prior state
+        - Beta/correlation stabilizes
+        disabled_regimes:
+        - 'Stable regime: no transition to detect'
+      cluster_id: regime_shift
       regime_window: 288
       transition_z_threshold: 2.5
       cooldown_bars: 48
@@ -255,11 +283,21 @@ events:
     parameters:
       synthetic_coverage: covered
       canonical_family: VOLATILITY_TRANSITION
+      trigger: Detector triggers on breakout trigger pattern
+      confirmation: Post-detection price action confirms signal validity
+      expected_behavior:
+        holding_horizon_bars: 8-48
+        invalidation_conditions:
+        - Vol re-expands above threshold within horizon
+        - Second shock occurs before resolution
+        disabled_regimes:
+        - 'Low volume: vol computation noise-dominated'
+      cluster_id: trend_momentum
       vol_lookback_window: 288
-      compression_ratio_max: 0.95
+      compression_ratio_max: 0.8
       compression_window: 6
-      min_breakout_distance: 0.0005
-      expansion_quantile: 0.70
+      min_breakout_distance: 0.0015
+      expansion_quantile: 0.85
       cooldown_bars: 12
       merge_gap_bars: 0
     templates:
@@ -278,8 +316,18 @@ events:
     events_file: regime_transition_events.parquet
     signal_column: chop_to_trend_shift_event
     parameters:
-      synthetic_coverage: uncovered
+      synthetic_coverage: covered
       canonical_family: REGIME_TRANSITION
+      trigger: Detector triggers on chop to trend shift pattern
+      confirmation: Post-detection price action confirms signal validity
+      expected_behavior:
+        holding_horizon_bars: 12-72
+        invalidation_conditions:
+        - Regime reverts to prior state
+        - Beta/correlation stabilizes
+        disabled_regimes:
+        - 'Stable regime: no transition to detect'
+      cluster_id: regime_shift
       regime_window: 288
       transition_z_threshold: 2.5
       cooldown_bars: 48
@@ -301,10 +349,23 @@ events:
     parameters:
       synthetic_coverage: covered
       canonical_family: FORCED_FLOW_AND_EXHAUSTION
+      trigger: Detector triggers on climax volume bar pattern
+      confirmation: Post-detection price action confirms signal validity
+      expected_behavior:
+        holding_horizon_bars: 2-12
+        invalidation_conditions:
+        - Volume normalizes
+        - Momentum diverges further
+        disabled_regimes:
+        - 'Low volume: flow signals unreliable'
+      cluster_id: exhaustion
       liquidation_spike_z_threshold: 3.0
       cascade_window_bars: 12
-      cooldown_bars: 24
+      cooldown_bars: 48
       merge_gap_bars: 0
+      vol_quantile: 0.992
+      ret_quantile: 0.998
+      range_quantile: 0.995
     templates:
     - mean_reversion
     - exhaustion_reversal
@@ -321,8 +382,18 @@ events:
     events_file: copula_pairs_events.parquet
     signal_column: copula_pairs_trading_event
     parameters:
-      synthetic_coverage: uncovered
+      synthetic_coverage: covered
       canonical_family: STATISTICAL_DISLOCATION
+      trigger: Detector triggers on copula pairs trading pattern
+      confirmation: Post-detection price action confirms signal validity
+      expected_behavior:
+        holding_horizon_bars: 6-36
+        invalidation_conditions:
+        - Basis normalizes within horizon
+        - Z-score returns to mean
+        disabled_regimes:
+        - 'Low basis volatility: z-score undefined'
+      cluster_id: basis_dislocation
       alpha1: 0.05
       alpha2: 0.95
       lookback_window: 288
@@ -341,8 +412,18 @@ events:
     events_file: regime_transition_events.parquet
     signal_column: correlation_breakdown_event
     parameters:
-      synthetic_coverage: uncovered
+      synthetic_coverage: covered
       canonical_family: REGIME_TRANSITION
+      trigger: Detector triggers on correlation breakdown event pattern
+      confirmation: Post-detection price action confirms signal validity
+      expected_behavior:
+        holding_horizon_bars: 12-72
+        invalidation_conditions:
+        - Regime reverts to prior state
+        - Beta/correlation stabilizes
+        disabled_regimes:
+        - 'Stable regime: no transition to detect'
+      cluster_id: regime_shift
       regime_window: 288
       transition_z_threshold: 2.5
       cooldown_bars: 48
@@ -356,6 +437,26 @@ events:
     horizons:
     - 60m
     max_candidates_per_run: 350
+  CROSS_ASSET_DESYNC_EVENT:
+    canonical_family: INFORMATION_DESYNC
+    reports_dir: ''
+    events_file: ''
+    signal_column: ''
+    parameters: {}
+    templates:
+    - desync_repair
+    - convergence
+    - basis_repair
+    - lead_lag_follow
+    - divergence_continuation
+    - cross_asset_mean_reversion
+    - lead_lag_continuation
+    - relative_value_basket
+    horizons:
+    - 5m
+    - 15m
+    - 60m
+    max_candidates_per_run: 600
   CROSS_VENUE_DESYNC:
     canonical_family: INFORMATION_DESYNC
     reports_dir: cross_venue_desync
@@ -436,11 +537,16 @@ events:
         - SPOT_PERP_BASIS_SHOCK: high co-occurrence; conceptually related
         - LIQUIDATION_CASCADE: moderate; cascade can create cross-venue desync
         - LIQUIDITY_VACUUM: low; different causal mechanism
+      trigger: Detector triggers on cross venue desync pattern
+      confirmation: Post-detection price action confirms signal validity
+      cluster_id: desync
       window_end: 32
       anchor_mode: basis_shock
-      anchor_quantile: 0.99
+      anchor_quantile: 0.995
       revert_z: 0.5
       basis_lookback: 96
+      persistence_bars: 2
+      min_basis_bps: 35.0
     templates:
     - desync_repair
     - convergence
@@ -460,6 +566,16 @@ events:
     parameters:
       synthetic_coverage: covered
       canonical_family: POSITIONING_EXTREMES
+      trigger: Detector triggers on deleveraging wave pattern
+      confirmation: Post-detection price action confirms signal validity
+      expected_behavior:
+        holding_horizon_bars: 4-24
+        invalidation_conditions:
+        - Position unwinds within expected horizon
+        - Funding reverses sign
+        disabled_regimes:
+        - 'Low liquidity regime: OI/vol signals unreliable'
+      cluster_id: forced_liquidation
       funding_extreme_quantile: 0.99
       oi_change_z_threshold: 3.0
       cooldown_bars: 24
@@ -483,15 +599,24 @@ events:
     events_file: liquidity_dislocation_events.parquet
     signal_column: depth_collapse_event
     parameters:
-      synthetic_coverage: uncovered
+      maturity: standard
+      synthetic_coverage: covered
       canonical_family: LIQUIDITY_DISLOCATION
+      trigger: Detector triggers on depth collapse pattern
+      confirmation: Post-detection price action confirms signal validity
+      expected_behavior:
+        holding_horizon_bars: 1-12
+        invalidation_conditions:
+        - Volume returns above median within 1-2 bars
+        - Spread compresses back to baseline
+        disabled_regimes:
+        - 'SPREAD_BLOWOUT active: spread elevated, unreliable signal'
+      cluster_id: liquidity_stress
       lookback_window: 288
       z_threshold: 3.0
       cooldown_bars: 12
       merge_gap_bars: 0
       min_volume_quantile: 0.2
-      spread_quantile: 0.70
-      rv_quantile: 0.50
     templates:
     - mean_reversion
     - continuation
@@ -508,8 +633,19 @@ events:
     events_file: liquidity_dislocation_events.parquet
     signal_column: depth_stress_proxy_event
     parameters:
+      maturity: standard
       synthetic_coverage: covered
       canonical_family: LIQUIDITY_DISLOCATION
+      trigger: Detector triggers on depth stress proxy pattern
+      confirmation: Post-detection price action confirms signal validity
+      expected_behavior:
+        holding_horizon_bars: 1-12
+        invalidation_conditions:
+        - Volume returns above median within 1-2 bars
+        - Spread compresses back to baseline
+        disabled_regimes:
+        - 'SPREAD_BLOWOUT active: spread elevated, unreliable signal'
+      cluster_id: liquidity_stress
       window: 288
       spread_quantile: 0.99
       rv_quantile: 0.9
@@ -525,8 +661,19 @@ events:
     parameters:
       synthetic_coverage: covered
       canonical_family: FORCED_FLOW_AND_EXHAUSTION
-      liquidation_spike_z_threshold: 3.0
-      cascade_window_bars: 12
+      trigger: Detector triggers on failed continuation pattern
+      confirmation: Post-detection price action confirms signal validity
+      expected_behavior:
+        holding_horizon_bars: 2-12
+        invalidation_conditions:
+        - Volume normalizes
+        - Momentum diverges further
+        disabled_regimes:
+        - 'Low volume: flow signals unreliable'
+      cluster_id: exhaustion
+      breakout_window: 48
+      reversal_window: 12
+      breakout_strength_min: 0.003
       cooldown_bars: 24
       merge_gap_bars: 0
     templates:
@@ -547,6 +694,16 @@ events:
     parameters:
       synthetic_coverage: covered
       canonical_family: TREND_STRUCTURE
+      trigger: Detector triggers on false breakout pattern
+      confirmation: Post-detection price action confirms signal validity
+      expected_behavior:
+        holding_horizon_bars: 12-48
+        invalidation_conditions:
+        - Trend reverses within holding period
+        - Range expands significantly beyond breakout level
+        disabled_regimes:
+        - 'Chop regime: no clear trend direction'
+      cluster_id: trend_momentum
       trend_window: 288
       breakout_z_threshold: 2.5
       cooldown_bars: 12
@@ -568,8 +725,18 @@ events:
     events_file: execution_friction_events.parquet
     signal_column: fee_regime_change_event
     parameters:
-      synthetic_coverage: uncovered
+      synthetic_coverage: covered
       canonical_family: EXECUTION_FRICTION
+      trigger: Detector triggers on fee regime change event pattern
+      confirmation: Post-detection price action confirms signal validity
+      expected_behavior:
+        holding_horizon_bars: 0-4
+        invalidation_conditions:
+        - Fees return to baseline
+        - Slippage normalizes
+        disabled_regimes:
+        - 'Market closed: execution data unavailable'
+      cluster_id: execution_cost
       spread_z_threshold: 3.0
       slippage_z_threshold: 3.0
       cooldown_bars: 12
@@ -587,8 +754,19 @@ events:
     events_file: forced_flow_and_exhaustion_events.parquet
     signal_column: flow_exhaustion_proxy_event
     parameters:
-      synthetic_coverage: uncovered
+      maturity: standard
+      synthetic_coverage: covered
       canonical_family: FORCED_FLOW_AND_EXHAUSTION
+      trigger: Detector triggers on flow exhaustion proxy pattern
+      confirmation: Post-detection price action confirms signal validity
+      expected_behavior:
+        holding_horizon_bars: 2-12
+        invalidation_conditions:
+        - Volume normalizes
+        - Momentum diverges further
+        disabled_regimes:
+        - 'Low volume: flow signals unreliable'
+      cluster_id: exhaustion
       lookback_window: 288
       z_threshold: 3.0
       cooldown_bars: 12
@@ -604,10 +782,21 @@ events:
       - '`threshold_bps` is expressed in basis points and is converted against decimal
         `funding_rate_scaled` values at runtime.'
       canonical_family: STATISTICAL_DISLOCATION
+      trigger: Detector triggers on fnd disloc pattern
+      confirmation: Post-detection price action confirms signal validity
+      expected_behavior:
+        holding_horizon_bars: 6-36
+        invalidation_conditions:
+        - Basis normalizes within horizon
+        - Z-score returns to mean
+        disabled_regimes:
+        - 'Low basis volatility: z-score undefined'
+      cluster_id: basis_dislocation
       threshold_bps: 2.0
       funding_quantile: 0.95
       alignment_window: 3
       cooldown_bars: 12
+      min_basis_bps: 5.0
     templates:
     - mean_reversion
     - overshoot_repair
@@ -622,8 +811,19 @@ events:
     events_file: directional_exhaustion_after_forced_flow_events.parquet
     signal_column: forced_flow_exhaustion_event
     parameters:
-      synthetic_coverage: uncovered
+      maturity: standard
+      synthetic_coverage: covered
       canonical_family: FORCED_FLOW_AND_EXHAUSTION
+      trigger: Detector triggers on forced flow exhaustion pattern
+      confirmation: Post-detection price action confirms signal validity
+      expected_behavior:
+        holding_horizon_bars: 2-12
+        invalidation_conditions:
+        - Volume normalizes
+        - Momentum diverges further
+        disabled_regimes:
+        - 'Low volume: flow signals unreliable'
+      cluster_id: exhaustion
       window_end: 32
       anchor_mode: taker_imbalance
       anchor_quantile: 0.99
@@ -643,7 +843,7 @@ events:
     events_file: funding_episode_events.parquet
     signal_column: funding_extreme_onset_event
     parameters:
-      synthetic_coverage: uncovered
+      synthetic_coverage: covered
       canonical_family: POSITIONING_EXTREMES
       detector_contract: true
       detector:
@@ -719,6 +919,9 @@ events:
         - OI_FLUSH: high co-occurrence; OI flush often follows funding extreme
         - LIQUIDATION_CASCADE: moderate co-occurrence if extreme is on losing side
         - SPREAD_BLOWOUT: low co-occurrence; funding and spread are independent signals
+      trigger: Detector triggers on funding extreme onset pattern
+      confirmation: Post-detection price action confirms signal validity
+      cluster_id: funding_crowding
       funding_pct_window: 2880
       extreme_pct: 95.0
       accel_pct: 95.0
@@ -770,6 +973,16 @@ events:
     parameters:
       synthetic_coverage: covered
       canonical_family: POSITIONING_EXTREMES
+      trigger: Detector triggers on funding flip pattern
+      confirmation: Post-detection price action confirms signal validity
+      expected_behavior:
+        holding_horizon_bars: 4-24
+        invalidation_conditions:
+        - Position unwinds within expected horizon
+        - Funding reverses sign
+        disabled_regimes:
+        - 'Low liquidity regime: OI/vol signals unreliable'
+      cluster_id: funding_crowding
       funding_extreme_quantile: 0.99
       oi_change_z_threshold: 3.0
       min_flip_abs: 0.00025
@@ -796,8 +1009,18 @@ events:
     events_file: funding_episode_events.parquet
     signal_column: funding_normalization_event
     parameters:
-      synthetic_coverage: uncovered
+      synthetic_coverage: covered
       canonical_family: POSITIONING_EXTREMES
+      trigger: Detector triggers on funding normalization trigger pattern
+      confirmation: Post-detection price action confirms signal validity
+      expected_behavior:
+        holding_horizon_bars: 4-24
+        invalidation_conditions:
+        - Position unwinds within expected horizon
+        - Funding reverses sign
+        disabled_regimes:
+        - 'Low liquidity regime: OI/vol signals unreliable'
+      cluster_id: funding_crowding
       funding_pct_window: 2880
       extreme_pct: 95.0
       accel_pct: 95.0
@@ -846,8 +1069,18 @@ events:
     events_file: funding_episode_events.parquet
     signal_column: funding_persistence_event
     parameters:
-      synthetic_coverage: uncovered
+      synthetic_coverage: covered
       canonical_family: POSITIONING_EXTREMES
+      trigger: Detector triggers on funding persistence trigger pattern
+      confirmation: Post-detection price action confirms signal validity
+      expected_behavior:
+        holding_horizon_bars: 4-24
+        invalidation_conditions:
+        - Position unwinds within expected horizon
+        - Funding reverses sign
+        disabled_regimes:
+        - 'Low liquidity regime: OI/vol signals unreliable'
+      cluster_id: funding_crowding
       funding_pct_window: 2880
       extreme_pct: 95.0
       accel_pct: 95.0
@@ -897,11 +1130,21 @@ events:
     events_file: temporal_structure_events.parquet
     signal_column: funding_timestamp_event
     parameters:
-      synthetic_coverage: uncovered
+      synthetic_coverage: covered
       canonical_family: TEMPORAL_STRUCTURE
+      trigger: Detector triggers on funding timestamp event pattern
+      confirmation: Post-detection price action confirms signal validity
+      expected_behavior:
+        holding_horizon_bars: 0-4
+        invalidation_conditions:
+        - Session closes without price action
+        disabled_regimes:
+        - 'Weekend/holiday: session timing unreliable'
+      cluster_id: temporal_anchor
       event_spacing_bars: 288
       cooldown_bars: 12
       merge_gap_bars: 0
+      funding_abs_quantile: 0.0
     templates:
     - mean_reversion
     - continuation
@@ -915,8 +1158,18 @@ events:
     events_file: statistical_dislocation_events.parquet
     signal_column: gap_overshoot_event
     parameters:
-      synthetic_coverage: uncovered
+      synthetic_coverage: covered
       canonical_family: STATISTICAL_DISLOCATION
+      trigger: Detector triggers on gap overshoot pattern
+      confirmation: Post-detection price action confirms signal validity
+      expected_behavior:
+        holding_horizon_bars: 6-36
+        invalidation_conditions:
+        - Basis normalizes within horizon
+        - Z-score returns to mean
+        disabled_regimes:
+        - 'Low basis volatility: z-score undefined'
+      cluster_id: statistical_stretch
       lookback_window: 288
       band_z_threshold: 3.0
       cooldown_bars: 12
@@ -935,8 +1188,18 @@ events:
     events_file: information_desync_events.parquet
     signal_column: index_component_divergence_event
     parameters:
-      synthetic_coverage: uncovered
+      synthetic_coverage: covered
       canonical_family: INFORMATION_DESYNC
+      trigger: Detector triggers on index component divergence pattern
+      confirmation: Post-detection price action confirms signal validity
+      expected_behavior:
+        holding_horizon_bars: 4-24
+        invalidation_conditions:
+        - Desync resolves (assets converge)
+        - Lead-lag relationship resumes
+        disabled_regimes:
+        - 'Low correlation assets: desync undefined'
+      cluster_id: desync
       desync_z_threshold: 3.0
       lead_lag_window: 60
       cooldown_bars: 12
@@ -958,8 +1221,18 @@ events:
     events_file: information_desync_events.parquet
     signal_column: lead_lag_break_event
     parameters:
-      synthetic_coverage: uncovered
+      synthetic_coverage: covered
       canonical_family: INFORMATION_DESYNC
+      trigger: Detector triggers on lead lag break pattern
+      confirmation: Post-detection price action confirms signal validity
+      expected_behavior:
+        holding_horizon_bars: 4-24
+        invalidation_conditions:
+        - Desync resolves (assets converge)
+        - Lead-lag relationship resumes
+        disabled_regimes:
+        - 'Low correlation assets: desync undefined'
+      cluster_id: desync
       desync_z_threshold: 3.0
       lead_lag_window: 60
       cooldown_bars: 12
@@ -975,22 +1248,24 @@ events:
     - 15m
     - 60m
     max_candidates_per_run: 500
-  INT_DEPTH_VACUUM_CONFIRM:
-    canonical_family: LIQUIDITY_DISLOCATION
-    templates:
-    - mean_reversion
-    - continuation
-    horizons:
-    - 15m
-    max_candidates_per_run: 500
   LIQUIDATION_CASCADE:
     canonical_family: POSITIONING_EXTREMES
     reports_dir: liquidation_cascade
     events_file: liquidation_cascade_events.parquet
     signal_column: liquidation_cascade_event
     parameters:
-      synthetic_coverage: uncovered
+      synthetic_coverage: covered
       canonical_family: POSITIONING_EXTREMES
+      trigger: Detector triggers on liquidation cascade pattern
+      confirmation: Post-detection price action confirms signal validity
+      expected_behavior:
+        holding_horizon_bars: 4-24
+        invalidation_conditions:
+        - Position unwinds within expected horizon
+        - Funding reverses sign
+        disabled_regimes:
+        - 'Low liquidity regime: OI/vol signals unreliable'
+      cluster_id: forced_liquidation
       liq_multiplier: 3.0
       median_window: 288
       liq_vol_th: 100000.0
@@ -1020,6 +1295,16 @@ events:
       - This detector is evaluated on bar features and depends on a prior forced-flow
         cluster being present in recent history.
       canonical_family: FORCED_FLOW_AND_EXHAUSTION
+      trigger: Detector triggers on liquidation exhaustion reversal pattern
+      confirmation: Post-detection price action confirms signal validity
+      expected_behavior:
+        holding_horizon_bars: 2-12
+        invalidation_conditions:
+        - Volume normalizes
+        - Momentum diverges further
+        disabled_regimes:
+        - 'Low volume: flow signals unreliable'
+      cluster_id: forced_liquidation
       rebound_window_bars: 12
       rebound_window: 6
       rebound_return_min: 0.001
@@ -1035,8 +1320,18 @@ events:
     events_file: liquidity_dislocation_events.parquet
     signal_column: liquidity_gap_print_event
     parameters:
-      synthetic_coverage: uncovered
+      synthetic_coverage: covered
       canonical_family: LIQUIDITY_DISLOCATION
+      trigger: Detector triggers on liquidity gap print pattern
+      confirmation: Post-detection price action confirms signal validity
+      expected_behavior:
+        holding_horizon_bars: 1-12
+        invalidation_conditions:
+        - Volume returns above median within 1-2 bars
+        - Spread compresses back to baseline
+        disabled_regimes:
+        - 'SPREAD_BLOWOUT active: spread elevated, unreliable signal'
+      cluster_id: liquidity_stress
       lookback_window: 288
       z_threshold: 3.0
       cooldown_bars: 12
@@ -1058,8 +1353,18 @@ events:
     events_file: liquidity_shock_events.parquet
     signal_column: liquidity_shock_event
     parameters:
-      synthetic_coverage: uncovered
+      synthetic_coverage: covered
       canonical_family: LIQUIDITY_DISLOCATION
+      trigger: Detector triggers on liquidity shock pattern
+      confirmation: Post-detection price action confirms signal validity
+      expected_behavior:
+        holding_horizon_bars: 1-12
+        invalidation_conditions:
+        - Volume returns above median within 1-2 bars
+        - Spread compresses back to baseline
+        disabled_regimes:
+        - 'SPREAD_BLOWOUT active: spread elevated, unreliable signal'
+      cluster_id: liquidity_stress
       depth_collapse_th: 0.5
       spread_spike_th: 3.0
       median_window: 288
@@ -1081,6 +1386,16 @@ events:
     parameters:
       synthetic_coverage: covered
       canonical_family: LIQUIDITY_DISLOCATION
+      trigger: Detector triggers on liquidity stress direct pattern
+      confirmation: Post-detection price action confirms signal validity
+      expected_behavior:
+        holding_horizon_bars: 1-12
+        invalidation_conditions:
+        - Volume returns above median within 1-2 bars
+        - Spread compresses back to baseline
+        disabled_regimes:
+        - 'SPREAD_BLOWOUT active: spread elevated, unreliable signal'
+      cluster_id: liquidity_stress
       depth_collapse_th: 0.5
       spread_spike_th: 3.0
       median_window: 288
@@ -1090,8 +1405,18 @@ events:
     events_file: liquidity_shock_events.parquet
     signal_column: liquidity_stress_proxy_event
     parameters:
+      maturity: standard
       synthetic_coverage: covered
       canonical_family: LIQUIDITY_DISLOCATION
+      trigger: Detector triggers on liquidity stress proxy pattern
+      confirmation: Post-detection price action confirms signal validity
+      expected_behavior:
+        holding_horizon_bars: 1-12
+        invalidation_conditions:
+        - Volume returns above median within 1-2 bars
+        - Spread compresses back to baseline
+        disabled_regimes:
+        - 'SPREAD_BLOWOUT active: spread elevated, unreliable signal'
       depth_collapse_th: 0.5
       spread_spike_th: 3.0
       median_window: 288
@@ -1101,7 +1426,7 @@ events:
     events_file: liquidity_vacuum_events.parquet
     signal_column: liquidity_vacuum_event
     parameters:
-      synthetic_coverage: uncovered
+      synthetic_coverage: covered
       canonical_family: LIQUIDITY_DISLOCATION
       detector_contract: true
       detector:
@@ -1179,6 +1504,9 @@ events:
         - LIQUIDATION_CASCADE: co-occurrence ~15-25%; liquidity withdraws during cascade
         - DEPTH_COLLAPSE: high co-occurrence; both detect thin-book conditions
         - VOL_SHOCK: moderate co-occurrence; may precede or co-occur
+      trigger: Detector triggers on liquidity vacuum pattern
+      confirmation: Post-detection price action confirms signal validity
+      cluster_id: liquidity_stress
       profile: lenient
       min_events_calibration: 1
       shock_quantiles: 0.5,0.6,0.7
@@ -1190,8 +1518,7 @@ events:
       merge_gap_bars: 2
       cooldown_bars: 12
       anchor_rule: max_intensity
-      min_occurrences: 1
-      shock_quantile: 0.90
+      min_occurrences: 3
     templates:
     - mean_reversion
     - stop_run_repair
@@ -1211,6 +1538,16 @@ events:
     parameters:
       synthetic_coverage: covered
       canonical_family: FORCED_FLOW_AND_EXHAUSTION
+      trigger: Detector triggers on momentum divergence trigger pattern
+      confirmation: Post-detection price action confirms signal validity
+      expected_behavior:
+        holding_horizon_bars: 2-12
+        invalidation_conditions:
+        - Volume normalizes
+        - Momentum diverges further
+        disabled_regimes:
+        - 'Low volume: flow signals unreliable'
+      cluster_id: exhaustion
       slow_trend_quantile: 0.7
       max_trend_persistence_bars: 72
       liquidation_spike_z_threshold: 3.0
@@ -1233,8 +1570,18 @@ events:
     events_file: oi_shock_events.parquet
     signal_column: oi_flush_event
     parameters:
-      synthetic_coverage: uncovered
+      synthetic_coverage: covered
       canonical_family: POSITIONING_EXTREMES
+      trigger: Detector triggers on oi flush pattern
+      confirmation: Post-detection price action confirms signal validity
+      expected_behavior:
+        holding_horizon_bars: 4-24
+        invalidation_conditions:
+        - Position unwinds within expected horizon
+        - Funding reverses sign
+        disabled_regimes:
+        - 'Low liquidity regime: OI/vol signals unreliable'
+      cluster_id: oi_dynamic
       oi_window: 96
       spike_z_th: 2.5
       flush_pct_th: -0.005
@@ -1257,8 +1604,18 @@ events:
     events_file: oi_shock_events.parquet
     signal_column: oi_spike_neg_event
     parameters:
-      synthetic_coverage: uncovered
+      synthetic_coverage: covered
       canonical_family: POSITIONING_EXTREMES
+      trigger: Detector triggers on oi spike negative pattern
+      confirmation: Post-detection price action confirms signal validity
+      expected_behavior:
+        holding_horizon_bars: 4-24
+        invalidation_conditions:
+        - Position unwinds within expected horizon
+        - Funding reverses sign
+        disabled_regimes:
+        - 'Low liquidity regime: OI/vol signals unreliable'
+      cluster_id: oi_dynamic
       oi_window: 96
       spike_z_th: 2.5
       flush_pct_th: -0.005
@@ -1281,8 +1638,18 @@ events:
     events_file: oi_shock_events.parquet
     signal_column: oi_spike_pos_event
     parameters:
-      synthetic_coverage: uncovered
+      synthetic_coverage: covered
       canonical_family: POSITIONING_EXTREMES
+      trigger: Detector triggers on oi spike positive pattern
+      confirmation: Post-detection price action confirms signal validity
+      expected_behavior:
+        holding_horizon_bars: 4-24
+        invalidation_conditions:
+        - Position unwinds within expected horizon
+        - Funding reverses sign
+        disabled_regimes:
+        - 'Low liquidity regime: OI/vol signals unreliable'
+      cluster_id: oi_dynamic
       oi_window: 96
       spike_z_th: 2.5
       flush_pct_th: -0.005
@@ -1304,13 +1671,31 @@ events:
     events_file: liquidity_dislocation_events.parquet
     signal_column: orderflow_imbalance_shock_event
     parameters:
-      synthetic_coverage: uncovered
+      maturity: standard
+      synthetic_coverage: covered
       canonical_family: LIQUIDITY_DISLOCATION
+      trigger: Detector triggers on orderflow imbalance shock pattern
+      confirmation: Post-detection price action confirms signal validity
+      expected_behavior:
+        holding_horizon_bars: 1-12
+        invalidation_conditions:
+        - Volume returns above median within 1-2 bars
+        - Spread compresses back to baseline
+        disabled_regimes:
+        - 'SPREAD_BLOWOUT active: spread elevated, unreliable signal'
+      cluster_id: orderflow_imbalance
       lookback_window: 288
       z_threshold: 3.0
       cooldown_bars: 12
       merge_gap_bars: 0
       min_volume_quantile: 0.2
+      ret_quantile: 0.998
+      rv_quantile: 0.92
+      vol_quantile: 0.92
+      ret_window: 288
+      rv_window: 288
+      vol_window: 288
+      min_history_bars: 288
     templates:
     - mean_reversion
     - continuation
@@ -1327,8 +1712,18 @@ events:
     events_file: statistical_dislocation_events.parquet
     signal_column: overshoot_after_shock_event
     parameters:
-      synthetic_coverage: uncovered
+      synthetic_coverage: covered
       canonical_family: STATISTICAL_DISLOCATION
+      trigger: Detector triggers on overshoot after shock pattern
+      confirmation: Post-detection price action confirms signal validity
+      expected_behavior:
+        holding_horizon_bars: 6-36
+        invalidation_conditions:
+        - Basis normalizes within horizon
+        - Z-score returns to mean
+        disabled_regimes:
+        - 'Low basis volatility: z-score undefined'
+      cluster_id: statistical_stretch
       lookback_window: 288
       band_z_threshold: 3.0
       cooldown_bars: 12
@@ -1347,8 +1742,17 @@ events:
     events_file: forced_flow_and_exhaustion_events.parquet
     signal_column: post_deleveraging_rebound_event
     parameters:
-      synthetic_coverage: uncovered
+      synthetic_coverage: covered
       canonical_family: FORCED_FLOW_AND_EXHAUSTION
+      trigger: Detector triggers on post deleveraging rebound pattern
+      confirmation: Post-detection price action confirms signal validity
+      expected_behavior:
+        holding_horizon_bars: 2-12
+        invalidation_conditions:
+        - Volume normalizes
+        - Momentum diverges further
+        disabled_regimes:
+        - 'Low volume: flow signals unreliable'
       rebound_window_bars: 12
       rebound_window: 6
       rebound_return_min: 0.001
@@ -1364,11 +1768,25 @@ events:
     events_file: liquidity_dislocation_events.parquet
     signal_column: price_vol_imbalance_proxy_event
     parameters:
+      maturity: standard
       synthetic_coverage: covered
       canonical_family: LIQUIDITY_DISLOCATION
+      trigger: Detector triggers on price vol imbalance proxy pattern
+      confirmation: Post-detection price action confirms signal validity
+      expected_behavior:
+        holding_horizon_bars: 1-12
+        invalidation_conditions:
+        - Volume returns above median within 1-2 bars
+        - Spread compresses back to baseline
+        disabled_regimes:
+        - 'SPREAD_BLOWOUT active: spread elevated, unreliable signal'
+      cluster_id: orderflow_imbalance
       ret_quantile: 0.995
       rv_quantile: 0.9
       volume_quantile: 0.9
+      ret_window: 288
+      rv_window: 288
+      vol_window: 288
       min_history_bars: 288
       min_spacing: 24
       cooldown_bars: 24
@@ -1379,8 +1797,18 @@ events:
     events_file: trend_structure_events.parquet
     signal_column: pullback_pivot_event
     parameters:
-      synthetic_coverage: uncovered
+      synthetic_coverage: covered
       canonical_family: TREND_STRUCTURE
+      trigger: Detector triggers on pullback pivot pattern
+      confirmation: Post-detection price action confirms signal validity
+      expected_behavior:
+        holding_horizon_bars: 12-48
+        invalidation_conditions:
+        - Trend reverses within holding period
+        - Range expands significantly beyond breakout level
+        disabled_regimes:
+        - 'Chop regime: no clear trend direction'
+      cluster_id: trend_momentum
       trend_window: 288
       breakout_z_threshold: 2.5
       cooldown_bars: 12
@@ -1402,8 +1830,18 @@ events:
     events_file: trend_structure_events.parquet
     signal_column: range_breakout_event
     parameters:
-      synthetic_coverage: uncovered
+      synthetic_coverage: covered
       canonical_family: TREND_STRUCTURE
+      trigger: Detector triggers on range breakout pattern
+      confirmation: Post-detection price action confirms signal validity
+      expected_behavior:
+        holding_horizon_bars: 12-48
+        invalidation_conditions:
+        - Trend reverses within holding period
+        - Range expands significantly beyond breakout level
+        disabled_regimes:
+        - 'Chop regime: no clear trend direction'
+      cluster_id: trend_momentum
       trend_window: 288
       breakout_z_threshold: 2.5
       cooldown_bars: 12
@@ -1425,8 +1863,18 @@ events:
     events_file: volatility_transition_events.parquet
     signal_column: range_compression_end_event
     parameters:
-      synthetic_coverage: uncovered
+      synthetic_coverage: covered
       canonical_family: VOLATILITY_TRANSITION
+      trigger: Detector triggers on range compression end pattern
+      confirmation: Post-detection price action confirms signal validity
+      expected_behavior:
+        holding_horizon_bars: 8-48
+        invalidation_conditions:
+        - Vol re-expands above threshold within horizon
+        - Second shock occurs before resolution
+        disabled_regimes:
+        - 'Low volume: vol computation noise-dominated'
+      cluster_id: vol_regime
       vol_lookback_window: 288
       compression_quantile: 0.1
       expansion_z_threshold: 2.5
@@ -1448,8 +1896,17 @@ events:
     events_file: temporal_structure_events.parquet
     signal_column: scheduled_news_window_event
     parameters:
-      synthetic_coverage: uncovered
+      synthetic_coverage: covered
       canonical_family: TEMPORAL_STRUCTURE
+      trigger: Detector triggers on scheduled news window event pattern
+      confirmation: Post-detection price action confirms signal validity
+      expected_behavior:
+        holding_horizon_bars: 0-4
+        invalidation_conditions:
+        - Session closes without price action
+        disabled_regimes:
+        - 'Weekend/holiday: session timing unreliable'
+      cluster_id: temporal_anchor
       event_spacing_bars: 288
       cooldown_bars: 12
       merge_gap_bars: 0
@@ -1461,50 +1918,113 @@ events:
     - 15m
     max_candidates_per_run: 300
   SEQ_FND_EXTREME_THEN_BREAKOUT:
-    canonical_family: POSITIONING_EXTREMES
-    templates:
-    - reversal_or_squeeze
-    - mean_reversion
-    horizons:
-    - 60m
-    max_candidates_per_run: 500
+    canonical_family: SEQ_FND_EXTREME_THEN_BREAKOUT
+    reports_dir: event_sequences
+    events_file: event_sequences.parquet
+    signal_column: seq_fnd_extreme_then_breakout_event
+    parameters:
+      synthetic_coverage: covered
+      canonical_family: POSITIONING_EXTREMES
+      trigger: Detector triggers on seq fnd extreme then breakout pattern
+      confirmation: Post-detection price action confirms signal validity
+      expected_behavior:
+        holding_horizon_bars: 4-24
+        invalidation_conditions:
+        - Position unwinds within expected horizon
+        - Funding reverses sign
+        disabled_regimes:
+        - 'Low liquidity regime: OI/vol signals unreliable'
+      cluster_id: funding_crowding
+      max_gap_bars: 96
+      cooldown_bars: 24
   SEQ_LIQ_VACUUM_THEN_DEPTH_RECOVERY:
-    canonical_family: LIQUIDITY_DISLOCATION
-    templates:
-    - mean_reversion
-    - continuation
-    horizons:
-    - 15m
-    max_candidates_per_run: 500
+    canonical_family: SEQ_LIQ_VACUUM_THEN_DEPTH_RECOVERY
+    reports_dir: event_sequences
+    events_file: event_sequences.parquet
+    signal_column: seq_liq_vacuum_then_depth_recovery_event
+    parameters:
+      synthetic_coverage: covered
+      canonical_family: LIQUIDITY_DISLOCATION
+      trigger: Detector triggers on seq liq vacuum then depth recovery pattern
+      confirmation: Post-detection price action confirms signal validity
+      expected_behavior:
+        holding_horizon_bars: 1-12
+        invalidation_conditions:
+        - Volume returns above median within 1-2 bars
+        - Spread compresses back to baseline
+        disabled_regimes:
+        - 'SPREAD_BLOWOUT active: spread elevated, unreliable signal'
+      cluster_id: liquidity_stress
+      max_gap_bars: 48
+      cooldown_bars: 24
   SEQ_OI_SPIKEPOS_THEN_VOL_SPIKE:
-    canonical_family: POSITIONING_EXTREMES
-    templates:
-    - reversal_or_squeeze
-    - mean_reversion
-    horizons:
-    - 60m
-    max_candidates_per_run: 500
+    canonical_family: SEQ_OI_SPIKEPOS_THEN_VOL_SPIKE
+    reports_dir: event_sequences
+    events_file: event_sequences.parquet
+    signal_column: seq_oi_spikepos_then_vol_spike_event
+    parameters:
+      synthetic_coverage: covered
+      canonical_family: POSITIONING_EXTREMES
+      trigger: Detector triggers on seq oi spikepos then vol spike pattern
+      confirmation: Post-detection price action confirms signal validity
+      expected_behavior:
+        holding_horizon_bars: 4-24
+        invalidation_conditions:
+        - Position unwinds within expected horizon
+        - Funding reverses sign
+        disabled_regimes:
+        - 'Low liquidity regime: OI/vol signals unreliable'
+      cluster_id: oi_dynamic
+      max_gap_bars: 48
+      cooldown_bars: 24
   SEQ_VOL_COMP_THEN_BREAKOUT:
-    canonical_family: VOLATILITY_TRANSITION
-    templates:
-    - mean_reversion
-    - continuation
-    - trend_continuation
-    horizons:
-    - 60m
-    max_candidates_per_run: 500
+    canonical_family: SEQ_VOL_COMP_THEN_BREAKOUT
+    reports_dir: event_sequences
+    events_file: event_sequences.parquet
+    signal_column: seq_vol_comp_then_breakout_event
+    parameters:
+      synthetic_coverage: covered
+      canonical_family: VOLATILITY_TRANSITION
+      trigger: Detector triggers on seq vol comp then breakout pattern
+      confirmation: Post-detection price action confirms signal validity
+      expected_behavior:
+        holding_horizon_bars: 8-48
+        invalidation_conditions:
+        - Vol re-expands above threshold within horizon
+        - Second shock occurs before resolution
+        disabled_regimes:
+        - 'Low volume: vol computation noise-dominated'
+      cluster_id: vol_regime
+      max_gap_bars: 48
+      cooldown_bars: 24
   SESSION_CLOSE_EVENT:
     canonical_family: TEMPORAL_STRUCTURE
     reports_dir: temporal_structure
     events_file: temporal_structure_events.parquet
     signal_column: session_close_event
     parameters:
-      synthetic_coverage: uncovered
+      synthetic_coverage: covered
       canonical_family: TEMPORAL_STRUCTURE
+      trigger: Detector triggers on session close event pattern
+      confirmation: Post-detection price action confirms signal validity
+      expected_behavior:
+        holding_horizon_bars: 0-4
+        invalidation_conditions:
+        - Session closes without price action
+        disabled_regimes:
+        - 'Weekend/holiday: session timing unreliable'
+      cluster_id: temporal_anchor
       event_spacing_bars: 288
       cooldown_bars: 12
       merge_gap_bars: 0
       intensity_scale: 60
+      hours_utc:
+      - 0
+      - 8
+      - 16
+      minute_close_start: 55
+      session_range_quantile: 0.0
+      session_vol_z_min: null
     templates:
     - mean_reversion
     - continuation
@@ -1518,12 +2038,28 @@ events:
     events_file: temporal_structure_events.parquet
     signal_column: session_open_event
     parameters:
-      synthetic_coverage: uncovered
+      synthetic_coverage: covered
       canonical_family: TEMPORAL_STRUCTURE
+      trigger: Detector triggers on session open event pattern
+      confirmation: Post-detection price action confirms signal validity
+      expected_behavior:
+        holding_horizon_bars: 0-4
+        invalidation_conditions:
+        - Session closes without price action
+        disabled_regimes:
+        - 'Weekend/holiday: session timing unreliable'
+      cluster_id: temporal_anchor
       event_spacing_bars: 288
       cooldown_bars: 12
       merge_gap_bars: 0
       intensity_scale: 60
+      hours_utc:
+      - 0
+      - 8
+      - 16
+      minute_open: 0
+      session_range_quantile: 0.0
+      session_vol_z_min: null
     templates:
     - mean_reversion
     - continuation
@@ -1537,8 +2073,18 @@ events:
     events_file: execution_friction_events.parquet
     signal_column: slippage_spike_event
     parameters:
-      synthetic_coverage: uncovered
+      synthetic_coverage: covered
       canonical_family: EXECUTION_FRICTION
+      trigger: Detector triggers on slippage spike event pattern
+      confirmation: Post-detection price action confirms signal validity
+      expected_behavior:
+        holding_horizon_bars: 0-4
+        invalidation_conditions:
+        - Fees return to baseline
+        - Slippage normalizes
+        disabled_regimes:
+        - 'Market closed: execution data unavailable'
+      cluster_id: execution_cost
       spread_z_threshold: 3.0
       slippage_z_threshold: 3.0
       cooldown_bars: 12
@@ -1558,10 +2104,22 @@ events:
     parameters:
       synthetic_coverage: covered
       canonical_family: INFORMATION_DESYNC
-      desync_z_threshold: 3.0
+      trigger: Detector triggers on spot perp basis shock pattern
+      confirmation: Post-detection price action confirms signal validity
+      expected_behavior:
+        holding_horizon_bars: 4-24
+        invalidation_conditions:
+        - Desync resolves (assets converge)
+        - Lead-lag relationship resumes
+        disabled_regimes:
+        - 'Low correlation assets: desync undefined'
+      cluster_id: desync
+      z_threshold: 5.0
+      shock_change_quantile: 0.95
       lead_lag_window: 60
       cooldown_bars: 12
       merge_gap_bars: 0
+      min_basis_bps: 15.0
     templates:
     - desync_repair
     - convergence
@@ -1579,8 +2137,18 @@ events:
     events_file: liquidity_dislocation_events.parquet
     signal_column: spread_blowout_event
     parameters:
-      synthetic_coverage: uncovered
+      synthetic_coverage: covered
       canonical_family: LIQUIDITY_DISLOCATION
+      trigger: Detector triggers on spread blowout pattern
+      confirmation: Post-detection price action confirms signal validity
+      expected_behavior:
+        holding_horizon_bars: 1-12
+        invalidation_conditions:
+        - Volume returns above median within 1-2 bars
+        - Spread compresses back to baseline
+        disabled_regimes:
+        - 'SPREAD_BLOWOUT active: spread elevated, unreliable signal'
+      cluster_id: liquidity_stress
       lookback_window: 288
       z_threshold: 3.0
       cooldown_bars: 12
@@ -1604,6 +2172,16 @@ events:
     parameters:
       synthetic_coverage: covered
       canonical_family: EXECUTION_FRICTION
+      trigger: Detector triggers on spread regime widening event pattern
+      confirmation: Post-detection price action confirms signal validity
+      expected_behavior:
+        holding_horizon_bars: 0-4
+        invalidation_conditions:
+        - Fees return to baseline
+        - Slippage normalizes
+        disabled_regimes:
+        - 'Market closed: execution data unavailable'
+      cluster_id: execution_cost
       trend_window: 24
       lookback_window: 2880
       min_periods: 288
@@ -1624,8 +2202,18 @@ events:
     events_file: trend_structure_events.parquet
     signal_column: support_resistance_break_event
     parameters:
-      synthetic_coverage: uncovered
+      synthetic_coverage: covered
       canonical_family: TREND_STRUCTURE
+      trigger: Detector triggers on support resistance break pattern
+      confirmation: Post-detection price action confirms signal validity
+      expected_behavior:
+        holding_horizon_bars: 12-48
+        invalidation_conditions:
+        - Trend reverses within holding period
+        - Range expands significantly beyond breakout level
+        disabled_regimes:
+        - 'Chop regime: no clear trend direction'
+      cluster_id: trend_momentum
       trend_window: 288
       breakout_z_threshold: 2.5
       cooldown_bars: 12
@@ -1647,8 +2235,19 @@ events:
     events_file: liquidity_dislocation_events.parquet
     signal_column: sweep_stoprun_event
     parameters:
-      synthetic_coverage: uncovered
+      maturity: standard
+      synthetic_coverage: covered
       canonical_family: LIQUIDITY_DISLOCATION
+      trigger: Detector triggers on sweep stoprun pattern
+      confirmation: Post-detection price action confirms signal validity
+      expected_behavior:
+        holding_horizon_bars: 1-12
+        invalidation_conditions:
+        - Volume returns above median within 1-2 bars
+        - Spread compresses back to baseline
+        disabled_regimes:
+        - 'SPREAD_BLOWOUT active: spread elevated, unreliable signal'
+      cluster_id: orderflow_imbalance
       lookback_window: 288
       z_threshold: 3.0
       cooldown_bars: 12
@@ -1672,10 +2271,19 @@ events:
     parameters:
       synthetic_coverage: covered
       canonical_family: TREND_STRUCTURE
+      trigger: Detector triggers on trend acceleration pattern
+      confirmation: Post-detection price action confirms signal validity
+      expected_behavior:
+        holding_horizon_bars: 12-48
+        invalidation_conditions:
+        - Trend reverses within holding period
+        - Range expands significantly beyond breakout level
+        disabled_regimes:
+        - 'Chop regime: no clear trend direction'
+      cluster_id: trend_momentum
       trend_window: 96
       breakout_z_threshold: 2.5
       min_spacing: 192
-      cooldown_bars: 12
       merge_gap_bars: 0
     templates:
     - breakout_followthrough
@@ -1694,8 +2302,18 @@ events:
     events_file: trend_structure_events.parquet
     signal_column: trend_deceleration_event
     parameters:
-      synthetic_coverage: uncovered
+      synthetic_coverage: covered
       canonical_family: TREND_STRUCTURE
+      trigger: Detector triggers on trend deceleration pattern
+      confirmation: Post-detection price action confirms signal validity
+      expected_behavior:
+        holding_horizon_bars: 12-48
+        invalidation_conditions:
+        - Trend reverses within holding period
+        - Range expands significantly beyond breakout level
+        disabled_regimes:
+        - 'Chop regime: no clear trend direction'
+      cluster_id: trend_momentum
       trend_window: 288
       breakout_z_threshold: 2.5
       cooldown_bars: 12
@@ -1719,6 +2337,16 @@ events:
     parameters:
       synthetic_coverage: covered
       canonical_family: FORCED_FLOW_AND_EXHAUSTION
+      trigger: Detector triggers on trend exhaustion trigger pattern
+      confirmation: Post-detection price action confirms signal validity
+      expected_behavior:
+        holding_horizon_bars: 2-12
+        invalidation_conditions:
+        - Volume normalizes
+        - Momentum diverges further
+        disabled_regimes:
+        - 'Low volume: flow signals unreliable'
+      cluster_id: exhaustion
       trend_window: 96
       min_trend_duration_bars: 72
       liquidation_spike_z_threshold: 3.0
@@ -1741,8 +2369,18 @@ events:
     events_file: regime_transition_events.parquet
     signal_column: trend_to_chop_shift_event
     parameters:
-      synthetic_coverage: uncovered
+      synthetic_coverage: covered
       canonical_family: REGIME_TRANSITION
+      trigger: Detector triggers on trend to chop shift pattern
+      confirmation: Post-detection price action confirms signal validity
+      expected_behavior:
+        holding_horizon_bars: 12-72
+        invalidation_conditions:
+        - Regime reverts to prior state
+        - Beta/correlation stabilizes
+        disabled_regimes:
+        - 'Stable regime: no transition to detect'
+      cluster_id: regime_shift
       regime_window: 288
       transition_z_threshold: 2.5
       cooldown_bars: 48
@@ -1762,8 +2400,18 @@ events:
     events_file: volatility_transition_events.parquet
     signal_column: vol_cluster_shift_event
     parameters:
-      synthetic_coverage: uncovered
+      synthetic_coverage: covered
       canonical_family: VOLATILITY_TRANSITION
+      trigger: Detector triggers on vol cluster shift pattern
+      confirmation: Post-detection price action confirms signal validity
+      expected_behavior:
+        holding_horizon_bars: 8-48
+        invalidation_conditions:
+        - Vol re-expands above threshold within horizon
+        - Second shock occurs before resolution
+        disabled_regimes:
+        - 'Low volume: vol computation noise-dominated'
+      cluster_id: vol_regime
       vol_lookback_window: 288
       compression_quantile: 0.1
       expansion_z_threshold: 2.5
@@ -1785,8 +2433,18 @@ events:
     events_file: regime_transition_events.parquet
     signal_column: vol_regime_shift_event
     parameters:
-      synthetic_coverage: uncovered
+      synthetic_coverage: covered
       canonical_family: REGIME_TRANSITION
+      trigger: Detector triggers on vol regime shift event pattern
+      confirmation: Post-detection price action confirms signal validity
+      expected_behavior:
+        holding_horizon_bars: 12-72
+        invalidation_conditions:
+        - Regime reverts to prior state
+        - Beta/correlation stabilizes
+        disabled_regimes:
+        - 'Stable regime: no transition to detect'
+      cluster_id: regime_shift
       regime_window: 288
       transition_z_threshold: 2.5
       cooldown_bars: 48
@@ -1806,8 +2464,18 @@ events:
     events_file: volatility_transition_events.parquet
     signal_column: vol_relaxation_start_event
     parameters:
-      synthetic_coverage: uncovered
+      synthetic_coverage: covered
       canonical_family: VOLATILITY_TRANSITION
+      trigger: Detector triggers on vol relaxation start pattern
+      confirmation: Post-detection price action confirms signal validity
+      expected_behavior:
+        holding_horizon_bars: 8-48
+        invalidation_conditions:
+        - Vol re-expands above threshold within horizon
+        - Second shock occurs before resolution
+        disabled_regimes:
+        - 'Low volume: vol computation noise-dominated'
+      cluster_id: vol_regime
       vol_lookback_window: 288
       compression_quantile: 0.1
       expansion_z_threshold: 2.5
@@ -1829,7 +2497,7 @@ events:
     events_file: vol_shock_relaxation_events.parquet
     signal_column: vol_shock_relaxation_event
     parameters:
-      synthetic_coverage: uncovered
+      synthetic_coverage: covered
       canonical_family: VOLATILITY_TRANSITION
       detector_contract: true
       detector:
@@ -1903,6 +2571,9 @@ events:
         - LIQUIDITY_VACUUM: moderate; both activate post-impulse
         - SPREAD_BLOWOUT: low; different mechanisms
         - TREND_ACCELERATION: low but possible; trending vol differs from shock vol
+      trigger: Detector triggers on vol shock pattern
+      confirmation: Post-detection price action confirms signal validity
+      cluster_id: vol_regime
       m_controls: 5
       bootstrap_iters: 1000
       phase_tolerance_bars: 16
@@ -1920,8 +2591,18 @@ events:
     events_file: volatility_transition_events.parquet
     signal_column: vol_spike_event
     parameters:
-      synthetic_coverage: uncovered
+      synthetic_coverage: covered
       canonical_family: VOLATILITY_TRANSITION
+      trigger: Detector triggers on vol spike pattern
+      confirmation: Post-detection price action confirms signal validity
+      expected_behavior:
+        holding_horizon_bars: 8-48
+        invalidation_conditions:
+        - Vol re-expands above threshold within horizon
+        - Second shock occurs before resolution
+        disabled_regimes:
+        - 'Low volume: vol computation noise-dominated'
+      cluster_id: vol_regime
       merge_gap_bars: 1
       cooldown_bars: 6
       anchor_rule: first
@@ -1942,8 +2623,18 @@ events:
     events_file: liquidity_dislocation_events.parquet
     signal_column: wick_reversal_proxy_event
     parameters:
-      synthetic_coverage: uncovered
+      maturity: standard
+      synthetic_coverage: covered
       canonical_family: LIQUIDITY_DISLOCATION
+      trigger: Detector triggers on wick reversal proxy pattern
+      confirmation: Post-detection price action confirms signal validity
+      expected_behavior:
+        holding_horizon_bars: 1-12
+        invalidation_conditions:
+        - Volume returns above median within 1-2 bars
+        - Spread compresses back to baseline
+        disabled_regimes:
+        - 'SPREAD_BLOWOUT active: spread elevated, unreliable signal'
       lookback_window: 288
       z_threshold: 3.0
       cooldown_bars: 12
@@ -1955,8 +2646,18 @@ events:
     events_file: statistical_dislocation_events.parquet
     signal_column: zscore_stretch_event
     parameters:
-      synthetic_coverage: uncovered
+      synthetic_coverage: covered
       canonical_family: STATISTICAL_DISLOCATION
+      trigger: Detector triggers on zscore stretch pattern
+      confirmation: Post-detection price action confirms signal validity
+      expected_behavior:
+        holding_horizon_bars: 6-36
+        invalidation_conditions:
+        - Basis normalizes within horizon
+        - Z-score returns to mean
+        disabled_regimes:
+        - 'Low basis volatility: z-score undefined'
+      cluster_id: statistical_stretch
       lookback_window: 288
       band_z_threshold: 3.0
       cooldown_bars: 12
@@ -1969,15 +2670,3 @@ events:
     - 15m
     - 60m
     max_candidates_per_run: 350
-  CROSS_ASSET_DESYNC_EVENT:
-    active: false
-    canonical_family: INFORMATION_DESYNC
-    parameters:
-      lookback_window: 2880
-      threshold_z: 3.0
-      revert_z: 0.5
-      window_end: 12
-    reports_dir: cross_asset_desync
-    events_file: cross_asset_desync_events.parquet
-    signal_column: cross_asset_desync_event
-    synthetic_coverage: covered

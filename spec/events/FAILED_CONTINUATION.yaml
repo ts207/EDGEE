@@ -4,8 +4,9 @@ reports_dir: forced_flow_and_exhaustion
 events_file: forced_flow_and_exhaustion_events.parquet
 signal_column: failed_continuation_event
 parameters:
-  liquidation_spike_z_threshold: 3.0
-  cascade_window_bars: 12
+  breakout_window: 48
+  reversal_window: 12
+  breakout_strength_min: 0.003
   cooldown_bars: 24
   merge_gap_bars: 0
 canonical_family: FORCED_FLOW_AND_EXHAUSTION

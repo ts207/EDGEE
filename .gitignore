@@ -73,6 +73,7 @@ gha-creds-*.json
 /nohup.out
 /out.log
 /verify_hydra.py
+/artifacts/
 
 /outputs/
 
