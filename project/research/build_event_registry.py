@@ -165,6 +165,11 @@ def main() -> int:
 
         if not events.empty:
             logging.info("Converting timestamps to int64")
+            # Ensure timestamp itself is int64
+            events["timestamp"] = (
+                pd.to_datetime(events["timestamp"], utc=True, errors="coerce")
+                .view("int64") // 10**6
+            )
             for _ts_col in (
                 "phenom_enter_ts",
                 "eval_bar_ts",
@@ -173,10 +178,13 @@ def main() -> int:
                 "signal_ts",
                 "exit_ts",
             ):
-                if _ts_col in events.columns:
-                    events[_ts_col] = (
-                        pd.to_numeric(events[_ts_col], errors="coerce").fillna(0).astype("int64")
-                    )
+                if _ts_col not in events.columns or events[_ts_col].isna().all():
+                    events[_ts_col] = events["timestamp"]
+                else:
+                    ts_ser = pd.to_datetime(events[_ts_col], utc=True, errors="coerce")
+                    # Fallback to main timestamp where values are NaT
+                    ts_ser = ts_ser.fillna(pd.to_datetime(events["timestamp"], unit="ms", utc=True))
+                    events[_ts_col] = ts_ser.view("int64") // 10**6
 
             logging.info("Validating events against EventRegistrySchema")
             EventRegistrySchema.validate(events)

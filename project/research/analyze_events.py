@@ -167,6 +167,11 @@ def _load_detector_input(
     data_root: Path | None = None,
 ) -> pd.DataFrame:
     data_root = data_root or get_data_root()
+    
+    # Check if detector needs basis features (perp + spot)
+    needs_basis = False
+    basis_cols = {"close_perp", "close_spot", "basis_bps"}
+    
     if event_type in (
         "BASIS_DISLOC",
         "BASIS_SNAPBACK",
@@ -174,7 +179,29 @@ def _load_detector_input(
         "CROSS_VENUE_CATCHUP",
         "FND_DISLOC",
         "SPOT_PERP_BASIS_SHOCK",
+        "VOL_SHOCK",
     ):
+        needs_basis = True
+    elif detector:
+        # Check required columns
+        req = getattr(detector, "required_columns", ())
+        if any(col in basis_cols for col in req):
+            needs_basis = True
+        
+        # Check if it's a sequence/composite detector that might need basis features
+        if not needs_basis and hasattr(detector, "_ensure_detectors"):
+            try:
+                detector._ensure_detectors()
+                anchor = getattr(detector, "_anchor_detector", None)
+                trigger = getattr(detector, "_trigger_detector", None)
+                if anchor and any(col in getattr(anchor, "required_columns", ()) for col in basis_cols):
+                    needs_basis = True
+                elif trigger and any(col in getattr(trigger, "required_columns", ()) for col in basis_cols):
+                    needs_basis = True
+            except Exception:
+                pass
+
+    if needs_basis:
         return _load_basis_features(run_id, symbol, timeframe, data_root=data_root)
     return load_features(run_id=run_id, symbol=symbol, timeframe=timeframe, data_root=data_root)
 

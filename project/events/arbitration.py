@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 import pandas as pd
+from project.events.shared import format_event_id
 from project.spec_registry import load_yaml_relative
 
 _SPEC_DIR = Path(__file__).resolve().parents[2] / "spec" / "events"
@@ -164,7 +165,10 @@ def arbitrate_events(
                     # For simplicity, we'll use timestamp diff in minutes assuming 5m bars
                     other_matches = sym_df[
                         (sym_df["event_type"] == other_type) &
-                        (sym_df["timestamp"].between(f_ts - window * 300, f_ts + window * 300))
+                        (sym_df["timestamp"].between(
+                            f_ts - pd.Timedelta(seconds=window * 300),
+                            f_ts + pd.Timedelta(seconds=window * 300)
+                        ))
                     ]
                     if other_matches.empty:
                         match = False
@@ -174,11 +178,20 @@ def arbitrate_events(
                 if match:
                     # Emit composite event at the latest timestamp of the matched group
                     latest_ts = max(e["timestamp"] for e in matched_evts)
+                    # Use integer epoch seconds for ID and count occurrences
+                    ts_idx = int(pd.to_datetime(latest_ts, utc=True).timestamp())
+                    sub_idx = len([r for r in composite_rows if r["timestamp"] == latest_ts and r["symbol"] == sym])
+                    
                     composite_rows.append({
                         "event_type": name,
+                        "event_id": format_event_id(name, sym, ts_idx, sub_idx),
+                        "signal_column": f"{name.lower()}_event",
                         "symbol": sym,
                         "timestamp": latest_ts,
+                        "phenom_enter_ts": latest_ts,
                         "enter_ts": latest_ts,
+                        "detected_ts": latest_ts,
+                        "signal_ts": latest_ts,
                         "exit_ts": latest_ts,
                         "event_tradeability_score": sum(e.get("event_tradeability_score", 0.5) for e in matched_evts) / len(matched_evts),
                         "composite_source": ",".join(required),

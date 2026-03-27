@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
+import numpy as np
 import pandas as pd
 
 from project.events.detectors.base import BaseEventDetector
@@ -63,7 +64,7 @@ class ThresholdDetector(BaseEventDetector):
         self, df: pd.DataFrame, *, features: Mapping[str, pd.Series], **params: Any
     ) -> pd.Series:
         signal = self.compute_signal(df, features=features, **params)
-        threshold = self.compute_threshold(df, features=features, **params).replace(0.0, pd.NA)
+        threshold = self.compute_threshold(df, features=features, **params).replace(0.0, np.nan)
         return (signal / threshold).astype(float)
 
     def event_indices(
