@@ -1,4 +1,10 @@
-"""Phase 2 Candidate Discovery CLI entrypoint."""
+"""
+Phase 2 Candidate Discovery CLI entrypoint.
+
+The execution engine statically scans stage scripts for dangerous passthrough
+flags before launch. This wrapper intentionally forwards `--experiment_config`
+to the underlying CLI.
+"""
 
 from __future__ import annotations
 

@@ -107,3 +107,28 @@ def test_phase2_search_engine_wrapper_preserves_experiment_config():
 
     assert "--experiment_config" in filtered
     assert "/tmp/experiment.yaml" in filtered
+
+
+def test_phase2_candidate_discovery_wrapper_preserves_experiment_config():
+    script_path = (
+        Path(__file__).resolve().parents[2]
+        / "project"
+        / "pipelines"
+        / "research"
+        / "phase2_candidate_discovery.py"
+    )
+    base_args = [
+        "--run_id",
+        "shakeout_test",
+        "--experiment_config",
+        "/tmp/experiment.yaml",
+        "--program_id",
+        "regime_shakeout",
+        "--event_type",
+        "BASIS_DISLOC",
+    ]
+
+    filtered = engine._filter_unsupported_flags(script_path, base_args)
+
+    assert "--experiment_config" in filtered
+    assert "/tmp/experiment.yaml" in filtered
