@@ -846,6 +846,7 @@ def execute_promotion(config: PromotionConfig) -> PromotionServiceResult:
             for column in [
                 "candidate_id",
                 "event_type",
+                "hypothesis_id",
                 "promotion_decision",
                 "promotion_track",
                 "rank_score",

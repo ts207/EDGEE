@@ -12,6 +12,7 @@ from project import PROJECT_ROOT
 from project.core.config import get_data_root
 from project.core.execution_costs import resolve_execution_costs
 from project.core.timeframes import normalize_timeframe, timeframe_to_minutes
+from project.domain.compiled_registry import get_domain_registry
 from project.events.event_specs import EVENT_REGISTRY_SPECS
 from project.io.utils import ensure_dir
 from project.research.cost_calibration import CandidateCostEstimate, ToBRegimeCostCalibrator
@@ -430,8 +431,14 @@ def execute_candidate_discovery(config: CandidateDiscoveryConfig) -> CandidateDi
                     ).sum()
                 )
             for idx, row in candidates.iterrows():
+                event_type = str(row.get("canonical_event_type", row.get("event_type", ""))).strip()
+                event_spec = get_domain_registry().get_event(event_type)
                 hyp = Hypothesis(
-                    event_family=str(row.get("event_type", "")).split("_")[0],
+                    event_family=(
+                        event_spec.canonical_regime
+                        if event_spec is not None and event_spec.canonical_regime
+                        else event_type
+                    ),
                     event_type=str(row.get("event_type", "")),
                     symbol_scope=symbol,
                     side=discovery.action_name_from_direction(row.get("direction", 0.0)),

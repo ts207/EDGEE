@@ -5,6 +5,9 @@ from pathlib import Path
 from typing import Any, Dict
 
 from project.core.config import get_data_root
+from project.research.services.pathing import phase2_candidates_path as canonical_phase2_candidates_path
+from project.research.services.pathing import phase2_diagnostics_path as canonical_phase2_diagnostics_path
+from project.research.services.pathing import phase2_run_dir
 
 
 def data_root(root: Path | None = None) -> Path:
@@ -63,12 +66,49 @@ def blueprint_summary_path(run_id: str, root: Path | None = None) -> Path:
     return blueprint_dir(run_id, root) / "blueprint_summary.json"
 
 
-def phase2_candidates_path(run_id: str, event_type: str, root: Path | None = None) -> Path:
-    base = reports_dir(root) / "phase2" / str(run_id) / str(event_type)
-    parquet = base / "phase2_candidates.parquet"
+def phase2_candidates_path(
+    run_id: str,
+    event_type: str | None = None,
+    root: Path | None = None,
+) -> Path:
+    resolved_root = data_root(root)
+    parquet = canonical_phase2_candidates_path(data_root=resolved_root, run_id=run_id)
     if parquet.exists():
         return parquet
-    return base / "phase2_candidates.csv"
+    csv = parquet.with_suffix(".csv")
+    if csv.exists():
+        return csv
+
+    legacy_event = str(event_type or "").strip()
+    if legacy_event:
+        legacy_root = phase2_run_dir(data_root=resolved_root, run_id=run_id)
+        for legacy_base in (
+            legacy_root / legacy_event,
+            legacy_root / "legacy" / legacy_event,
+        ):
+            legacy_parquet = legacy_base / "phase2_candidates.parquet"
+            if legacy_parquet.exists():
+                return legacy_parquet
+            legacy_csv = legacy_base / "phase2_candidates.csv"
+            if legacy_csv.exists():
+                return legacy_csv
+            for nested in sorted(legacy_base.glob("*/phase2_candidates.parquet")):
+                return nested
+            for nested in sorted(legacy_base.glob("*/phase2_candidates.csv")):
+                return nested
+
+    return parquet
+
+
+def phase2_diagnostics_path(run_id: str, root: Path | None = None) -> Path:
+    resolved_root = data_root(root)
+    canonical = canonical_phase2_diagnostics_path(data_root=resolved_root, run_id=run_id)
+    if canonical.exists():
+        return canonical
+    legacy = phase2_run_dir(data_root=resolved_root, run_id=run_id) / "search_engine" / "phase2_diagnostics.json"
+    if legacy.exists():
+        return legacy
+    return canonical
 
 
 def load_json_dict(path: Path) -> Dict[str, Any]:

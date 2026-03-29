@@ -7,6 +7,8 @@ from typing import Any, Dict, Mapping, Sequence
 
 import pandas as pd
 
+from project.artifacts import phase2_diagnostics_path
+
 
 DEFAULT_DRIFT_THRESHOLDS: Dict[str, float] = {
     "max_phase2_candidate_count_delta_abs": 10.0,
@@ -29,12 +31,7 @@ DEFAULT_DRIFT_THRESHOLDS: Dict[str, float] = {
 
 def research_diagnostics_paths(*, data_root: Path, run_id: str) -> Dict[str, Path]:
     return {
-        "phase2": data_root
-        / "reports"
-        / "phase2"
-        / run_id
-        / "search_engine"
-        / "phase2_diagnostics.json",
+        "phase2": phase2_diagnostics_path(run_id, data_root),
         "promotion": data_root / "reports" / "promotions" / run_id / "promotion_diagnostics.json",
         "edge_candidates": data_root
         / "reports"

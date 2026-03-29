@@ -20,6 +20,7 @@ Recommended reading order:
 14. [13_TRIGGER_TYPES.md](/home/irene/Edge/docs/13_TRIGGER_TYPES.md)
 15. [14_FULL_PROJECT_GUIDE.md](/home/irene/Edge/docs/14_FULL_PROJECT_GUIDE.md)
 16. [15_EVENT_REFERENCE.md](/home/irene/Edge/docs/15_EVENT_REFERENCE.md)
+17. [16_BOUNDED_EXPERIMENT_TEMPLATE.md](/home/irene/Edge/docs/16_BOUNDED_EXPERIMENT_TEMPLATE.md)
 
 Reference surfaces:
 

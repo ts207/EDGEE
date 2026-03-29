@@ -14,9 +14,14 @@ class ExecutableStrategyMetadata(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     spec_version: str = EXECUTABLE_STRATEGY_SPEC_VERSION
+    proposal_id: str = ""
     run_id: str
+    hypothesis_id: str = ""
     blueprint_id: str
     candidate_id: str
+    canonical_event_type: str = ""
+    canonical_regime: str = ""
+    routing_profile_id: str = ""
     event_type: str
     direction: str
     retail_profile: str
@@ -181,6 +186,8 @@ class ExecutableStrategySpec(BaseModel):
                 },
             },
             "lineage": {
+                "proposal_id": self.metadata.proposal_id,
+                "hypothesis_id": self.metadata.hypothesis_id,
                 "source_path": self.research_origin.source_path,
                 "compiler_version": self.research_origin.compiler_version,
                 "generated_at_utc": self.research_origin.generated_at_utc,
@@ -220,9 +227,14 @@ class ExecutableStrategySpec(BaseModel):
         entry_delay = blueprint.entry.delay_bars
         return cls(
             metadata=ExecutableStrategyMetadata(
+                proposal_id=blueprint.lineage.proposal_id,
                 run_id=run_id,
+                hypothesis_id=blueprint.lineage.hypothesis_id,
                 blueprint_id=blueprint.id,
                 candidate_id=blueprint.candidate_id,
+                canonical_event_type=blueprint.lineage.canonical_event_type,
+                canonical_regime=blueprint.lineage.canonical_regime,
+                routing_profile_id=blueprint.lineage.routing_profile_id,
                 event_type=blueprint.event_type,
                 direction=blueprint.direction,
                 retail_profile=retail_profile,

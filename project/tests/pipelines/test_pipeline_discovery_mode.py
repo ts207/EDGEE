@@ -284,3 +284,92 @@ def test_preflight_marks_search_engine_active_for_experiment_config(tmp_path):
 
     assert preflight["effective_behavior"]["runs_search_engine"] is True
     assert preflight["effective_behavior"]["runs_legacy_phase2_conditional"] is False
+
+
+def test_preflight_auto_enables_spot_pipeline_for_basis_regime_experiment(tmp_path):
+    from project.pipelines.pipeline_planning import prepare_run_preflight
+    from project.pipelines.stages.utils import script_supports_flag
+
+    registry_root = Path(__file__).parents[3] / "project" / "configs" / "registries"
+    project_root = Path(__file__).parents[3] / "project"
+
+    experiment_config = tmp_path / "experiment.yaml"
+    experiment_config.write_text(
+        yaml.safe_dump(
+            {
+                "program_id": "edge_basis_funding_dislocation",
+                "run_mode": "research",
+                "description": "basis/funding dislocation spot coverage check",
+                "instrument_scope": {
+                    "instrument_classes": ["crypto"],
+                    "symbols": ["BTCUSDT", "ETHUSDT"],
+                    "timeframe": "5m",
+                    "start": "2023-01-15",
+                    "end": "2023-02-28",
+                },
+                "trigger_space": {
+                    "allowed_trigger_types": ["EVENT"],
+                    "events": {"include": ["BASIS_DISLOC"]},
+                    "canonical_regimes": ["BASIS_FUNDING_DISLOCATION"],
+                },
+                "templates": {"include": ["mean_reversion"]},
+                "evaluation": {
+                    "horizons_bars": [12],
+                    "directions": ["long", "short"],
+                    "entry_lags": [1],
+                },
+                "contexts": {"include": {}},
+                "search_control": {
+                    "max_hypotheses_total": 4,
+                    "max_hypotheses_per_template": 4,
+                    "max_hypotheses_per_event_family": 4,
+                    "random_seed": 42,
+                },
+                "promotion": {
+                    "enabled": False,
+                    "track": "standard",
+                    "multiplicity_scope": "program_id",
+                },
+                "artifacts": {},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    args = _make_args(
+        run_id="r0",
+        symbols="BTCUSDT,ETHUSDT",
+        start="2023-01-15",
+        end="2023-02-28",
+        timeframes="5m",
+        experiment_config=str(experiment_config),
+        registry_root=str(registry_root),
+        objective_name="retail_profitability",
+        objective_spec=None,
+        retail_profiles_spec=None,
+        force=0,
+        allow_missing_funding=0,
+        enable_cross_venue_spot_pipeline=0,
+        runtime_invariants_mode="warn",
+        emit_run_hash=0,
+        determinism_replay_checks=0,
+        oms_replay_checks=0,
+        performance_mode=0,
+        run_strategy_blueprint_compiler=0,
+        run_strategy_builder=0,
+    )
+
+    preflight = prepare_run_preflight(
+        args=args,
+        project_root=project_root,
+        data_root=project_root.parent / "data",
+        cli_flag_present=lambda _flag: False,
+        run_id_default=lambda: "unused",
+        script_supports_flag=script_supports_flag,
+    )
+
+    stage_names = list(preflight["stages"].keys())
+    assert args.enable_cross_venue_spot_pipeline == 1
+    assert "ingest_binance_spot_ohlcv_5m" in stage_names
+    assert "build_cleaned_5m_spot" in stage_names
+    assert "build_features_5m_spot" in stage_names

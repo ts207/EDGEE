@@ -6,6 +6,12 @@ Canonical loop:
 
 `observe -> retrieve memory -> define objective -> propose -> plan -> execute -> evaluate -> reflect -> adapt`
 
+Default policy after the baseline cleanup:
+
+- use the heavy lane only for structural changes to architecture, schemas, routing semantics, storage semantics, or identity lineage
+- use the bounded experiment lane for normal progress
+- follow [16_BOUNDED_EXPERIMENT_TEMPLATE.md](/home/irene/Edge/docs/16_BOUNDED_EXPERIMENT_TEMPLATE.md) for the standing research loop, required artifacts, promotion gates, and governance cadence
+
 ## Preferred Workflow
 
 ### 1. Query knowledge first

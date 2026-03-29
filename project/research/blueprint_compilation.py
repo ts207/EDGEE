@@ -402,6 +402,8 @@ def compile_blueprint(
     regime_bucket = str(merged_row.get("regime_bucket", "")).strip()
     recommended_bucket = str(merged_row.get("recommended_bucket", "")).strip()
     routing_profile_id = str(merged_row.get("routing_profile_id", "")).strip()
+    proposal_id = str(merged_row.get("proposal_id", "")).strip()
+    hypothesis_id = str(merged_row.get("hypothesis_id", "")).strip()
 
     operator_version = "unknown"
     if operator_registry is not None:
@@ -439,6 +441,8 @@ def compile_blueprint(
         overlays=overlays,
         evaluation=evaluation,
         lineage=LineageSpec(
+            proposal_id=proposal_id,
+            hypothesis_id=hypothesis_id,
             source_path=str(merged_row.get("source_path", "")),
             compiler_version=compiler_version,
             generated_at_utc=deterministic_ts,

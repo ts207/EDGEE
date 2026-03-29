@@ -678,6 +678,29 @@ def main() -> int:
             for bp in blueprints:
                 f.write(json.dumps(bp.to_dict(), sort_keys=True) + "\n")
 
+        low_capital_contract = assert_low_capital_contract(
+            contract,
+            stage_name="compile_strategy_blueprints",
+        )
+        audit_rows = {str(row.get("candidate_id", "")).strip(): row for row in edge_df.to_dict("records")}
+        _write_strategy_contract_artifacts(
+            blueprints=blueprints,
+            out_dir=out_dir,
+            run_id=args.run_id,
+            retail_profile=str(args.retail_profile),
+            low_capital_contract=low_capital_contract,
+            require_low_capital_contract=bool(contract.require_low_capital_contract),
+            effective_max_concurrent_positions=int(contract.max_concurrent_positions or 1),
+            effective_per_position_notional_cap_usd=float(
+                contract.effective_per_position_notional_cap_usd or 0.0
+            ),
+            default_fee_tier="default",
+            fees_bps_per_side=float(costs.fee_bps_per_side),
+            slippage_bps_per_fill=float(costs.slippage_bps_per_fill),
+            audit_rows={bp.id: audit_rows.get(bp.candidate_id, {}) for bp in blueprints},
+            portfolio_state_path=None,
+        )
+
         finalize_manifest(manifest, "success", stats={"blueprint_count": len(blueprints)})
         return 0
     except Exception as exc:

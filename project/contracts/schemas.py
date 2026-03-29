@@ -17,11 +17,10 @@ class DataFrameSchemaContract:
 _SCHEMA_REGISTRY: Dict[str, DataFrameSchemaContract] = {
     "phase2_candidates": DataFrameSchemaContract(
         name="phase2_candidates",
-        required_columns=("candidate_id", "event_type", "symbol", "run_id"),
+        required_columns=("candidate_id", "hypothesis_id", "event_type", "symbol", "run_id"),
         optional_columns=(
             "estimate_bps",
             "q_value",
-            "hypothesis_id",
             "split_scheme_id",
             "canonical_regime",
             "subtype",
@@ -36,6 +35,7 @@ _SCHEMA_REGISTRY: Dict[str, DataFrameSchemaContract] = {
         name="promotion_audit",
         required_columns=("candidate_id", "event_type", "promotion_decision", "promotion_track"),
         optional_columns=(
+            "hypothesis_id",
             "q_value",
             "promotion_score",
             "bundle_version",
@@ -54,6 +54,7 @@ _SCHEMA_REGISTRY: Dict[str, DataFrameSchemaContract] = {
         name="promoted_candidates",
         required_columns=("candidate_id", "event_type", "status"),
         optional_columns=(
+            "hypothesis_id",
             "promotion_track",
             "selection_score",
             "bundle_version",
@@ -71,6 +72,7 @@ _SCHEMA_REGISTRY: Dict[str, DataFrameSchemaContract] = {
         name="evidence_bundle_summary",
         required_columns=("candidate_id", "event_type", "promotion_decision", "promotion_track"),
         optional_columns=(
+            "hypothesis_id",
             "rank_score",
             "policy_version",
             "bundle_version",
@@ -87,6 +89,7 @@ _SCHEMA_REGISTRY: Dict[str, DataFrameSchemaContract] = {
         name="promotion_decisions",
         required_columns=("candidate_id", "event_type", "promotion_decision", "promotion_track"),
         optional_columns=(
+            "hypothesis_id",
             "rank_score",
             "policy_version",
             "bundle_version",
@@ -141,4 +144,14 @@ def validate_dataframe_for_schema(
             raise ValueError(
                 f"dataframe for schema '{schema_name}' has all-null required columns: {bad}"
             )
+        if schema_name == "phase2_candidates":
+            identical = (
+                out["candidate_id"].astype(str).str.strip()
+                == out["hypothesis_id"].astype(str).str.strip()
+            )
+            if bool(identical.all()):
+                raise ValueError(
+                    "dataframe for schema 'phase2_candidates' has collapsed lineage: "
+                    "candidate_id must differ from hypothesis_id for current-format artifacts"
+                )
     return out

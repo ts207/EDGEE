@@ -180,6 +180,8 @@ class EvaluationSpec(BaseModel):
 
 class LineageSpec(BaseModel):
     model_config = ConfigDict(frozen=True)
+    proposal_id: str = ""
+    hypothesis_id: str = ""
     source_path: str = Field(min_length=1)
     compiler_version: str = Field(min_length=1)
     generated_at_utc: str = Field(min_length=1)

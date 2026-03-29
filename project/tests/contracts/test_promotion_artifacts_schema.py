@@ -13,6 +13,7 @@ def test_validate_promotion_artifacts_schemas():
     audit = pd.DataFrame(
         {
             "candidate_id": ["c1"],
+            "hypothesis_id": ["hyp1"],
             "event_type": ["VOL_SHOCK"],
             "promotion_decision": ["promoted"],
             "promotion_track": ["standard"],
@@ -28,6 +29,7 @@ def test_validate_promotion_artifacts_schemas():
     summary = pd.DataFrame(
         {
             "candidate_id": ["c1"],
+            "hypothesis_id": ["hyp1"],
             "event_type": ["VOL_SHOCK"],
             "promotion_decision": ["promoted"],
             "promotion_track": ["standard"],

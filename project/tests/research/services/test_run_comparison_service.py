@@ -429,7 +429,7 @@ def test_summarize_run_research_status_classifies_keep_research_success(tmp_path
         },
     )
     _write_json(
-        data_root / "reports" / "phase2" / run_id / "search_engine" / "phase2_diagnostics.json",
+        data_root / "reports" / "phase2" / run_id / "phase2_diagnostics.json",
         {
             "combined_candidate_rows": 4,
             "multiplicity_discoveries": 1,
@@ -500,7 +500,7 @@ def test_write_run_matrix_summary_report_emits_run_classifications_and_compariso
             },
         )
         _write_json(
-            data_root / "reports" / "phase2" / run_id / "search_engine" / "phase2_diagnostics.json",
+            data_root / "reports" / "phase2" / run_id / "phase2_diagnostics.json",
             {
                 "combined_candidate_rows": candidate_count,
                 "multiplicity_discoveries": max(candidate_count - 3, 0),

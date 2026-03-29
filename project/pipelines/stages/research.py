@@ -76,6 +76,9 @@ def _event_runtime_overrides(args: Any, event_type: str) -> Mapping[str, Any]:
 
 
 def _resolve_candidate_promotion_profile(args: Any) -> str:
+    canonical = str(getattr(args, "promotion_profile", "auto")).strip().lower()
+    if canonical in {"research", "deploy"}:
+        return canonical
     configured = str(getattr(args, "candidate_promotion_profile", "auto")).strip().lower()
     if configured in {"research", "deploy"}:
         return configured
@@ -369,117 +372,6 @@ def build_research_stages(
             )
         )
 
-        if not experiment_plan:
-            for event_type, _, _ in selected_chain:
-                for tf in timeframes:
-                    phase2_stage_name = f"phase2_conditional_hypotheses__{event_type}_{tf}"
-                    phase2_args = [
-                        "--run_id",
-                        run_id,
-                        "--event_type",
-                        event_type,
-                        "--symbols",
-                        symbols,
-                        "--timeframe",
-                        tf,
-                        "--shift_labels_k",
-                        str(int(args.phase2_shift_labels_k)),
-                        "--mode",
-                        str(args.mode),
-                        "--gate_profile",
-                        gate_profile,
-                        "--cost_calibration_mode",
-                        str(args.phase2_cost_calibration_mode),
-                        "--cost_min_tob_coverage",
-                        str(float(args.phase2_cost_min_tob_coverage)),
-                        "--cost_tob_tolerance_minutes",
-                        str(int(args.phase2_cost_tob_tolerance_minutes)),
-                        "--retail_profile",
-                        str(args.retail_profile),
-                    ]
-                    if getattr(args, "phase2_min_validation_n_obs", None) is not None:
-                        phase2_args.extend(
-                            ["--min_validation_n_obs", str(int(args.phase2_min_validation_n_obs))]
-                        )
-                    if getattr(args, "phase2_min_test_n_obs", None) is not None:
-                        phase2_args.extend(
-                            ["--min_test_n_obs", str(int(args.phase2_min_test_n_obs))]
-                        )
-                    if getattr(args, "phase2_min_total_n_obs", None) is not None:
-                        phase2_args.extend(
-                            ["--min_total_n_obs", str(int(args.phase2_min_total_n_obs))]
-                        )
-                    if concept_file:
-                        phase2_args.extend(["--concept_file", concept_file])
-
-                    if agent_selections["templates"]:
-                        phase2_args.extend(["--templates"] + agent_selections["templates"])
-                    if agent_selections["horizons"]:
-                        phase2_args.extend(["--horizons"] + agent_selections["horizons"])
-                    if getattr(args, "directions", None):
-                        phase2_args.extend(["--directions"] + args.directions)
-                    if getattr(args, "entry_lags", None):
-                        phase2_args.extend(["--entry_lags"] + [str(l) for l in args.entry_lags])
-                    if getattr(args, "program_id", None):
-                        phase2_args.extend(["--program_id", str(args.program_id)])
-                    if getattr(args, "search_budget", None):
-                        phase2_args.extend(["--search_budget", str(args.search_budget)])
-
-                    stages.append(
-                        (
-                            phase2_stage_name,
-                            project_root
-                            / "pipelines"
-                            / "research"
-                            / "phase2_candidate_discovery.py",
-                            phase2_args,
-                        )
-                    )
-
-                    if int(args.run_bridge_eval_phase2):
-                        bridge_stage_name = f"bridge_evaluate_phase2__{event_type}_{tf}"
-                        stages.append(
-                            (
-                                bridge_stage_name,
-                                project_root
-                                / "pipelines"
-                                / "research"
-                                / "bridge_evaluate_phase2.py",
-                                [
-                                    "--run_id",
-                                    run_id,
-                                    "--event_type",
-                                    event_type,
-                                    "--symbols",
-                                    symbols,
-                                    "--timeframe",
-                                    tf,
-                                    "--start",
-                                    start,
-                                    "--end",
-                                    end,
-                                    "--train_frac",
-                                    str(float(args.bridge_train_frac)),
-                                    "--validation_frac",
-                                    str(float(args.bridge_validation_frac)),
-                                    "--embargo_days",
-                                    str(int(args.bridge_embargo_days)),
-                                    "--edge_cost_k",
-                                    str(float(args.bridge_edge_cost_k)),
-                                    "--stressed_cost_multiplier",
-                                    str(float(args.bridge_stressed_cost_multiplier)),
-                                    "--min_validation_trades",
-                                    str(int(args.bridge_min_validation_trades)),
-                                    "--mode",
-                                    str(args.mode),
-                                    "--candidate_mask",
-                                    str(args.bridge_candidate_mask),
-                                    "--retail_profile",
-                                    str(args.retail_profile),
-                                ],
-                            )
-                        )
-
     if discovery_mode == "search" and int(args.run_phase2_conditional):
         search_args = [
             "--run_id",
@@ -747,29 +639,7 @@ def build_research_stages(
                 )
             )
 
-    # The event-conditioned discovery stage is already added in the loop above.
-    # If discovery_mode == 'search', we might want to prune it, but for safety in this
-    # incremental PR we keep it and just focus on wiring the new ones.
-    # The Retirement Criterion (Option B) says we run both and compare first.
-
     if experiment_plan:
-        discovery_stages = [
-            s[0] for s in stages if s[0].startswith("phase2_conditional_hypotheses__")
-        ]
-        if discovery_mode == "search":
-            discovery_stages.append("phase2_search_engine")
-
-        # finalize_experiment must run AFTER all discovery stages
-        # The pipeline planner will handle the dependency if we add it to the name or something?
-        # Actually, the planner uses _resolve_dependencies which looks for patterns.
-        # But finalized_experiment doesn't follow a standard pattern yet.
-
-        # I'll just name it so it matches a dependency pattern if one exists,
-        # or I'll change the planner to support explicit dependencies.
-
-        # Wait, the planner uses _resolve_dependencies(name, all_stage_names).
-        # Let's check that.
-
         stages.append(
             (
                 "finalize_experiment",

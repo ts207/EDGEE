@@ -126,7 +126,7 @@ def test_run_candidate_discovery_service_smoke(monkeypatch, tmp_path):
     assert result.exit_code == 0
     assert not result.combined_candidates.empty
     assert "hypothesis_id" in result.combined_candidates.columns
-    assert any((tmp_path / "phase2" / "BTCUSDT").glob("phase2_candidates.*"))
+    assert any((tmp_path / "phase2" / "symbols" / "BTCUSDT").glob("phase2_candidates.*"))
     diagnostics = json.loads(
         (tmp_path / "phase2" / "phase2_diagnostics.json").read_text(encoding="utf-8")
     )

@@ -31,11 +31,19 @@ def test_canonicalize_event_episodes_contract_fields_are_tuple_shaped() -> None:
 
 def test_schema_normalization_and_validation() -> None:
     df = pd.DataFrame(
-        [{"candidate_id": "c1", "event_type": "VOL_SHOCK", "symbol": "BTCUSDT", "run_id": "r1"}]
+        [
+            {
+                "candidate_id": "cand_1",
+                "hypothesis_id": "hyp_1",
+                "event_type": "VOL_SHOCK",
+                "symbol": "BTCUSDT",
+                "run_id": "r1",
+            }
+        ]
     )
     out = validate_dataframe_for_schema(df, "phase2_candidates")
     assert "estimate_bps" in out.columns
-    assert out.iloc[0]["candidate_id"] == "c1"
+    assert out.iloc[0]["candidate_id"] == "cand_1"
     empty = normalize_dataframe_for_schema(pd.DataFrame(), "promotion_decisions")
     assert {"candidate_id", "event_type", "promotion_decision", "promotion_track"}.issubset(
         set(empty.columns)

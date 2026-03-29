@@ -4,6 +4,9 @@ Phase 2 Candidate Discovery CLI entrypoint.
 The execution engine statically scans stage scripts for dangerous passthrough
 flags before launch. This wrapper intentionally forwards `--experiment_config`
 to the underlying CLI.
+
+This is a compatibility-only entrypoint and is no longer scheduled as the
+authoritative phase-2 discovery stage for new runs.
 """
 
 from __future__ import annotations

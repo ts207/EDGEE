@@ -13,8 +13,10 @@ import logging
 import pandas as pd
 import numpy as np
 
+from project.domain.compiled_registry import get_domain_registry
+from project.research.discovery import candidate_id_from_hypothesis
 from project.research.multiplicity import make_family_id
-from project.spec_validation import get_event_family, resolve_execution_templates
+from project.research.regime_routing import annotate_regime_metadata
 
 log = logging.getLogger(__name__)
 
@@ -44,6 +46,14 @@ def _sanitize_event_type(row: pd.Series) -> str:
         str(row.get("trigger_type", "event")),
         str(row.get("trigger_key", "UNKNOWN")),
     )
+
+
+def _registry_semantics(event_type: str) -> tuple[str, str]:
+    spec = get_domain_registry().get_event(event_type)
+    if spec is None:
+        token = str(event_type or "").strip().upper()
+        return token, token
+    return spec.event_type, spec.canonical_regime or spec.canonical_family or spec.event_type
 
 
 def hypotheses_to_bridge_candidates(
@@ -81,9 +91,19 @@ def hypotheses_to_bridge_candidates(
 
     # Core Mappings
     out = pd.DataFrame()
-    out["candidate_id"] = filtered["hypothesis_id"].astype(str)
     event_types = [_sanitize_event_type(row) for _, row in filtered.iterrows()]
     out["event_type"] = event_types
+    out["hypothesis_id"] = filtered["hypothesis_id"].astype(str)
+    out["canonical_event_type"] = [canonical for canonical, _ in map(_registry_semantics, event_types)]
+    out["canonical_family"] = [family for _, family in map(_registry_semantics, event_types)]
+    out["candidate_id"] = [
+        candidate_id_from_hypothesis(
+            hypothesis_id=str(hypothesis_id),
+            symbol=str(symbol).strip().upper() or "ALL",
+            event_type=str(event_type),
+        )
+        for hypothesis_id, event_type in zip(filtered["hypothesis_id"], out["canonical_event_type"])
+    ]
     
     # Only filter pure regime-label STATE_ events - ones that have very high event counts
     # (appearing on >50% of bars = >280 bars in 3-day window)
@@ -193,14 +213,6 @@ def hypotheses_to_bridge_candidates(
         errors="coerce",
     ).fillna(out["p_value"]).astype(float)
 
-    # Derive family_id from trigger metadata
-    # Derive canonical_family from trigger_key (the part after "type:", e.g. "event:VOL_SPIKE" -> "VOL_SPIKE")
-    out["canonical_family"] = (
-        filtered["trigger_key"]
-        .apply(lambda k: str(k).split(":", 1)[1].upper() if ":" in str(k) else str(k).upper())
-        .values
-    )
-
     out["family_id"] = [
         make_family_id(
             str(symbol),
@@ -211,7 +223,7 @@ def hypotheses_to_bridge_candidates(
             canonical_family=str(canonical_family),
         )
         for event_type, template_id, horizon, canonical_family in zip(
-            out["event_type"],
+            out["canonical_event_type"],
             filtered["template_id"],
             filtered["horizon"],
             out["canonical_family"],
@@ -229,9 +241,8 @@ def hypotheses_to_bridge_candidates(
         filter_rows = out[~base_mask]
         expanded_parts = [filter_rows]
         for _, row in base_rows.iterrows():
-            event_id = str(row.get("canonical_family", ""))
-            family = get_event_family(event_id) if event_id else None
-            exec_templates = resolve_execution_templates(family) if family else []
+            family = str(row.get("canonical_family", "")).strip().upper()
+            exec_templates = list(get_domain_registry().family_templates(family)) if family else []
             if not exec_templates:
                 if family:
                     log.warning(
@@ -249,6 +260,7 @@ def hypotheses_to_bridge_candidates(
                 expanded_parts.append(pd.DataFrame([new_row]))
         out = pd.concat(expanded_parts, ignore_index=True)
 
+    out = annotate_regime_metadata(out)
     return out.reset_index(drop=True)
 
 

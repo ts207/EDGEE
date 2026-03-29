@@ -5,6 +5,7 @@ import os
 import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Mapping
+import yaml
 
 from project import PROJECT_ROOT
 from project.pipelines.pipeline_defaults import (
@@ -28,6 +29,17 @@ from project.specs.ontology import ontology_spec_hash
 from project.pipelines.planner import build_pipeline_plan
 from project.events.phase2 import PHASE2_EVENT_CHAIN
 from project.pipelines.effective_config import resolve_effective_args
+
+
+_SPOT_PIPELINE_EVENT_HINTS = {
+    "BASIS_DISLOC",
+    "CROSS_VENUE_DESYNC",
+    "FND_DISLOC",
+    "SPOT_PERP_BASIS_SHOCK",
+}
+_SPOT_PIPELINE_REGIME_HINTS = {
+    "BASIS_FUNDING_DISLOCATION",
+}
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -247,6 +259,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--ci_fail_on_non_production_overrides", type=int, default=0)
     parser.add_argument("--candidate_promotion_max_q_value", type=float, default=None)
     parser.add_argument(
+        "--promotion_profile",
+        choices=["auto", "research", "deploy", "disabled"],
+        default="auto",
+    )
+    parser.add_argument(
         "--candidate_promotion_profile",
         choices=["auto", "research", "deploy"],
         default="auto",
@@ -376,6 +393,58 @@ def parse_timeframes_csv(timeframes_csv: str) -> List[str]:
     return out
 
 
+def _normalized_tokens(values: Any) -> set[str]:
+    if values is None:
+        return set()
+    if isinstance(values, str):
+        token = values.strip().upper()
+        return {token} if token else set()
+    if not isinstance(values, (list, tuple, set)):
+        return set()
+    return {
+        str(value).strip().upper()
+        for value in values
+        if str(value).strip()
+    }
+
+
+def _experiment_trigger_hints(args: argparse.Namespace) -> tuple[set[str], set[str]]:
+    events = _normalized_tokens(getattr(args, "events", None))
+    phase2_event_type = str(getattr(args, "phase2_event_type", "") or "").strip().upper()
+    if phase2_event_type and phase2_event_type != "ALL":
+        events.add(phase2_event_type)
+
+    regimes: set[str] = set()
+    experiment_config_path = str(getattr(args, "experiment_config", "") or "").strip()
+    if not experiment_config_path:
+        return events, regimes
+
+    try:
+        payload = yaml.safe_load(Path(experiment_config_path).read_text(encoding="utf-8")) or {}
+    except Exception:
+        return events, regimes
+    if not isinstance(payload, dict):
+        return events, regimes
+
+    trigger_space = payload.get("trigger_space", {})
+    if not isinstance(trigger_space, Mapping):
+        return events, regimes
+
+    event_block = trigger_space.get("events", {})
+    if isinstance(event_block, Mapping):
+        events |= _normalized_tokens(event_block.get("include", []))
+    regimes |= _normalized_tokens(trigger_space.get("canonical_regimes", []))
+    return events, regimes
+
+
+def _requires_cross_venue_spot_pipeline(args: argparse.Namespace) -> bool:
+    events, regimes = _experiment_trigger_hints(args)
+    return bool(
+        (events & _SPOT_PIPELINE_EVENT_HINTS)
+        or (regimes & _SPOT_PIPELINE_REGIME_HINTS)
+    )
+
+
 def resolve_pipeline_artifact_contracts(
     stages: Mapping[str, Any],
 ) -> tuple[Dict[str, ResolvedStageArtifactContract], List[str]]:
@@ -407,7 +476,9 @@ def _strict_promotion_requires_negative_controls(args: argparse.Namespace) -> bo
         return False
 
     mode = str(getattr(args, "mode", "research") or "research").strip().lower()
-    profile = str(getattr(args, "candidate_promotion_profile", "auto") or "auto").strip().lower()
+    profile = str(getattr(args, "promotion_profile", "auto") or "auto").strip().lower()
+    if profile == "auto":
+        profile = str(getattr(args, "candidate_promotion_profile", "auto") or "auto").strip().lower()
     return mode in {"production", "certification"} or profile == "deploy"
 
 
@@ -543,6 +614,15 @@ def prepare_run_preflight(
         return {"exit_code": 2, "run_id": run_id}
 
     args.timeframes = ",".join(parse_timeframes_csv(getattr(args, "timeframes", "5m")))
+
+    if (
+        not cli_flag_present("--enable_cross_venue_spot_pipeline")
+        and not cli_flag_present("--skip_ingest_spot_ohlcv")
+        and not bool(int(getattr(args, "enable_cross_venue_spot_pipeline", 0) or 0))
+        and not bool(int(getattr(args, "skip_ingest_spot_ohlcv", 0) or 0))
+        and _requires_cross_venue_spot_pipeline(args)
+    ):
+        args.enable_cross_venue_spot_pipeline = 1
 
     if bool(int(getattr(args, "performance_mode", 0) or 0)):
         if not cli_flag_present("--runtime_invariants_mode"):

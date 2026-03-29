@@ -14,6 +14,7 @@ import pandas as pd
 import yaml
 
 from project import PROJECT_ROOT
+from project.artifacts import phase2_candidates_path
 from project.core.config import get_data_root
 from project.domain.compiled_registry import get_domain_registry
 from project.events.config import compose_event_config
@@ -447,7 +448,7 @@ def _candidate_surface_frame(data_root: Path, run_id: str) -> tuple[pd.DataFrame
 
 
 def _phase2_path(data_root: Path, run_id: str) -> Path:
-    return data_root / "reports" / "phase2" / run_id / "search_engine" / "phase2_candidates.parquet"
+    return phase2_candidates_path(run_id, root=data_root)
 
 
 def _edge_candidates_path(data_root: Path, run_id: str) -> Path:

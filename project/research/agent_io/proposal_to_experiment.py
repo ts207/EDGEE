@@ -98,12 +98,11 @@ def build_run_all_overrides(proposal: AgentProposal) -> Dict[str, Any]:
         "program_id": proposal.program_id,
         "mode": proposal.run_mode,
         "objective_name": proposal.objective_name,
+        "promotion_profile": proposal.promotion_profile,
         "symbols": ",".join(proposal.symbols),
     }
     if proposal.promotion_profile == "disabled":
         overrides["run_candidate_promotion"] = 0
-    else:
-        overrides["candidate_promotion_profile"] = proposal.promotion_profile
     for key, value in sorted(proposal.knobs.items()):
         overrides[key] = value
     return overrides

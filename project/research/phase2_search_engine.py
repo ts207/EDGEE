@@ -4,8 +4,7 @@ Phase 2 Search Engine Stage.
 Generates hypotheses from spec/search_space.yaml, evaluates them against the
 wide feature table, and writes bridge-compatible candidates to the output directory.
 
-This stage runs in parallel with phase2_candidate_discovery.py.
-Both write the same bridge schema to different directories.
+This is the authoritative phase-2 discovery stage for new runs.
 """
 
 from __future__ import annotations
@@ -43,6 +42,12 @@ from project.research.search.search_feature_utils import (
 )
 from project.research.services.phase2_diagnostics import build_search_engine_diagnostics
 from project.research.services.reporting_service import write_json_report
+from project.research.services.pathing import (
+    phase2_candidates_path,
+    phase2_diagnostics_path,
+    phase2_hypotheses_dir,
+    phase2_run_dir,
+)
 from project.research.regime_routing import annotate_regime_metadata
 
 log = logging.getLogger(__name__)
@@ -254,7 +259,7 @@ def _write_regime_conditional_candidates(
 
 
 def _write_hypothesis_audit_artifacts(out_dir: Path, symbol: str, audit: dict) -> None:
-    audit_dir = out_dir / "hypotheses" / str(symbol).upper()
+    audit_dir = out_dir / str(symbol).upper()
     ensure_dir(audit_dir)
     write_parquet(
         _normalize_audit_frame(audit.get("generated_rows", [])),
@@ -315,8 +320,8 @@ def run(
         experiment_config,
     )
     ensure_dir(out_dir)
-    output_path = out_dir / "phase2_candidates.parquet"
-    diagnostics_path = out_dir / "phase2_diagnostics.json"
+    output_path = phase2_candidates_path(data_root=data_root, run_id=run_id)
+    diagnostics_path = phase2_diagnostics_path(data_root=data_root, run_id=run_id)
     symbols_requested = [s.strip().upper() for s in str(symbols).split(",") if s.strip()]
     timeframe = str(timeframe or "5m").strip().lower() or "5m"
     search_profile = resolve_search_profile(
@@ -413,7 +418,11 @@ def run(
                 max_hypotheses=int(search_budget) if search_budget is not None else None,
                 features=features,
             )
-            _write_hypothesis_audit_artifacts(out_dir, symbol, generation_audit)
+            _write_hypothesis_audit_artifacts(
+                phase2_hypotheses_dir(data_root=data_root, run_id=run_id),
+                symbol,
+                generation_audit,
+            )
             log.info("Generated %d hypotheses for %s", len(hypotheses), symbol)
 
         total_hypotheses_generated += int(len(hypotheses))
@@ -735,7 +744,7 @@ def main(argv=None) -> int:
     from project.core.config import get_data_root
 
     data_root = Path(args.data_root) if args.data_root else get_data_root()
-    out_dir = data_root / "reports" / "phase2" / args.run_id / "search_engine"
+    out_dir = phase2_run_dir(data_root=data_root, run_id=args.run_id)
 
     return run(
         run_id=args.run_id,

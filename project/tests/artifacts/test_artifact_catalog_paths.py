@@ -39,7 +39,7 @@ def test_catalog_paths_and_json_loading(tmp_path: Path) -> None:
 
 def test_phase2_candidates_prefers_existing_parquet(tmp_path: Path) -> None:
     root = tmp_path / "data"
-    base = root / "reports" / "phase2" / "r2" / "VOL"
+    base = root / "reports" / "phase2" / "r2"
     base.mkdir(parents=True, exist_ok=True)
     csv_path = base / "phase2_candidates.csv"
     csv_path.write_text("candidate_id\n1\n", encoding="utf-8")

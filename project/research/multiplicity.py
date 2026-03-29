@@ -173,7 +173,11 @@ def apply_multiplicity_controls(
     # 4. Cluster Logic
     def _cluster_key(row):
         symbol = str(row.get("symbol", "")).strip().upper()
-        event = str(row.get("canonical_family", "") or row.get("event_type", "")).strip()
+        event = str(
+            row.get("canonical_regime", "")
+            or row.get("canonical_family", "")
+            or row.get("event_type", "")
+        ).strip()
         horizon = str(row.get("horizon", "")).strip()
         state = str(row.get("state_id", "")).strip()
         return f"{symbol}_{event}_{horizon}_{state}"

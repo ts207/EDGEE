@@ -5,6 +5,7 @@ Extracted from pipeline scripts to enable unit testing and clean module boundari
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 from pathlib import Path
@@ -16,6 +17,23 @@ import pandas as pd
 from project.core.constants import HORIZON_BARS_BY_TIMEFRAME
 
 log = logging.getLogger(__name__)
+
+
+def candidate_id_from_hypothesis(
+    *,
+    hypothesis_id: str,
+    symbol: str,
+    event_type: str,
+) -> str:
+    payload = "|".join(
+        [
+            str(hypothesis_id).strip(),
+            str(symbol).strip().upper(),
+            str(event_type).strip().upper(),
+        ]
+    )
+    digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
+    return f"cand_{digest}"
 
 
 def bool_mask_from_series(series: pd.Series) -> pd.Series:
@@ -495,7 +513,11 @@ def _synthesize_experiment_hypotheses(
 
             rows.append(
                 {
-                    "candidate_id": h.hypothesis_id(),
+                    "candidate_id": candidate_id_from_hypothesis(
+                        hypothesis_id=h.hypothesis_id(),
+                        symbol=symbol,
+                        event_type=event_type,
+                    ),
                     "symbol": symbol,
                     "event_type": event_type,
                     "trigger_type": t.trigger_type,

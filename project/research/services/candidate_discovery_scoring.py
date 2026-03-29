@@ -6,6 +6,7 @@ from typing import Callable, Optional
 import numpy as np
 import pandas as pd
 
+from project.domain.compiled_registry import get_domain_registry
 from project.research import discovery
 from project.research.gating import (
     build_event_return_frame,
@@ -21,6 +22,16 @@ from project.research.validation import (
 )
 from project.research.multiplicity import simes_p_value
 from project.research.gating import bh_adjust
+
+
+def _canonical_grouping_for_event(event_type: object) -> str:
+    token = str(event_type or "").strip().upper()
+    if not token:
+        return ""
+    spec = get_domain_registry().get_event(token)
+    if spec is None:
+        return token
+    return spec.canonical_regime or spec.canonical_family or spec.event_type
 
 
 def _json_array(values: list[object]) -> str:
@@ -495,7 +506,9 @@ def split_and_score_candidates(
         )
         row_horizon = str(row.get("horizon", discovery.bars_to_timeframe(row_horizon_bars)))
         rule = str(row.get("rule_template", "continuation"))
-        canonical_family = str(row.get("event_type", "")).split("_")[0]
+        canonical_family = _canonical_grouping_for_event(
+            row.get("canonical_event_type", row.get("event_type", ""))
+        )
         direction_value = row.get("direction")
         stop_loss_bps = row.get("stop_loss_bps")
         take_profit_bps = row.get("take_profit_bps")
@@ -644,7 +657,8 @@ def apply_validation_multiple_testing(candidates_df: pd.DataFrame) -> pd.DataFra
     if candidates_df.empty:
         return candidates_df.copy()
     out = candidates_df.copy()
-    out["event_family"] = out.get("event_type", "").astype(str).str.split("_").str[0]
+    source_events = out.get("canonical_event_type", out.get("event_type", pd.Series("", index=out.index)))
+    out["event_family"] = source_events.map(_canonical_grouping_for_event)
     out = assign_test_families(
         out,
         family_cols=["run_id", "event_family", "horizon"],

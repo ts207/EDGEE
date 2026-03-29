@@ -25,7 +25,7 @@ def _write_json(path: Path, payload: dict) -> None:
 
 
 def _seed_run(data_root: Path, run_id: str, *, phase2_rows: list[dict], promoted_rows: list[dict]) -> None:
-    phase2_path = data_root / "reports" / "phase2" / run_id / "search_engine" / "phase2_candidates.parquet"
+    phase2_path = data_root / "reports" / "phase2" / run_id / "phase2_candidates.parquet"
     phase2_path.parent.mkdir(parents=True, exist_ok=True)
     pd.DataFrame(phase2_rows).to_parquet(phase2_path)
 
@@ -206,7 +206,7 @@ def test_build_shakeout_audit_pairs_regime_and_raw_runs(tmp_path):
 
 
 def test_summarize_shakeout_run_tolerates_missing_promotion_artifacts(tmp_path):
-    phase2_path = tmp_path / "reports" / "phase2" / "run_missing_promotions" / "search_engine"
+    phase2_path = tmp_path / "reports" / "phase2" / "run_missing_promotions"
     phase2_path.mkdir(parents=True, exist_ok=True)
     pd.DataFrame(
         [

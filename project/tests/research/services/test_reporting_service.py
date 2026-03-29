@@ -10,7 +10,15 @@ from project.research.services.reporting_service import (
 
 def test_write_candidate_reports_writes_bundle(tmp_path):
     combined = pd.DataFrame(
-        [{"candidate_id": "c1", "event_type": "VOL_SHOCK", "symbol": "BTCUSDT", "run_id": "r1"}]
+        [
+            {
+                "candidate_id": "cand_1",
+                "hypothesis_id": "hyp_1",
+                "event_type": "VOL_SHOCK",
+                "symbol": "BTCUSDT",
+                "run_id": "r1",
+            }
+        ]
     )
     symbols = {"BTCUSDT": combined.copy()}
     result = write_candidate_reports(
@@ -22,7 +30,7 @@ def test_write_candidate_reports_writes_bundle(tmp_path):
     assert (tmp_path / "phase2_candidates.parquet").exists() or (
         tmp_path / "phase2_candidates.csv"
     ).exists()
-    assert (tmp_path / "BTCUSDT").exists()
+    assert (tmp_path / "symbols" / "BTCUSDT").exists()
     assert (tmp_path / "phase2_diagnostics.json").exists()
     assert "combined_candidates" in result.written_frames
 
@@ -32,6 +40,7 @@ def test_write_promotion_reports_writes_bundle(tmp_path):
         [
             {
                 "candidate_id": "c1",
+                "hypothesis_id": "hyp1",
                 "event_type": "VOL_SHOCK",
                 "promotion_decision": "promoted",
                 "promotion_track": "standard",
@@ -61,6 +70,7 @@ def test_write_promotion_reports_writes_bundle(tmp_path):
             [
                 {
                     "candidate_id": "c1",
+                    "hypothesis_id": "hyp1",
                     "event_type": "VOL_SHOCK",
                     "promotion_decision": "promoted",
                     "promotion_track": "standard",
@@ -71,6 +81,7 @@ def test_write_promotion_reports_writes_bundle(tmp_path):
             [
                 {
                     "candidate_id": "c1",
+                    "hypothesis_id": "hyp1",
                     "event_type": "VOL_SHOCK",
                     "promotion_decision": "promoted",
                     "promotion_track": "standard",

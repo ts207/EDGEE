@@ -4,7 +4,7 @@ from project.core.config import get_data_root
 import json
 import logging
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -50,6 +50,63 @@ from project.strategy.runtime import get_strategy, is_dsl_strategy
 BARS_PER_YEAR = BARS_PER_YEAR_BY_TIMEFRAME
 LOGGER = logging.getLogger(__name__)
 _DEFAULT_TIMEFRAME = "5m"
+
+
+def _spec_metadata_payload(raw_spec: Any) -> Dict[str, Any]:
+    if raw_spec is None:
+        return {}
+    if hasattr(raw_spec, "model_dump"):
+        payload = raw_spec.model_dump()
+    elif isinstance(raw_spec, dict):
+        payload = dict(raw_spec)
+    else:
+        return {}
+    metadata = payload.get("metadata", {}) if isinstance(payload.get("metadata"), dict) else {}
+    return {
+        "proposal_id": str(metadata.get("proposal_id", "")).strip(),
+        "run_id": str(metadata.get("run_id", "")).strip(),
+        "hypothesis_id": str(metadata.get("hypothesis_id", "")).strip(),
+        "candidate_id": str(metadata.get("candidate_id", "")).strip(),
+        "blueprint_id": str(metadata.get("blueprint_id", "")).strip(),
+        "canonical_event_type": str(metadata.get("canonical_event_type", "")).strip(),
+        "canonical_regime": str(metadata.get("canonical_regime", "")).strip(),
+        "routing_profile_id": str(metadata.get("routing_profile_id", "")).strip(),
+    }
+
+
+def run_engine_for_specs(
+    run_id: str,
+    symbols: List[str],
+    strategy_specs: Iterable[Any],
+    *,
+    cost_bps: float,
+    data_root: Path | None = None,
+    start_ts: pd.Timestamp | None = None,
+    end_ts: pd.Timestamp | None = None,
+    timeframe: str = _DEFAULT_TIMEFRAME,
+    memory_efficient: bool = True,
+) -> Dict[str, object]:
+    strategies: list[str] = []
+    params_by_strategy: Dict[str, Dict[str, object]] = {}
+    for idx, spec in enumerate(strategy_specs):
+        metadata = _spec_metadata_payload(spec)
+        suffix = str(metadata.get("blueprint_id") or idx).strip() or str(idx)
+        strategy_name = f"dsl_interpreter_v1__{suffix}"
+        strategies.append(strategy_name)
+        params_by_strategy[strategy_name] = {"executable_strategy_spec": spec}
+    return run_engine(
+        run_id=run_id,
+        symbols=symbols,
+        strategies=strategies,
+        params={},
+        cost_bps=cost_bps,
+        data_root=data_root,
+        params_by_strategy=params_by_strategy,
+        start_ts=start_ts,
+        end_ts=end_ts,
+        timeframe=timeframe,
+        memory_efficient=memory_efficient,
+    )
 
 
 def _load_symbol_data(
@@ -351,6 +408,15 @@ def run_engine(
         for res in symbol_results:
             if getattr(res, "strategy_metadata", None):
                 merged_meta.update(res.strategy_metadata)
+        merged_meta.update(
+            {
+                key: value
+                for key, value in _spec_metadata_payload(
+                    strategy_params.get("executable_strategy_spec")
+                ).items()
+                if value
+            }
+        )
         metrics["strategy_metadata"][strategy_name] = merged_meta
 
     raw_positions_by_strategy = {}

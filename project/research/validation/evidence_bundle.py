@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 
 from project.core.coercion import as_bool, safe_float, safe_int
+from project.domain.compiled_registry import get_domain_registry
 from project.domain.promotion.promotion_policy import PromotionPolicy
 from project.research.validation.falsification import evaluate_negative_controls
 from project.research.validation.regime_tests import build_stability_result_from_row
@@ -28,7 +29,12 @@ def _json_safe(value: Any) -> Any:
 
 def _event_family(event_type: str) -> str:
     token = str(event_type or "").strip()
-    return token.split("_")[0] if token else ""
+    if not token:
+        return ""
+    spec = get_domain_registry().get_event(token)
+    if spec is None:
+        return token.upper()
+    return spec.canonical_regime or spec.canonical_family or spec.event_type
 
 
 def _bool_gate_value(row: Dict[str, Any], key: str, default: bool = True) -> bool:
@@ -240,6 +246,7 @@ def build_evidence_bundle(
             "q_value_program": safe_float(row.get("q_value_program", np.nan), np.nan),
         },
         metadata={
+            "hypothesis_id": str(row.get("hypothesis_id", "")).strip(),
             "plan_row_id": str(row.get("plan_row_id", "")).strip(),
             "tob_coverage": tob_coverage,
             "event_is_descriptive": bool(as_bool(row.get("event_is_descriptive", False))),
@@ -609,6 +616,7 @@ def bundle_to_flat_record(bundle: Dict[str, Any]) -> Dict[str, Any]:
         ),
         "cost_survival_ratio": safe_float(cost.get("cost_survival_ratio", np.nan), np.nan),
         "plan_row_id": str(meta.get("plan_row_id", "")).strip(),
+        "hypothesis_id": str(meta.get("hypothesis_id", "")).strip(),
         "bridge_certified": bool(as_bool(meta.get("bridge_certified", False))),
         "has_realized_oos_path": bool(as_bool(meta.get("has_realized_oos_path", False))),
         "repeated_fold_consistency": safe_float(

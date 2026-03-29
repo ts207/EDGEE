@@ -56,7 +56,7 @@ def write_candidate_reports(
     result.written_frames["combined_candidates"] = combined_frame
     result.written_paths["combined_candidates"] = combined_actual
     for symbol, frame in symbol_candidates.items():
-        sym_out = out_dir / str(symbol) / "phase2_candidates.parquet"
+        sym_out = out_dir / "symbols" / str(symbol).upper() / "phase2_candidates.parquet"
         sym_frame, sym_actual = write_dataframe_report(
             frame,
             sym_out,

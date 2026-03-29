@@ -23,6 +23,7 @@ from project.research.services.candidate_discovery_service import (
     _apply_validation_multiple_testing,
     _split_and_score_candidates,
 )
+from project.research.regime_routing import annotate_regime_metadata
 from project.research.services.reporting_service import write_candidate_reports
 from project.research.validation import assign_test_families, apply_multiple_testing
 from project.research.validation.evidence_bundle import bundle_to_flat_record
@@ -275,6 +276,7 @@ def run_research_smoke(dataset: SmokeDatasetInfo) -> Dict[str, Any]:
             horizon_bars=SMOKE_HORIZON_BARS,
             entry_lag_bars=0,
         )
+        candidates["hypothesis_id"] = [f"hyp_smoke_{symbol.lower()}_{idx}" for idx in range(len(candidates))]
         candidates["run_id"] = dataset.run_id
         candidates["split_scheme_id"] = "smoke_tvt"
         scored = _split_and_score_candidates(
@@ -290,6 +292,7 @@ def run_research_smoke(dataset: SmokeDatasetInfo) -> Dict[str, Any]:
         frames.append(scored)
     combined = pd.concat(frames, ignore_index=True)
     combined = _apply_validation_multiple_testing(combined)
+    combined = annotate_regime_metadata(combined)
     symbol_candidates = {str(symbol): frame.copy() for symbol, frame in combined.groupby("symbol")}
     out_dir = dataset.root / "reports" / "phase2" / dataset.run_id
     write_candidate_reports(
@@ -322,6 +325,7 @@ def build_smoke_edge_candidates(
         rows.append(
             {
                 "candidate_id": candidate_id,
+                "hypothesis_id": rec.get("hypothesis_id", ""),
                 "family_id": rec.get("family_id", "SMOKE_FAMILY"),
                 "run_id": dataset.run_id,
                 "symbol": symbol,
@@ -359,7 +363,6 @@ def build_smoke_edge_candidates(
                 "gate_promo_negative_control": "pass" if promoted_like else "missing_evidence",
                 "gate_promo_hypothesis_audit": "pass" if promoted_like else "missing_evidence",
                 "plan_row_id": f"plan_{i}",
-                "hypothesis_id": f"plan_{i}",
                 "confirmatory_locked": True,
                 "frozen_spec_hash": current_hash,
                 "run_mode": "confirmatory",
@@ -438,8 +441,15 @@ def materialize_smoke_promotion_inputs(
     ensure_dir(phase2_dir)
     hypothesis_registry = pd.DataFrame(
         [
-            {"hypothesis_id": f"plan_{i}", "statuses": ["executed"], "executed": True}
-            for i in range(len(candidates))
+            {
+                "hypothesis_id": str(row.get("hypothesis_id", "")).strip(),
+                "plan_row_id": str(row.get("plan_row_id", "")).strip()
+                or str(row.get("hypothesis_id", "")).strip(),
+                "statuses": ["executed"],
+                "executed": True,
+            }
+            for row in candidates.to_dict(orient="records")
+            if str(row.get("hypothesis_id", "")).strip()
         ]
     )
     _write_df(hypothesis_registry, phase2_dir / "hypothesis_registry.parquet")
@@ -460,6 +470,12 @@ def run_promotion_smoke(
         [
             "--run_id",
             dataset.run_id,
+            "--program_id",
+            "smoke_program",
+            "--objective_name",
+            "retail_profitability",
+            "--promotion_profile",
+            "research",
             "--min_events",
             "40",
             "--min_tob_coverage",

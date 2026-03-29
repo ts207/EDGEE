@@ -11,8 +11,37 @@ import sys
 
 import pandas as pd
 from project.core.config import get_data_root
+from project.artifacts import phase2_candidates_path
 
 _LOG = logging.getLogger(__name__)
+
+
+def _load_phase2_results(*, data_root: Path, run_id: str) -> pd.DataFrame:
+    path = phase2_candidates_path(run_id, root=data_root)
+    if not path.exists():
+        return pd.DataFrame()
+    try:
+        if path.suffix == ".parquet":
+            return pd.read_parquet(path)
+        return pd.read_csv(path)
+    except Exception as exc:
+        _LOG.warning("Failed to read %s: %s", path, exc)
+        return pd.DataFrame()
+
+
+def _adapt_legacy_results(results_df: pd.DataFrame) -> pd.DataFrame:
+    if results_df.empty:
+        return results_df.copy()
+    out = results_df.copy()
+    out["lineage_migrated"] = False
+    if "hypothesis_id" not in out.columns:
+        out["hypothesis_id"] = pd.NA
+    if "candidate_id" in out.columns:
+        candidate_ids = out["candidate_id"].astype(str).str.strip()
+        migratable = out["hypothesis_id"].isna() & candidate_ids.str.startswith("hyp_")
+        out.loc[migratable, "hypothesis_id"] = candidate_ids.loc[migratable]
+        out.loc[migratable, "lineage_migrated"] = True
+    return out
 
 
 def finalize_experiment(
@@ -32,32 +61,7 @@ def finalize_experiment(
         return
     hyps_df = pd.read_parquet(hyp_path)
 
-    # Collect phase 2 candidate reports for this run
-    all_results = []
-    possible_roots = [
-        data_root / "reports" / "phase2_discovery",
-        data_root / "reports" / "phase2",
-    ]
-
-    for reports_root in possible_roots:
-        if reports_root.exists():
-            run_reports = reports_root / run_id
-            if run_reports.exists():
-                for p in run_reports.rglob("*.parquet"):
-                    if "candidates" in p.name or "evaluated" in p.name:
-                        try:
-                            df = pd.read_parquet(p)
-                            if not df.empty and (
-                                "hypothesis_id" in df.columns or "candidate_id" in df.columns
-                            ):
-                                all_results.append(df)
-                        except Exception as e:
-                            _LOG.warning(f"Failed to read {p}: {e}")
-
-    if not all_results:
-        results_df = pd.DataFrame()
-    else:
-        results_df = pd.concat(all_results, ignore_index=True)
+    results_df = _adapt_legacy_results(_load_phase2_results(data_root=data_root, run_id=run_id))
 
     # Robust ID matching
     from project.io.utils import write_parquet
@@ -72,13 +76,19 @@ def finalize_experiment(
         merged_df["created_at"] = merged_df["created_at"].fillna(finalized_at)
 
     if not results_df.empty:
-        # Create unique evaluation map
-        # We prefer hypothesis_id, fallback to candidate_id
+        current_format = {
+            "hypothesis_id",
+            "candidate_id",
+        }.issubset(results_df.columns) and not (
+            results_df["candidate_id"].astype(str) == results_df["hypothesis_id"].astype(str)
+        ).all()
+
         eval_map = {}
 
         for _, row in results_df.iterrows():
             hid = row.get("hypothesis_id")
-            cid = row.get("candidate_id")
+            if not hid:
+                continue
 
             # Helper to assign terminal status
             def get_status(r):
@@ -98,15 +108,6 @@ def finalize_experiment(
             if hid and str(hid).startswith("hyp_"):
                 eval_map[str(hid)] = r_data
 
-            if cid:
-                cid_str = str(cid)
-                # Handle SYMBOL::prefix
-                if "::" in cid_str:
-                    cid_str = cid_str.split("::")[-1]
-
-                if cid_str.startswith("hyp_") and cid_str not in eval_map:
-                    eval_map[cid_str] = r_data
-
         # Apply to merged_df using record-based updates to prevent fragmentation
         updated_records = []
         for _, row in merged_df.iterrows():
@@ -116,16 +117,13 @@ def finalize_experiment(
             if hid in eval_map:
                 res = eval_map[hid]
                 for k, v in res.items():
-                    # Preserve original hypothesis_id if the result came from candidate_id matching
-                    if k in ["hypothesis_id", "candidate_id"] and v != hid:
-                        continue
                     if k not in r_data or pd.isna(r_data.get(k)):
                         r_data[k] = v
 
                 # Ensure expectancy is populated from mean_return_bps if missing
                 if pd.isna(r_data.get("expectancy")) and not pd.isna(r_data.get("mean_return_bps")):
                     r_data["expectancy"] = float(r_data["mean_return_bps"]) / 10000.0
-            else:
+            elif current_format:
                 # Handle unsupported/missing
                 t_type = row.get("trigger_type")
                 if t_type == "transition":
@@ -137,6 +135,8 @@ def finalize_experiment(
                     r_data["eval_status"] = "unsupported_trigger_evaluator"
                 else:
                     r_data["eval_status"] = "not_executed_or_missing_data"
+            else:
+                r_data["eval_status"] = "not_executed_or_missing_data"
 
             updated_records.append(r_data)
 
