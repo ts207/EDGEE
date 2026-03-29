@@ -24,16 +24,33 @@ def test_env(tmp_path):
                     "E2": {"enabled": True, "family": "F1", "instrument_classes": ["crypto"]},
                     "E3": {"enabled": True, "family": "F2", "instrument_classes": ["crypto"]},
                     "E4": {"enabled": True, "family": "F2", "instrument_classes": ["crypto"]},
+                    "VOL_SHOCK": {"enabled": True, "family": "VOL", "instrument_classes": ["crypto"]},
+                    "ZSCORE_STRETCH": {"enabled": True, "family": "STAT", "instrument_classes": ["crypto"]},
                 }
             }
         )
     )
     (reg_dir / "templates.yaml").write_text(
         yaml.dump(
-            {"templates": {"continuation": {"enabled": True, "supports_trigger_types": ["EVENT"]}}}
+            {
+                "templates": {
+                    "continuation": {"enabled": True, "supports_trigger_types": ["EVENT"]},
+                    "mean_reversion": {"enabled": True, "supports_trigger_types": ["EVENT"]},
+                }
+            }
         )
     )
-    (reg_dir / "contexts.yaml").write_text(yaml.dump({"context_dimensions": {}}))
+    (reg_dir / "contexts.yaml").write_text(
+        yaml.dump(
+            {
+                "context_dimensions": {
+                    "vol_regime": {"allowed_values": ["low", "high"]},
+                    "carry_state": {"allowed_values": ["positive", "negative", "neutral"]},
+                    "session": {"allowed_values": ["open", "close"]},
+                }
+            }
+        )
+    )
     (reg_dir / "search_limits.yaml").write_text(
         yaml.dump({"limits": {"max_events_per_run": 10, "max_templates_per_run": 10}})
     )
@@ -122,3 +139,55 @@ def test_execute_pipeline_invokes_run_all(monkeypatch, test_env, tmp_path):
 
     assert captured["cmd"][:3] == [sys.executable, "-m", "project.pipelines.run_all"]
     assert captured["check"] is True
+
+
+def test_step_repair_uses_event_from_failure_detail(test_env):
+    controller = test_env
+    proposal = controller._step_repair(
+        {
+            "latest_reflection": {},
+            "superseded_stages": set(),
+            "next_actions": {
+                "repair": [
+                    {
+                        "stage": "build_event_registry",
+                        "failure_detail": "detector truth broke for VOL_SHOCK under audit",
+                        "proposed_scope": {"stage": "build_event_registry"},
+                    }
+                ]
+            },
+        }
+    )
+
+    assert proposal is not None
+    assert proposal["trigger_space"]["events"]["include"] == ["VOL_SHOCK"]
+
+
+def test_step_repair_uses_stage_default_before_global_fallback(test_env):
+    controller = test_env
+    proposal = controller._step_repair(
+        {
+            "latest_reflection": {},
+            "superseded_stages": set(),
+            "next_actions": {
+                "repair": [
+                    {
+                        "stage": "build_event_registry",
+                        "failure_detail": "",
+                        "proposed_scope": {"stage": "build_event_registry"},
+                    }
+                ]
+            },
+        }
+    )
+
+    assert proposal is not None
+    assert proposal["trigger_space"]["events"]["include"] == ["VOL_SHOCK"]
+
+
+def test_context_for_proposal_uses_registry_dimensions(test_env):
+    controller = test_env
+    assert controller._context_for_proposal() == {
+        "vol_regime": ["low", "high"],
+        "carry_state": ["positive", "negative", "neutral"],
+    }

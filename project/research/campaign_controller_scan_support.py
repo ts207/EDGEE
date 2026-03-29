@@ -823,4 +823,16 @@ def build_proposal(
 def context_for_proposal(ctrl: Any) -> Dict[str, List[str]]:
     if not ctrl.config.enable_context_conditioning:
         return {}
-    return {"vol_regime": ["low", "high"]}
+    allowed_contexts = ctrl.registries.contexts.get("context_dimensions", {})
+    selected_dimensions = list(getattr(ctrl.config, "proposal_context_dimensions", []) or [])
+    out: Dict[str, List[str]] = {}
+    for dimension in selected_dimensions:
+        meta = allowed_contexts.get(str(dimension), {})
+        values = [
+            str(value).strip()
+            for value in list(meta.get("allowed_values", []))
+            if str(value).strip()
+        ]
+        if values:
+            out[str(dimension)] = values
+    return out

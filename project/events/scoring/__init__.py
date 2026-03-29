@@ -2,17 +2,18 @@ from __future__ import annotations
 
 """Event quality and confidence scoring."""
 
-from typing import List
+from typing import TYPE_CHECKING, List
 
 import numpy as np
 import pandas as pd
 
-from project.events.scoring.confidence import (
-    EventConfidenceModel,
-    load_event_confidence_model,
-    score_detected_events,
-    train_event_confidence_model,
-)
+if TYPE_CHECKING:
+    from project.events.scoring.confidence import (
+        EventConfidenceModel,
+        load_event_confidence_model,
+        score_detected_events,
+        train_event_confidence_model,
+    )
 
 EventScoreColumns: List[str] = [
     "severity_score",
@@ -165,6 +166,24 @@ def score_event_frame(df: pd.DataFrame) -> pd.DataFrame:
     )
 
     return out
+
+
+_LAZY_CONFIDENCE_EXPORTS = {
+    "EventConfidenceModel",
+    "load_event_confidence_model",
+    "score_detected_events",
+    "train_event_confidence_model",
+}
+
+
+def __getattr__(name: str):
+    if name in _LAZY_CONFIDENCE_EXPORTS:
+        from project.events.scoring import confidence as _confidence
+
+        value = getattr(_confidence, name)
+        globals()[name] = value
+        return value
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 __all__ = [

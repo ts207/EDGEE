@@ -11,6 +11,8 @@ def test_live_environment_configs_use_distinct_order_sources_and_snapshot_paths(
 
     assert paper["oms_lineage"]["order_source"] == "paper_oms"
     assert production["oms_lineage"]["order_source"] == "production_oms"
+    assert paper["runtime_mode"] == "monitor_only"
+    assert production["runtime_mode"] == "monitor_only"
     assert paper["live_state_snapshot_path"] == "artifacts/live_state_paper.json"
     assert production["live_state_snapshot_path"] == "artifacts/live_state_production.json"
     assert paper["live_state_snapshot_path"] != production["live_state_snapshot_path"]

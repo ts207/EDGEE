@@ -1,6 +1,7 @@
 workflow_id: golden_certification_v1
 golden_workflow_config: project/configs/golden_workflow.yaml
 runtime_run_id: smoke_run
+runtime_mode: monitor_only
 stale_threshold_sec: 60.0
 freshness_streams:
   - symbol: BTCUSDT

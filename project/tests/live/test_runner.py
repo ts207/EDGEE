@@ -66,6 +66,8 @@ def test_live_runner_exposes_persistent_session_metadata(tmp_path) -> None:
     assert runner.session_metadata["execution_degradation_block_edge_bps"] == -5.0
     assert runner.session_metadata["execution_degradation_throttle_scale"] == 0.5
     assert runner.session_metadata["execution_quality_report_path"] == str(report_path)
+    assert runner.session_metadata["runtime_mode"] == "monitor_only"
+    assert runner.session_metadata["strategy_runtime_implemented"] is False
 
 
 def test_live_runner_periodic_account_sync_updates_state() -> None:
@@ -272,6 +274,8 @@ def test_live_runner_submit_strategy_result_routes_order_through_oms(monkeypatch
         ["btcusdt"],
         order_manager=OrderManager(),
         data_manager=_DummyDataManager(),
+        runtime_mode="trading",
+        strategy_runtime={"implemented": True},
     )
     accepted = runner.submit_strategy_result(
         result,
@@ -326,6 +330,8 @@ def test_live_runner_sync_submit_fails_closed_for_exchange_backed_oms(
         ["btcusdt"],
         order_manager=OrderManager(exchange_client=_DummyExchangeClient()),
         data_manager=_DummyDataManager(),
+        runtime_mode="trading",
+        strategy_runtime={"implemented": True},
     )
 
     with pytest.raises(Exception, match="submit_strategy_result_async"):
@@ -378,6 +384,8 @@ def test_live_runner_submit_strategy_result_async_hits_venue(monkeypatch, tmp_pa
         ["btcusdt"],
         order_manager=OrderManager(exchange_client=exchange_client),
         data_manager=_DummyDataManager(),
+        runtime_mode="trading",
+        strategy_runtime={"implemented": True},
     )
 
     accepted = asyncio.run(
@@ -400,7 +408,7 @@ def test_live_runner_submit_strategy_result_async_hits_venue(monkeypatch, tmp_pa
     assert order.exchange_order_id == "venue-3"
 
 
-def test_live_runner_submit_strategy_result_returns_none_for_flat_result() -> None:
+def test_live_runner_submit_strategy_result_rejects_monitor_only_mode() -> None:
     result = StrategyResult(
         name="dummy",
         data=pd.DataFrame(
@@ -422,6 +430,38 @@ def test_live_runner_submit_strategy_result_returns_none_for_flat_result() -> No
         trace=pd.DataFrame(),
     )
     runner = LiveEngineRunner(["btcusdt"], data_manager=_DummyDataManager())
+
+    with pytest.raises(RuntimeError, match="monitor_only"):
+        runner.submit_strategy_result(result, client_order_id="flat")
+
+
+def test_live_runner_submit_strategy_result_returns_none_for_flat_result_in_trading_mode() -> None:
+    result = StrategyResult(
+        name="dummy",
+        data=pd.DataFrame(
+            {
+                "timestamp": pd.date_range("2024-01-01", periods=1, freq="5min", tz="UTC"),
+                "symbol": ["BTCUSDT"],
+                "target_position": [0.0],
+                "prior_executed_position": [0.0],
+                "fill_price": [100.0],
+                "close": [100.0],
+                "expected_return_bps": [20.0],
+                "expected_adverse_bps": [5.0],
+                "expected_cost_bps": [3.0],
+                "expected_net_edge_bps": [12.0],
+            }
+        ),
+        diagnostics={},
+        strategy_metadata={},
+        trace=pd.DataFrame(),
+    )
+    runner = LiveEngineRunner(
+        ["btcusdt"],
+        data_manager=_DummyDataManager(),
+        runtime_mode="trading",
+        strategy_runtime={"implemented": True},
+    )
 
     assert runner.submit_strategy_result(result, client_order_id="flat") is None
 
@@ -463,6 +503,8 @@ def test_live_runner_submit_strategy_result_throttles_negative_bucket(
         execution_degradation_block_edge_bps=-5.0,
         execution_degradation_throttle_scale=0.5,
         data_manager=_DummyDataManager(),
+        runtime_mode="trading",
+        strategy_runtime={"implemented": True},
     )
     runner.order_manager.execution_attribution.extend(
         [
@@ -552,6 +594,8 @@ def test_live_runner_submit_strategy_result_blocks_degraded_bucket(monkeypatch, 
         execution_degradation_block_edge_bps=-5.0,
         execution_degradation_throttle_scale=0.5,
         data_manager=_DummyDataManager(),
+        runtime_mode="trading",
+        strategy_runtime={"implemented": True},
     )
     runner.order_manager.execution_attribution.extend(
         [
@@ -639,6 +683,8 @@ def test_live_runner_persists_execution_quality_report_after_fill(monkeypatch, t
         order_manager=OrderManager(),
         execution_quality_report_path=report_path,
         data_manager=_DummyDataManager(),
+        runtime_mode="trading",
+        strategy_runtime={"implemented": True},
     )
     runner.submit_strategy_result(
         result,
@@ -669,6 +715,20 @@ def test_live_runner_persists_execution_quality_report_after_fill(monkeypatch, t
 def test_live_runner_persist_execution_quality_report_returns_none_without_path() -> None:
     runner = LiveEngineRunner(["btcusdt"], data_manager=_DummyDataManager())
     assert runner.persist_execution_quality_report() is None
+
+
+def test_live_runner_start_rejects_unimplemented_trading_runtime() -> None:
+    runner = LiveEngineRunner(
+        ["btcusdt"],
+        data_manager=_DummyDataManager(),
+        runtime_mode="trading",
+    )
+
+    async def _exercise() -> None:
+        with pytest.raises(RuntimeError, match="strategy_runtime.implemented=true"):
+            await runner.start()
+
+    asyncio.run(_exercise())
 
 
 # --- TICKET-010: kill-switch trigger tests ---

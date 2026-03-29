@@ -13,6 +13,7 @@ def test_build_live_runner_uses_snapshot_path_and_config_defaults(tmp_path: Path
     config_path.write_text(
         "\n".join(
             [
+                "runtime_mode: monitor_only",
                 "freshness_streams:",
                 "  - symbol: BTCUSDT",
                 "    stream: kline_5m",
@@ -41,6 +42,8 @@ def test_build_live_runner_uses_snapshot_path_and_config_defaults(tmp_path: Path
             execution_degradation_throttle_scale,
             stale_threshold_sec,
             order_manager,
+            runtime_mode,
+            strategy_runtime,
         ):
             self.session_metadata = {
                 "symbols": list(symbols),
@@ -53,6 +56,10 @@ def test_build_live_runner_uses_snapshot_path_and_config_defaults(tmp_path: Path
                 "execution_degradation_block_edge_bps": float(execution_degradation_block_edge_bps),
                 "execution_degradation_throttle_scale": float(execution_degradation_throttle_scale),
                 "stale_threshold_sec": float(stale_threshold_sec),
+                "runtime_mode": str(runtime_mode),
+                "strategy_runtime_implemented": bool(
+                    isinstance(strategy_runtime, dict) and strategy_runtime.get("implemented", False)
+                ),
             }
             self.order_manager = order_manager
 
@@ -73,6 +80,8 @@ def test_build_live_runner_uses_snapshot_path_and_config_defaults(tmp_path: Path
     assert runner.session_metadata["execution_degradation_block_edge_bps"] == -5.0
     assert runner.session_metadata["execution_degradation_throttle_scale"] == 0.5
     assert runner.session_metadata["stale_threshold_sec"] == 60.0
+    assert runner.session_metadata["runtime_mode"] == "monitor_only"
+    assert runner.session_metadata["strategy_runtime_implemented"] is False
 
 
 def test_run_live_engine_print_session_metadata(capsys, tmp_path: Path) -> None:
@@ -80,6 +89,7 @@ def test_run_live_engine_print_session_metadata(capsys, tmp_path: Path) -> None:
     config_path.write_text(
         "\n".join(
             [
+                "runtime_mode: monitor_only",
                 "freshness_streams:",
                 "  - symbol: BTCUSDT",
                 "    stream: kline_5m",
@@ -103,6 +113,8 @@ def test_run_live_engine_print_session_metadata(capsys, tmp_path: Path) -> None:
     assert out["execution_degradation_block_edge_bps"] == -5.0
     assert out["execution_degradation_throttle_scale"] == 0.5
     assert out["stale_threshold_sec"] == 60.0
+    assert out["runtime_mode"] == "monitor_only"
+    assert out["strategy_runtime_implemented"] is False
 
 
 def test_validate_live_runtime_environment_accepts_paper_contract() -> None:
@@ -141,6 +153,44 @@ def test_validate_live_runtime_environment_rejects_missing_production_credential
 
     assert "EDGE_BINANCE_API_KEY must be set" in message
     assert "EDGE_BINANCE_API_SECRET must be set" in message
+
+
+def test_validate_live_runtime_environment_rejects_trading_mode_without_strategy_runtime(
+    tmp_path: Path,
+) -> None:
+    config_path = tmp_path / "live_trading.yaml"
+    config_path.write_text(
+        "\n".join(
+            [
+                "runtime_mode: trading",
+                "freshness_streams:",
+                "  - symbol: BTCUSDT",
+                "    stream: kline_5m",
+                "live_state_snapshot_path: state/live_state.json",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    try:
+        run_live_engine.validate_live_runtime_environment(
+            config_path=config_path,
+            environ={
+                "EDGE_ENVIRONMENT": "paper",
+                "EDGE_VENUE": "binance",
+                "EDGE_LIVE_CONFIG": str(config_path),
+                "EDGE_LIVE_SNAPSHOT_PATH": "state/live_state.json",
+                "EDGE_BINANCE_PAPER_API_KEY": "paper-key",
+                "EDGE_BINANCE_PAPER_API_SECRET": "paper-secret",
+            },
+        )
+    except run_live_engine.LiveRuntimeConfigError as exc:
+        message = str(exc)
+    else:
+        raise AssertionError("expected LiveRuntimeConfigError")
+
+    assert "strategy_runtime.implemented=true" in message
 
 
 def test_run_live_engine_print_session_metadata_skips_runtime_env_validation(

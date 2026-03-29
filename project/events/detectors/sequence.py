@@ -1,16 +1,29 @@
 from __future__ import annotations
 
 import logging
+from functools import lru_cache
 from typing import Any, Mapping, Optional
 
 import numpy as np
 import pandas as pd
 
+from project import PROJECT_ROOT
 from project.events.detectors.base import BaseEventDetector
 from project.events.detectors.registry import get_detector
+from project.spec_registry import load_yaml_path
 from project.spec_validation import load_ontology_events
 
 log = logging.getLogger(__name__)
+
+
+@lru_cache(maxsize=1)
+def _load_registered_event_metadata() -> dict[str, dict[str, Any]]:
+    try:
+        payload = load_yaml_path(PROJECT_ROOT / "project" / "configs" / "registries" / "events.yaml") or {}
+    except Exception:
+        return {}
+    events = payload.get("events", {})
+    return events if isinstance(events, dict) else {}
 
 
 class EventSequenceDetector(BaseEventDetector):
@@ -78,6 +91,7 @@ class EventSequenceDetector(BaseEventDetector):
         if self._anchor_detector is None:
             if not self.anchor_event:
                 raise ValueError(f"Anchor event not defined for {self.event_type}")
+            self._validate_component_event(self.anchor_event, role="anchor")
             self._anchor_detector = get_detector(self.anchor_event)
             if self._anchor_detector is None:
                 raise ValueError(f"Unknown anchor event: {self.anchor_event}")
@@ -85,9 +99,18 @@ class EventSequenceDetector(BaseEventDetector):
         if self._trigger_detector is None:
             if not self.trigger_event:
                 raise ValueError(f"Trigger event not defined for {self.event_type}")
+            self._validate_component_event(self.trigger_event, role="trigger")
             self._trigger_detector = get_detector(self.trigger_event)
             if self._trigger_detector is None:
                 raise ValueError(f"Unknown trigger event: {self.trigger_event}")
+
+    def _validate_component_event(self, event_name: str, *, role: str) -> None:
+        candidate = str(event_name or "").strip()
+        if candidate.startswith("SEQ_"):
+            raise ValueError(f"Sequence {role} event '{candidate}' is not allowed.")
+        metadata = _load_registered_event_metadata().get(candidate, {})
+        if isinstance(metadata, dict) and not metadata.get("sequence_eligible", True):
+            raise ValueError(f"Sequence {role} event '{candidate}' is not sequence-eligible.")
 
     def prepare_features(self, df: pd.DataFrame, **params: Any) -> Mapping[str, pd.Series]:
         self._ensure_detectors()

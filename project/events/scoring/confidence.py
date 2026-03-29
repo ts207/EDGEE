@@ -7,13 +7,6 @@ from typing import Any, Sequence
 
 import numpy as np
 import pandas as pd
-from sklearn.calibration import CalibratedClassifierCV
-from sklearn.compose import ColumnTransformer
-from sklearn.ensemble import HistGradientBoostingClassifier
-from sklearn.impute import SimpleImputer
-from sklearn.metrics import average_precision_score, brier_score_loss, log_loss, roc_auc_score
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import OneHotEncoder
 
 from project.features.event_scoring import select_model_feature_frame, split_feature_columns
 
@@ -28,6 +21,32 @@ _DEFAULT_LABEL_CANDIDATES: tuple[str, ...] = (
 )
 
 _DEFAULT_SPLIT_ORDER: tuple[str, ...] = ("train", "validation", "test")
+_SKLEARN_DEPENDENCY_ERROR = "scikit-learn is required for event confidence modeling."
+
+
+def _load_sklearn_objects() -> dict[str, Any]:
+    try:
+        from sklearn.calibration import CalibratedClassifierCV
+        from sklearn.compose import ColumnTransformer
+        from sklearn.ensemble import HistGradientBoostingClassifier
+        from sklearn.impute import SimpleImputer
+        from sklearn.metrics import average_precision_score, brier_score_loss, log_loss, roc_auc_score
+        from sklearn.pipeline import Pipeline
+        from sklearn.preprocessing import OneHotEncoder
+    except ModuleNotFoundError as exc:  # pragma: no cover - environment-specific
+        raise ModuleNotFoundError(_SKLEARN_DEPENDENCY_ERROR) from exc
+    return {
+        "CalibratedClassifierCV": CalibratedClassifierCV,
+        "ColumnTransformer": ColumnTransformer,
+        "HistGradientBoostingClassifier": HistGradientBoostingClassifier,
+        "SimpleImputer": SimpleImputer,
+        "average_precision_score": average_precision_score,
+        "brier_score_loss": brier_score_loss,
+        "log_loss": log_loss,
+        "roc_auc_score": roc_auc_score,
+        "Pipeline": Pipeline,
+        "OneHotEncoder": OneHotEncoder,
+    }
 
 
 @dataclass
@@ -146,7 +165,13 @@ def _build_pipeline(
     numeric_columns: Sequence[str],
     categorical_columns: Sequence[str],
     random_state: int = 42,
-) -> Pipeline:
+) -> Any:
+    sklearn = _load_sklearn_objects()
+    ColumnTransformer = sklearn["ColumnTransformer"]
+    HistGradientBoostingClassifier = sklearn["HistGradientBoostingClassifier"]
+    Pipeline = sklearn["Pipeline"]
+    SimpleImputer = sklearn["SimpleImputer"]
+    OneHotEncoder = sklearn["OneHotEncoder"]
     transformers: list[tuple[str, Any, list[str]]] = []
     if numeric_columns:
         transformers.append(("num", SimpleImputer(strategy="median"), list(numeric_columns)))
@@ -182,6 +207,11 @@ def _build_pipeline(
 
 
 def _metrics(y_true: Sequence[int], y_prob: Sequence[float]) -> dict[str, float]:
+    sklearn = _load_sklearn_objects()
+    average_precision_score = sklearn["average_precision_score"]
+    brier_score_loss = sklearn["brier_score_loss"]
+    log_loss = sklearn["log_loss"]
+    roc_auc_score = sklearn["roc_auc_score"]
     y_arr = np.asarray(list(y_true), dtype=int)
     p_arr = np.asarray(list(y_prob), dtype=float)
     classes = set(y_arr.tolist())
@@ -240,6 +270,8 @@ def train_event_confidence_model(
             f"Insufficient train rows for event confidence model: {len(prepared_train)} < {min_train_rows}"
         )
 
+    sklearn = _load_sklearn_objects()
+    CalibratedClassifierCV = sklearn["CalibratedClassifierCV"]
     y_train = _coerce_binary_target(train_df.loc[prepared_train.index, resolved_label])
     pipeline = _build_pipeline(
         numeric_columns=feature_report["numeric"],

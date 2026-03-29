@@ -44,6 +44,8 @@ class LiveEngineRunner:
         health_check_interval_seconds: float = 5.0,
         stale_threshold_sec: float = 10.0,
         reconcile_at_startup: bool = True,
+        runtime_mode: str = "monitor_only",
+        strategy_runtime: Dict[str, Any] | None = None,
     ):
         # Phase 3: Native REST Client for Initialization & Recovery
         self.rest_client = BinanceFuturesClient(
@@ -88,6 +90,8 @@ class LiveEngineRunner:
         self.reconcile_at_startup = bool(reconcile_at_startup)
         self.account_snapshot_fetcher = account_snapshot_fetcher
         self.account_sync_failure_count = 0
+        self.runtime_mode = str(runtime_mode or "monitor_only").strip().lower()
+        self.strategy_runtime = dict(strategy_runtime or {})
         
         # Phase 5: Incubation Ledger
         self.incubation_ledger = IncubationLedger(
@@ -124,7 +128,29 @@ class LiveEngineRunner:
                 if self.execution_quality_report_path is not None
                 else ""
             ),
+            "runtime_mode": self.runtime_mode,
+            "strategy_runtime_implemented": bool(self.strategy_runtime.get("implemented", False)),
         }
+
+    def _ensure_runtime_mode_known(self) -> None:
+        if self.runtime_mode not in {"monitor_only", "trading"}:
+            raise RuntimeError(
+                f"Unsupported runtime_mode '{self.runtime_mode}'. Expected 'monitor_only' or 'trading'."
+            )
+
+    def _ensure_runtime_ready_for_start(self) -> None:
+        self._ensure_runtime_mode_known()
+        if self.runtime_mode == "trading" and not bool(self.strategy_runtime.get("implemented", False)):
+            raise RuntimeError(
+                "runtime_mode='trading' requires strategy_runtime.implemented=true"
+            )
+
+    def _ensure_trading_enabled(self) -> None:
+        self._ensure_runtime_ready_for_start()
+        if self.runtime_mode != "trading":
+            raise RuntimeError(
+                "Order submission is disabled when runtime_mode='monitor_only'."
+            )
 
     def _assess_execution_degradation(self, order: Any) -> Dict[str, float | str]:
         metadata = dict(getattr(order, "metadata", {}) or {})
@@ -178,6 +204,7 @@ class LiveEngineRunner:
         min_depth_usd: float = 25_000.0,
         min_tob_coverage: float = 0.80,
     ) -> Dict[str, Any] | None:
+        self._ensure_trading_enabled()
         prepared = self._prepare_strategy_order(
             result,
             client_order_id=client_order_id,
@@ -216,6 +243,7 @@ class LiveEngineRunner:
         min_depth_usd: float = 25_000.0,
         min_tob_coverage: float = 0.80,
     ) -> Dict[str, Any] | None:
+        self._ensure_trading_enabled()
         prepared = self._prepare_strategy_order(
             result,
             client_order_id=client_order_id,
@@ -358,6 +386,7 @@ class LiveEngineRunner:
 
     async def start(self):
         _LOG.info("Starting Live Engine for %s", self.symbols)
+        self._ensure_runtime_ready_for_start()
         if self.state_store._snapshot_path is not None:
             _LOG.info("Live state auto-persist enabled at %s", self.state_store._snapshot_path)
 

@@ -96,6 +96,8 @@ def test_build_event_return_frame_and_expectancy_stats() -> None:
     assert stats["n_events"] == 2.0
     assert stats["mean_return"] > 0
     assert stats["gate_max_drawdown"] is True
+    assert stats["stability_pass"] is True
+    assert stats["stability_pass"] == stats["gate_max_drawdown"]
 
     mean_return, p_value, n_events, gate = calculate_expectancy(
         sym_events,
@@ -110,6 +112,39 @@ def test_build_event_return_frame_and_expectancy_stats() -> None:
     assert mean_return > 0
     assert 0.0 <= p_value <= 1.0
     assert gate is True
+
+
+def test_calculate_expectancy_stats_maps_stability_pass_from_drawdown_gate(monkeypatch) -> None:
+    timestamps = pd.date_range("2024-01-01", periods=6, freq="5min", tz="UTC")
+    sym_events = pd.DataFrame({"enter_ts": [timestamps[0], timestamps[1]]})
+    features_df = pd.DataFrame(
+        {
+            "timestamp": timestamps,
+            "close": [100.0, 101.0, 102.0, 103.0, 104.0, 105.0],
+        }
+    )
+
+    monkeypatch.setattr(
+        "project.research.gating.max_drawdown_gate",
+        lambda returns: {"max_drawdown": 1.0, "dd_to_expectancy_ratio": 9.0, "gate_max_drawdown": False},
+    )
+
+    stats = calculate_expectancy_stats(
+        sym_events,
+        features_df,
+        rule="enter_long_market",
+        horizon="5m",
+        side_policy="both",
+        canonical_family="basis",
+        shift_labels_k=0,
+        entry_lag_bars=1,
+        min_samples=2,
+        horizon_bars_override=1,
+    )
+
+    assert stats["n_events"] == 2.0
+    assert stats["gate_max_drawdown"] is False
+    assert stats["stability_pass"] is False
 
 
 def test_return_path_thresholds_apply_stop_loss_and_take_profit() -> None:

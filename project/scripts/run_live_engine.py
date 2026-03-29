@@ -16,23 +16,44 @@ from project import PROJECT_ROOT
 from project.spec_registry import load_yaml_path
 
 
-def _default_config_path() -> Path:
-    return PROJECT_ROOT / "configs" / "golden_certification.yaml"
-
-
-def load_live_engine_config(path: Path) -> Dict[str, Any]:
-    payload = load_yaml_path(path) or {}
-    if not isinstance(payload, dict):
-        raise ValueError(f"Live engine config must be a mapping: {path}")
-    return dict(payload)
-
-
 class LiveRuntimeConfigError(ValueError):
     pass
 
 
 class VenueConnectivityError(RuntimeError):
     pass
+
+
+def _default_config_path() -> Path:
+    return PROJECT_ROOT / "configs" / "golden_certification.yaml"
+
+
+def _normalize_runtime_mode(config: Dict[str, Any], *, config_path: Path) -> str:
+    runtime_mode = str(config.get("runtime_mode", "")).strip().lower()
+    if runtime_mode not in {"monitor_only", "trading"}:
+        raise LiveRuntimeConfigError(
+            f"Live engine config must set runtime_mode to 'monitor_only' or 'trading': {config_path}"
+        )
+    return runtime_mode
+
+
+def _normalize_strategy_runtime(config: Dict[str, Any], *, config_path: Path) -> Dict[str, Any]:
+    strategy_runtime = config.get("strategy_runtime", {})
+    if strategy_runtime in (None, ""):
+        return {}
+    if not isinstance(strategy_runtime, dict):
+        raise LiveRuntimeConfigError(f"strategy_runtime must be a mapping: {config_path}")
+    return dict(strategy_runtime)
+
+
+def load_live_engine_config(path: Path) -> Dict[str, Any]:
+    payload = load_yaml_path(path) or {}
+    if not isinstance(payload, dict):
+        raise ValueError(f"Live engine config must be a mapping: {path}")
+    config = dict(payload)
+    config["runtime_mode"] = _normalize_runtime_mode(config, config_path=path)
+    config["strategy_runtime"] = _normalize_strategy_runtime(config, config_path=path)
+    return config
 
 
 def resolve_live_engine_session_metadata(
@@ -55,6 +76,8 @@ def resolve_live_engine_session_metadata(
             "live_state_snapshot_path", PROJECT_ROOT.parent / "artifacts" / "live_state.json"
         )
     )
+    runtime_mode = str(config.get("runtime_mode", "monitor_only")).strip().lower()
+    strategy_runtime = config.get("strategy_runtime", {})
     recovery_streak = int(config.get("microstructure_recovery_streak", 3) or 3)
     account_sync_interval_seconds = float(config.get("account_sync_interval_seconds", 30.0) or 30.0)
     account_sync_failure_threshold = int(config.get("account_sync_failure_threshold", 3) or 3)
@@ -81,6 +104,10 @@ def resolve_live_engine_session_metadata(
         "execution_degradation_block_edge_bps": execution_degradation_block_edge_bps,
         "execution_degradation_throttle_scale": execution_degradation_throttle_scale,
         "stale_threshold_sec": stale_threshold_sec,
+        "runtime_mode": runtime_mode,
+        "strategy_runtime_implemented": bool(
+            isinstance(strategy_runtime, dict) and strategy_runtime.get("implemented", False)
+        ),
     }
 
 
@@ -115,6 +142,12 @@ def validate_live_runtime_environment(
 ) -> Dict[str, str]:
     config = load_live_engine_config(config_path)
     environment_name = _resolve_runtime_environment(config, config_path=config_path)
+    runtime_mode = str(config.get("runtime_mode", "monitor_only")).strip().lower()
+    strategy_runtime = config.get("strategy_runtime", {})
+    if runtime_mode == "trading" and not bool(strategy_runtime.get("implemented", False)):
+        raise LiveRuntimeConfigError(
+            "runtime_mode 'trading' requires strategy_runtime.implemented=true"
+        )
     env = dict(environ or os.environ)
     if not environment_name:
         return {}
@@ -354,6 +387,7 @@ def build_live_runner(
 ):
     from project.live.runner import LiveEngineRunner
 
+    config = load_live_engine_config(config_path)
     session_metadata = resolve_live_engine_session_metadata(
         config_path=config_path,
         symbols=symbols,
@@ -389,6 +423,8 @@ def build_live_runner(
         ],
         stale_threshold_sec=session_metadata["stale_threshold_sec"],
         order_manager=order_manager,
+        runtime_mode=session_metadata["runtime_mode"],
+        strategy_runtime=dict(config.get("strategy_runtime", {})),
     )
 
 

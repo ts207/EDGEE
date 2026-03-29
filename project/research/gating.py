@@ -836,6 +836,7 @@ def calculate_expectancy_stats(
         "p_value": p_value,
         "n_events": float(len(event_returns)),
         "n_effective": float(n_eff),
+        "stability_pass": bool(dd_result["gate_max_drawdown"]),
         "std_return": std_ret,
         "t_stat": t_stat,
         "max_drawdown": dd_result["max_drawdown"],

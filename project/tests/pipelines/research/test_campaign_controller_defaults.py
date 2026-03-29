@@ -15,6 +15,7 @@ def test_scan_trigger_types_default_includes_all():
 def test_context_conditioning_enabled_by_default():
     config = CampaignConfig(program_id="test")
     assert config.enable_context_conditioning is True
+    assert config.proposal_context_dimensions == ["vol_regime", "carry_state"]
 
 def test_mi_scan_enabled_by_default():
     config = CampaignConfig(program_id="test")

@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import json
 import logging
+import re
 import subprocess
 import sys
 from dataclasses import dataclass, field
@@ -27,6 +28,12 @@ from project.spec_registry.search_space import (
 _LOG = logging.getLogger(__name__)
 
 _QUALITY_SCORES: Dict[str, float] = _QUALITY_SCORES_MAP
+_REPAIR_STAGE_DEFAULT_EVENTS: Dict[str, str] = {
+    "build_event_registry": "VOL_SHOCK",
+    "analyze_events": "VOL_SHOCK",
+    "phase2_candidate_discovery": "VOL_SHOCK",
+    "bridge_evaluate_phase2": "VOL_SHOCK",
+}
 
 def _load_event_quality_weights(search_space_path: Path) -> Dict[str, float]:
     """Backward-compatible shim for quality weight loading."""
@@ -55,6 +62,7 @@ class CampaignConfig:
     # True   — adds vol_regime: [low, high] to every Step 4 proposal, tripling
     #           the regime-conditional hypothesis count per run.
     enable_context_conditioning: bool = True
+    proposal_context_dimensions: List[str] = None  # type: ignore[assignment]
 
     # Phase 4.4: optional live portfolio snapshot consumed by downstream
     # blueprint/allocation compilation for portfolio-aware sizing.
@@ -84,6 +92,14 @@ class CampaignConfig:
                 "SEQUENCE",
                 "INTERACTION",
             ]
+        if self.proposal_context_dimensions is None:
+            self.proposal_context_dimensions = ["vol_regime", "carry_state"]
+        else:
+            self.proposal_context_dimensions = [
+                str(dim).strip()
+                for dim in self.proposal_context_dimensions
+                if str(dim).strip()
+            ]
 
 
 @dataclass
@@ -100,6 +116,24 @@ class CampaignSummary:
 
     def to_json(self) -> str:
         return json.dumps(self.__dict__, indent=2)
+
+
+def _event_from_failure_detail(failure_detail: Any, enabled_events: List[str]) -> str:
+    detail = str(failure_detail or "").upper()
+    if not detail:
+        return ""
+    for event_id in sorted(enabled_events, key=len, reverse=True):
+        pattern = rf"(?<![A-Z0-9_]){re.escape(event_id.upper())}(?![A-Z0-9_])"
+        if re.search(pattern, detail):
+            return event_id
+    return ""
+
+
+def _repair_event_for_stage(stage: str, enabled_events: List[str]) -> str:
+    candidate = _REPAIR_STAGE_DEFAULT_EVENTS.get(str(stage or "").strip().lower(), "")
+    if candidate and candidate in enabled_events:
+        return candidate
+    return ""
 
 
 # ---------------------------------------------------------------------------
@@ -351,17 +385,14 @@ class CampaignController:
         stage = str(top_repair.get("proposed_scope", {}).get("stage", "unknown"))
         _LOG.info("STEP 1 REPAIR: open failure in stage=%s — proposing diagnostic run", stage)
 
-        # Use the most recent reflection's top_event if available, else a safe default
-        try:
-            mf = json.loads(mem["latest_reflection"].get("market_findings", "{}") or "{}")
-            event_type = str(mf.get("top_event", "")).strip()
-        except Exception:
-            event_type = ""
-
         events_registry = self.registries.events.get("events", {})
         enabled = [e for e, m in events_registry.items() if m.get("enabled", True)]
-        if not event_type or event_type not in events_registry:
-            event_type = enabled[0] if enabled else "ZSCORE_STRETCH"
+        failure_detail = str(top_repair.get("failure_detail", "")).strip()
+        event_type = _event_from_failure_detail(failure_detail, enabled)
+        if not event_type:
+            event_type = _repair_event_for_stage(stage, enabled)
+        if not event_type:
+            event_type = "ZSCORE_STRETCH"
 
         return self._build_proposal(
             events=[event_type],
