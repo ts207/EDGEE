@@ -51,12 +51,66 @@ REGIME_DIMENSIONS: dict = {
 }
 
 
+def _numeric_series(features: pd.DataFrame, column: str) -> pd.Series:
+    return pd.to_numeric(features[column], errors="coerce").fillna(0.0)
+
+
 def _resolve_state_col(state_id: str, features: pd.DataFrame) -> str | None:
     """Return the first column name matching state_id that exists in features."""
     for col in ColumnRegistry.state_cols(state_id):
         if col in features.columns:
             return col
     return None
+
+
+def _alias_state_mask(state_id: str, features: pd.DataFrame) -> pd.Series | None:
+    """Resolve common search-prepared aliases that are not registered as state columns."""
+    sid = str(state_id).strip().lower()
+
+    if sid == "funding_positive" and "carry_state_code" in features.columns:
+        return _numeric_series(features, "carry_state_code") > 0
+    if sid == "funding_negative" and "carry_state_code" in features.columns:
+        return _numeric_series(features, "carry_state_code") < 0
+
+    if sid == "trend_active":
+        if "trending_state" in features.columns:
+            return _numeric_series(features, "trending_state") > 0
+        bull = (
+            _numeric_series(features, "bull_trend_regime")
+            if "bull_trend_regime" in features.columns
+            else pd.Series(0.0, index=features.index)
+        )
+        bear = (
+            _numeric_series(features, "bear_trend_regime")
+            if "bear_trend_regime" in features.columns
+            else pd.Series(0.0, index=features.index)
+        )
+        if "bull_trend_regime" in features.columns or "bear_trend_regime" in features.columns:
+            return (bull > 0) | (bear > 0)
+
+    if sid == "chop_active":
+        if "chop_state" in features.columns:
+            return _numeric_series(features, "chop_state") > 0
+        if "chop_regime" in features.columns:
+            return _numeric_series(features, "chop_regime") > 0
+
+    if sid == "spread_tight":
+        if "prob_spread_tight" in features.columns:
+            return _numeric_series(features, "prob_spread_tight") >= 0.5
+    if sid == "spread_wide":
+        if "prob_spread_wide" in features.columns:
+            return _numeric_series(features, "prob_spread_wide") >= 0.5
+        if "spread_elevated_state" in features.columns:
+            return _numeric_series(features, "spread_elevated_state") > 0
+
+    return None
+
+
+def _state_active_mask(state_id: str, features: pd.DataFrame) -> pd.Series | None:
+    col = _resolve_state_col(state_id, features)
+    if col is not None:
+        return _numeric_series(features, col) == 1
+    return _alias_state_mask(state_id, features)
 
 
 def label_regimes(features: pd.DataFrame) -> pd.Series:
@@ -86,11 +140,10 @@ def label_regimes(features: pd.DataFrame) -> pd.Series:
 
         resolved_any = False
         for state_id, label in cfg["states"].items():
-            col = _resolve_state_col(state_id, features)
-            if col is None:
+            active = _state_active_mask(state_id, features)
+            if active is None:
                 continue
             resolved_any = True
-            active = pd.to_numeric(features[col], errors="coerce").fillna(0) == 1
             # Set label where this state is active (earlier states take priority)
             currently_unknown = dim_series == default_label
             dim_series = dim_series.where(~(active & currently_unknown), other=label)

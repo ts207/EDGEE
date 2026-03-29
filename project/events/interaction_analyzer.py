@@ -12,11 +12,15 @@ class InteractionOp:
 
 def _within_lag(l_ts: pd.Timestamp, r_ts: pd.Timestamp, lag: any) -> bool:
     """Check if r_ts is within lag of l_ts."""
+    delta = r_ts - l_ts
     if isinstance(lag, pd.Timedelta):
-        return pd.Timedelta(0) < (r_ts - l_ts) <= lag
+        return pd.Timedelta(0) < delta <= lag
+
+    if hasattr(delta, "total_seconds"):
+        diff = delta.total_seconds() / 60
     else:
-        diff = (r_ts - l_ts).total_seconds() / 60
-        return 0 < diff <= lag
+        diff = float(delta)
+    return 0 < diff <= float(lag)
 
 
 def detect_interactions(

@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pandas as pd
+import pandas.io.parquet as pq_mod
 
 from project.io import parquet_compat
 from project.io import utils as io_utils
@@ -11,9 +12,13 @@ from project.io import utils as io_utils
 def test_pandas_to_parquet_fallback_preserves_parquet_path(tmp_path: Path, monkeypatch) -> None:
     original_to_parquet = pd.DataFrame.to_parquet
     original_read_parquet = pd.read_parquet
+    original_module_to_parquet = pq_mod.to_parquet
+    original_module_read_parquet = pq_mod.read_parquet
     monkeypatch.setattr(parquet_compat, "_HAS_NATIVE_PARQUET", False)
     monkeypatch.setattr(pd.DataFrame, "to_parquet", original_to_parquet)
     monkeypatch.setattr(pd, "read_parquet", original_read_parquet)
+    monkeypatch.setattr(pq_mod, "to_parquet", original_module_to_parquet)
+    monkeypatch.setattr(pq_mod, "read_parquet", original_module_read_parquet)
     parquet_compat.patch_pandas_parquet_fallback()
 
     path = tmp_path / "frame.parquet"

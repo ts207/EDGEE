@@ -79,12 +79,22 @@ def test_select_bridge_gate_spec_reads_override():
                 "edge_cost_k": 1.75,
                 "stressed_cost_multiplier": 1.25,
                 "min_validation_trades": 12,
+                "search_bridge_min_t_stat": 1.9,
+                "search_bridge_min_robustness_score": 0.65,
+                "search_bridge_min_regime_stability_score": 0.55,
+                "search_bridge_min_stress_survival": 0.4,
+                "search_bridge_stress_cost_buffer_bps": 1.5,
             }
         }
     )
     assert out["edge_cost_k"] == 1.75
     assert out["stressed_cost_multiplier"] == 1.25
     assert out["min_validation_trades"] == 12
+    assert out["search_bridge_min_t_stat"] == 1.9
+    assert out["search_bridge_min_robustness_score"] == 0.65
+    assert out["search_bridge_min_regime_stability_score"] == 0.55
+    assert out["search_bridge_min_stress_survival"] == 0.4
+    assert out["search_bridge_stress_cost_buffer_bps"] == 1.5
 
 
 def test_resolve_promotion_base_min_events_uses_spec_and_contract_floor():

@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from project.domain.compiled_registry import refresh_domain_registry
+from project.domain.compiled_registry import get_domain_registry, refresh_domain_registry
 from project.domain.hypotheses import HypothesisSpec, TriggerSpec, TriggerType
 from project.domain.models import DomainRegistry, EventDefinition, StateDefinition, TemplateOperatorDefinition
 from project.events.event_aliases import EVENT_ALIASES, resolve_event_alias
@@ -98,8 +98,30 @@ def test_domain_registry_helpers_work_on_small_synthetic_registry():
             "families": {"FAM": {"templates": ["t2", "t3"], "x": 1}},
         },
         event_definitions={
-            "E1": EventDefinition("E1", "FAM", "reports", "e1.parquet", "sig1", {}, {"k": 1}, "spec/e1.yaml"),
-            "E2": EventDefinition("E2", "FAM", "reports", "e2.parquet", "sig2", {}, {"k": 2}, "spec/e2.yaml"),
+            "E1": EventDefinition(
+                event_type="E1",
+                canonical_family="FAM",
+                canonical_regime="FAM",
+                legacy_family="",
+                reports_dir="reports",
+                events_file="e1.parquet",
+                signal_column="sig1",
+                parameters={},
+                raw={"k": 1},
+                spec_path="spec/e1.yaml",
+            ),
+            "E2": EventDefinition(
+                event_type="E2",
+                canonical_family="FAM",
+                canonical_regime="FAM",
+                legacy_family="",
+                reports_dir="reports",
+                events_file="e2.parquet",
+                signal_column="sig2",
+                parameters={},
+                raw={"k": 2},
+                spec_path="spec/e2.yaml",
+            ),
         },
         state_definitions={
             "S1": StateDefinition("S1", "SFAM", "SRC", {"a": 1}),
@@ -173,3 +195,4 @@ def test_refresh_domain_registry_clears_caches(monkeypatch):
     monkeypatch.setattr("project.domain.compiled_registry.clear_caches", lambda: None)
     refresh_domain_registry()
     assert called["n"] == 1
+    get_domain_registry.cache_clear()

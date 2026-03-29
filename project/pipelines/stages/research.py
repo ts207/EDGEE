@@ -490,6 +490,8 @@ def build_research_stages(
             str(getattr(args, "phase2_gate_profile", "auto")),
             "--search_spec",
             getattr(args, "search_spec", "spec/search_space.yaml"),
+            "--phase2_event_type",
+            str(getattr(args, "phase2_event_type", "") or ""),
             "--min_n",
             str(int(getattr(args, "search_min_n", 30))),
             "--registry_root",

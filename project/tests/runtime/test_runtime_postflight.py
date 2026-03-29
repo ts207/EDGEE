@@ -84,6 +84,35 @@ def test_runtime_postflight_fails_on_future_event_time(tmp_path):
     assert out["determinism_replay_checks_status"] == "pass"
 
 
+def test_runtime_postflight_uses_eval_bar_time_for_next_bar_detector_rows(tmp_path):
+    data_root = tmp_path / "data"
+    run_id = "runtime_postflight_eval_bar"
+    events_path = data_root / "events" / run_id / "events.csv"
+    _write_events_csv(
+        events_path,
+        [
+            {
+                "event_id": "e1",
+                "event_type": "VOL_SHOCK",
+                "symbol": "BTCUSDT",
+                "eval_bar_ts": 1_700_000_000_000_000,
+                "enter_ts": 1_700_000_300_000_000,
+                "detected_ts": 1_700_000_000_000_000,
+            }
+        ],
+    )
+
+    out = run_runtime_postflight_audit(
+        run_id=run_id,
+        data_root=data_root,
+        repo_root=PROJECT_ROOT.parent,
+        determinism_replay_checks=False,
+    )
+
+    assert out["status"] == "pass"
+    assert int(out["watermark_violation_count"]) == 0
+
+
 def test_runtime_postflight_loads_runtime_replay_reports(tmp_path):
     data_root = tmp_path / "data"
     run_id = "runtime_postflight_replay_reports"

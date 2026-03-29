@@ -179,7 +179,6 @@ def _load_detector_input(
         "CROSS_VENUE_CATCHUP",
         "FND_DISLOC",
         "SPOT_PERP_BASIS_SHOCK",
-        "VOL_SHOCK",
     ):
         needs_basis = True
     elif detector:

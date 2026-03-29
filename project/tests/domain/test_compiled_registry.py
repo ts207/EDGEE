@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from project.domain.compiled_registry import get_domain_registry
+from project.domain.hypotheses import HypothesisSpec, TriggerSpec
+from project.research.search.feasibility import check_hypothesis_feasibility
 
 
 def test_domain_registry_compiles_core_event_state_and_template_views():
@@ -13,9 +15,25 @@ def test_domain_registry_compiles_core_event_state_and_template_views():
     event = registry.get_event("VOL_SHOCK")
     assert event is not None
     assert event.event_type == "VOL_SHOCK"
-    assert event.canonical_family
+    assert event.canonical_family == "VOLATILITY_TRANSITION"
+    assert event.canonical_regime == "VOLATILITY_TRANSITION"
     assert event.signal_column
     assert event.spec_path.endswith("VOL_SHOCK.yaml")
+
+
+def test_vol_shock_is_feasible_for_continuation_template_family():
+    registry = get_domain_registry()
+    spec = HypothesisSpec(
+        trigger=TriggerSpec.event("VOL_SHOCK"),
+        direction="long",
+        horizon="60m",
+        template_id="continuation",
+    )
+
+    result = check_hypothesis_feasibility(spec, registry=registry)
+
+    assert result.valid is True
+    assert "incompatible_template_family" not in result.reasons
 
 
 def test_domain_registry_includes_runtime_promoted_event_specs():

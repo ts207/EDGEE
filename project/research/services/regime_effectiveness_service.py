@@ -21,6 +21,15 @@ RETURN_COLUMNS = (
     "bridge_validation_after_cost_bps",
 )
 EXECUTION_COLUMNS = ("resolved_cost_bps", "avg_dynamic_cost_bps", "spread_bps", "slippage_bps", "depth")
+DIRECT_PROXY_COLUMNS = (
+    "canonical_regime",
+    "direct_count",
+    "proxy_count",
+    "direct_mean_return_bps",
+    "proxy_mean_return_bps",
+    "stability_gap_bps",
+    "stability_ratio",
+)
 
 
 @dataclass(frozen=True)
@@ -275,7 +284,7 @@ def compute_regime_effectiveness(episodes: pd.DataFrame) -> RegimeEffectivenessA
                     "stability_ratio": float(proxy_mean / direct_mean) if direct_mean not in (0.0, -0.0) else 0.0,
                 }
             )
-    direct_proxy = pd.DataFrame(direct_proxy_rows)
+    direct_proxy = pd.DataFrame(direct_proxy_rows, columns=DIRECT_PROXY_COLUMNS)
     if not direct_proxy.empty:
         main = main.merge(
             direct_proxy[["canonical_regime", "stability_gap_bps"]].rename(

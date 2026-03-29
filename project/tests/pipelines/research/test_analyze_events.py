@@ -7,6 +7,8 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
+from project.research.analyze_events import _load_detector_input
+
 
 class TestAnalyzeEventsMain:
     """Tests for the universal analyze_events.py entry point."""
@@ -61,3 +63,29 @@ class TestAnalyzeEventsMain:
         # Must accept at least one positional-or-keyword arg (argv)
         params = list(sig.parameters.values())
         assert len(params) >= 1
+
+
+def test_load_detector_input_keeps_vol_shock_on_standard_feature_path(monkeypatch):
+    class DummyDetector:
+        required_columns = ("timestamp", "close", "high", "low")
+
+    sentinel = pd.DataFrame({"timestamp": pd.to_datetime(["2024-01-01T00:00:00Z"])})
+
+    def _unexpected_basis(*args, **kwargs):
+        raise AssertionError("VOL_SHOCK should not use the basis feature loader")
+
+    monkeypatch.setattr("project.research.analyze_events._load_basis_features", _unexpected_basis)
+    monkeypatch.setattr(
+        "project.research.analyze_events.load_features",
+        lambda **kwargs: sentinel,
+    )
+
+    out = _load_detector_input(
+        detector=DummyDetector(),
+        event_type="VOL_SHOCK",
+        run_id="run_x",
+        symbol="BTCUSDT",
+        timeframe="5m",
+    )
+
+    pd.testing.assert_frame_equal(out, sentinel)

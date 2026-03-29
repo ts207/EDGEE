@@ -18,9 +18,12 @@ from pathlib import Path
 from typing import Optional
 
 import pandas as pd
+import yaml
 
 from project import PROJECT_ROOT
-from project.specs.gates import load_gates_spec, select_phase2_gate_spec
+from project.domain.compiled_registry import get_domain_registry
+from project.spec_registry import load_yaml_path
+from project.specs.gates import load_gates_spec, select_bridge_gate_spec, select_phase2_gate_spec
 from project.research.search.profile import resolve_search_profile
 from project.research.search.generator import generate_hypotheses_with_audit
 from project.research.search.evaluator import (
@@ -43,6 +46,81 @@ from project.research.services.reporting_service import write_json_report
 from project.research.regime_routing import annotate_regime_metadata
 
 log = logging.getLogger(__name__)
+
+_DEFAULT_BROAD_SEARCH_SPECS = {
+    "",
+    "full",
+    "search_space.yaml",
+    "spec/search_space.yaml",
+}
+
+
+def _is_default_broad_search_spec(search_spec: str) -> bool:
+    return str(search_spec or "").strip() in _DEFAULT_BROAD_SEARCH_SPECS
+
+
+def _load_search_spec_doc(search_spec: str) -> dict:
+    raw = str(search_spec or "").strip()
+    if raw.endswith((".yaml", ".yml")):
+        path = Path(raw)
+        if not path.is_absolute():
+            path = PROJECT_ROOT.parent / path
+        doc = load_yaml_path(path)
+    else:
+        from project.spec_validation import loaders
+
+        doc = loaders.load_search_spec(raw)
+    if not isinstance(doc, dict):
+        raise ValueError(f"Search spec must resolve to a mapping: {search_spec}")
+    return dict(doc)
+
+
+def _write_event_scoped_search_spec(
+    *,
+    search_spec: str,
+    phase2_event_type: str,
+    out_dir: Path,
+) -> str:
+    event_type = str(phase2_event_type or "").strip().upper()
+    if not event_type or event_type == "ALL" or not _is_default_broad_search_spec(search_spec):
+        return str(search_spec)
+
+    base_doc = _load_search_spec_doc(search_spec)
+    narrowed = dict(base_doc)
+    registry = get_domain_registry()
+    event_row = registry.event_row(event_type)
+    metadata = dict(narrowed.get("metadata") or {})
+    metadata["auto_scope"] = f"event:{event_type}"
+    metadata["auto_scope_source"] = "phase2_event_type"
+    narrowed["metadata"] = metadata
+    narrowed["events"] = [event_type]
+    event_templates = event_row.get("templates", [])
+    if isinstance(event_templates, (list, tuple)) and event_templates:
+        narrowed["templates"] = [str(item) for item in event_templates if str(item).strip()]
+    event_horizons = event_row.get("horizons", [])
+    if isinstance(event_horizons, (list, tuple)) and event_horizons:
+        narrowed["horizons"] = [str(item) for item in event_horizons if str(item).strip()]
+    if "max_candidates_per_run" in event_row:
+        narrowed["max_candidates_per_run"] = int(event_row["max_candidates_per_run"])
+    narrowed.pop("states", None)
+    narrowed.pop("transitions", None)
+    narrowed.pop("feature_predicates", None)
+    narrowed["include_sequences"] = False
+    narrowed["include_interactions"] = False
+    triggers = dict(narrowed.get("triggers") or {})
+    triggers["events"] = [event_type]
+    triggers.pop("states", None)
+    triggers.pop("transitions", None)
+    triggers.pop("feature_predicates", None)
+    narrowed["triggers"] = triggers
+
+    ensure_dir(out_dir)
+    resolved_spec_path = out_dir / f"resolved_search_spec__{event_type}.yaml"
+    resolved_spec_path.write_text(
+        yaml.safe_dump(narrowed, sort_keys=False),
+        encoding="utf-8",
+    )
+    return str(resolved_spec_path)
 
 
 def _normalize_audit_frame(rows: list[dict]) -> pd.DataFrame:
@@ -224,6 +302,7 @@ def run(
     experiment_config: Optional[str] = None,
     registry_root: str | Path = "project/configs/registries",
     use_context_quality: bool = True,
+    phase2_event_type: str = "",
 ) -> int:
     """
     Core logic. Returns exit code (0=success, 1=failure).
@@ -246,7 +325,11 @@ def run(
         min_n=min_n,
         min_t_stat=min_t_stat,
     )
-    resolved_search_spec = str(search_profile["search_spec"])
+    resolved_search_spec = _write_event_scoped_search_spec(
+        search_spec=str(search_profile["search_spec"]),
+        phase2_event_type=phase2_event_type,
+        out_dir=out_dir,
+    )
     resolved_min_n = int(search_profile["min_n"])
     resolved_min_t_stat = float(search_profile["min_t_stat"])
     phase2_gates = select_phase2_gate_spec(
@@ -254,6 +337,7 @@ def run(
         mode="research",
         gate_profile=str(gate_profile or "auto"),
     )
+    bridge_gates = select_bridge_gate_spec(load_gates_spec(PROJECT_ROOT.parent))
     multiplicity_max_q = float(phase2_gates.get("max_q_value", 0.05))
 
     # 1. Load data and evaluate symbols
@@ -467,6 +551,19 @@ def run(
             metrics,
             min_t_stat=resolved_min_t_stat,
             min_n=resolved_min_n,
+            bridge_min_t_stat=float(bridge_gates.get("search_bridge_min_t_stat", 2.0)),
+            bridge_min_robustness_score=float(
+                bridge_gates.get("search_bridge_min_robustness_score", 0.7)
+            ),
+            bridge_min_regime_stability_score=float(
+                bridge_gates.get("search_bridge_min_regime_stability_score", 0.6)
+            ),
+            bridge_min_stress_survival=float(
+                bridge_gates.get("search_bridge_min_stress_survival", 0.5)
+            ),
+            bridge_stress_cost_buffer_bps=float(
+                bridge_gates.get("search_bridge_stress_cost_buffer_bps", 2.0)
+            ),
         )
 
         if not candidates.empty:
@@ -598,6 +695,7 @@ def main(argv=None) -> int:
     parser.add_argument("--discovery_profile", default="standard")
     parser.add_argument("--gate_profile", default="auto")
     parser.add_argument("--search_spec", default="spec/search_space.yaml")
+    parser.add_argument("--phase2_event_type", default="")
     parser.add_argument("--chunk_size", type=int, default=500)
     parser.add_argument("--min_t_stat", type=float, default=1.5)
     parser.add_argument("--min_n", type=int, default=30)
@@ -639,6 +737,7 @@ def main(argv=None) -> int:
         use_context_quality=bool(int(args.use_context_quality)),
         experiment_config=args.experiment_config,
         registry_root=args.registry_root,
+        phase2_event_type=args.phase2_event_type,
     )
 
 

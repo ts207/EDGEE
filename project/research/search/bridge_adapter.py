@@ -52,6 +52,11 @@ def hypotheses_to_bridge_candidates(
     min_t_stat: float = 1.5,
     min_n: int = 30,
     min_events: int = 5,
+    bridge_min_t_stat: float = 2.0,
+    bridge_min_robustness_score: float = 0.7,
+    bridge_min_regime_stability_score: float = 0.6,
+    bridge_min_stress_survival: float = 0.5,
+    bridge_stress_cost_buffer_bps: float = 2.0,
 ) -> pd.DataFrame:
     """
     Map evaluator metrics to the production schema.
@@ -135,20 +140,26 @@ def hypotheses_to_bridge_candidates(
     out["turnover_proxy_mean"] = 0.5  # Default turnover proxy
 
     # Gating Flags
-    out["gate_oos_validation"] = filtered["robustness_score"] >= 0.7
+    out["gate_oos_validation"] = filtered["robustness_score"] >= float(
+        bridge_min_robustness_score
+    )
     out["gate_multiplicity"] = False  # Will be set by apply_multiplicity_controls()
-    out["gate_c_regime_stable"] = filtered["robustness_score"] >= 0.6
+    out["gate_c_regime_stable"] = filtered["robustness_score"] >= float(
+        bridge_min_regime_stability_score
+    )
     out["gate_after_cost_positive"] = filtered["cost_adjusted_return_bps"] > 0
-    out["gate_after_cost_stressed_positive"] = (filtered["cost_adjusted_return_bps"] - 2.0) > 0
+    out["gate_after_cost_stressed_positive"] = (
+        filtered["cost_adjusted_return_bps"] - float(bridge_stress_cost_buffer_bps)
+    ) > 0
 
     # Overall Tradability
     # A candidate is "tradable" if it passes t-stat, n, OOS score,
     # and survives at least 50% of stress scenarios.
     out["gate_bridge_tradable"] = (
-        (out["t_stat"] >= 2.0)
+        (out["t_stat"] >= float(bridge_min_t_stat))
         & (out["gate_after_cost_stressed_positive"])
         & (out["gate_oos_validation"])
-        & (out["stress_test_survival"] >= 0.5)
+        & (out["stress_test_survival"] >= float(bridge_min_stress_survival))
     )
 
     out["bridge_eval_status"] = np.where(out["gate_bridge_tradable"], "tradable", "rejected")

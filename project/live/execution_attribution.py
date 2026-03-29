@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, asdict
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Dict, List
+
+from project.io.utils import write_parquet
 
 
 def _utcnow() -> datetime:
@@ -140,12 +143,9 @@ def write_attribution_summary(
 ) -> None:
     """Write aggregated attribution summaries to parquet for research feedback loop."""
     import pandas as pd
-    from pathlib import Path
 
     if not records:
         return
-
-    df = pd.DataFrame([record_to_dict(r) for r in records])
 
     by_key = {}
     for key in ["symbol", "volatility_regime", "microstructure_regime"]:
@@ -160,5 +160,4 @@ def write_attribution_summary(
 
     if summaries:
         summary_df = pd.DataFrame(summaries)
-        Path(output_path).parent.mkdir(parents=True, exist_ok=True)
-        summary_df.to_parquet(output_path, index=False)
+        write_parquet(summary_df, Path(output_path))

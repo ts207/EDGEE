@@ -129,3 +129,12 @@ regimes:
     holding_horizon_profile: short_to_intraday
     stop_logic_profile: failed_release
     profit_taking_profile: breakout_extension
+  VOLATILITY_TRANSITION:
+    bucket: trade_generating
+    eligible_templates: [mean_reversion, continuation, trend_continuation, pullback_entry, only_if_regime]
+    forbidden_templates: [tail_risk_avoid]
+    risk_posture: selective
+    execution_style: normalization_confirmed
+    holding_horizon_profile: short_to_intraday
+    stop_logic_profile: volatility_reexpansion
+    profit_taking_profile: normalization_decay

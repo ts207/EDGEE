@@ -13,6 +13,7 @@ triggers:
   # Discrete market occurrences — drawn from spec/templates/event_template_registry.yaml
   events:
     # Volatility family
+    - VOL_SHOCK
     - VOL_SPIKE
     - VOL_CLUSTER_SHIFT
     - RANGE_COMPRESSION_END

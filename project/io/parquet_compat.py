@@ -60,7 +60,18 @@ def read_parquet_compat(
     target = _coerce_path(path)
     allowed = set(inspect.signature(reader).parameters)
     reader_kwargs = {key: value for key, value in kwargs.items() if key in allowed}
-    frame = reader(target, **reader_kwargs)
+    try:
+        frame = reader(target, **reader_kwargs)
+    except Exception:
+        if not _HAS_NATIVE_PARQUET:
+            raise
+        import pyarrow.parquet as pq
+
+        frame = pq.ParquetFile(target).read(columns=columns).to_pandas()
+        if columns is None:
+            return frame
+        cols = [column for column in columns if column in frame.columns]
+        return frame.loc[:, cols]
     if columns is not None:
         cols = [column for column in columns if column in frame.columns]
         frame = frame.loc[:, cols]
@@ -85,8 +96,10 @@ def patch_pandas_parquet_fallback() -> None:
     original_read_pickle = pd.read_pickle
 
     def _to_parquet_fallback(self: pd.DataFrame, path, *args, **kwargs):
+        if len(args) > 1:
+            raise TypeError("parquet fallback accepts at most one positional argument after path")
         if args:
-            raise TypeError("parquet fallback requires keyword arguments after path")
+            kwargs.setdefault("engine", args[0])
         return write_parquet_compat(
             self,
             path,
@@ -94,9 +107,13 @@ def patch_pandas_parquet_fallback() -> None:
             **kwargs,
         )
 
-    def _read_parquet_fallback(path, columns=None, *args, **kwargs):
-        if args:
-            raise TypeError("parquet fallback requires keyword arguments after path")
+    def _read_parquet_fallback(path, *args, columns=None, **kwargs):
+        if len(args) > 2:
+            raise TypeError("parquet fallback accepts at most engine and columns positionally")
+        if len(args) >= 1:
+            kwargs.setdefault("engine", args[0])
+        if len(args) == 2 and columns is None:
+            columns = args[1]
         return read_parquet_compat(
             path,
             columns=columns,

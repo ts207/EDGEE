@@ -95,6 +95,12 @@ def _first_timestamp_us(row: Any, fields: Iterable[str]) -> Optional[int]:
     return None
 
 
+def _event_time_us(row: Any) -> Optional[int]:
+    # Detector rows often carry both eval-time and next-bar entry time.
+    # For causality auditing, the event becomes observable at eval-bar close.
+    return _first_timestamp_us(row, ["eval_bar_ts", "enter_ts", "timestamp", "event_time"])
+
+
 def run_watermark_audit(
     events: Iterable[Any],
     *,
@@ -108,7 +114,7 @@ def run_watermark_audit(
     max_observed_lag_us = 0
 
     for row in events:
-        event_time = _first_timestamp_us(row, ["enter_ts", "timestamp", "event_time"])
+        event_time = _event_time_us(row)
         detect_time = _first_timestamp_us(row, ["detected_ts", "recv_time"])
 
         if event_time is None or detect_time is None:

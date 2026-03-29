@@ -165,6 +165,19 @@ def select_bridge_gate_spec(gates_spec: Dict[str, Any]) -> Dict[str, Any]:
         "edge_cost_k": float(bridge_cfg.get("edge_cost_k", 2.0)),
         "stressed_cost_multiplier": float(bridge_cfg.get("stressed_cost_multiplier", 1.5)),
         "min_validation_trades": int(bridge_cfg.get("min_validation_trades", 20) or 20),
+        "search_bridge_min_t_stat": float(bridge_cfg.get("search_bridge_min_t_stat", 2.0)),
+        "search_bridge_min_robustness_score": float(
+            bridge_cfg.get("search_bridge_min_robustness_score", 0.7)
+        ),
+        "search_bridge_min_regime_stability_score": float(
+            bridge_cfg.get("search_bridge_min_regime_stability_score", 0.6)
+        ),
+        "search_bridge_min_stress_survival": float(
+            bridge_cfg.get("search_bridge_min_stress_survival", 0.5)
+        ),
+        "search_bridge_stress_cost_buffer_bps": float(
+            bridge_cfg.get("search_bridge_stress_cost_buffer_bps", 2.0)
+        ),
         "micro_max_spread_stress": float(bridge_cfg.get("micro_max_spread_stress", 2.0)),
         "micro_max_depth_depletion": float(bridge_cfg.get("micro_max_depth_depletion", 0.70)),
         "micro_max_sweep_pressure": float(bridge_cfg.get("micro_max_sweep_pressure", 2.5)),

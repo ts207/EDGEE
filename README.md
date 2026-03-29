@@ -183,7 +183,8 @@ Exit status alone is not sufficient.
 
 ## Read Next
 
-- `docs/00_INDEX.md`
-- `docs/06_OPERATOR_WORKFLOW.md`
-- `docs/08_ENTRY_POINTS_AND_CLI.md`
-- `docs/10_TESTING_AND_QUALITY.md`
+- [docs/README.md](/home/irene/Edge/docs/README.md)
+- [docs/03_OPERATOR_WORKFLOW.md](/home/irene/Edge/docs/03_OPERATOR_WORKFLOW.md)
+- [docs/04_COMMANDS_AND_ENTRY_POINTS.md](/home/irene/Edge/docs/04_COMMANDS_AND_ENTRY_POINTS.md)
+- [docs/06_QUALITY_GATES_AND_PROMOTION.md](/home/irene/Edge/docs/06_QUALITY_GATES_AND_PROMOTION.md)
+- [docs/08_TESTING_AND_MAINTENANCE.md](/home/irene/Edge/docs/08_TESTING_AND_MAINTENANCE.md)

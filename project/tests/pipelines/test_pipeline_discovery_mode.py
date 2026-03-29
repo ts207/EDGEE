@@ -15,10 +15,14 @@ def _make_args(**overrides):
         run_phase2_conditional=1,
         phase2_event_type="all",
         phase2_gate_profile_resolved="auto",
+        phase2_gate_profile="auto",
         timeframes="15m",
         concept="",
         seed=42,
         discovery_mode="search",
+        search_spec="spec/search_space.yaml",
+        search_min_n=30,
+        registry_root="project/configs/registries",
         # Added missing defaults
         phase2_shift_labels_k=0,
         mode="research",
@@ -76,6 +80,26 @@ def test_discovery_mode_search_includes_search_stage(tmp_path):
     names = [s[0] for s in stages]
     assert any("phase2_search_engine" in n for n in names)
     assert not any("compare_discovery_paths" in n for n in names)
+
+
+def test_search_stage_receives_phase2_event_type_pin(tmp_path):
+    from project.pipelines.stages.research import build_research_stages
+
+    stages = build_research_stages(
+        args=_make_args(phase2_event_type="VOL_SHOCK"),
+        run_id="r0",
+        symbols="BTCUSDT",
+        start="2024-01-01",
+        end="2024-03-01",
+        research_gate_profile="discovery",
+        project_root=tmp_path,
+        data_root=tmp_path,
+        phase2_event_chain=[],
+    )
+    names = [s[0] for s in stages]
+    _, _, search_args = next(stage for stage in stages if stage[0] == "phase2_search_engine")
+    idx = search_args.index("--phase2_event_type")
+    assert search_args[idx + 1] == "VOL_SHOCK"
     assert "phase1_correlation_clustering" in names
 
 

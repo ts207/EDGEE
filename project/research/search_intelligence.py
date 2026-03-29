@@ -180,7 +180,18 @@ def _build_frontier(
 
     domain_registry = get_domain_registry()
     events = registries.events.get("events", {})
-    enabled_events = list(domain_registry.default_executable_event_ids())
+    if isinstance(events, dict) and events:
+        enabled_events = [
+            str(event_id).strip()
+            for event_id, cfg in events.items()
+            if str(event_id).strip()
+            and not (
+                isinstance(cfg, dict)
+                and str(cfg.get("enabled", True)).strip().lower() in {"0", "false", "no"}
+            )
+        ]
+    else:
+        enabled_events = list(domain_registry.default_executable_event_ids())
     tested_events = set(
         tested_regions.get("event_type", pd.Series(dtype="object")).astype(str).unique()
     )

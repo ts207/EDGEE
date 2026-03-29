@@ -163,6 +163,8 @@ def test_compare_run_reports_reads_json_files(tmp_path):
     candidate_promo = tmp_path / "candidate_promo.json"
     baseline_edge = tmp_path / "baseline_edge.parquet"
     candidate_edge = tmp_path / "candidate_edge.parquet"
+    baseline_regime = tmp_path / "baseline_regime.json"
+    candidate_regime = tmp_path / "candidate_regime.json"
 
     baseline_phase2.write_text(
         json.dumps(
@@ -196,6 +198,32 @@ def test_compare_run_reports_reads_json_files(tmp_path):
         ),
         encoding="utf-8",
     )
+    baseline_regime.write_text(
+        json.dumps(
+            {
+                "status": "ok",
+                "regimes_total": 1,
+                "episodes_total": 2,
+                "scorecard_rows": 1,
+                "recommended_bucket_counts": {"trade_generating": 1},
+                "top_regimes_by_incidence": [{"canonical_regime": "LIQUIDITY_STRESS", "episode_count": 2}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    candidate_regime.write_text(
+        json.dumps(
+            {
+                "status": "ok",
+                "regimes_total": 2,
+                "episodes_total": 5,
+                "scorecard_rows": 2,
+                "recommended_bucket_counts": {"trade_generating": 2},
+                "top_regimes_by_incidence": [{"canonical_regime": "VOLATILITY_TRANSITION", "episode_count": 3}],
+            }
+        ),
+        encoding="utf-8",
+    )
     import pandas as pd
 
     pd.DataFrame(
@@ -212,6 +240,8 @@ def test_compare_run_reports_reads_json_files(tmp_path):
         candidate_promotion_path=candidate_promo,
         baseline_edge_candidates_path=baseline_edge,
         candidate_edge_candidates_path=candidate_edge,
+        baseline_regime_effectiveness_path=baseline_regime,
+        candidate_regime_effectiveness_path=candidate_regime,
     )
 
     assert out["phase2"]["delta"]["candidate_count"] == 3
@@ -222,6 +252,8 @@ def test_compare_run_reports_reads_json_files(tmp_path):
         "baseline_exists": True,
         "candidate_exists": True,
     }
+    assert out["regime_effectiveness"]["delta"]["regimes_total"] == 1
+    assert out["regime_effectiveness"]["top_regime_changed"] is True
 
 
 def test_assess_run_comparison_reports_warn_or_fail_status():
@@ -273,6 +305,9 @@ def test_resolve_drift_thresholds_pins_current_calibration_defaults():
         "max_edge_after_cost_positive_validation_count_delta_abs": 2.0,
         "max_edge_median_resolved_cost_bps_delta_abs": 0.25,
         "max_edge_median_expectancy_bps_delta_abs": 0.25,
+        "max_regime_incidence_drift_abs": 0.15,
+        "max_regime_actionability_drift_abs": 2.0,
+        "max_regime_direct_proxy_gap_drift_abs": 5.0,
     }
 
 

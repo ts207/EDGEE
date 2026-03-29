@@ -886,7 +886,7 @@ events:
     strategy_only: false
     notes: Start of volatility normalization after expansion.
   VOL_SHOCK:
-    canonical_regime: VOLATILITY_EXPANSION
+    canonical_regime: VOLATILITY_TRANSITION
     subtype: vol_shock
     phase: shock
     evidence_mode: statistical
