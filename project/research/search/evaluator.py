@@ -11,6 +11,7 @@ feature_predicate triggers all resolve to a boolean mask over the feature table.
 
 from __future__ import annotations
 
+import math
 import logging
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -48,6 +49,7 @@ from project.research.search.evaluator_utils import (
     trigger_mask as _trigger_mask,
     context_mask as _context_mask,
     trigger_key as _trigger_key,
+    signed_returns_for_spec as _signed_returns_for_spec,
 )
 
 log = logging.getLogger(__name__)
@@ -71,6 +73,9 @@ METRICS_COLUMNS = [
     "sharpe",
     "hit_rate",
     "cost_adjusted_return_bps",
+    "p_value",
+    "p_value_raw",
+    "p_value_for_fdr",
     "mae_mean_bps",
     "mfe_mean_bps",
     "robustness_score",
@@ -80,6 +85,12 @@ METRICS_COLUMNS = [
     "valid",
     "invalid_reason",
 ]
+
+
+def _normal_p_value(stat: float) -> float:
+    if not np.isfinite(stat):
+        return 1.0
+    return float(math.erfc(abs(float(stat)) / math.sqrt(2.0)))
 
 
 def evaluated_records_from_metrics(metrics_df: pd.DataFrame) -> pd.DataFrame:
@@ -112,6 +123,9 @@ def _null_row(spec: HypothesisSpec, n: int, reason: str = "unknown") -> Dict[str
             "sharpe": 0.0,
             "hit_rate": 0.0,
             "cost_adjusted_return_bps": 0.0,
+            "p_value": 1.0,
+            "p_value_raw": 1.0,
+            "p_value_for_fdr": 1.0,
             "mae_mean_bps": 0.0,
             "mfe_mean_bps": 0.0,
             "robustness_score": 0.0,
@@ -122,6 +136,14 @@ def _null_row(spec: HypothesisSpec, n: int, reason: str = "unknown") -> Dict[str
     )
     row = evaluated.to_record()
     return {column: row.get(column) for column in METRICS_COLUMNS}
+
+
+def _is_supported_profile(spec: HypothesisSpec) -> tuple[bool, str]:
+    if str(spec.cost_profile).strip().lower() != "standard":
+        return False, "unsupported_cost_profile"
+    if str(spec.objective_profile).strip().lower() != "mean_return":
+        return False, "unsupported_objective_profile"
+    return True, ""
 
 
 def evaluate_hypothesis_batch(
@@ -197,6 +219,11 @@ def evaluate_hypothesis_batch(
     regime_rows: List[Dict[str, Any]] = []  # Phase 4.2 — per-hypothesis regime breakdown
 
     for spec in hypotheses:
+        profiles_supported, profile_reason = _is_supported_profile(spec)
+        if not profiles_supported:
+            rows.append(_null_row(spec, 0, profile_reason))
+            continue
+
         feasibility = check_hypothesis_feasibility(spec, features=features)
         if not feasibility.valid:
             rows.append(_null_row(spec, 0, feasibility.primary_reason or "infeasible"))
@@ -279,7 +306,10 @@ def evaluate_hypothesis_batch(
         # NOTE: Overlap correction is handled entirely by the Newey-West
         # variance estimator below — no separate n_eff deflation is needed.
 
-        signed = event_returns * direction_sign
+        signed, sign_reason = _signed_returns_for_spec(spec, features, event_returns)
+        if signed is None:
+            rows.append(_null_row(spec, n, sign_reason or "direction_resolution_failed"))
+            continue
 
         # 2. Weighted Mean
         w_sum = event_weights.sum()
@@ -376,8 +406,9 @@ def evaluate_hypothesis_batch(
         )  # Cap at theoretical max to avoid sparse-trigger Sharpe inflation
         sharpe = (weighted_mean / weighted_std) * np.sqrt(trades_per_year)
         hit_rate = float((signed > 0).mean())
-        mean_bps = weighted_mean * 10_000.0
+        mean_bps = weighted_mean
         cost_adj_bps = mean_bps - cost_bps
+        p_value = _normal_p_value(t_stat)
 
         candidate = CandidateHypothesis(spec=spec, search_spec_name="evaluation")
         checked = FeasibilityCheckedHypothesis(
@@ -395,6 +426,9 @@ def evaluate_hypothesis_batch(
                 "sharpe": round(sharpe, 4),
                 "hit_rate": round(hit_rate, 4),
                 "cost_adjusted_return_bps": round(cost_adj_bps, 4),
+                "p_value": round(p_value, 8),
+                "p_value_raw": round(p_value, 8),
+                "p_value_for_fdr": round(p_value, 8),
                 "mae_mean_bps": round(mae_mean * 10_000.0, 4),
                 "mfe_mean_bps": round(mfe_mean * 10_000.0, 4),
                 "robustness_score": round(robustness, 4),

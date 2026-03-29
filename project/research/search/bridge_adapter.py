@@ -13,7 +13,7 @@ import logging
 import pandas as pd
 import numpy as np
 
-from project.research.gating import one_sided_p_from_t
+from project.research.multiplicity import make_family_id
 from project.spec_validation import get_event_family, resolve_execution_templates
 
 log = logging.getLogger(__name__)
@@ -49,6 +49,7 @@ def _sanitize_event_type(row: pd.Series) -> str:
 def hypotheses_to_bridge_candidates(
     metrics_df: pd.DataFrame,
     *,
+    symbol: str = "ALL",
     min_t_stat: float = 1.5,
     min_n: int = 30,
     min_events: int = 5,
@@ -57,6 +58,8 @@ def hypotheses_to_bridge_candidates(
     bridge_min_regime_stability_score: float = 0.6,
     bridge_min_stress_survival: float = 0.5,
     bridge_stress_cost_buffer_bps: float = 2.0,
+    prefilter_min_n: bool = True,
+    prefilter_min_t_stat: bool = True,
 ) -> pd.DataFrame:
     """
     Map evaluator metrics to the production schema.
@@ -66,7 +69,13 @@ def hypotheses_to_bridge_candidates(
             generate candidates on every bar, creating noise. Default 5 filters
             out regime-label candidates that fire on >50% of bars.
     """
-    filtered, _ = split_bridge_candidates(metrics_df, min_t_stat=min_t_stat, min_n=min_n)
+    filtered, _ = split_bridge_candidates(
+        metrics_df,
+        min_t_stat=min_t_stat,
+        min_n=min_n,
+        require_min_n=prefilter_min_n,
+        require_min_t_stat=prefilter_min_t_stat,
+    )
     if filtered.empty:
         return pd.DataFrame()
 
@@ -100,6 +109,10 @@ def hypotheses_to_bridge_candidates(
     out["n"] = filtered["n"].astype(int)
     out["sample_size"] = out["n"]
     out["n_events"] = out["n"]
+    out["gate_search_min_sample_size"] = out["n"] >= int(min_n)
+    out["gate_search_min_t_stat"] = pd.to_numeric(
+        filtered["t_stat"], errors="coerce"
+    ).fillna(0.0) >= float(min_t_stat)
     for source_col in (
         "train_n_obs",
         "validation_n_obs",
@@ -169,21 +182,18 @@ def hypotheses_to_bridge_candidates(
     out["pnl_series"] = "[]"
 
     # Derive p-values from t-statistics
-    out["p_value"] = [
-        one_sided_p_from_t(float(row["t_stat"]), max(1, int(row["n"]) - 1))
-        for _, row in filtered.iterrows()
-    ]
-    out["p_value_for_fdr"] = out["p_value"]
+    p_value_series = pd.to_numeric(
+        filtered.get("p_value_raw", filtered.get("p_value", 1.0)),
+        errors="coerce",
+    ).fillna(1.0)
+    out["p_value"] = p_value_series.astype(float)
+    out["p_value_raw"] = out["p_value"]
+    out["p_value_for_fdr"] = pd.to_numeric(
+        filtered.get("p_value_for_fdr", out["p_value"]),
+        errors="coerce",
+    ).fillna(out["p_value"]).astype(float)
 
     # Derive family_id from trigger metadata
-    out["family_id"] = (
-        filtered["trigger_type"].astype(str)
-        + "_"
-        + filtered["template_id"].astype(str)
-        + "_"
-        + filtered["horizon"].astype(str)
-    ).values
-
     # Derive canonical_family from trigger_key (the part after "type:", e.g. "event:VOL_SPIKE" -> "VOL_SPIKE")
     out["canonical_family"] = (
         filtered["trigger_key"]
@@ -191,9 +201,25 @@ def hypotheses_to_bridge_candidates(
         .values
     )
 
+    out["family_id"] = [
+        make_family_id(
+            str(symbol),
+            str(event_type),
+            str(template_id),
+            str(horizon),
+            "",
+            canonical_family=str(canonical_family),
+        )
+        for event_type, template_id, horizon, canonical_family in zip(
+            out["event_type"],
+            filtered["template_id"],
+            filtered["horizon"],
+            out["canonical_family"],
+        )
+    ]
+
     # Symbol placeholder
-    if "symbol" not in out.columns:
-        out["symbol"] = "ALL"
+    out["symbol"] = str(symbol).strip().upper() or "ALL"
 
     # Expand base candidates (template_id="base") into one row per execution template.
     # Filter template candidates pass through unchanged.
@@ -231,6 +257,8 @@ def split_bridge_candidates(
     *,
     min_t_stat: float = 1.5,
     min_n: int = 30,
+    require_min_n: bool = True,
+    require_min_t_stat: bool = True,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     if metrics_df.empty:
         return pd.DataFrame(), pd.DataFrame()
@@ -240,7 +268,11 @@ def split_bridge_candidates(
     min_t_mask = pd.to_numeric(metrics_df["t_stat"], errors="coerce").fillna(0.0) >= float(
         min_t_stat
     )
-    pass_mask = valid_mask & min_n_mask & min_t_mask
+    pass_mask = valid_mask.copy()
+    if require_min_n:
+        pass_mask = pass_mask & min_n_mask
+    if require_min_t_stat:
+        pass_mask = pass_mask & min_t_mask
 
     filtered = metrics_df[pass_mask].copy()
     failed = metrics_df[~pass_mask].copy()

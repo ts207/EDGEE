@@ -4,6 +4,7 @@ import types
 from pathlib import Path
 import pytest
 import sys
+import yaml
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parents[2]))
@@ -23,6 +24,16 @@ def _make_args(**overrides):
         search_spec="spec/search_space.yaml",
         search_min_n=30,
         registry_root="project/configs/registries",
+        config=[],
+        market_context_workers=1,
+        fees_bps=None,
+        slippage_bps=None,
+        cost_bps=None,
+        skip_ingest_ohlcv=0,
+        skip_ingest_funding=0,
+        skip_ingest_spot_ohlcv=0,
+        run_ingest_liquidation_snapshot=0,
+        run_ingest_open_interest_hist=0,
         # Added missing defaults
         phase2_shift_labels_k=0,
         mode="research",
@@ -120,3 +131,156 @@ def test_discovery_mode_argument_is_ignored_in_favor_of_canonical_search(tmp_pat
     names = [s[0] for s in stages]
     assert any("phase2_search_engine" in n for n in names)
     assert not any("compare_discovery_paths" in n for n in names)
+
+
+def test_experiment_config_uses_search_engine_without_legacy_phase2(tmp_path):
+    from project.pipelines.stages.research import build_research_stages
+
+    registry_root = Path(__file__).parents[3] / "project" / "configs" / "registries"
+
+    experiment_config = tmp_path / "experiment.yaml"
+    experiment_config.write_text(
+        yaml.safe_dump(
+            {
+                "program_id": "single_hypothesis_test",
+                "run_mode": "research",
+                "description": "single hypothesis",
+                "instrument_scope": {
+                    "instrument_classes": ["crypto"],
+                    "symbols": ["BTCUSDT"],
+                    "timeframe": "5m",
+                    "start": "2022-11-01",
+                    "end": "2022-12-31",
+                },
+                "trigger_space": {
+                    "allowed_trigger_types": ["EVENT"],
+                    "events": {"include": ["BASIS_DISLOC"]},
+                },
+                "templates": {"include": ["mean_reversion"]},
+                "evaluation": {
+                    "horizons_bars": [12],
+                    "directions": ["short"],
+                    "entry_lags": [1],
+                },
+                "contexts": {"include": {}},
+                "search_control": {
+                    "max_hypotheses_total": 1,
+                    "max_hypotheses_per_template": 1,
+                    "max_hypotheses_per_event_family": 1,
+                    "random_seed": 42,
+                },
+                "promotion": {
+                    "enabled": False,
+                    "track": "standard",
+                    "multiplicity_scope": "program_id",
+                },
+                "artifacts": {},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    stages = build_research_stages(
+        args=_make_args(
+            discovery_mode="search",
+            experiment_config=str(experiment_config),
+            registry_root=str(registry_root),
+        ),
+        run_id="r0",
+        symbols="BTCUSDT",
+        start="2022-11-01",
+        end="2022-12-31",
+        research_gate_profile="discovery",
+        project_root=tmp_path,
+        data_root=tmp_path,
+        phase2_event_chain=[("BASIS_DISLOC", "basis", [])],
+    )
+
+    names = [stage[0] for stage in stages]
+    assert "phase2_search_engine" in names
+    assert "phase2_conditional_hypotheses__BASIS_DISLOC_15m" not in names
+    assert "bridge_evaluate_phase2__BASIS_DISLOC_15m" not in names
+
+
+def test_preflight_marks_search_engine_active_for_experiment_config(tmp_path):
+    from project.pipelines.pipeline_planning import prepare_run_preflight
+    from project.pipelines.stages.utils import script_supports_flag
+
+    registry_root = Path(__file__).parents[3] / "project" / "configs" / "registries"
+    project_root = Path(__file__).parents[3] / "project"
+
+    experiment_config = tmp_path / "experiment.yaml"
+    experiment_config.write_text(
+        yaml.safe_dump(
+            {
+                "program_id": "single_hypothesis_test",
+                "run_mode": "research",
+                "description": "single hypothesis",
+                "instrument_scope": {
+                    "instrument_classes": ["crypto"],
+                    "symbols": ["BTCUSDT"],
+                    "timeframe": "5m",
+                    "start": "2022-11-01",
+                    "end": "2022-12-31",
+                },
+                "trigger_space": {
+                    "allowed_trigger_types": ["EVENT"],
+                    "events": {"include": ["BASIS_DISLOC"]},
+                },
+                "templates": {"include": ["mean_reversion"]},
+                "evaluation": {
+                    "horizons_bars": [12],
+                    "directions": ["short"],
+                    "entry_lags": [1],
+                },
+                "contexts": {"include": {}},
+                "search_control": {
+                    "max_hypotheses_total": 1,
+                    "max_hypotheses_per_template": 1,
+                    "max_hypotheses_per_event_family": 1,
+                    "random_seed": 42,
+                },
+                "promotion": {
+                    "enabled": False,
+                    "track": "standard",
+                    "multiplicity_scope": "program_id",
+                },
+                "artifacts": {},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    args = _make_args(
+        run_id="r0",
+        symbols="BTCUSDT",
+        start="2022-11-01",
+        end="2022-12-31",
+        experiment_config=str(experiment_config),
+        registry_root=str(registry_root),
+        objective_name="retail_profitability",
+        objective_spec=None,
+        retail_profiles_spec=None,
+        force=0,
+        allow_missing_funding=0,
+        enable_cross_venue_spot_pipeline=0,
+        runtime_invariants_mode="warn",
+        emit_run_hash=0,
+        determinism_replay_checks=0,
+        oms_replay_checks=0,
+        performance_mode=0,
+        run_strategy_blueprint_compiler=0,
+        run_strategy_builder=0,
+    )
+
+    preflight = prepare_run_preflight(
+        args=args,
+        project_root=project_root,
+        data_root=project_root.parent / "data",
+        cli_flag_present=lambda _flag: False,
+        run_id_default=lambda: "unused",
+        script_supports_flag=script_supports_flag,
+    )
+
+    assert preflight["effective_behavior"]["runs_search_engine"] is True
+    assert preflight["effective_behavior"]["runs_legacy_phase2_conditional"] is False

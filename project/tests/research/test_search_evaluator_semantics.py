@@ -1,0 +1,173 @@
+from __future__ import annotations
+
+import numpy as np
+import pandas as pd
+from pathlib import Path
+
+from project.core.column_registry import ColumnRegistry
+from project.domain.hypotheses import HypothesisSpec, TriggerSpec
+from project.events.event_specs import EVENT_REGISTRY_SPECS
+from project.research.search.evaluator import evaluate_hypothesis_batch
+from project.research.search.search_feature_utils import prepare_search_features_for_symbol
+
+
+def _base_features() -> pd.DataFrame:
+    timestamps = pd.date_range("2024-01-01", periods=40, freq="5min", tz="UTC")
+    return pd.DataFrame(
+        {
+            "timestamp": timestamps,
+            "symbol": ["BTCUSDT"] * len(timestamps),
+            "close": 100.0 + np.arange(len(timestamps), dtype=float),
+            "split_label": ["test"] * len(timestamps),
+            "rv_pct_17280": [0.1] * len(timestamps),
+        }
+    )
+
+
+def _patch_robustness(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "project.research.search.evaluator.evaluate_by_regime",
+        lambda *args, **kwargs: pd.DataFrame(
+            [{"regime": "baseline", "n": 4, "mean_return_bps": 1.0, "t_stat": 1.0, "hit_rate": 1.0, "valid": True}]
+        ),
+    )
+    monkeypatch.setattr(
+        "project.research.search.evaluator.evaluate_stress_scenarios",
+        lambda *args, **kwargs: pd.DataFrame(),
+    )
+    monkeypatch.setattr(
+        "project.research.search.evaluator.detect_kill_switches",
+        lambda *args, **kwargs: pd.DataFrame(),
+    )
+
+
+def test_prepare_search_features_for_symbol_merges_event_direction_metadata(monkeypatch):
+    base = _base_features()
+
+    monkeypatch.setattr(
+        "project.research.search.search_feature_utils.load_registry_flags",
+        lambda **kwargs: pd.DataFrame(
+            {
+                "timestamp": [base.loc[0, "timestamp"]],
+                "symbol": ["BTCUSDT"],
+                EVENT_REGISTRY_SPECS["VOL_SHOCK"].signal_column: [True],
+            }
+        ),
+    )
+    monkeypatch.setattr(
+        "project.research.search.search_feature_utils.load_registry_events",
+        lambda **kwargs: pd.DataFrame(
+            {
+                "timestamp": [base.loc[0, "timestamp"]],
+                "symbol": ["BTCUSDT"],
+                "event_type": ["VOL_SHOCK"],
+                "sign": [1],
+                "direction": ["up"],
+            }
+        ),
+    )
+
+    features = prepare_search_features_for_symbol(
+        run_id="dummy",
+        symbol="BTCUSDT",
+        timeframe="5m",
+        data_root=Path("/tmp"),
+        load_features_fn=lambda **kwargs: base.copy(),
+    )
+
+    direction_col = ColumnRegistry.event_direction_cols("VOL_SHOCK")[0]
+    assert direction_col in features.columns
+    assert features.loc[0, direction_col] == 1.0
+
+
+def test_event_templates_use_spec_side_policy_in_canonical_evaluator(monkeypatch):
+    _patch_robustness(monkeypatch)
+    features = _base_features()
+    signal_col = EVENT_REGISTRY_SPECS["VOL_SHOCK"].signal_column
+    features[signal_col] = False
+    features.loc[[0, 5, 10, 15], signal_col] = True
+    features[ColumnRegistry.event_direction_cols("VOL_SHOCK")[0]] = np.nan
+    features.loc[[0, 5, 10, 15], ColumnRegistry.event_direction_cols("VOL_SHOCK")[0]] = 1.0
+
+    continuation = HypothesisSpec(
+        trigger=TriggerSpec.event("VOL_SHOCK"),
+        direction="long",
+        horizon="12b",
+        template_id="continuation",
+    )
+    mean_reversion = HypothesisSpec(
+        trigger=TriggerSpec.event("VOL_SHOCK"),
+        direction="long",
+        horizon="12b",
+        template_id="mean_reversion",
+    )
+
+    metrics = evaluate_hypothesis_batch(
+        [continuation, mean_reversion],
+        features,
+        min_sample_size=1,
+    ).set_index("template_id")
+
+    assert bool(metrics.loc["continuation", "valid"]) is True
+    assert bool(metrics.loc["mean_reversion", "valid"]) is True
+    assert float(metrics.loc["continuation", "mean_return_bps"]) > 0.0
+    assert float(metrics.loc["mean_reversion", "mean_return_bps"]) < 0.0
+    assert float(metrics.loc["continuation", "cost_adjusted_return_bps"]) < float(
+        metrics.loc["continuation", "mean_return_bps"]
+    )
+    assert 0.0 <= float(metrics.loc["continuation", "p_value"]) <= 1.0
+
+
+def test_gate_templates_fail_closed_in_canonical_evaluator(monkeypatch):
+    _patch_robustness(monkeypatch)
+    features = _base_features()
+    signal_col = EVENT_REGISTRY_SPECS["VOL_SHOCK"].signal_column
+    features[signal_col] = False
+    features.loc[[0, 5], signal_col] = True
+
+    spec = HypothesisSpec(
+        trigger=TriggerSpec.event("VOL_SHOCK"),
+        direction="long",
+        horizon="12b",
+        template_id="only_if_regime",
+    )
+
+    monkeypatch.setattr(
+        "project.research.search.evaluator_utils.operator_semantics",
+        lambda _: {"side_policy": "both", "label_target": "gate", "requires_direction": False},
+    )
+
+    metrics = evaluate_hypothesis_batch([spec], features, min_sample_size=1)
+
+    assert bool(metrics.loc[0, "valid"]) is False
+    assert metrics.loc[0, "invalid_reason"] == "gate_template_unsupported"
+
+
+def test_non_default_profiles_fail_closed_in_canonical_evaluator(monkeypatch):
+    _patch_robustness(monkeypatch)
+    features = _base_features()
+    signal_col = EVENT_REGISTRY_SPECS["VOL_SHOCK"].signal_column
+    features[signal_col] = False
+    features.loc[[0, 5], signal_col] = True
+
+    cost_spec = HypothesisSpec(
+        trigger=TriggerSpec.event("VOL_SHOCK"),
+        direction="long",
+        horizon="12b",
+        template_id="continuation",
+        cost_profile="premium",
+    )
+    objective_spec = HypothesisSpec(
+        trigger=TriggerSpec.event("VOL_SHOCK"),
+        direction="long",
+        horizon="12b",
+        template_id="continuation",
+        objective_profile="sharpe",
+    )
+
+    metrics = evaluate_hypothesis_batch([cost_spec, objective_spec], features, min_sample_size=1)
+
+    assert list(metrics["invalid_reason"]) == [
+        "unsupported_cost_profile",
+        "unsupported_objective_profile",
+    ]

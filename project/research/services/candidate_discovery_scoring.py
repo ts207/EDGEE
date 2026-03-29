@@ -9,8 +9,6 @@ import pandas as pd
 from project.research import discovery
 from project.research.gating import (
     build_event_return_frame,
-    build_event_return_frame_from_joined,
-    join_events_to_features,
 )
 from project.research.validation.falsification import generate_placebo_events
 from project.research.validation.regime_tests import evaluate_by_regime
@@ -401,23 +399,6 @@ def split_and_score_candidates(
     )
     random_placebo_events = _random_entry_events(working, features_input)
 
-    can_reuse_joined = (
-        build_event_return_frame_fn is build_event_return_frame
-        and not features_input.empty
-        and "timestamp" in features_input.columns
-        and "close" in features_input.columns
-    )
-    joined_frames: dict[str, pd.DataFrame] = {}
-    feat_close = np.array([], dtype=float)
-    if can_reuse_joined:
-        features_input = features_input.sort_values("timestamp").reset_index(drop=True)
-        feat_close = features_input["close"].astype(float).to_numpy()
-        joined_frames = {
-            "observed": join_events_to_features(working, features_input),
-            "shift_placebo": join_events_to_features(shift_placebo_events, features_input),
-            "random_placebo": join_events_to_features(random_placebo_events, features_input),
-        }
-
     source_events = {
         "observed": working,
         "shift_placebo": shift_placebo_events,
@@ -500,18 +481,11 @@ def split_and_score_candidates(
             "cost_bps": float(cost_estimate.cost_bps) if cost_estimate is not None else 0.0,
             "direction_override": pd.to_numeric(direction_value, errors="coerce"),
         }
-        if can_reuse_joined:
-            frame = build_event_return_frame_from_joined(
-                joined_frames[source_kind],
-                feat_close,
-                **kwargs,
-            )
-        else:
-            frame = build_event_return_frame_fn(
-                source_events[source_kind],
-                features_input,
-                **kwargs,
-            )
+        frame = build_event_return_frame_fn(
+            source_events[source_kind],
+            features_input,
+            **kwargs,
+        )
         frame_cache[cache_key] = frame
         return frame
 

@@ -19,7 +19,11 @@ import pandas as pd
 
 from project.domain.compiled_registry import get_domain_registry
 from project.domain.hypotheses import HypothesisSpec
-from project.research.search.evaluator_utils import trigger_mask, forward_log_returns
+from project.research.search.evaluator_utils import (
+    trigger_mask,
+    forward_log_returns,
+    signed_returns_for_spec,
+)
 
 log = logging.getLogger(__name__)
 
@@ -72,8 +76,6 @@ def detect_kill_switches(
     if features.empty or "close" not in features.columns:
         return pd.DataFrame()
 
-    direction_sign = 1.0 if spec.direction == "long" else -1.0
-
     # 1. Trigger mask (with entry lag)
     mask_raw = trigger_mask(spec, features)
     if spec.entry_lag > 0:
@@ -95,8 +97,10 @@ def detect_kill_switches(
         return pd.DataFrame()
 
     fwd = forward_log_returns(features["close"], horizon_bars)
-    # Binary target: 1 if hypothesis fails (return sign != direction sign)
-    signed_fwd = fwd * direction_sign
+    signed_fwd, reason = signed_returns_for_spec(spec, features, fwd)
+    if signed_fwd is None:
+        return pd.DataFrame()
+    # Binary target: 1 if hypothesis fails (return sign < 0)
     failed = (signed_fwd < 0).astype(float)
     base_failure_rate = float(failed[mask].mean())
 

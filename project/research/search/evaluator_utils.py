@@ -13,6 +13,7 @@ import numpy as np
 import pandas as pd
 
 from project.core.constants import HORIZON_BARS_BY_TIMEFRAME, horizon_bars_for_label
+from project.research.direction_semantics import normalize_side_policy, resolve_effect_sign
 from project.domain.compiled_registry import get_domain_registry
 from project.domain.hypotheses import HypothesisSpec, TriggerType
 from project.core.column_registry import ColumnRegistry
@@ -257,3 +258,63 @@ def context_mask(
 
 def trigger_key(spec: HypothesisSpec) -> str:
     return spec.trigger.label()
+
+
+def event_direction_series(spec: HypothesisSpec, features: pd.DataFrame) -> Optional[pd.Series]:
+    if spec.trigger.trigger_type != TriggerType.EVENT or features.empty:
+        return None
+    event_id = str(spec.trigger.event_id or "").upper()
+    for col in ColumnRegistry.event_direction_cols(event_id):
+        if col in features.columns:
+            return pd.to_numeric(features[col], errors="coerce")
+    return None
+
+
+def operator_semantics(spec: HypothesisSpec) -> Optional[Dict[str, Any]]:
+    operator = get_domain_registry().get_operator(spec.template_id)
+    if operator is None:
+        return None
+    raw = dict(operator.raw)
+    side_policy = normalize_side_policy(str(raw.get("side_policy", "both")))
+    label_target = str(raw.get("label_target", "fwd_return_h")).strip().lower() or "fwd_return_h"
+    requires_direction = bool(raw.get("requires_direction", True))
+    return {
+        "side_policy": side_policy,
+        "label_target": label_target,
+        "requires_direction": requires_direction,
+    }
+
+
+def signed_returns_for_spec(
+    spec: HypothesisSpec,
+    features: pd.DataFrame,
+    returns: pd.Series,
+) -> tuple[Optional[pd.Series], Optional[str]]:
+    semantics = operator_semantics(spec)
+    if semantics is None:
+        return None, "unknown_template_operator"
+    if semantics["label_target"] == "gate":
+        return None, "gate_template_unsupported"
+
+    if spec.trigger.trigger_type == TriggerType.EVENT and not semantics["requires_direction"]:
+        direction_series = event_direction_series(spec, features)
+        if direction_series is None:
+            return None, "missing_event_direction"
+        if spec.entry_lag > 0:
+            direction_series = direction_series.shift(int(spec.entry_lag))
+        aligned = direction_series.loc[returns.index].dropna()
+        if aligned.empty or len(aligned) != len(returns):
+            return None, "missing_event_direction"
+        sign_values = aligned.apply(
+            lambda value: resolve_effect_sign(
+                template_verb=spec.template_id,
+                side_policy=str(semantics["side_policy"]),
+                event_direction=value,
+                label_target=str(semantics["label_target"]),
+                fallback_sign=1,
+            )
+        ).astype(float)
+        return returns * sign_values, None
+
+    direction_sign = 1.0 if spec.direction == "long" else -1.0 if spec.direction == "short" else 1.0
+    return returns * float(direction_sign), None

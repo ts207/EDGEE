@@ -369,49 +369,49 @@ def build_research_stages(
             )
         )
 
-        for event_type, _, _ in selected_chain:
-            for tf in timeframes:
-                phase2_stage_name = f"phase2_conditional_hypotheses__{event_type}_{tf}"
-                phase2_args = [
-                    "--run_id",
-                    run_id,
-                    "--event_type",
-                    event_type,
-                    "--symbols",
-                    symbols,
-                    "--timeframe",
-                    tf,
-                    "--shift_labels_k",
-                    str(int(args.phase2_shift_labels_k)),
-                    "--mode",
-                    str(args.mode),
-                    "--gate_profile",
-                    gate_profile,
-                    "--cost_calibration_mode",
-                    str(args.phase2_cost_calibration_mode),
-                    "--cost_min_tob_coverage",
-                    str(float(args.phase2_cost_min_tob_coverage)),
-                    "--cost_tob_tolerance_minutes",
-                    str(int(args.phase2_cost_tob_tolerance_minutes)),
-                    "--retail_profile",
-                    str(args.retail_profile),
-                ]
-                if getattr(args, "phase2_min_validation_n_obs", None) is not None:
-                    phase2_args.extend(
-                        ["--min_validation_n_obs", str(int(args.phase2_min_validation_n_obs))]
-                    )
-                if getattr(args, "phase2_min_test_n_obs", None) is not None:
-                    phase2_args.extend(["--min_test_n_obs", str(int(args.phase2_min_test_n_obs))])
-                if getattr(args, "phase2_min_total_n_obs", None) is not None:
-                    phase2_args.extend(["--min_total_n_obs", str(int(args.phase2_min_total_n_obs))])
-                if concept_file:
-                    phase2_args.extend(["--concept_file", concept_file])
+        if not experiment_plan:
+            for event_type, _, _ in selected_chain:
+                for tf in timeframes:
+                    phase2_stage_name = f"phase2_conditional_hypotheses__{event_type}_{tf}"
+                    phase2_args = [
+                        "--run_id",
+                        run_id,
+                        "--event_type",
+                        event_type,
+                        "--symbols",
+                        symbols,
+                        "--timeframe",
+                        tf,
+                        "--shift_labels_k",
+                        str(int(args.phase2_shift_labels_k)),
+                        "--mode",
+                        str(args.mode),
+                        "--gate_profile",
+                        gate_profile,
+                        "--cost_calibration_mode",
+                        str(args.phase2_cost_calibration_mode),
+                        "--cost_min_tob_coverage",
+                        str(float(args.phase2_cost_min_tob_coverage)),
+                        "--cost_tob_tolerance_minutes",
+                        str(int(args.phase2_cost_tob_tolerance_minutes)),
+                        "--retail_profile",
+                        str(args.retail_profile),
+                    ]
+                    if getattr(args, "phase2_min_validation_n_obs", None) is not None:
+                        phase2_args.extend(
+                            ["--min_validation_n_obs", str(int(args.phase2_min_validation_n_obs))]
+                        )
+                    if getattr(args, "phase2_min_test_n_obs", None) is not None:
+                        phase2_args.extend(
+                            ["--min_test_n_obs", str(int(args.phase2_min_test_n_obs))]
+                        )
+                    if getattr(args, "phase2_min_total_n_obs", None) is not None:
+                        phase2_args.extend(
+                            ["--min_total_n_obs", str(int(args.phase2_min_total_n_obs))]
+                        )
+                    if concept_file:
+                        phase2_args.extend(["--concept_file", concept_file])
 
-                # Pass agent selections if present
-                if experiment_plan:
-                    phase2_args.extend(["--experiment_config", str(args.experiment_config)])
-                    phase2_args.extend(["--program_id", experiment_plan.program_id])
-                else:
                     if agent_selections["templates"]:
                         phase2_args.extend(["--templates"] + agent_selections["templates"])
                     if agent_selections["horizons"]:
@@ -425,54 +425,60 @@ def build_research_stages(
                     if getattr(args, "search_budget", None):
                         phase2_args.extend(["--search_budget", str(args.search_budget)])
 
-                stages.append(
-                    (
-                        phase2_stage_name,
-                        project_root / "pipelines" / "research" / "phase2_candidate_discovery.py",
-                        phase2_args,
-                    )
-                )
-
-                if int(args.run_bridge_eval_phase2):
-                    bridge_stage_name = f"bridge_evaluate_phase2__{event_type}_{tf}"
                     stages.append(
                         (
-                            bridge_stage_name,
-                            project_root / "pipelines" / "research" / "bridge_evaluate_phase2.py",
-                            [
-                                "--run_id",
-                                run_id,
-                                "--event_type",
-                                event_type,
-                                "--symbols",
-                                symbols,
-                                "--timeframe",
-                                tf,
-                                "--start",
-                                start,
-                                "--end",
-                                end,
-                                "--train_frac",
-                                str(float(args.bridge_train_frac)),
-                                "--validation_frac",
-                                str(float(args.bridge_validation_frac)),
-                                "--embargo_days",
-                                str(int(args.bridge_embargo_days)),
-                                "--edge_cost_k",
-                                str(float(args.bridge_edge_cost_k)),
-                                "--stressed_cost_multiplier",
-                                str(float(args.bridge_stressed_cost_multiplier)),
-                                "--min_validation_trades",
-                                str(int(args.bridge_min_validation_trades)),
-                                "--mode",
-                                str(args.mode),
-                                "--candidate_mask",
-                                str(args.bridge_candidate_mask),
-                                "--retail_profile",
-                                str(args.retail_profile),
-                            ],
+                            phase2_stage_name,
+                            project_root
+                            / "pipelines"
+                            / "research"
+                            / "phase2_candidate_discovery.py",
+                            phase2_args,
                         )
                     )
+
+                    if int(args.run_bridge_eval_phase2):
+                        bridge_stage_name = f"bridge_evaluate_phase2__{event_type}_{tf}"
+                        stages.append(
+                            (
+                                bridge_stage_name,
+                                project_root
+                                / "pipelines"
+                                / "research"
+                                / "bridge_evaluate_phase2.py",
+                                [
+                                    "--run_id",
+                                    run_id,
+                                    "--event_type",
+                                    event_type,
+                                    "--symbols",
+                                    symbols,
+                                    "--timeframe",
+                                    tf,
+                                    "--start",
+                                    start,
+                                    "--end",
+                                    end,
+                                    "--train_frac",
+                                    str(float(args.bridge_train_frac)),
+                                    "--validation_frac",
+                                    str(float(args.bridge_validation_frac)),
+                                    "--embargo_days",
+                                    str(int(args.bridge_embargo_days)),
+                                    "--edge_cost_k",
+                                    str(float(args.bridge_edge_cost_k)),
+                                    "--stressed_cost_multiplier",
+                                    str(float(args.bridge_stressed_cost_multiplier)),
+                                    "--min_validation_trades",
+                                    str(int(args.bridge_min_validation_trades)),
+                                    "--mode",
+                                    str(args.mode),
+                                    "--candidate_mask",
+                                    str(args.bridge_candidate_mask),
+                                    "--retail_profile",
+                                    str(args.retail_profile),
+                                ],
+                            )
+                        )
 
     if discovery_mode == "search" and int(args.run_phase2_conditional):
         search_args = [

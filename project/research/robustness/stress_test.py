@@ -20,7 +20,11 @@ import pandas as pd
 
 from project.domain.compiled_registry import get_domain_registry
 from project.domain.hypotheses import HypothesisSpec, TriggerSpec
-from project.research.search.evaluator_utils import trigger_mask, forward_log_returns
+from project.research.search.evaluator_utils import (
+    trigger_mask,
+    forward_log_returns,
+    signed_returns_for_spec,
+)
 from project.core.column_registry import ColumnRegistry
 
 log = logging.getLogger(__name__)
@@ -103,8 +107,6 @@ def evaluate_stress_scenarios(
     if features.empty or "close" not in features.columns:
         return pd.DataFrame()
 
-    direction_sign = 1.0 if spec.direction == "long" else -1.0
-
     # Trigger mask (no entry lag)
     mask_raw = trigger_mask(spec, features)
     if spec.entry_lag > 0:
@@ -168,7 +170,22 @@ def evaluate_stress_scenarios(
             )
             continue
 
-        signed = event_returns * direction_sign
+        signed, reason = signed_returns_for_spec(spec, features, event_returns)
+        if signed is None:
+            rows.append(
+                {
+                    "scenario": scenario["name"],
+                    "description": scenario.get("description", ""),
+                    "n": n,
+                    "mean_return_bps": float("nan"),
+                    "t_stat": float("nan"),
+                    "hit_rate": float("nan"),
+                    "pct_of_base_n": round(n / base_n, 4) if base_n > 0 else float("nan"),
+                    "valid": False,
+                    "skip_reason": reason or "direction_resolution_failed",
+                }
+            )
+            continue
         mean_r = float(signed.mean())
         std_r = float(signed.std(ddof=1))
         t = mean_r / (std_r / np.sqrt(n)) if std_r > 1e-10 else 0.0

@@ -161,3 +161,35 @@ def test_return_path_thresholds_apply_stop_loss_and_take_profit() -> None:
         take_profit_bps=20.0,
     )
     assert take_profit > 0
+
+
+def test_build_event_return_frame_ignores_nan_direction_override() -> None:
+    timestamps = pd.date_range("2024-01-01", periods=4, freq="5min", tz="UTC")
+    sym_events = pd.DataFrame(
+        {
+            "enter_ts": [timestamps[0]],
+            "direction": ["down"],
+            "split_label": ["test"],
+        }
+    )
+    features_df = pd.DataFrame(
+        {
+            "timestamp": timestamps,
+            "close": [100.0, 95.0, 90.0, 90.0],
+        }
+    )
+
+    frame = build_event_return_frame(
+        sym_events,
+        features_df,
+        rule="continuation",
+        horizon="5m",
+        side_policy="directional",
+        canonical_family="VOLATILITY_TRANSITION",
+        entry_lag_bars=1,
+        horizon_bars_override=1,
+        direction_override=float("nan"),
+    )
+
+    assert frame.loc[0, "direction_sign"] == -1.0
+    assert frame.loc[0, "forward_return_raw"] > 0.0

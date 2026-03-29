@@ -547,8 +547,9 @@ def run(
             min_n=resolved_min_n,
         )
         _write_evaluation_artifacts(out_dir, symbol, metrics, gate_failures)
-        candidates = hypotheses_to_bridge_candidates(
+        candidate_universe = hypotheses_to_bridge_candidates(
             metrics,
+            symbol=symbol,
             min_t_stat=resolved_min_t_stat,
             min_n=resolved_min_n,
             bridge_min_t_stat=float(bridge_gates.get("search_bridge_min_t_stat", 2.0)),
@@ -564,10 +565,32 @@ def run(
             bridge_stress_cost_buffer_bps=float(
                 bridge_gates.get("search_bridge_stress_cost_buffer_bps", 2.0)
             ),
+            prefilter_min_n=True,
+            prefilter_min_t_stat=False,
         )
 
+        if (
+            not candidate_universe.empty
+            and "p_value" in candidate_universe.columns
+            and "family_id" in candidate_universe.columns
+        ):
+            from project.research.multiplicity import apply_multiplicity_controls
+
+            candidate_universe = apply_multiplicity_controls(
+                candidate_universe,
+                max_q=multiplicity_max_q,
+                mode="research",
+                min_sample_size=resolved_min_n,
+            )
+
+        if not candidate_universe.empty:
+            candidates = candidate_universe[
+                candidate_universe["gate_search_min_t_stat"].fillna(False).astype(bool)
+            ].copy()
+        else:
+            candidates = candidate_universe
+
         if not candidates.empty:
-            candidates["symbol"] = symbol
             if "candidate_id" in candidates.columns:
                 candidates["candidate_id"] = symbol + "::" + candidates["candidate_id"].astype(str)
             all_candidates.append(candidates)
@@ -613,14 +636,7 @@ def run(
     # 5. Aggregate and final processing
     final_df = pd.concat(all_candidates, ignore_index=True) if all_candidates else pd.DataFrame()
 
-    if not final_df.empty and "p_value" in final_df.columns and "family_id" in final_df.columns:
-        from project.research.multiplicity import apply_multiplicity_controls
-
-        try:
-            max_q = multiplicity_max_q
-        except Exception:
-            max_q = 0.05
-        final_df = apply_multiplicity_controls(final_df, max_q=max_q, mode="research")
+    if not final_df.empty and "is_discovery" in final_df.columns:
         log.info(
             "Multiplicity: %d discoveries out of %d candidates",
             int(final_df.get("is_discovery", pd.Series(False)).sum()),

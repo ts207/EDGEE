@@ -59,7 +59,9 @@ def _trigger_required_columns(trigger) -> set[str]:
         event_id = str(getattr(trigger, "event_id", "") or "").upper()
         spec_event = EVENT_REGISTRY_SPECS.get(event_id)
         signal_col = spec_event.signal_column if spec_event else None
-        return set(ColumnRegistry.event_cols(event_id, signal_col=signal_col))
+        return set(ColumnRegistry.event_cols(event_id, signal_col=signal_col)) | set(
+            ColumnRegistry.event_direction_cols(event_id)
+        )
     if trigger_type == "state":
         return set(ColumnRegistry.state_cols(getattr(trigger, "state_id", "") or ""))
     if trigger_type == "transition":

@@ -17,6 +17,9 @@ Recommended reading order:
 11. [10_WORKED_EXAMPLE_MECHANICAL_FAILURE.md](/home/irene/Edge/docs/10_WORKED_EXAMPLE_MECHANICAL_FAILURE.md)
 12. [11_AUDIT_MATRIX.md](/home/irene/Edge/docs/11_AUDIT_MATRIX.md)
 13. [12_AUDIT_RUN_SCHEDULE.md](/home/irene/Edge/docs/12_AUDIT_RUN_SCHEDULE.md)
+14. [13_TRIGGER_TYPES.md](/home/irene/Edge/docs/13_TRIGGER_TYPES.md)
+15. [14_FULL_PROJECT_GUIDE.md](/home/irene/Edge/docs/14_FULL_PROJECT_GUIDE.md)
+16. [15_EVENT_REFERENCE.md](/home/irene/Edge/docs/15_EVENT_REFERENCE.md)
 
 Reference surfaces:
 

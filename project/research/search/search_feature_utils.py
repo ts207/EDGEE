@@ -5,7 +5,10 @@ from typing import Iterable
 
 import pandas as pd
 
+from project.core.column_registry import ColumnRegistry
+from project.events.shared import direction_to_sign
 from project.events.event_flags import load_registry_flags
+from project.events.event_repository import load_registry_events
 from project.research.phase2 import load_features as load_features_impl
 from project.research.validation import assign_split_labels
 from project.specs.ontology import MATERIALIZED_STATE_COLUMNS_BY_ID
@@ -66,6 +69,53 @@ def normalize_search_feature_columns(features: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
+def _normalize_event_direction_sign(events: pd.DataFrame) -> pd.Series:
+    sign = pd.to_numeric(events.get("sign"), errors="coerce")
+    if sign is not None:
+        sign = sign.where(sign.isin([-1, 1]))
+    else:
+        sign = pd.Series(index=events.index, dtype=float)
+    if sign.isna().any():
+        fallback = events.get("direction")
+        if fallback is not None:
+            mapped = fallback.map(direction_to_sign).astype(float)
+            sign = sign.fillna(mapped)
+    return sign
+
+
+def _build_event_direction_frame(events: pd.DataFrame) -> pd.DataFrame:
+    if events.empty:
+        return pd.DataFrame(columns=["timestamp", "symbol"])
+
+    out = events.copy()
+    ts = pd.to_datetime(out.get("timestamp"), utc=True, errors="coerce")
+    if ts.isna().all() and "signal_ts" in out.columns:
+        ts = pd.to_datetime(out.get("signal_ts"), utc=True, errors="coerce")
+    out["timestamp"] = ts
+    out["direction_sign"] = _normalize_event_direction_sign(out)
+    out = out.dropna(subset=["timestamp", "symbol", "event_type", "direction_sign"]).copy()
+    if out.empty:
+        return pd.DataFrame(columns=["timestamp", "symbol"])
+
+    out["symbol"] = out["symbol"].astype(str).str.upper()
+    out["event_type"] = out["event_type"].astype(str).str.upper()
+    out = out.sort_values(["timestamp", "symbol", "event_type"]).drop_duplicates(
+        subset=["timestamp", "symbol", "event_type"], keep="last"
+    )
+    pivot = (
+        out.pivot(index=["timestamp", "symbol"], columns="event_type", values="direction_sign")
+        .reset_index()
+    )
+    pivot.columns.name = None
+
+    rename_map = {
+        event_type: ColumnRegistry.event_direction_cols(str(event_type))[0]
+        for event_type in pivot.columns
+        if event_type not in {"timestamp", "symbol"}
+    }
+    return pivot.rename(columns=rename_map)
+
+
 def prepare_search_features_for_symbol(
     *,
     run_id: str,
@@ -88,7 +138,18 @@ def prepare_search_features_for_symbol(
         if not sym_flags.empty:
             features = pd.merge(features, sym_flags, on=["timestamp", "symbol"], how="left")
             flag_cols = [c for c in sym_flags.columns if c not in ["timestamp", "symbol"]]
-            features[flag_cols] = features[flag_cols].fillna(False)
+            features[flag_cols] = features[flag_cols].apply(
+                lambda col: col.where(col.notna(), False).astype(bool)
+            )
+
+    registry_events = load_registry_events(
+        data_root=data_root,
+        run_id=run_id,
+        symbols=[str(symbol).upper()],
+    )
+    direction_frame = _build_event_direction_frame(registry_events)
+    if not direction_frame.empty:
+        features = pd.merge(features, direction_frame, on=["timestamp", "symbol"], how="left")
 
     if "split_label" not in features.columns:
         features = assign_split_labels(features, time_col="timestamp")

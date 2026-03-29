@@ -640,9 +640,13 @@ def prepare_run_preflight(
         )
     )
 
-    runs_search_engine = any(name == "phase2_search_engine" for name, *_ in stages)
+    if isinstance(stages, dict):
+        stage_names = [str(name) for name in stages.keys()]
+    else:
+        stage_names = [str(stage[0]) for stage in stages]
+    runs_search_engine = "phase2_search_engine" in stage_names
     runs_legacy_phase2_conditional = any(
-        str(name).startswith("phase2_conditional_hypotheses__") for name, *_ in stages
+        name.startswith("phase2_conditional_hypotheses__") for name in stage_names
     )
     phase2_event_type_source = "explicit" if cli_flag_present("--phase2_event_type") else "implicit"
     if (

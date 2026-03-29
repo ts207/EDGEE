@@ -356,7 +356,7 @@ def build_event_return_frame(
     features_sorted = features_df.sort_values("timestamp").reset_index(drop=True)
     merged = join_events_to_features(sym_events, features_sorted)
     feat_close = features_sorted["close"].astype(float).to_numpy()
-    return build_event_return_frame_from_joined(
+    return _build_event_return_frame_from_joined(
         merged,
         feat_close,
         rule=rule,
@@ -376,7 +376,7 @@ def build_event_return_frame(
     )
 
 
-def build_event_return_frame_from_joined(
+def _build_event_return_frame_from_joined(
     merged: pd.DataFrame,
     feat_close: np.ndarray,
     *,
@@ -425,7 +425,7 @@ def build_event_return_frame_from_joined(
         ):
             continue
 
-        if direction_override is not None:
+        if direction_override is not None and pd.notna(direction_override):
             direction_sign = float(direction_override)
             event_direction = 1  # dummy for records
         else:

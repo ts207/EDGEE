@@ -25,6 +25,7 @@ def test_slice_chunk_features_preserves_evaluator_and_trigger_columns(monkeypatc
 
     event_spec = EVENT_REGISTRY_SPECS["VOL_SHOCK"]
     event_cols = ColumnRegistry.event_cols("VOL_SHOCK", signal_col=event_spec.signal_column)
+    direction_cols = ColumnRegistry.event_direction_cols("VOL_SHOCK")
 
     features = pd.DataFrame(
         {
@@ -41,6 +42,7 @@ def test_slice_chunk_features_preserves_evaluator_and_trigger_columns(monkeypatc
             "ms_vol_entropy": [0.1],
             "rv_pct": [0.95],
             event_cols[0]: [True],
+            direction_cols[0]: [1.0],
             "unused_column": [123],
         }
     )
@@ -51,6 +53,7 @@ def test_slice_chunk_features_preserves_evaluator_and_trigger_columns(monkeypatc
     assert "timestamp" in sliced.columns
     assert "split_label" in sliced.columns
     assert event_cols[0] in sliced.columns
+    assert direction_cols[0] in sliced.columns
     assert "high_vol_regime" in sliced.columns
     assert "trending_state" in sliced.columns
     assert "chop_state" in sliced.columns
