@@ -18,6 +18,11 @@ def _read_optional_parquet(path: Path) -> pd.DataFrame:
     return pd.DataFrame()
 
 
+def _has_columns(df: pd.DataFrame, columns: Iterable[str]) -> bool:
+    required = {str(column) for column in columns}
+    return required.issubset(set(df.columns))
+
+
 def query_static_rows(
     *,
     data_root: Path | None = None,
@@ -35,35 +40,53 @@ def query_static_rows(
 
     filtered = entities.copy()
     if event:
-        filtered = filtered[
-            (filtered["entity_type"] == "event") & (filtered["name"].astype(str) == str(event))
-        ]
+        if not _has_columns(filtered, ("entity_type", "name")):
+            filtered = filtered.head(0)
+        else:
+            filtered = filtered[
+                (filtered["entity_type"] == "event") & (filtered["name"].astype(str) == str(event))
+            ]
     elif template:
-        filtered = filtered[
-            (filtered["entity_type"] == "template")
-            & (filtered["name"].astype(str) == str(template))
-        ]
+        if not _has_columns(filtered, ("entity_type", "name")):
+            filtered = filtered.head(0)
+        else:
+            filtered = filtered[
+                (filtered["entity_type"] == "template")
+                & (filtered["name"].astype(str) == str(template))
+            ]
     elif state:
-        filtered = filtered[
-            (filtered["entity_type"] == "state") & (filtered["name"].astype(str) == str(state))
-        ]
+        if not _has_columns(filtered, ("entity_type", "name")):
+            filtered = filtered.head(0)
+        else:
+            filtered = filtered[
+                (filtered["entity_type"] == "state") & (filtered["name"].astype(str) == str(state))
+            ]
     elif detector:
-        filtered = filtered[
-            (filtered["entity_type"] == "detector")
-            & (filtered["name"].astype(str) == str(detector))
-        ]
+        if not _has_columns(filtered, ("entity_type", "name")):
+            filtered = filtered.head(0)
+        else:
+            filtered = filtered[
+                (filtered["entity_type"] == "detector")
+                & (filtered["name"].astype(str) == str(detector))
+            ]
     elif feature:
-        filtered = filtered[
-            (filtered["entity_type"] == "feature") & (filtered["name"].astype(str) == str(feature))
-        ]
+        if not _has_columns(filtered, ("entity_type", "name")):
+            filtered = filtered.head(0)
+        else:
+            filtered = filtered[
+                (filtered["entity_type"] == "feature") & (filtered["name"].astype(str) == str(feature))
+            ]
     else:
         filtered = filtered.head(limit)
 
     entity_ids = filtered.get("entity_id", pd.Series(dtype="object")).astype(str).tolist()
-    rel = relations[
-        relations.get("from_entity_id", pd.Series(dtype="object")).astype(str).isin(entity_ids)
-        | relations.get("to_entity_id", pd.Series(dtype="object")).astype(str).isin(entity_ids)
-    ].head(limit)
+    if _has_columns(relations, ("from_entity_id", "to_entity_id")):
+        rel = relations[
+            relations.get("from_entity_id", pd.Series(dtype="object")).astype(str).isin(entity_ids)
+            | relations.get("to_entity_id", pd.Series(dtype="object")).astype(str).isin(entity_ids)
+        ].head(limit)
+    else:
+        rel = relations.head(0)
     return {
         "entities": filtered.head(limit).to_dict(orient="records"),
         "relations": rel.to_dict(orient="records"),

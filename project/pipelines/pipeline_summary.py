@@ -28,18 +28,31 @@ def load_kpi_source_frame(run_id: str) -> Tuple[Optional[Any], Optional[str], Op
         (report_dir / "promotions" / run_id / "promotion_audit.csv", "promotion_audit"),
         (report_dir / "promotions" / run_id / "promoted_candidates.parquet", "promoted_candidates"),
         (report_dir / "promotions" / run_id / "promoted_candidates.csv", "promoted_candidates"),
+        (
+            report_dir / "edge_candidates" / run_id / "edge_candidates_normalized.parquet",
+            "edge_candidates",
+        ),
+        (
+            report_dir / "edge_candidates" / run_id / "edge_candidates_normalized.csv",
+            "edge_candidates",
+        ),
         (report_dir / f"promoted_candidates_{run_id}.parquet", "promoted_candidates"),
         (report_dir / f"promotion_audit_{run_id}.csv", "promotion_audit"),
         (report_dir / f"edge_candidates_{run_id}.parquet", "edge_candidates"),
         (report_dir / f"edge_candidates_{run_id}.csv", "edge_candidates"),
     ]
 
+    empty_match: Tuple[Optional[Any], Optional[str], Optional[Path]] = (None, None, None)
     for path, name in candidate_paths:
         df = read_table_auto(path)
-        if df is not None and not df.empty:
+        if df is None:
+            continue
+        if not df.empty:
             return df, name, path
+        if empty_match[0] is None:
+            empty_match = (df, name, path)
 
-    return None, None, None
+    return empty_match
 
 
 def numeric_metric(df: Any, columns: List[str], *, aggregation: str) -> Dict[str, Any]:

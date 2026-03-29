@@ -179,3 +179,12 @@ def test_query_surfaces_return_machine_readable_rows(tmp_path, monkeypatch):
     assert memory_payload["failures"][0]["failure_class"] == "gate_reject"
     assert adjacent_payload["adjacent_regions"][0]["template_id"] == "continuation"
     assert advanced_knobs_payload["knobs"][0]["name"] == "deploy.enforce_placebo_controls"
+
+
+def test_query_static_rows_returns_empty_payload_when_static_tables_are_absent(tmp_path, monkeypatch):
+    data_root = tmp_path
+    monkeypatch.setenv("BACKTEST_DATA_ROOT", str(data_root))
+
+    payload = query_static_rows(data_root=data_root, event="VOL_SHOCK")
+
+    assert payload == {"entities": [], "relations": []}
