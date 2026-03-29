@@ -5,6 +5,7 @@ import json
 import pandas as pd
 
 from project.io.utils import ensure_dir, write_parquet
+from project.scripts import validate_synthetic_detector_truth as truth_script
 from project.scripts.validate_synthetic_detector_truth import validate_detector_truth
 
 
@@ -475,6 +476,115 @@ def test_rejects_low_precision(tmp_path):
     assert not report["passed"]
 
 
+def test_calibrated_runs_treat_uncalibrated_events_as_hit_only(monkeypatch, tmp_path):
+    monkeypatch.setattr(
+        truth_script,
+        "_load_detector_thresholds",
+        lambda: {
+            "BREAKOUT_TRIGGER": {
+                "golden_synthetic_discovery": {"min_precision": 0.8, "min_recall": 0.6}
+            }
+        },
+    )
+
+    truth_map = {
+        "segments": [
+            {
+                "symbol": "BTCUSDT",
+                "start_ts": "2024-01-01T00:00:00Z",
+                "end_ts": "2024-01-01T01:00:00Z",
+                "regime_label": "stress",
+                "expected_event_types": ["VOL_SHOCK"],
+            }
+        ]
+    }
+    truth_map_path = _write_truth_map(tmp_path, truth_map)
+    run_id = "golden_synthetic_discovery"
+    _write_vol_shock_events(
+        tmp_path,
+        run_id,
+        [
+            {"enter_ts": "2024-01-01T00:15:00Z", "symbol": "BTCUSDT", "event_type": "VOL_SHOCK"},
+            {"enter_ts": "2024-01-02T00:00:00Z", "symbol": "BTCUSDT", "event_type": "VOL_SHOCK"},
+            {"enter_ts": "2024-01-03T00:00:00Z", "symbol": "BTCUSDT", "event_type": "VOL_SHOCK"},
+        ],
+    )
+
+    report = validate_detector_truth(
+        data_root=tmp_path,
+        run_id=run_id,
+        truth_map_path=truth_map_path,
+        event_types=["VOL_SHOCK"],
+    )
+
+    event_report = report["event_reports"][0]
+    per_symbol = event_report["per_symbol"][0]
+    assert report["run_has_calibrated_thresholds"]
+    assert event_report["gate_mode"] == "hit_only"
+    assert per_symbol["gate_mode"] == "hit_only"
+    assert per_symbol["passed_hit_requirement"]
+    assert report["passed"]
+
+
+def test_calibrated_events_keep_generic_precision_and_off_regime_gates(monkeypatch, tmp_path):
+    monkeypatch.setattr(
+        truth_script,
+        "_load_detector_thresholds",
+        lambda: {
+            "VOL_SHOCK": {
+                "golden_synthetic_discovery": {"min_precision": 0.75, "min_recall": 0.75}
+            }
+        },
+    )
+
+    truth_map = {
+        "segments": [
+            {
+                "symbol": "BTCUSDT",
+                "start_ts": "2024-01-01T00:00:00Z",
+                "end_ts": "2024-01-01T02:00:00Z",
+                "regime_label": "stress",
+                "expected_event_types": ["VOL_SHOCK"],
+            },
+            {
+                "symbol": "BTCUSDT",
+                "start_ts": "2024-01-02T00:00:00Z",
+                "end_ts": "2024-01-02T02:00:00Z",
+                "regime_label": "stress",
+                "expected_event_types": ["VOL_SHOCK"],
+            },
+        ]
+    }
+    truth_map_path = _write_truth_map(tmp_path, truth_map)
+    run_id = "golden_synthetic_discovery"
+    _write_vol_shock_events(
+        tmp_path,
+        run_id,
+        [
+            {"enter_ts": "2024-01-01T00:30:00Z", "symbol": "BTCUSDT", "event_type": "VOL_SHOCK"},
+            {"enter_ts": "2024-01-05T00:00:00Z", "symbol": "BTCUSDT", "event_type": "VOL_SHOCK"},
+        ],
+    )
+
+    report = validate_detector_truth(
+        data_root=tmp_path,
+        run_id=run_id,
+        truth_map_path=truth_map_path,
+        event_types=["VOL_SHOCK"],
+    )
+
+    event_report = report["event_reports"][0]
+    per_symbol = event_report["per_symbol"][0]
+    assert event_report["gate_mode"] == "generic"
+    assert per_symbol["gate_mode"] == "generic"
+    assert per_symbol["passed_hit_requirement"]
+    assert per_symbol["precision"] == 0.5
+    assert per_symbol["off_regime_rate"] == 0.5
+    assert not per_symbol["passed_off_regime_bound"]
+    assert per_symbol["passed_precision_bound"]
+    assert not report["passed"]
+
+
 def test_accepts_clean_detector(tmp_path):
     """TICKET-015: a clean detector with low off-regime rate passes new defaults."""
     import pandas as pd
@@ -512,3 +622,28 @@ def test_accepts_clean_detector(tmp_path):
     assert per_symbol["passed_off_regime_bound"]
     assert per_symbol["passed_precision_bound"]
     assert report["passed"]
+
+
+def test_main_discovers_truth_map_under_artifacts_root(tmp_path, monkeypatch):
+    run_id = "golden_synthetic_discovery"
+    repo_root = tmp_path / "repo"
+    data_root = repo_root / "data"
+    artifact_root = repo_root / "artifacts" / "golden_synthetic_discovery"
+    truth_path = artifact_root / "synthetic" / run_id / "synthetic_regime_segments.json"
+    truth_path.parent.mkdir(parents=True, exist_ok=True)
+    truth_path.write_text(json.dumps({"segments": []}), encoding="utf-8")
+
+    captured: dict[str, object] = {}
+
+    def _fake_validate_detector_truth(**kwargs):
+        captured.update(kwargs)
+        return {"passed": True}
+
+    monkeypatch.setattr(truth_script, "get_data_root", lambda: data_root)
+    monkeypatch.setattr(truth_script, "validate_detector_truth", _fake_validate_detector_truth)
+
+    rc = truth_script.main(["--run_id", run_id])
+
+    assert rc == 0
+    assert captured["data_root"] == artifact_root
+    assert captured["truth_map_path"] == truth_path

@@ -198,7 +198,18 @@ class FalseBreakoutDetector(TrendBase):
         window = int(params.get("trend_window", params.get("range_window", 48)))
         rolling_max = close.rolling(window).max().shift(1)
         rolling_min = close.rolling(window).min().shift(1)
-        return {"close": close, "rolling_max": rolling_max, "rolling_min": rolling_min}
+        range_ratio = pd.Series(np.nan, index=df.index, dtype=float)
+        if "range_96" in df.columns and "range_med_2880" in df.columns:
+            range_ratio = (
+                pd.to_numeric(df["range_96"], errors="coerce")
+                / pd.to_numeric(df["range_med_2880"], errors="coerce").replace(0.0, np.nan)
+            ).astype(float)
+        return {
+            "close": close,
+            "rolling_max": rolling_max,
+            "rolling_min": rolling_min,
+            "range_ratio": range_ratio,
+        }
 
     def compute_raw_mask(
         self, df: pd.DataFrame, *, features: dict[str, pd.Series], **params: Any
@@ -227,7 +238,17 @@ class FalseBreakoutDetector(TrendBase):
             False
         )
 
-        return ((was_break_up & is_back_in_up) | (was_break_dn & is_back_in_dn)).fillna(False)
+        range_gate = pd.Series(True, index=features["close"].index, dtype=bool)
+        max_range_ratio = params.get("max_range_ratio")
+        if max_range_ratio is not None:
+            range_gate = (
+                pd.to_numeric(features.get("range_ratio"), errors="coerce")
+                <= float(max_range_ratio)
+            ).fillna(False)
+
+        return (
+            ((was_break_up & is_back_in_up) | (was_break_dn & is_back_in_dn)) & range_gate
+        ).fillna(False)
 
 
 class PullbackPivotDetector(TrendBase):

@@ -6,7 +6,7 @@ signal_column: breakout_trigger_event
 description: Breakout trigger requires recent range compression followed by a distance-confirmed
   break beyond the rolling high or low.
 parameters:
-  vol_lookback_window: 288
+  vol_lookback_window: 96
   compression_ratio_max: 0.8
   compression_window: 6
   min_breakout_distance: 0.0015

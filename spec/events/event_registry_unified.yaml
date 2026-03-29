@@ -431,11 +431,9 @@ canonical_regimes:
   VOLATILITY_EXPANSION:
     event_types:
     - VOL_CLUSTER_SHIFT
-    - VOL_SHOCK
     - VOL_SPIKE
     default_executable_event_types:
     - VOL_CLUSTER_SHIFT
-    - VOL_SHOCK
     - VOL_SPIKE
   VOLATILITY_RELAXATION_COMPRESSION_RELEASE:
     event_types:
@@ -447,6 +445,11 @@ canonical_regimes:
     - BREAKOUT_TRIGGER
     - RANGE_COMPRESSION_END
     - VOL_RELAXATION_START
+  VOLATILITY_TRANSITION:
+    event_types:
+    - VOL_SHOCK
+    default_executable_event_types:
+    - VOL_SHOCK
 events:
   ABSORPTION_PROXY:
     canonical_family: LIQUIDITY_STRESS
@@ -663,7 +666,7 @@ events:
         disabled_regimes:
         - 'Low volume: vol computation noise-dominated'
       cluster_id: trend_momentum
-      vol_lookback_window: 288
+      vol_lookback_window: 96
       compression_ratio_max: 0.8
       compression_window: 6
       min_breakout_distance: 0.0015
@@ -1251,6 +1254,7 @@ events:
         - 'Chop regime: no clear trend direction'
       cluster_id: trend_momentum
       trend_window: 288
+      max_range_ratio: 8.0
       breakout_z_threshold: 2.5
       cooldown_bars: 12
       merge_gap_bars: 0
@@ -3854,8 +3858,8 @@ events:
     research_only: false
     strategy_only: false
     deconflict_priority: 80
-    notes: Canonical volatility shock anchored at shock onset; detector emits onset
-      events and records relaxation telemetry for downstream evaluation.
+    notes: Canonical volatility shock; current detector implementation also models
+      relaxation boundary.
     reports_dir: vol_shock_relaxation
     events_file: vol_shock_relaxation_events.parquet
     signal_column: vol_shock_relaxation_event
@@ -3865,11 +3869,10 @@ events:
       detector_contract: true
       detector:
         signal_definition: 'Detects realized-volatility shock onset using a point-in-time-safe
-          dynamic threshold on the realized-volatility shock ratio. The emitted
-          event is the first bar where the shock ratio crosses above the dynamic
-          threshold; post-event fields record relaxation and decay diagnostics, but
-          the detector does not require a separate bootstrap-confirmed relaxation
-          gate before emission.
+          dynamic threshold on the realized-volatility shock ratio. The emitted event
+          is the first bar where the shock ratio crosses above the dynamic threshold;
+          post-event fields record relaxation and decay diagnostics, but the detector
+          does not require a separate bootstrap-confirmed relaxation gate before emission.
 
           '
         formula: 'logret[i]        = log(close[i] / close[i-1])

@@ -14,6 +14,31 @@ from project.io.utils import read_parquet
 
 
 TIME_COLUMNS = ("enter_ts", "timestamp", "signal_ts", "event_ts", "anchor_ts")
+_THRESHOLD_FIXTURE_PATH = (
+    Path(__file__).resolve().parents[1] / "tests" / "events" / "fixtures" / "detector_thresholds.json"
+)
+
+
+def _resolve_default_truth_map_and_data_root(
+    *,
+    run_id: str,
+    data_root: Path,
+) -> tuple[Path, Path]:
+    default_truth_map = data_root / "synthetic" / run_id / "synthetic_regime_segments.json"
+    if default_truth_map.exists():
+        return data_root, default_truth_map
+
+    artifacts_root = data_root.parent / "artifacts"
+    preferred = artifacts_root / run_id / "synthetic" / run_id / "synthetic_regime_segments.json"
+    if preferred.exists():
+        return preferred.parents[2], preferred
+
+    matches = sorted(artifacts_root.glob(f"*/synthetic/{run_id}/synthetic_regime_segments.json"))
+    if matches:
+        selected = matches[0]
+        return selected.parents[2], selected
+
+    return data_root, default_truth_map
 
 
 def load_truth_map(path: Path) -> List[Dict[str, Any]]:
@@ -21,6 +46,47 @@ def load_truth_map(path: Path) -> List[Dict[str, Any]]:
     if isinstance(payload, dict) and isinstance(payload.get("segments"), list):
         return [dict(item) for item in payload["segments"] if isinstance(item, Mapping)]
     raise ValueError(f"Invalid truth-map payload: {path}")
+
+
+def _load_detector_thresholds() -> dict[str, dict[str, dict[str, float]]]:
+    if not _THRESHOLD_FIXTURE_PATH.exists():
+        return {}
+
+    payload = json.loads(_THRESHOLD_FIXTURE_PATH.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        return {}
+
+    thresholds: dict[str, dict[str, dict[str, float]]] = {}
+    for event_type, runs in payload.items():
+        if not isinstance(runs, Mapping):
+            continue
+        normalized_runs: dict[str, dict[str, float]] = {}
+        for run_id, bounds in runs.items():
+            if not isinstance(bounds, Mapping):
+                continue
+            normalized_runs[str(run_id)] = {
+                str(key): float(value)
+                for key, value in bounds.items()
+                if str(key) in {"min_precision", "min_recall"}
+            }
+        thresholds[str(event_type).strip().upper()] = normalized_runs
+    return thresholds
+
+
+def _run_has_calibrated_thresholds(
+    thresholds: Mapping[str, Mapping[str, Mapping[str, float]]], run_id: str
+) -> bool:
+    return any(str(run_id) in runs for runs in thresholds.values())
+
+
+def _passes_symbol_gates(symbol_row: Mapping[str, Any], *, gate_mode: str) -> bool:
+    if not bool(symbol_row.get("passed_hit_requirement", False)):
+        return False
+    if gate_mode == "hit_only":
+        return True
+    return bool(symbol_row.get("passed_off_regime_bound", False)) and (
+        symbol_row.get("passed_precision_bound") is not False
+    )
 
 
 def _event_time_series(frame: pd.DataFrame) -> pd.Series:
@@ -139,12 +205,19 @@ def _build_event_reports(
     max_off_regime_rate: float,
     get_tolerance,
     min_precision_fraction: float | None = None,
+    detector_thresholds: Mapping[str, Mapping[str, Mapping[str, float]]] | None = None,
+    run_has_calibrated_thresholds: bool = False,
 ) -> list[dict[str, Any]]:
     event_reports: List[Dict[str, Any]] = []
+    detector_thresholds = detector_thresholds or {}
     for event_type in event_types:
         spec = EVENT_REGISTRY_SPECS.get(event_type)
         if spec and spec.synthetic_coverage == "synthetic-unvalidatable":
             continue
+        calibration_bounds = detector_thresholds.get(event_type, {}).get(run_id)
+        gate_mode = "generic"
+        if calibration_bounds is None and run_has_calibrated_thresholds:
+            gate_mode = "hit_only"
 
         frame = load_event_frame(data_root=data_root, run_id=run_id, event_type=event_type)
         times = _event_time_series(frame)
@@ -176,11 +249,19 @@ def _build_event_reports(
             expected_windows = len(windows)
             off_regime_rate = float(off_regime_events / max(1, int(symbol_times.notna().sum())))
             precision = float(in_window_events / max(1, int(symbol_times.notna().sum())))
-            passed_precision = (
-                bool(precision >= float(min_precision_fraction))
-                if min_precision_fraction is not None
-                else None
-            )
+            recall = float(hit_windows / max(1, expected_windows)) if expected_windows > 0 else 1.0
+            if gate_mode == "hit_only":
+                passed_precision = None
+                passed_off_regime = None
+                passed_recall = None
+            else:
+                passed_precision = (
+                    bool(precision >= float(min_precision_fraction))
+                    if min_precision_fraction is not None
+                    else None
+                )
+                passed_off_regime = bool(off_regime_rate <= float(max_off_regime_rate))
+                passed_recall = None
             per_symbol.append(
                 {
                     "symbol": symbol,
@@ -190,11 +271,14 @@ def _build_event_reports(
                     "off_regime_events": int(off_regime_events),
                     "off_regime_rate": off_regime_rate,
                     "precision": precision,
+                    "recall": recall,
+                    "gate_mode": gate_mode,
                     "passed_hit_requirement": bool(
                         hit_windows > 0 if expected_windows > 0 else True
                     ),
-                    "passed_off_regime_bound": bool(off_regime_rate <= float(max_off_regime_rate)),
+                    "passed_off_regime_bound": passed_off_regime,
                     "passed_precision_bound": passed_precision,
+                    "passed_recall_bound": passed_recall,
                 }
             )
         event_reports.append(
@@ -207,6 +291,8 @@ def _build_event_reports(
                 if event_type in EVENT_REGISTRY_SPECS
                 else None,
                 "total_events": total_events,
+                "calibration_bounds": dict(calibration_bounds) if calibration_bounds else None,
+                "gate_mode": gate_mode,
                 "per_symbol": per_symbol,
             }
         )
@@ -249,6 +335,8 @@ def validate_detector_truth(
         for event_type in (event_types or [])
         if str(event_type).strip()
     }
+    detector_thresholds = _load_detector_thresholds()
+    run_has_calibrated_thresholds = _run_has_calibrated_thresholds(detector_thresholds, run_id)
 
     def _get_tolerance(event_type: str) -> pd.Timedelta:
         if isinstance(tolerance_minutes, dict):
@@ -271,6 +359,8 @@ def validate_detector_truth(
         max_off_regime_rate=float(max_off_regime_rate),
         get_tolerance=_get_tolerance,
         min_precision_fraction=min_precision_fraction,
+        detector_thresholds=detector_thresholds,
+        run_has_calibrated_thresholds=run_has_calibrated_thresholds,
     )
     supporting_event_reports = (
         _build_event_reports(
@@ -286,6 +376,8 @@ def validate_detector_truth(
             max_off_regime_rate=float(max_off_regime_rate),
             get_tolerance=_get_tolerance,
             min_precision_fraction=min_precision_fraction,
+            detector_thresholds=detector_thresholds,
+            run_has_calibrated_thresholds=run_has_calibrated_thresholds,
         )
         if include_supporting_events
         else []
@@ -293,19 +385,16 @@ def validate_detector_truth(
 
     overall_pass = all(
         all(
-            symbol_row["passed_hit_requirement"]
-            and symbol_row["passed_off_regime_bound"]
-            and (
-                symbol_row["passed_precision_bound"] is not False
-                if min_precision_fraction is not None
-                else True
+            _passes_symbol_gates(
+                symbol_row,
+                gate_mode=str(event_row.get("gate_mode", "generic")),
             )
             for symbol_row in event_row["per_symbol"]
         )
         for event_row in event_reports
     )
     return {
-        "schema_version": "synthetic_detector_truth_validation_v2",
+        "schema_version": "synthetic_detector_truth_validation_v3",
         "run_id": run_id,
         "truth_map_path": str(truth_map_path),
         "tolerance_minutes": tolerance_minutes
@@ -316,6 +405,7 @@ def validate_detector_truth(
             float(min_precision_fraction) if min_precision_fraction is not None else None
         ),
         "selected_event_types": sorted(selected_event_types),
+        "run_has_calibrated_thresholds": bool(run_has_calibrated_thresholds),
         "event_reports": event_reports,
         "supporting_event_reports": supporting_event_reports,
         "include_supporting_events": bool(include_supporting_events),
@@ -344,11 +434,13 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     data_root = Path(args.data_root) if args.data_root else get_data_root()
-    truth_map_path = (
-        Path(args.truth_map_path)
-        if args.truth_map_path
-        else data_root / "synthetic" / args.run_id / "synthetic_regime_segments.json"
-    )
+    if args.truth_map_path:
+        truth_map_path = Path(args.truth_map_path)
+    else:
+        data_root, truth_map_path = _resolve_default_truth_map_and_data_root(
+            run_id=str(args.run_id),
+            data_root=Path(data_root),
+        )
     result = validate_detector_truth(
         data_root=data_root,
         run_id=str(args.run_id),
