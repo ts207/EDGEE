@@ -152,6 +152,18 @@ def test_evaluate_row_characterization_does_not_fail_closed_on_missing_baseline(
     assert "failed_baseline_comparison" not in result["reject_reason"]
 
 
+def test_evaluate_row_characterization_enforces_program_level_q_value():
+    row = _passing_row()
+    row["q_value"] = 0.01
+    row["q_value_program"] = 0.90
+
+    result = evaluate_row(row=row, **_base_kwargs())
+
+    assert result["promotion_decision"] == "rejected"
+    assert result["gate_promo_statistical"] == "fail"
+    assert "statistical_program_q_value" in result["reject_reason"]
+
+
 def test_evaluate_row_characterization_flags_continuation_quality_fragility():
     row = _passing_row()
     row["template_verb"] = "continuation"

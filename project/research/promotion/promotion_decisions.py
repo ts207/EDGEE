@@ -102,6 +102,7 @@ def evaluate_row(
         plan_row_id = str(row.get("plan_row_id", "")).strip()
         n_events = _quiet_int(row.get("n_events", row.get("sample_size", 0)), 0)
         q_value = coerce_numeric_nan(row.get("q_value"))
+        q_value_program = coerce_numeric_nan(row.get("q_value_program"))
 
         is_descriptive = as_bool(row.get("event_is_descriptive", False))
         is_trade_trigger = as_bool(row.get("event_is_trade_trigger", True))
@@ -113,14 +114,22 @@ def evaluate_row(
             )
 
         q_value_available = bool(np.isfinite(q_value))
+        program_q_value_available = bool(np.isfinite(q_value_program))
+        effective_q_value = max(q_value, q_value_program) if program_q_value_available else q_value
         statistical_pass = (
-            q_value_available and finite_le(q_value, max_q_value) and (n_events >= int(min_events))
+            q_value_available and finite_le(effective_q_value, max_q_value) and (n_events >= int(min_events))
         )
         if not statistical_pass:
             if not q_value_available:
                 reasons.add_pair(
                     reject_reason="statistical_missing_q_value",
                     promo_fail_reason="gate_promo_statistical_q_value",
+                    category="statistical_significance",
+                )
+            elif program_q_value_available and not finite_le(q_value_program, max_q_value):
+                reasons.add_pair(
+                    reject_reason="statistical_program_q_value",
+                    promo_fail_reason="gate_promo_statistical_program_q_value",
                     category="statistical_significance",
                 )
             reasons.add_pair(

@@ -308,12 +308,15 @@ def train_event_confidence_model(
         label_column=resolved_label,
         split_column=split_column,
         calibration_method=calibration_method,
-        training_summary={
-            "train": _metrics(y_train, model.predict_proba(prepared_train)[:, -1]),
+        training_summary={},
+    )
+    model.training_summary.update(
+        {
+            "train": _metrics(y_train, model.predict_proba(prepared_train)),
             "validation": {},
             "test": {},
             **calibration_summary,
-        },
+        }
     )
 
     if not test_df.empty and resolved_label in test_df.columns:
@@ -325,7 +328,10 @@ def train_event_confidence_model(
         )
         if not prepared_test.empty:
             y_test = _coerce_binary_target(test_df.loc[prepared_test.index, resolved_label])
-            model.training_summary["test"] = _metrics(y_test, model.predict_proba(test_df.loc[prepared_test.index]))
+            model.training_summary["test"] = _metrics(
+                y_test,
+                model.predict_proba(prepared_test),
+            )
 
     return model
 

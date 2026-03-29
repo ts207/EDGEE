@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pandas as pd
 
+from project.core.stats import NeweyWestMeanResult
 from project.research.helpers.shrinkage import (
     _apply_hierarchical_shrinkage,
     _asymmetric_tau_days,
@@ -11,6 +12,7 @@ from project.research.helpers.shrinkage import (
     _time_decay_weights,
 )
 from project.research.gating import calculate_expectancy_stats
+import project.research.gating as gating_module
 
 
 def _base_rows() -> pd.DataFrame:
@@ -398,3 +400,32 @@ def test_calculate_expectancy_stats_emits_regime_conditioned_tau_metrics():
     assert stats["mean_tau_down_days"] > 0.0
     assert stats["mean_tau_up_days"] > stats["mean_tau_down_days"]
     assert 1.5 <= stats["tau_directional_ratio"] <= 3.0
+
+
+def test_calculate_expectancy_stats_passes_time_decay_weights_to_hac(monkeypatch):
+    captured: dict[str, object] = {}
+
+    def fake_newey_west(values, max_lag=None, *, weights=None):
+        captured["weights"] = None if weights is None else list(pd.Series(weights, dtype=float))
+        return NeweyWestMeanResult(t_stat=2.0, se=0.1, mean=0.01, n=len(pd.Series(values)), max_lag=1)
+
+    monkeypatch.setattr(gating_module, "newey_west_t_stat_for_mean", fake_newey_west)
+
+    ts = pd.date_range("2026-01-01", periods=120, freq="5min", tz="UTC")
+    features = pd.DataFrame({"timestamp": ts, "close": 100.0 + pd.Series(range(len(ts)), dtype=float)})
+    events = pd.DataFrame({"enter_ts": [ts[20], ts[40], ts[80], ts[100]]})
+
+    calculate_expectancy_stats(
+        sym_events=events,
+        features_df=features,
+        rule="continuation",
+        canonical_family="POSITIONING_EXTREMES",
+        horizon="5m",
+        min_samples=2,
+        time_decay_enabled=True,
+        time_decay_tau_seconds=600.0,
+        time_decay_floor_weight=0.02,
+    )
+
+    assert captured["weights"] is not None
+    assert len(set(round(float(weight), 6) for weight in captured["weights"])) > 1

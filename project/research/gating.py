@@ -571,7 +571,10 @@ def _calculate_weights(
         )
     else:
         return _time_decay_weights(
-            ts_series, ref_ts, tau_seconds_default, float(time_decay_floor_weight)
+            ts_series,
+            ref_ts=ref_ts,
+            tau_seconds=tau_seconds_default,
+            floor_weight=float(time_decay_floor_weight),
         )
 
 
@@ -818,8 +821,11 @@ def calculate_expectancy_stats(
         else float(returns_series.std())
     )
     
-    # Use Newey-West HAC t-stat to account for autocorrelation
-    nw = newey_west_t_stat_for_mean(returns_series)
+    # Match the significance test to the estimator used for mean_return.
+    nw = newey_west_t_stat_for_mean(
+        returns_series,
+        weights=weights if bool(time_decay_enabled) else None,
+    )
     t_stat = (
         float(nw.t_stat) if np.isfinite(nw.t_stat) 
         else float(mean_ret / (std_ret / np.sqrt(max(n_eff, 1.0)))) if std_ret > 0 and n_eff > 1 

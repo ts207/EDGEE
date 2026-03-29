@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import numpy as np
 import pandas as pd
+import pytest
 from types import SimpleNamespace
 
 import project.research.validate_expectancy_traps as traps
@@ -90,6 +91,43 @@ def test_apply_robust_survivor_gates_enforces_fdr_and_oos():
     legacy = out[out["gate_legacy_survivor"]]
     assert len(legacy) >= 1
     assert len(legacy) >= len(survivors)
+
+
+def test_apply_robust_survivor_gates_uses_hac_p_for_fdr():
+    df = pd.DataFrame(
+        [
+            {
+                "condition": "dependent_tests",
+                "horizon": 4,
+                "event_samples": 180,
+                "event_mean": 0.0012,
+                "event_t": 2.4,
+                "hac_t": 2.6,
+                "hac_p": 0.40,
+                "bootstrap_p": 0.001,
+                "oos_samples": 70,
+                "oos_mean": 0.0009,
+                "oos_sign_consistent": True,
+            }
+        ]
+    )
+
+    out = traps._apply_robust_survivor_gates(
+        df,
+        min_samples=100,
+        legacy_tstat_threshold=2.0,
+        robust_hac_t_threshold=1.96,
+        bootstrap_alpha=0.05,
+        fdr_q=0.05,
+        oos_min_samples=40,
+        require_oos_positive=1,
+        require_oos_sign_consistency=1,
+    )
+
+    row = out.iloc[0]
+    assert row["composite_p_value"] == pytest.approx(0.40)
+    assert row["fdr_q_value"] == pytest.approx(0.40)
+    assert bool(row["gate_robust_survivor"]) is False
 
 
 def test_gate_profile_discovery_relaxes_thresholds():

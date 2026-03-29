@@ -170,22 +170,10 @@ def apply_robust_survivor_gates(
         out["oos_pass"] = False
     out["oos_pass"] = out["oos_pass"].astype(bool)
 
-    # Issue 5: Composite p-value
-    # Prefer Fisher's method if scipy is available, otherwise fallback to HAC p-value (primary parametric test)
-    # Avoid taking max() which discards evidence.
-    try:
-        from scipy.stats import chi2
-        # Fisher's combined probability test: -2 * sum(ln(p)) ~ Chi2(2k)
-        # We have 2 tests: HAC and Bootstrap.
-        # Clip p-values to avoid log(0)
-        p1 = out["hac_p"].clip(lower=1e-12)
-        p2 = out["bootstrap_p"].clip(lower=1e-12)
-        fisher_stat = -2.0 * (np.log(p1) + np.log(p2))
-        # Survival function of Chi2 with 4 degrees of freedom
-        out["composite_p_value"] = chi2.sf(fisher_stat, 4)
-    except ImportError:
-        # Fallback to HAC p-value as the primary metric for FDR
-        out["composite_p_value"] = out["hac_p"]
+    # HAC p-value is the primary p-value for FDR control.
+    # Bootstrap remains a separate required gate because the two tests share the same
+    # return series and do not satisfy Fisher-style independence assumptions.
+    out["composite_p_value"] = out["hac_p"]
 
     out["composite_p_value"] = out["composite_p_value"].clip(lower=0.0, upper=1.0)
     out["fdr_q_value"] = bh_adjust(out["composite_p_value"]).astype(float)

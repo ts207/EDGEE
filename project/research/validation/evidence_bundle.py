@@ -366,8 +366,12 @@ def evaluate_promotion_bundle(bundle: Dict[str, Any], policy: PromotionPolicy) -
     meta = bundle.get("metadata", {})
     n_events = int(safe_int(sample.get("n_events", 0), 0))
     q_value = safe_float(uncertainty.get("q_value", np.nan), np.nan)
+    q_value_program = safe_float(
+        bundle.get("multiplicity_adjustment", {}).get("q_value_program", np.nan), np.nan
+    )
     q_value_by = safe_float(uncertainty.get("q_value_by", np.nan), np.nan)
     q_value_cluster = safe_float(uncertainty.get("q_value_cluster", np.nan), np.nan)
+    effective_q_value = max(q_value, q_value_program) if np.isfinite(q_value_program) else q_value
     tob_coverage = safe_float(cost.get("tob_coverage", meta.get("tob_coverage", np.nan)), np.nan)
     if not np.isfinite(tob_coverage):
         tob_coverage = safe_float(bundle.get("tob_coverage", np.nan), np.nan)
@@ -408,7 +412,7 @@ def evaluate_promotion_bundle(bundle: Dict[str, Any], policy: PromotionPolicy) -
             "pass"
             if (
                 np.isfinite(q_value)
-                and q_value <= float(policy.max_q_value)
+                and effective_q_value <= float(policy.max_q_value)
                 and n_events >= int(policy.min_events)
             )
             else ("fail" if np.isfinite(q_value) else "missing_evidence")

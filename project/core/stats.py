@@ -57,7 +57,8 @@ def test_cointegration(x: pd.Series, y: pd.Series) -> float:
         from statsmodels.tsa.stattools import coint
 
         _stat, _pvalue, _crit = coint(xa, ya)
-        return _approx_coint_pvalue(float(_stat), n=len(aligned))
+        if np.isfinite(_pvalue):
+            return float(np.clip(_pvalue, 0.0, 1.0))
     except Exception as e:
         _LOG.warning("statsmodels.tsa.stattools.coint failed or missing; using finite-sample ADF fallback. Error: %s", e)
         pass
@@ -470,17 +471,37 @@ def canonical_bh_group_key(
 
 
 def newey_west_t_stat_for_mean(
-    values: object, max_lag: Optional[int] = None
+    values: object,
+    max_lag: Optional[int] = None,
+    *,
+    weights: object | None = None,
 ) -> NeweyWestMeanResult:
     """Compute a HAC/Newey-West t-statistic for the sample mean."""
-    arr = pd.to_numeric(pd.Series(values), errors="coerce").to_numpy(dtype=float)
-    arr = arr[np.isfinite(arr)]
+    value_series = pd.to_numeric(pd.Series(values), errors="coerce")
+    if weights is None:
+        weight_series = pd.Series(1.0, index=value_series.index, dtype=float)
+    else:
+        weight_series = pd.to_numeric(pd.Series(weights), errors="coerce").reindex(
+            value_series.index
+        )
+    mask = value_series.notna() & np.isfinite(value_series) & weight_series.notna() & np.isfinite(weight_series)
+    arr = value_series.loc[mask].to_numpy(dtype=float)
+    weight_arr = np.clip(weight_series.loc[mask].to_numpy(dtype=float), 0.0, None)
+    positive_mask = weight_arr > 0.0
+    arr = arr[positive_mask]
+    weight_arr = weight_arr[positive_mask]
     n = int(arr.size)
     if n < 2:
         return NeweyWestMeanResult(
             t_stat=float("nan"), se=float("nan"), mean=float("nan"), n=n, max_lag=0
         )
-    mean = float(np.mean(arr))
+    total_weight = float(weight_arr.sum())
+    if not np.isfinite(total_weight) or total_weight <= 0.0:
+        return NeweyWestMeanResult(
+            t_stat=float("nan"), se=float("nan"), mean=float("nan"), n=n, max_lag=0
+        )
+    norm_weights = weight_arr / total_weight
+    mean = float(np.dot(norm_weights, arr))
     centered = arr - mean
     if max_lag is None:
         # Andrews (1991) rule of thumb
@@ -488,17 +509,17 @@ def newey_west_t_stat_for_mean(
         # Cap at 50 to ensure numerical stability for very long series (Audit L-5)
         max_lag = min(max_lag, 50)
     max_lag = int(max(0, min(max_lag, n - 1)))
-    gamma0 = float(np.dot(centered, centered) / n)
-    lr_var = gamma0
+    weighted_centered = norm_weights * centered
+    lr_var = float(np.dot(weighted_centered, weighted_centered))
     for lag in range(1, max_lag + 1):
         weight = 1.0 - lag / (max_lag + 1.0)
-        cov = float(np.dot(centered[lag:], centered[:-lag]) / n)
+        cov = float(np.dot(weighted_centered[lag:], weighted_centered[:-lag]))
         lr_var += 2.0 * weight * cov
     if not np.isfinite(lr_var) or lr_var <= 0.0:
         return NeweyWestMeanResult(
             t_stat=float("nan"), se=float("nan"), mean=mean, n=n, max_lag=max_lag
         )
-    se = math.sqrt(lr_var / n)
+    se = math.sqrt(lr_var)
     t_stat = float(mean / se) if se > 0.0 else float("nan")
     return NeweyWestMeanResult(t_stat=t_stat, se=float(se), mean=mean, n=n, max_lag=max_lag)
 
