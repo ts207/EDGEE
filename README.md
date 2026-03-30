@@ -129,3 +129,13 @@ Use `docs/generated/` for current generated surfaces:
 - [docs/06_QUALITY_GATES_AND_PROMOTION.md](docs/06_QUALITY_GATES_AND_PROMOTION.md) — gate policy
 - [docs/08_TESTING_AND_MAINTENANCE.md](docs/08_TESTING_AND_MAINTENANCE.md) — test and maintenance commands
 - [docs/AGENT_CONTRACT.md](docs/AGENT_CONTRACT.md) — agent operating contract
+
+## Fast synthetic demo
+
+This repository includes a proposal-driven synthetic demo path that does not require a populated `data/lake/` checkout.
+
+- Proposal spec: `spec/proposals/demo_synthetic_fast.yaml`
+- Direct command: `python -m project.scripts.run_demo_synthetic_proposal --plan_only 1`
+- Make target: `make synthetic-demo`
+
+Synthetic proposals can now carry explicit pipeline overlays through `config_overlays`, plus `discovery_profile`, `phase2_gate_profile`, and `search_spec`, so synthetic routing is selected by configuration rather than by filename or description alone.

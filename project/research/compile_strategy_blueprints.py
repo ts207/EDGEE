@@ -711,6 +711,13 @@ def main() -> int:
             audit_rows={bp.id: audit_rows.get(bp.candidate_id, {}) for bp in blueprints},
             portfolio_state_path=None,
         )
+        from project.research.live_export import export_promoted_theses_for_run
+
+        export_promoted_theses_for_run(
+            args.run_id,
+            data_root=DATA_ROOT,
+            blueprints=[bp.to_dict() for bp in blueprints],
+        )
 
         finalize_manifest(manifest, "success", stats={"blueprint_count": len(blueprints)})
         return 0

@@ -418,3 +418,181 @@ def test_preflight_auto_enables_spot_pipeline_for_basis_regime_experiment(tmp_pa
     assert "ingest_binance_spot_ohlcv_5m" in stage_names
     assert "build_cleaned_5m_spot" in stage_names
     assert "build_features_5m_spot" in stage_names
+
+
+def test_preflight_respects_experiment_promotion_toggle_and_adds_promotion_stages(tmp_path):
+    from project.pipelines.pipeline_planning import prepare_run_preflight
+    from project.pipelines.stages.utils import script_supports_flag
+
+    registry_root = Path(__file__).parents[3] / "project" / "configs" / "registries"
+    project_root = Path(__file__).parents[3] / "project"
+
+    experiment_config = tmp_path / "experiment.yaml"
+    experiment_config.write_text(
+        yaml.safe_dump(
+            {
+                "program_id": "single_hypothesis_test",
+                "run_mode": "research",
+                "description": "single hypothesis",
+                "instrument_scope": {
+                    "instrument_classes": ["crypto"],
+                    "symbols": ["BTCUSDT"],
+                    "timeframe": "5m",
+                    "start": "2022-11-01",
+                    "end": "2022-12-31",
+                },
+                "trigger_space": {
+                    "allowed_trigger_types": ["EVENT"],
+                    "events": {"include": ["BASIS_DISLOC"]},
+                },
+                "templates": {"include": ["mean_reversion"]},
+                "evaluation": {
+                    "horizons_bars": [12],
+                    "directions": ["short"],
+                    "entry_lags": [1],
+                },
+                "contexts": {"include": {}},
+                "search_control": {
+                    "max_hypotheses_total": 1,
+                    "max_hypotheses_per_template": 1,
+                    "max_hypotheses_per_event_family": 1,
+                    "random_seed": 42,
+                },
+                "promotion": {
+                    "enabled": True,
+                    "track": "standard",
+                    "multiplicity_scope": "program_id",
+                },
+                "artifacts": {},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    args = _make_args(
+        run_id="r0",
+        symbols="BTCUSDT",
+        start="2022-11-01",
+        end="2022-12-31",
+        experiment_config=str(experiment_config),
+        registry_root=str(registry_root),
+        objective_name="retail_profitability",
+        objective_spec=None,
+        retail_profiles_spec=None,
+        force=0,
+        allow_missing_funding=0,
+        enable_cross_venue_spot_pipeline=0,
+        runtime_invariants_mode="warn",
+        emit_run_hash=0,
+        determinism_replay_checks=0,
+        oms_replay_checks=0,
+        performance_mode=0,
+        run_candidate_promotion=0,
+        run_edge_registry_update=0,
+        run_strategy_blueprint_compiler=0,
+        run_strategy_builder=0,
+    )
+
+    preflight = prepare_run_preflight(
+        args=args,
+        project_root=project_root,
+        data_root=project_root.parent / "data",
+        cli_flag_present=lambda _flag: False,
+        run_id_default=lambda: "unused",
+        script_supports_flag=script_supports_flag,
+    )
+
+    stage_names = list(preflight["stages"].keys())
+    assert args.run_candidate_promotion == 1
+    assert args.run_edge_registry_update == 1
+    assert "promote_candidates" in stage_names
+    assert "update_edge_registry" in stage_names
+
+
+def test_preflight_disables_promotion_when_experiment_config_turns_it_off(tmp_path):
+    from project.pipelines.pipeline_planning import prepare_run_preflight
+    from project.pipelines.stages.utils import script_supports_flag
+
+    registry_root = Path(__file__).parents[3] / "project" / "configs" / "registries"
+    project_root = Path(__file__).parents[3] / "project"
+
+    experiment_config = tmp_path / "experiment.yaml"
+    experiment_config.write_text(
+        yaml.safe_dump(
+            {
+                "program_id": "single_hypothesis_test",
+                "run_mode": "research",
+                "description": "single hypothesis",
+                "instrument_scope": {
+                    "instrument_classes": ["crypto"],
+                    "symbols": ["BTCUSDT"],
+                    "timeframe": "5m",
+                    "start": "2022-11-01",
+                    "end": "2022-12-31",
+                },
+                "trigger_space": {
+                    "allowed_trigger_types": ["EVENT"],
+                    "events": {"include": ["BASIS_DISLOC"]},
+                },
+                "templates": {"include": ["mean_reversion"]},
+                "evaluation": {
+                    "horizons_bars": [12],
+                    "directions": ["short"],
+                    "entry_lags": [1],
+                },
+                "contexts": {"include": {}},
+                "search_control": {
+                    "max_hypotheses_total": 1,
+                    "max_hypotheses_per_template": 1,
+                    "max_hypotheses_per_event_family": 1,
+                    "random_seed": 42,
+                },
+                "promotion": {
+                    "enabled": False,
+                    "track": "standard",
+                    "multiplicity_scope": "program_id",
+                },
+                "artifacts": {},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    args = _make_args(
+        run_id="r0",
+        symbols="BTCUSDT",
+        start="2022-11-01",
+        end="2022-12-31",
+        experiment_config=str(experiment_config),
+        registry_root=str(registry_root),
+        objective_name="retail_profitability",
+        objective_spec=None,
+        retail_profiles_spec=None,
+        force=0,
+        allow_missing_funding=0,
+        enable_cross_venue_spot_pipeline=0,
+        runtime_invariants_mode="warn",
+        emit_run_hash=0,
+        determinism_replay_checks=0,
+        oms_replay_checks=0,
+        performance_mode=0,
+        run_candidate_promotion=1,
+        run_edge_registry_update=1,
+        run_strategy_blueprint_compiler=0,
+        run_strategy_builder=0,
+    )
+
+    preflight = prepare_run_preflight(
+        args=args,
+        project_root=project_root,
+        data_root=project_root.parent / "data",
+        cli_flag_present=lambda _flag: False,
+        run_id_default=lambda: "unused",
+        script_supports_flag=script_supports_flag,
+    )
+
+    stage_names = list(preflight["stages"].keys())
+    assert args.run_candidate_promotion == 0
+    assert args.run_edge_registry_update == 0
+    assert "promote_candidates" not in stage_names
+    assert "update_edge_registry" not in stage_names

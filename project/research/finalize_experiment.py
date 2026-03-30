@@ -11,6 +11,7 @@ import sys
 
 import pandas as pd
 from project.core.config import get_data_root
+from project.core.exceptions import DataIntegrityError
 from project.artifacts import phase2_candidates_path
 
 _LOG = logging.getLogger(__name__)
@@ -48,18 +49,21 @@ def finalize_experiment(
     data_root: Path,
     program_id: str,
     run_id: str,
-) -> None:
+) -> int:
     exp_dir = data_root / "artifacts" / "experiments" / program_id / run_id
     if not exp_dir.exists():
         _LOG.error(f"Experiment directory not found: {exp_dir}")
-        return
+        return 1
 
     # Load expanded hypotheses
     hyp_path = exp_dir / "expanded_hypotheses.parquet"
     if not hyp_path.exists():
         _LOG.error(f"Expanded hypotheses not found at: {hyp_path}")
-        return
-    hyps_df = pd.read_parquet(hyp_path)
+        return 1
+    try:
+        hyps_df = pd.read_parquet(hyp_path)
+    except Exception as exc:
+        raise DataIntegrityError(f"Failed to read expanded hypotheses from {hyp_path}: {exc}") from exc
 
     results_df = _adapt_legacy_results(_load_phase2_results(data_root=data_root, run_id=run_id))
 
@@ -180,6 +184,7 @@ def finalize_experiment(
     }
     (exp_dir / "summary.json").write_text(json.dumps(summary, indent=2))
     _LOG.info(f"Finalized experiment {program_id}/{run_id}. Ledger updated.")
+    return 0
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -194,8 +199,7 @@ def main(argv=None):
     parser = build_parser()
     args = parser.parse_args(argv)
     data_root = Path(args.data_root) if args.data_root else get_data_root()
-    finalize_experiment(data_root, args.program_id, args.run_id)
-    return 0
+    return int(finalize_experiment(data_root, args.program_id, args.run_id))
 
 
 if __name__ == "__main__":

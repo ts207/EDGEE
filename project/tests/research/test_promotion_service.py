@@ -213,6 +213,213 @@ def test_execute_promotion_success_path(monkeypatch, tmp_path: Path) -> None:
     assert writes["evidence_bundle_summary"].shape[0] == 1
 
 
+def test_execute_promotion_allows_research_run_mode(monkeypatch, tmp_path: Path) -> None:
+    candidates_df = pd.DataFrame(
+        {
+            "candidate_id": ["cand-1"],
+            "event_type": ["BASIS_DISLOC"],
+            "confirmatory_locked": [False],
+            "frozen_spec_hash": [pd.NA],
+            "symbol": ["BTCUSDT"],
+        }
+    )
+    audit_df = pd.DataFrame(
+        {
+            "candidate_id": ["cand-1"],
+            "event_type": ["BASIS_DISLOC"],
+            "promotion_decision": ["rejected"],
+            "promotion_track": ["fallback_only"],
+            "rank_score": [0.0],
+            "rejection_reasons": ["min_events"],
+            "policy_version": ["v1"],
+            "bundle_version": ["1"],
+            "is_reduced_evidence": [False],
+            "promotion_metrics_trace": [json.dumps({"economics": {"passed": False}})],
+            "evidence_bundle_json": [json.dumps({"candidate_id": "cand-1", "event_type": "BASIS_DISLOC"})],
+        }
+    )
+    promoted_df = pd.DataFrame(columns=["candidate_id", "event_type"])
+    writes = {}
+
+    monkeypatch.setattr(
+        svc,
+        "load_run_manifest",
+        lambda run_id: {
+            "run_mode": "research",
+            "discovery_profile": "standard",
+            "program_id": "prog-1",
+            "symbols": "BTCUSDT",
+        },
+    )
+    monkeypatch.setattr(
+        svc,
+        "resolve_objective_profile_contract",
+        lambda **kwargs: SimpleNamespace(
+            min_net_expectancy_bps=3.0,
+            max_fee_plus_slippage_bps=7.0,
+            max_daily_turnover_multiple=2.0,
+            require_retail_viability=True,
+            require_low_capital_contract=True,
+            min_trade_count=10,
+        ),
+    )
+    monkeypatch.setattr(svc, "ontology_spec_hash", lambda root: "spec-hash")
+    monkeypatch.setattr(svc, "_load_gates_spec", lambda root: {})
+    monkeypatch.setattr(svc, "_load_hypothesis_index", lambda **kwargs: {})
+    monkeypatch.setattr(svc, "_load_negative_control_summary", lambda run_id: {})
+    monkeypatch.setattr(svc, "_hydrate_edge_candidates_from_phase2", lambda **kwargs: candidates_df.copy())
+    monkeypatch.setattr(svc, "promote_candidates", lambda **kwargs: (audit_df.copy(), promoted_df.copy(), {"seed": 1}))
+    monkeypatch.setattr(svc, "build_promotion_statistical_audit", lambda **kwargs: audit_df.copy())
+    monkeypatch.setattr(svc, "stabilize_promoted_output_schema", lambda **kwargs: promoted_df.copy())
+    monkeypatch.setattr(svc, "serialize_evidence_bundles", lambda bundles, path: writes.setdefault("bundles", list(bundles)))
+    monkeypatch.setattr(svc, "bundle_to_flat_record", lambda bundle: dict(bundle))
+    monkeypatch.setattr(svc, "write_promotion_reports", lambda **kwargs: writes.update(kwargs))
+    monkeypatch.setattr(svc, "start_manifest", lambda *args, **kwargs: {"status": "started"})
+    monkeypatch.setattr(svc, "finalize_manifest", lambda manifest, status, **kwargs: manifest.update({"status": status, **kwargs}))
+
+    config = svc.PromotionConfig(
+        run_id="run-1",
+        symbols="BTCUSDT",
+        out_dir=tmp_path / "out",
+        max_q_value=0.05,
+        min_events=5,
+        min_stability_score=0.5,
+        min_sign_consistency=0.5,
+        min_cost_survival_ratio=0.5,
+        max_negative_control_pass_rate=0.25,
+        min_tob_coverage=0.5,
+        require_hypothesis_audit=True,
+        allow_missing_negative_controls=False,
+        require_multiplicity_diagnostics=True,
+        min_dsr=1.0,
+        max_overlap_ratio=0.5,
+        max_profile_correlation=0.5,
+        allow_discovery_promotion=False,
+        program_id="prog-1",
+        retail_profile="capital_constrained",
+        objective_name="retail_profitability",
+        objective_spec=None,
+        retail_profiles_spec=None,
+        promotion_profile="auto",
+    )
+
+    result = svc.execute_promotion(config)
+
+    assert result.exit_code == 0
+    assert result.diagnostics["promotion_profile"] == "research"
+    assert set(writes["audit_df"]["source_run_mode"]) == {"research"}
+
+
+def test_execute_promotion_normalizes_empty_bundle_outputs(monkeypatch, tmp_path: Path) -> None:
+    candidates_df = pd.DataFrame(
+        {
+            "candidate_id": ["cand-1"],
+            "event_type": ["BASIS_DISLOC"],
+            "symbol": ["BTCUSDT"],
+        }
+    )
+    audit_df = pd.DataFrame()
+    promoted_df = pd.DataFrame(columns=["candidate_id", "event_type"])
+    writes = {}
+
+    monkeypatch.setattr(
+        svc,
+        "load_run_manifest",
+        lambda run_id: {
+            "run_mode": "research",
+            "discovery_profile": "standard",
+            "program_id": "prog-1",
+            "symbols": "BTCUSDT",
+        },
+    )
+    monkeypatch.setattr(
+        svc,
+        "resolve_objective_profile_contract",
+        lambda **kwargs: SimpleNamespace(
+            min_net_expectancy_bps=3.0,
+            max_fee_plus_slippage_bps=7.0,
+            max_daily_turnover_multiple=2.0,
+            require_retail_viability=True,
+            require_low_capital_contract=True,
+            min_trade_count=10,
+        ),
+    )
+    monkeypatch.setattr(svc, "ontology_spec_hash", lambda root: "spec-hash")
+    monkeypatch.setattr(svc, "_load_gates_spec", lambda root: {})
+    monkeypatch.setattr(svc, "_load_hypothesis_index", lambda **kwargs: {})
+    monkeypatch.setattr(svc, "_load_negative_control_summary", lambda run_id: {})
+    monkeypatch.setattr(svc, "_hydrate_edge_candidates_from_phase2", lambda **kwargs: candidates_df.copy())
+    monkeypatch.setattr(
+        svc,
+        "promote_candidates",
+        lambda **kwargs: (audit_df.copy(), promoted_df.copy(), {"seed": 1}),
+    )
+    monkeypatch.setattr(svc, "build_promotion_statistical_audit", lambda **kwargs: audit_df.copy())
+    monkeypatch.setattr(svc, "stabilize_promoted_output_schema", lambda **kwargs: promoted_df.copy())
+    monkeypatch.setattr(
+        svc,
+        "serialize_evidence_bundles",
+        lambda bundles, path: writes.setdefault("bundles", list(bundles)),
+    )
+    monkeypatch.setattr(svc, "write_promotion_reports", lambda **kwargs: writes.update(kwargs))
+    monkeypatch.setattr(svc, "start_manifest", lambda *args, **kwargs: {"status": "started"})
+    monkeypatch.setattr(
+        svc,
+        "finalize_manifest",
+        lambda manifest, status, **kwargs: manifest.update({"status": status, **kwargs}),
+    )
+
+    config = svc.PromotionConfig(
+        run_id="run-1",
+        symbols="BTCUSDT",
+        out_dir=tmp_path / "out",
+        max_q_value=0.05,
+        min_events=5,
+        min_stability_score=0.5,
+        min_sign_consistency=0.5,
+        min_cost_survival_ratio=0.5,
+        max_negative_control_pass_rate=0.25,
+        min_tob_coverage=0.5,
+        require_hypothesis_audit=True,
+        allow_missing_negative_controls=False,
+        require_multiplicity_diagnostics=True,
+        min_dsr=1.0,
+        max_overlap_ratio=0.5,
+        max_profile_correlation=0.5,
+        allow_discovery_promotion=False,
+        program_id="prog-1",
+        retail_profile="capital_constrained",
+        objective_name="retail_profitability",
+        objective_spec=None,
+        retail_profiles_spec=None,
+        promotion_profile="auto",
+    )
+
+    result = svc.execute_promotion(config)
+
+    assert result.exit_code == 0
+    assert writes["bundles"] == []
+    assert writes["evidence_bundle_summary"].empty
+    assert writes["promotion_decisions"].empty
+    assert set(writes["evidence_bundle_summary"].columns) >= {
+        "candidate_id",
+        "event_type",
+        "promotion_decision",
+        "promotion_track",
+        "policy_version",
+        "bundle_version",
+        "is_reduced_evidence",
+    }
+    assert set(writes["promotion_decisions"].columns) >= {
+        "candidate_id",
+        "event_type",
+        "promotion_decision",
+        "promotion_track",
+        "policy_version",
+        "bundle_version",
+        "is_reduced_evidence",
+    }
+
 
 def test_trace_helpers_and_scope_classification() -> None:
     assert svc._trace_payload('{"a": {"passed": false}}') == {"a": {"passed": False}}

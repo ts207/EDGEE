@@ -137,6 +137,38 @@ def test_merge_funding_rates_normalizes_timestamp_units():
     assert out["funding_rate_scaled"].notna().all()
 
 
+def test_merge_funding_rates_preserves_funding_rate_feature_fallback_column():
+    funding = pd.DataFrame(
+        {
+            "timestamp": pd.to_datetime(["2026-01-01T00:00:00Z", "2026-01-01T00:10:00Z"], utc=True),
+            "funding_rate_feature": [0.0015, -0.0025],
+        }
+    )
+
+    out = build_features._merge_funding_rates(_bars(), funding, symbol="BTCUSDT")
+
+    assert "funding_rate_feature" in out.columns
+    assert out["funding_rate_feature"].tolist() == pytest.approx([0.0015, 0.0015, -0.0025])
+
+
+def test_merge_funding_rates_prefers_existing_cleaned_bar_funding_columns():
+    bars = _bars().copy()
+    bars["funding_rate_feature"] = [0.001, 0.001, -0.002]
+    bars["funding_rate_scaled"] = [0.001, 0.001, np.nan]
+    funding = pd.DataFrame(
+        {
+            "timestamp": pd.to_datetime(["2026-01-01T00:00:00Z"], utc=True),
+            "funding_rate_scaled": [0.02],
+        }
+    )
+
+    out = build_features._merge_funding_rates(bars, funding, symbol="BTCUSDT")
+
+    assert "funding_rate_scaled_x" not in out.columns
+    assert "funding_rate_scaled_y" not in out.columns
+    assert out["funding_rate_scaled"].tolist() == pytest.approx([0.001, 0.001, -0.002])
+
+
 def test_safe_logret_1_avoids_inf_for_non_positive_prices():
     close = pd.Series([100.0, 101.0, 0.0, 102.0, 103.0])
     out = build_features._safe_logret_1(close)
@@ -225,3 +257,48 @@ def test_merge_optional_microstructure_inputs_derives_proxy_columns_without_tob(
 
 def test_blank_feature_schema_version_defaults_to_canonical():
     assert build_features.normalize_feature_schema_version("") == "feature_schema_v2"
+
+
+def test_build_features_derives_funding_magnitude_from_funding_rate_feature_fallback():
+    timestamps = pd.date_range("2026-01-01T00:00:00Z", periods=10, freq="5min", tz="UTC")
+    bars = pd.DataFrame(
+        {
+            "timestamp": timestamps,
+            "open": np.linspace(100.0, 109.0, num=10),
+            "high": np.linspace(101.0, 110.0, num=10),
+            "low": np.linspace(99.0, 108.0, num=10),
+            "close": np.linspace(100.5, 109.5, num=10),
+            "volume": np.linspace(10.0, 19.0, num=10),
+        }
+    )
+    funding = pd.DataFrame(
+        {
+            "timestamp": bars["timestamp"],
+            "funding_rate_feature": [
+                0.0,
+                0.0015,
+                -0.0025,
+                0.0035,
+                -0.001,
+                0.002,
+                -0.003,
+                0.001,
+                -0.0005,
+                0.0025,
+            ],
+        }
+    )
+
+    out = build_features.build_features(
+        bars,
+        funding,
+        symbol="BTCUSDT",
+        run_id="unit_test",
+        data_root=build_features.Path("/tmp"),
+        timeframe="5m",
+    )
+
+    assert out["funding_rate_scaled"].tolist() == pytest.approx(funding["funding_rate_feature"].tolist())
+    assert out["funding_abs"].iloc[2] == pytest.approx(0.0015)
+    assert out["funding_abs"].iloc[3] == pytest.approx(0.0025)
+    assert out["funding_abs_pct"].max() > 0.0

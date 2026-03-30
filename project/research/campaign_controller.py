@@ -35,6 +35,10 @@ _REPAIR_STAGE_DEFAULT_EVENTS: Dict[str, str] = {
     "bridge_evaluate_phase2": "VOL_SHOCK",
 }
 
+
+class CampaignMemoryIntegrityError(RuntimeError):
+    """Raised when persisted campaign memory exists but cannot be trusted."""
+
 def _load_event_quality_weights(search_space_path: Path) -> Dict[str, float]:
     """Backward-compatible shim for quality weight loading."""
     return load_event_priority_weights(search_space_path)
@@ -80,6 +84,7 @@ class CampaignConfig:
     explore_date_scope: tuple[str, str] = ("2024-01-01", "2024-06-30")
     scan_event_date_scope: tuple[str, str] = ("2024-01-01", "2024-01-31")
     scan_general_date_scope: tuple[str, str] = ("2024-01-01", "2024-03-31")
+    strict_memory_integrity: bool = True
 
     def __post_init__(self) -> None:
         # Default to the full trigger sequence
@@ -281,14 +286,22 @@ class CampaignController:
     def _read_memory(self) -> Dict[str, Any]:
         """Read the full memory state for this program into a single dict."""
         paths = memory_paths(self.config.program_id, data_root=self.data_root)
+        integrity_errors: List[str] = []
+
+        def _record_memory_error(path: Path, message: str, *, exc_info: bool = False) -> None:
+            detail = f"{path}: {message}"
+            integrity_errors.append(detail)
+            _LOG.error("Campaign memory integrity failure at %s: %s", path, message, exc_info=exc_info)
 
         def _json(path: Path) -> Dict[str, Any]:
             if path.exists():
                 try:
                     payload = json.loads(path.read_text(encoding="utf-8"))
-                    return payload if isinstance(payload, dict) else {}
+                    if isinstance(payload, dict):
+                        return payload
+                    _record_memory_error(path, "expected JSON object payload, got non-object")
                 except Exception:
-                    _LOG.warning("Failed to load JSON memory from %s", path, exc_info=True)
+                    _record_memory_error(path, "failed to parse JSON memory artifact", exc_info=True)
                     return {}
             return {}
 
@@ -297,7 +310,7 @@ class CampaignController:
                 try:
                     return pd.read_parquet(path)
                 except Exception:
-                    _LOG.warning("Failed to load Parquet memory from %s", path, exc_info=True)
+                    _record_memory_error(path, "failed to read Parquet memory artifact", exc_info=True)
                     return pd.DataFrame()
             return pd.DataFrame()
 
@@ -308,9 +321,15 @@ class CampaignController:
         # Latest reflection row as a dict (empty dict if none yet)
         latest_reflection: Dict[str, Any] = {}
         if not reflections.empty:
-            latest_reflection = reflections.sort_values(
-                "created_at", ascending=False
-            ).iloc[0].to_dict()
+            if "created_at" not in reflections.columns:
+                _record_memory_error(
+                    paths.reflections,
+                    "reflections memory artifact is missing required column created_at",
+                )
+            else:
+                latest_reflection = reflections.sort_values(
+                    "created_at", ascending=False
+                ).iloc[0].to_dict()
 
         # Avoid regions from belief_state: list of dicts with region metadata
         avoid_region_keys: Set[str] = {
@@ -339,8 +358,16 @@ class CampaignController:
                     ]["stage"].astype(str).unique()
                 )
         except Exception:
-            _LOG.warning("Failed to read superseded stages from memory", exc_info=True)
-            pass
+            _record_memory_error(
+                paths.failures,
+                "failed to read failures memory artifact for superseded-stage lookup",
+                exc_info=True,
+            )
+
+        if integrity_errors and self.config.strict_memory_integrity:
+            raise CampaignMemoryIntegrityError(
+                "Campaign memory integrity check failed: " + " | ".join(integrity_errors)
+            )
 
         return {
             "belief_state": belief_state,

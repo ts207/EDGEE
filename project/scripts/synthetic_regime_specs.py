@@ -27,7 +27,9 @@ REGIME_EXPECTATIONS: Dict[str, Dict[str, Any]] = {
     "funding_dislocation": {
         "intended_effect_direction": "funding_extreme_signaled",
         "expected_event_types": [
+            "CROSS_VENUE_DESYNC",
             "FND_DISLOC",
+            "FUNDING_NORMALIZATION_TRIGGER",
         ],
         "supporting_event_types": [
             "FUNDING_FLIP",
@@ -86,6 +88,10 @@ REGIME_EXPECTATIONS: Dict[str, Dict[str, Any]] = {
         "intended_effect_direction": "forced_deleveraging",
         "expected_event_types": [
             "DELEVERAGING_WAVE",
+            "OI_FLUSH",
+            "FORCED_FLOW_EXHAUSTION",
+        ],
+        "supporting_event_types": [
             "CLIMAX_VOLUME_BAR",
         ],
         "expected_detector_families": [
@@ -96,6 +102,7 @@ REGIME_EXPECTATIONS: Dict[str, Dict[str, Any]] = {
     "post_deleveraging_rebound": {
         "intended_effect_direction": "rebound_after_deleveraging",
         "expected_event_types": [
+            "POST_DELEVERAGING_REBOUND",
             "LIQUIDATION_EXHAUSTION_REVERSAL",
         ],
         "expected_detector_families": [

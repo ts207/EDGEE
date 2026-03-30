@@ -95,3 +95,14 @@ def test_proposal_schema_canonicalizes_carry_state_aliases():
     proposal = load_agent_proposal(payload)
 
     assert proposal.contexts["carry_state"] == ["funding_pos", "funding_neg", "neutral"]
+
+
+def test_synthetic_proposal_carries_explicit_pipeline_overrides():
+    from project.research.agent_io.proposal_schema import load_agent_proposal
+
+    proposal = load_agent_proposal("spec/proposals/demo_synthetic_fast.yaml")
+
+    assert proposal.discovery_profile == "synthetic"
+    assert proposal.phase2_gate_profile == "synthetic"
+    assert proposal.search_spec == "synthetic_truth"
+    assert proposal.config_overlays == ["project/configs/golden_synthetic_discovery_fast.yaml"]

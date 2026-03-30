@@ -8,11 +8,15 @@ from project.scripts.run_live_engine import load_live_engine_config
 def test_live_environment_configs_use_distinct_order_sources_and_snapshot_paths() -> None:
     paper = load_live_engine_config(Path("project/configs/live_paper.yaml"))
     production = load_live_engine_config(Path("project/configs/live_production.yaml"))
+    paper_trading = load_live_engine_config(Path("project/configs/live_paper_btc_thesis_v1.yaml"))
 
     assert paper["oms_lineage"]["order_source"] == "paper_oms"
     assert production["oms_lineage"]["order_source"] == "production_oms"
     assert paper["runtime_mode"] == "monitor_only"
     assert production["runtime_mode"] == "monitor_only"
+    assert paper_trading["runtime_mode"] == "trading"
+    assert paper_trading["strategy_runtime"]["implemented"] is True
+    assert paper_trading["strategy_runtime"]["auto_submit"] is True
     assert paper["live_state_snapshot_path"] == "artifacts/live_state_paper.json"
     assert production["live_state_snapshot_path"] == "artifacts/live_state_production.json"
     assert paper["live_state_snapshot_path"] != production["live_state_snapshot_path"]

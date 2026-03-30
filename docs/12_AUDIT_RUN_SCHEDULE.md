@@ -225,8 +225,8 @@ Target run:
 Actions:
 
 1. read [run_manifest.json](../data/runs/codex_real_btc_vol_shock_202211_202212_20260328_5/run_manifest.json)
-2. read [phase2_diagnostics.json](../data/reports/phase2/codex_real_btc_vol_shock_202211_202212_20260328_5/phase2_diagnostics.json)
-3. inspect [phase2_candidates.parquet](../data/reports/phase2/codex_real_btc_vol_shock_202211_202212_20260328_5/phase2_candidates.parquet)
+2. read [phase2_diagnostics.json](../data/reports/phase2/codex_real_btc_vol_shock_202211_202212_20260328_5/search_engine/phase2_diagnostics.json)
+3. inspect [phase2_candidates.parquet](../data/reports/phase2/codex_real_btc_vol_shock_202211_202212_20260328_5/search_engine/phase2_candidates.parquet)
 4. read [funnel_summary.json](../data/reports/codex_real_btc_vol_shock_202211_202212_20260328_5/funnel_summary.json)
 
 Pass if:

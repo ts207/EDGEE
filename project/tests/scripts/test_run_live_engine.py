@@ -150,6 +150,24 @@ def test_validate_live_runtime_environment_accepts_monitor_only_without_trading_
     assert out["venue"] == ""
 
 
+def test_validate_live_runtime_environment_accepts_paper_thesis_trading_contract() -> None:
+    out = run_live_engine.validate_live_runtime_environment(
+        config_path=Path("project/configs/live_paper_btc_thesis_v1.yaml"),
+        snapshot_path="/var/lib/edge/live_state_paper_btc_thesis.json",
+        environ={
+            "EDGE_ENVIRONMENT": "paper",
+            "EDGE_VENUE": "binance",
+            "EDGE_LIVE_CONFIG": "/opt/edge/project/configs/live_paper_btc_thesis_v1.yaml",
+            "EDGE_LIVE_SNAPSHOT_PATH": "/var/lib/edge/live_state_paper_btc_thesis.json",
+            "EDGE_BINANCE_PAPER_API_KEY": "paper-key",
+            "EDGE_BINANCE_PAPER_API_SECRET": "paper-secret",
+        },
+    )
+
+    assert out["environment"] == "paper"
+    assert out["venue"] == "binance"
+
+
 def test_validate_live_runtime_environment_rejects_missing_production_credentials(
     tmp_path: Path,
 ) -> None:

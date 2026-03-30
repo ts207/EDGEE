@@ -9,6 +9,7 @@ from project.core.column_registry import ColumnRegistry
 from project.events.shared import direction_to_sign
 from project.events.event_flags import load_registry_flags
 from project.events.event_repository import load_registry_events
+from project.events.event_specs import EVENT_REGISTRY_SPECS
 from project.research.phase2 import load_features as load_features_impl
 from project.research.validation import assign_split_labels
 from project.specs.ontology import MATERIALIZED_STATE_COLUMNS_BY_ID
@@ -116,12 +117,34 @@ def _build_event_direction_frame(events: pd.DataFrame) -> pd.DataFrame:
     return pivot.rename(columns=rename_map)
 
 
+def _ensure_expected_event_columns(
+    features: pd.DataFrame,
+    *,
+    expected_event_ids: Iterable[str] | None = None,
+) -> pd.DataFrame:
+    if features.empty or expected_event_ids is None:
+        return features
+
+    out = features.copy()
+    for raw_event_id in expected_event_ids:
+        event_id = str(raw_event_id or "").strip().upper()
+        if not event_id:
+            continue
+        event_spec = EVENT_REGISTRY_SPECS.get(event_id)
+        signal_col = event_spec.signal_column if event_spec is not None else None
+        for column in ColumnRegistry.event_cols(event_id, signal_col=signal_col):
+            if column not in out.columns:
+                out[column] = False
+    return out
+
+
 def prepare_search_features_for_symbol(
     *,
     run_id: str,
     symbol: str,
     timeframe: str,
     data_root: Path,
+    expected_event_ids: Iterable[str] | None = None,
     load_features_fn=_load_features_wrapper,
 ) -> pd.DataFrame:
     features = load_features_fn(
@@ -150,6 +173,11 @@ def prepare_search_features_for_symbol(
     direction_frame = _build_event_direction_frame(registry_events)
     if not direction_frame.empty:
         features = pd.merge(features, direction_frame, on=["timestamp", "symbol"], how="left")
+
+    features = _ensure_expected_event_columns(
+        features,
+        expected_event_ids=expected_event_ids,
+    )
 
     if "split_label" not in features.columns:
         features = assign_split_labels(features, time_col="timestamp")

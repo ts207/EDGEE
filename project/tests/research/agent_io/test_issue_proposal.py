@@ -137,3 +137,33 @@ def test_issue_proposal_writes_program_memory_audit(monkeypatch, tmp_path):
     assert proposal_dir.exists()
     assert any(Path(row["proposal_path"]).exists() for row in memory_payload["proposals"])
     assert result["run_id"].startswith("btc_campaign_")
+
+
+def test_build_run_all_command_repeats_config_overlays():
+    from project.research.agent_io.execute_proposal import build_run_all_command
+
+    cmd = build_run_all_command(
+        run_id="demo_run",
+        registry_root=Path("project/configs/registries"),
+        experiment_config_path=Path("/tmp/experiment.yaml"),
+        run_all_overrides={
+            "config": ["project/configs/a.yaml", "project/configs/b.yaml"],
+            "discovery_profile": "synthetic",
+            "search_spec": "synthetic_truth",
+        },
+        symbols=["BTCUSDT"],
+        start="2025-01-01",
+        end="2025-01-31",
+        plan_only=True,
+        dry_run=False,
+    )
+
+    config_pairs = [
+        (cmd[idx], cmd[idx + 1])
+        for idx in range(len(cmd) - 1)
+        if cmd[idx] == "--config"
+    ]
+    assert config_pairs == [
+        ("--config", "project/configs/a.yaml"),
+        ("--config", "project/configs/b.yaml"),
+    ]

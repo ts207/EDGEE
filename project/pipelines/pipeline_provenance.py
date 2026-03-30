@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from project import PROJECT_ROOT
+from project.core.exceptions import DataIntegrityError
 from project.pipelines.pipeline_defaults import DATA_ROOT, utc_now_iso
 from project.pipelines.execution_engine_support import _manifest_declared_outputs_exist
 
@@ -498,8 +499,8 @@ def objective_spec_metadata(
             spec = dict(spec["objective"])
         spec_hash = hashlib.sha256(content.encode()).hexdigest()
         return spec, spec_hash, str(path)
-    except Exception:
-        return {}, "error_hash", str(path)
+    except Exception as exc:
+        raise DataIntegrityError(f"Failed to load objective spec metadata from {path}: {exc}") from exc
 
 
 def resolve_retail_profile_name(name: str) -> str:
@@ -532,5 +533,5 @@ def retail_profile_metadata(
         # We hash the whole file for the registry hash
         file_hash = hashlib.sha256(content.encode()).hexdigest()
         return profile, file_hash, str(path)
-    except Exception:
-        return {}, "error_hash", str(path)
+    except Exception as exc:
+        raise DataIntegrityError(f"Failed to load retail profile metadata from {path}: {exc}") from exc

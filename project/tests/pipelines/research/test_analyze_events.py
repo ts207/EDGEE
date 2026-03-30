@@ -89,3 +89,30 @@ def test_load_detector_input_keeps_vol_shock_on_standard_feature_path(monkeypatc
     )
 
     pd.testing.assert_frame_equal(out, sentinel)
+
+
+def test_load_detector_input_logs_detector_preflight_failures(monkeypatch, caplog):
+    class DummyDetector:
+        required_columns = ("timestamp", "close", "high", "low")
+
+        def _ensure_detectors(self):
+            raise RuntimeError("preflight broke")
+
+    sentinel = pd.DataFrame({"timestamp": pd.to_datetime(["2024-01-01T00:00:00Z"])})
+
+    monkeypatch.setattr(
+        "project.research.analyze_events.load_features",
+        lambda **kwargs: sentinel,
+    )
+
+    with caplog.at_level("WARNING"):
+        out = _load_detector_input(
+            detector=DummyDetector(),
+            event_type="SEQ_FAKE",
+            run_id="run_x",
+            symbol="BTCUSDT",
+            timeframe="5m",
+        )
+
+    pd.testing.assert_frame_equal(out, sentinel)
+    assert "Failed detector preflight while inferring basis feature requirements" in caplog.text

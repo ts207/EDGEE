@@ -252,3 +252,97 @@ def test_post_deleveraging_rebound_properties():
                 baseline["high"] - np.maximum(baseline["open"], baseline["close"])
             ) / baseline["close"]
             assert wick_seg.mean() > wick_base.mean()
+
+
+def test_truth_map_uses_current_backlog_event_names_and_windows():
+    payload = generate_symbol_frames(
+        symbol="BTCUSDT",
+        start_ts=pd.Timestamp("2026-01-01T00:00:00Z"),
+        end_exclusive=pd.Timestamp("2026-03-01T00:00:00Z"),
+        seed=7,
+    )
+
+    funding_segment = next(seg for seg in payload["regimes"] if seg["regime_type"] == "funding_dislocation")
+    deleveraging_segment = next(
+        seg for seg in payload["regimes"] if seg["regime_type"] == "deleveraging_burst"
+    )
+    rebound_segment = next(
+        seg for seg in payload["regimes"] if seg["regime_type"] == "post_deleveraging_rebound"
+    )
+
+    assert "CROSS_VENUE_DESYNC" in funding_segment["expected_event_types"]
+    assert "FUNDING_NORMALIZATION_TRIGGER" in funding_segment["expected_event_types"]
+    assert "FUNDING_NORMALIZATION_TRIGGER" in funding_segment["event_truth_windows"]
+    funding_window = funding_segment["event_truth_windows"]["FUNDING_NORMALIZATION_TRIGGER"][0]
+    funding_start = pd.Timestamp(funding_segment["start_ts"], tz="UTC")
+    funding_end = pd.Timestamp(funding_segment["end_ts"], tz="UTC")
+    funding_window_start = pd.Timestamp(funding_window["start_ts"], tz="UTC")
+    assert funding_window_start <= funding_start + ((funding_end - funding_start) * 0.25)
+    assert "OI_FLUSH" in deleveraging_segment["expected_event_types"]
+    assert "FORCED_FLOW_EXHAUSTION" in deleveraging_segment["expected_event_types"]
+    assert "OI_FLUSH" in deleveraging_segment["event_truth_windows"]
+    assert "FORCED_FLOW_EXHAUSTION" in deleveraging_segment["event_truth_windows"]
+    assert "POST_DELEVERAGING_REBOUND" in rebound_segment["expected_event_types"]
+    assert "POST_DELEVERAGING_REBOUND" in rebound_segment["event_truth_windows"]
+    rebound_window = rebound_segment["event_truth_windows"]["POST_DELEVERAGING_REBOUND"][0]
+    rebound_end = pd.Timestamp(rebound_segment["end_ts"], tz="UTC")
+    rebound_window_end = pd.Timestamp(rebound_window["end_ts"], tz="UTC")
+    assert rebound_window_end >= rebound_end + pd.Timedelta(hours=1)
+
+
+def test_synthetic_regimes_cross_backlog_threshold_shapes():
+    payload = generate_symbol_frames(
+        symbol="BTCUSDT",
+        start_ts=pd.Timestamp("2026-01-01T00:00:00Z"),
+        end_exclusive=pd.Timestamp("2026-04-01T00:00:00Z"),
+        seed=7,
+    )
+
+    perp = payload["perp"].copy()
+    perp["timestamp"] = pd.to_datetime(perp["timestamp"], utc=True)
+    funding = payload["funding"].copy()
+    funding["timestamp"] = pd.to_datetime(funding["timestamp"], utc=True)
+    open_interest = payload["open_interest"].copy()
+    open_interest["timestamp"] = pd.to_datetime(open_interest["timestamp"], utc=True)
+
+    funding_segment = next(seg for seg in payload["regimes"] if seg["regime_type"] == "funding_dislocation")
+    deleveraging_segment = next(
+        seg for seg in payload["regimes"] if seg["regime_type"] == "deleveraging_burst"
+    )
+    rebound_segment = next(
+        seg for seg in payload["regimes"] if seg["regime_type"] == "post_deleveraging_rebound"
+    )
+
+    funding_start = pd.Timestamp(funding_segment["start_ts"], tz="UTC")
+    funding_end = pd.Timestamp(funding_segment["end_ts"], tz="UTC")
+    funding_frame = funding[
+        (funding["timestamp"] >= funding_start) & (funding["timestamp"] < funding_end)
+    ].reset_index(drop=True)
+    assert not funding_frame.empty
+    assert funding_frame["funding_rate_scaled"].abs().max() >= 0.001
+    assert funding_frame["funding_rate_scaled"].abs().iloc[-1] < funding_frame["funding_rate_scaled"].abs().max() * 0.25
+
+    deleveraging_start = pd.Timestamp(deleveraging_segment["start_ts"], tz="UTC")
+    deleveraging_end = pd.Timestamp(deleveraging_segment["end_ts"], tz="UTC")
+    oi_frame = open_interest[
+        (open_interest["timestamp"] >= deleveraging_start)
+        & (open_interest["timestamp"] < deleveraging_end)
+    ].reset_index(drop=True)
+    assert not oi_frame.empty
+    oi_pct = oi_frame["open_interest"].pct_change().fillna(0.0)
+    assert oi_pct.min() <= -0.005
+
+    burst_perp = perp[
+        (perp["timestamp"] >= deleveraging_start) & (perp["timestamp"] < deleveraging_end)
+    ].reset_index(drop=True)
+    assert not burst_perp.empty
+    assert burst_perp["spread_bps"].max() >= 5.0
+
+    rebound_start = pd.Timestamp(rebound_segment["start_ts"], tz="UTC")
+    rebound_end = pd.Timestamp(rebound_segment["end_ts"], tz="UTC")
+    rebound_perp = perp[
+        (perp["timestamp"] >= rebound_start) & (perp["timestamp"] < rebound_end)
+    ].reset_index(drop=True)
+    assert not rebound_perp.empty
+    rebound_ret = (rebound_perp["close"].iloc[-1] / rebound_perp["close"].iloc[0]) - 1.0
+    assert rebound_ret >= 0.01

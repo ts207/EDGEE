@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional, Set
 
 import pandas as pd
 import yaml
+from project.core.exceptions import DataIntegrityError
 from project.domain.compiled_registry import get_domain_registry
 from project.research.search.bridge_adapter import canonical_bridge_event_type
 from project.research.context_labels import canonicalize_context_label
@@ -692,9 +693,10 @@ def load_mi_candidate_predicates(ctrl: Any) -> List[Dict[str, Any]]:
         )
         if not candidates:
             return []
-        raw = json.loads(candidates[0].read_text(encoding="utf-8"))
+        source_path = candidates[0]
+        raw = json.loads(source_path.read_text(encoding="utf-8"))
         if not isinstance(raw, list):
-            return []
+            raise DataIntegrityError(f"MI predicate artifact {source_path} did not contain a JSON list")
         valid = [
             pred
             for pred in raw
@@ -703,8 +705,8 @@ def load_mi_candidate_predicates(ctrl: Any) -> List[Dict[str, Any]]:
         valid.sort(key=lambda pred: float(pred.get("mi_score", 0.0)), reverse=True)
         return valid
     except Exception as exc:
-        _LOG.debug("_load_mi_candidate_predicates: %s", exc)
-        return []
+        _LOG.warning("Failed to load MI candidate predicates", exc_info=True)
+        raise DataIntegrityError(f"Failed to load MI candidate predicates: {exc}") from exc
 
 
 def find_weak_signal_event_pairs(ctrl: Any) -> List[tuple]:

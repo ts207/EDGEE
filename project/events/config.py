@@ -11,6 +11,7 @@ from typing import Any, Dict, Mapping, Sequence
 from project import PROJECT_ROOT
 from project.domain.compiled_registry import get_domain_registry
 from project.spec_registry import (
+    load_yaml_path,
     load_yaml_relative,
 )
 
@@ -185,6 +186,19 @@ def _operator_registry() -> Dict[str, Dict[str, Any]]:
     return {name: dict(spec.raw) for name, spec in registry.template_operator_definitions.items()}
 
 
+@lru_cache(maxsize=None)
+def _detector_default_parameters(event_type: str) -> Dict[str, Any]:
+    from project.events.detectors.registry import get_detector, load_all_detectors
+
+    normalized = str(event_type).strip().upper()
+    if not normalized:
+        return {}
+    load_all_detectors()
+    detector = get_detector(normalized)
+    defaults = getattr(detector, "defaults", {}) if detector is not None else {}
+    return dict(defaults) if isinstance(defaults, dict) else {}
+
+
 def compose_config(
     event_type: str,
     *,
@@ -221,6 +235,21 @@ def compose_config(
                 f"{ontology_path} / {runtime_path}"
             )
         row = dict(event_def.raw)
+    source_spec = load_yaml_path(selected_spec_path) if selected_spec_path.exists() else {}
+    if isinstance(source_spec, dict) and source_spec:
+        source_parameters = source_spec.get("parameters", {})
+        if isinstance(source_parameters, dict) and source_parameters:
+            merged_parameters = {}
+            if isinstance(row.get("parameters"), dict):
+                merged_parameters.update(row["parameters"])
+            merged_parameters.update(source_parameters)
+            row["parameters"] = merged_parameters
+        for key, value in source_spec.items():
+            if key == "parameters":
+                continue
+            current = row.get(key)
+            if current in (None, "", [], {}):
+                row[key] = value
 
     defaults = unified.get("defaults", {})
     family_name = (
@@ -276,6 +305,7 @@ def compose_config(
     effective_parameters = {}
     effective_parameters.update(defaults.get("parameters", {}))
     effective_parameters.update(family_defaults.get("parameters", {}))
+    effective_parameters.update(_detector_default_parameters(normalized))
     effective_parameters.update(legacy_parameters)
     effective_parameters.update(event_parameters)
     effective_parameters.update(overrides)

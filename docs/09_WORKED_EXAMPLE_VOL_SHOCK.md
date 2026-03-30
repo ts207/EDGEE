@@ -90,9 +90,9 @@ Interpretation:
 
 The search diagnostics are:
 
-- [phase2_diagnostics.json](../data/reports/phase2/codex_real_btc_vol_shock_202211_202212_20260328_5/phase2_diagnostics.json)
+- [phase2_diagnostics.json](../data/reports/phase2/codex_real_btc_vol_shock_202211_202212_20260328_5/search_engine/phase2_diagnostics.json)
 - [phase2_search_engine.log](../data/runs/codex_real_btc_vol_shock_202211_202212_20260328_5/phase2_search_engine.log)
-- resolved spec: [resolved_search_spec__VOL_SHOCK.yaml](../data/reports/phase2/codex_real_btc_vol_shock_202211_202212_20260328_5/resolved_search_spec__VOL_SHOCK.yaml)
+- resolved spec: [resolved_search_spec__VOL_SHOCK.yaml](../data/reports/phase2/codex_real_btc_vol_shock_202211_202212_20260328_5/search_engine/resolved_search_spec__VOL_SHOCK.yaml)
 
 Important facts:
 
@@ -127,7 +127,7 @@ Statistical conclusion at this stage:
 
 Candidate output:
 
-- [phase2_candidates.parquet](../data/reports/phase2/codex_real_btc_vol_shock_202211_202212_20260328_5/phase2_candidates.parquet)
+- [phase2_candidates.parquet](../data/reports/phase2/codex_real_btc_vol_shock_202211_202212_20260328_5/search_engine/phase2_candidates.parquet)
 
 Top rows by `t_stat`:
 
@@ -238,8 +238,8 @@ If you are new, open these files in order and write one sentence after each:
 
 1. [run_manifest.json](../data/runs/codex_real_btc_vol_shock_202211_202212_20260328_5/run_manifest.json)
 2. [vol_shock_relaxation_events.parquet](../data/reports/vol_shock_relaxation/codex_real_btc_vol_shock_202211_202212_20260328_5/vol_shock_relaxation_events.parquet)
-3. [phase2_diagnostics.json](../data/reports/phase2/codex_real_btc_vol_shock_202211_202212_20260328_5/phase2_diagnostics.json)
-4. [phase2_candidates.parquet](../data/reports/phase2/codex_real_btc_vol_shock_202211_202212_20260328_5/phase2_candidates.parquet)
+3. [phase2_diagnostics.json](../data/reports/phase2/codex_real_btc_vol_shock_202211_202212_20260328_5/search_engine/phase2_diagnostics.json)
+4. [phase2_candidates.parquet](../data/reports/phase2/codex_real_btc_vol_shock_202211_202212_20260328_5/search_engine/phase2_candidates.parquet)
 5. [funnel_summary.json](../data/reports/codex_real_btc_vol_shock_202211_202212_20260328_5/funnel_summary.json)
 
 If your five sentences do not clearly answer:

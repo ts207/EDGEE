@@ -17,6 +17,33 @@ class ReportBundleResult:
     written_frames: Dict[str, pd.DataFrame] = field(default_factory=dict)
 
 
+_PROMOTION_SCHEMA_DEFAULTS: Dict[str, Dict[str, Any]] = {
+    "evidence_bundle_summary": {
+        "policy_version": "",
+        "bundle_version": "",
+        "is_reduced_evidence": False,
+    },
+    "promotion_decisions": {
+        "policy_version": "",
+        "bundle_version": "",
+        "is_reduced_evidence": False,
+    },
+}
+
+
+def _apply_schema_defaults(frame: pd.DataFrame, schema_name: Optional[str]) -> pd.DataFrame:
+    out = frame.copy()
+    defaults = _PROMOTION_SCHEMA_DEFAULTS.get(str(schema_name or ""))
+    if not defaults:
+        return out
+    for column, default in defaults.items():
+        if column not in out.columns:
+            out[column] = default
+        elif not out.empty:
+            out[column] = out[column].where(~out[column].isna(), default)
+    return out
+
+
 def write_dataframe_report(
     df: pd.DataFrame,
     output_path: Path,
@@ -24,7 +51,7 @@ def write_dataframe_report(
     schema_name: Optional[str] = None,
     allow_empty: bool = True,
 ) -> tuple[pd.DataFrame, Path]:
-    frame = df.copy()
+    frame = _apply_schema_defaults(df, schema_name)
     if schema_name is not None:
         frame = validate_dataframe_for_schema(frame, schema_name, allow_empty=allow_empty)
     ensure_dir(output_path.parent)

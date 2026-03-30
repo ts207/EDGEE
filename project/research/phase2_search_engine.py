@@ -162,6 +162,36 @@ def _annotate_candidate_regime_metadata(frame: pd.DataFrame) -> pd.DataFrame:
     return annotate_regime_metadata(frame)
 
 
+def _classify_metrics_counts(
+    metrics: pd.DataFrame,
+    *,
+    min_n: int,
+    min_t_stat: float,
+) -> tuple[int, int, int]:
+    if metrics.empty:
+        return 0, 0, 0
+
+    valid_mask = metrics.get("valid", pd.Series(False, index=metrics.index)).fillna(False).astype(bool)
+    invalid_reason = metrics.get("invalid_reason", pd.Series("", index=metrics.index)).fillna("").astype(str)
+    n_values = pd.to_numeric(metrics.get("n", 0), errors="coerce").fillna(0)
+    t_values = pd.to_numeric(metrics.get("t_stat", 0.0), errors="coerce").abs().fillna(0.0)
+
+    valid_metrics_rows = int(valid_mask.sum())
+    rejected_by_min_n = int(((~valid_mask) & invalid_reason.eq("min_sample_size")).sum())
+    rejected_by_min_t_stat = int(
+        (
+            valid_mask
+            & (n_values >= int(min_n))
+            & (t_values < float(min_t_stat))
+        ).sum()
+    )
+    rejected_invalid_metrics = max(
+        0,
+        int(len(metrics)) - valid_metrics_rows - rejected_by_min_n,
+    )
+    return valid_metrics_rows, rejected_invalid_metrics, rejected_by_min_n
+
+
 # Phase 4.2 — regime-conditional candidate discovery signal columns
 _REGIME_CANDIDATE_COLUMNS = [
     "event_type",
@@ -258,6 +288,18 @@ def _write_regime_conditional_candidates(
         "Phase 4.2: wrote %d regime_conditional_candidates to %s",
         len(rcc_df), rcc_path,
     )
+
+
+def _expected_event_ids_from_hypotheses(hypotheses) -> list[str]:
+    expected: list[str] = []
+    seen: set[str] = set()
+    for spec in hypotheses:
+        trigger = getattr(spec, "trigger", None)
+        event_id = str(getattr(trigger, "event_id", "") or "").strip().upper()
+        if event_id and event_id not in seen:
+            expected.append(event_id)
+            seen.add(event_id)
+    return expected
 
 
 def _write_hypothesis_audit_artifacts(out_dir: Path, symbol: str, audit: dict) -> None:
@@ -379,34 +421,22 @@ def run(
         log.info("Processing symbol %s...", symbol)
 
         # 1a. Load and prepare search feature frame
+        preloaded_expected_event_ids = (
+            _expected_event_ids_from_hypotheses(experiment_plan.hypotheses)
+            if experiment_plan is not None
+            else None
+        )
         features = prepare_search_features_for_symbol(
             run_id=run_id,
             symbol=symbol,
             timeframe=timeframe,
             data_root=data_root,
+            expected_event_ids=preloaded_expected_event_ids,
             load_features_fn=load_features,
         )
         if features.empty:
             log.warning("Empty feature table for %s", symbol)
             continue
-
-        log.info(
-            "Loaded features for %s: %d rows, %d columns",
-            symbol,
-            len(features),
-            len(features.columns),
-        )
-        max_feature_columns = max(max_feature_columns, int(len(features.columns)))
-        sym_flags = features[
-            [c for c in features.columns if c.endswith(("_event", "_active", "_signal"))]
-        ].copy()
-        if not sym_flags.empty:
-            max_event_flag_columns_merged = max(
-                max_event_flag_columns_merged, int(len(sym_flags.columns))
-            )
-
-        total_feature_rows += int(len(features))
-        total_event_flag_rows += int(len(features)) if not sym_flags.empty else 0
 
         # 2. Generate hypotheses
         if experiment_plan:
@@ -426,6 +456,38 @@ def run(
                 generation_audit,
             )
             log.info("Generated %d hypotheses for %s", len(hypotheses), symbol)
+
+        expected_event_ids = _expected_event_ids_from_hypotheses(hypotheses)
+        if experiment_plan is None and expected_event_ids:
+            features = prepare_search_features_for_symbol(
+                run_id=run_id,
+                symbol=symbol,
+                timeframe=timeframe,
+                data_root=data_root,
+                expected_event_ids=expected_event_ids,
+                load_features_fn=load_features,
+            )
+            if features.empty:
+                log.warning("Empty feature table for %s after expected-event materialization", symbol)
+                continue
+
+        log.info(
+            "Loaded features for %s: %d rows, %d columns",
+            symbol,
+            len(features),
+            len(features.columns),
+        )
+        max_feature_columns = max(max_feature_columns, int(len(features.columns)))
+        sym_flags = features[
+            [c for c in features.columns if c.endswith(("_event", "_active", "_signal"))]
+        ].copy()
+        if not sym_flags.empty:
+            max_event_flag_columns_merged = max(
+                max_event_flag_columns_merged, int(len(sym_flags.columns))
+            )
+
+        total_feature_rows += int(len(features))
+        total_event_flag_rows += int(len(features)) if not sym_flags.empty else 0
 
         total_hypotheses_generated += int(len(hypotheses))
         total_feasible_hypotheses += int(
@@ -451,7 +513,7 @@ def run(
                     feature_rows=int(len(features)),
                     feature_columns=int(len(features.columns)),
                     event_flag_rows=int(len(sym_flags)),
-                    event_flag_columns_merged=max(0, int(len(sym_flags.columns) - 2)),
+                    event_flag_columns_merged=int(len(sym_flags.columns)),
                     hypotheses_generated=0,
                     feasible_hypotheses=0,
                     rejected_hypotheses=int(generation_audit.get("counts", {}).get("rejected", 0)),
@@ -497,7 +559,7 @@ def run(
                     feature_rows=int(len(features)),
                     feature_columns=int(len(features.columns)),
                     event_flag_rows=int(len(sym_flags)),
-                    event_flag_columns_merged=max(0, int(len(sym_flags.columns) - 2)),
+                    event_flag_columns_merged=int(len(sym_flags.columns)),
                     hypotheses_generated=int(len(hypotheses)),
                     feasible_hypotheses=int(
                         generation_audit.get("counts", {}).get("feasible", len(hypotheses))
@@ -521,21 +583,15 @@ def run(
             )
             continue
 
+        valid_metrics_rows, rejected_invalid_metrics, rejected_by_min_n = _classify_metrics_counts(
+            metrics,
+            min_n=resolved_min_n,
+            min_t_stat=resolved_min_t_stat,
+        )
         valid_mask = (
             metrics.get("valid", pd.Series(False, index=metrics.index)).fillna(False).astype(bool)
             if not metrics.empty
             else pd.Series(dtype=bool)
-        )
-        valid_metrics_rows = int(valid_mask.sum())
-        rejected_invalid_metrics = max(0, int(len(metrics)) - valid_metrics_rows)
-        rejected_by_min_n = int(
-            (
-                valid_mask
-                & (
-                    pd.to_numeric(metrics.get("n", 0), errors="coerce").fillna(0)
-                    < int(resolved_min_n)
-                )
-            ).sum()
         )
         rejected_by_min_t_stat = int(
             (
@@ -623,7 +679,7 @@ def run(
                 feature_rows=int(len(features)),
                 feature_columns=int(len(features.columns)),
                 event_flag_rows=int(len(sym_flags)),
-                event_flag_columns_merged=max(0, int(len(sym_flags.columns) - 2)),
+                event_flag_columns_merged=int(len(sym_flags.columns)),
                 hypotheses_generated=int(len(hypotheses)),
                 feasible_hypotheses=int(
                     generation_audit.get("counts", {}).get("feasible", len(hypotheses))

@@ -406,6 +406,34 @@ states:
   - false_breakout_reversal
   - continuation
   - only_if_trend
+- state_id: OVERBOUGHT_STATE
+  family: TREND_STRUCTURE
+  source_event_type: TREND_EXHAUSTION_TRIGGER
+  activation_rule: momentum oscillator in upper extreme while trend extension is stretched
+  decay_rule: exit when momentum normalizes or reversal confirms
+  features_required:
+  - rsi
+  - macd
+  - trend_return_96
+  allowed_templates:
+  - momentum_fade
+  - exhaustion_reversal
+  - mean_reversion
+  - drawdown_filter
+- state_id: OVERSOLD_STATE
+  family: TREND_STRUCTURE
+  source_event_type: TREND_DECELERATION
+  activation_rule: momentum oscillator in lower extreme after downside extension
+  decay_rule: exit when momentum normalizes or continuation resumes
+  features_required:
+  - rsi
+  - macd
+  - trend_return_96
+  allowed_templates:
+  - momentum_fade
+  - exhaustion_reversal
+  - mean_reversion
+  - drawdown_filter
 - state_id: PULLBACK_STATE
   family: TREND_STRUCTURE
   source_event_type: PULLBACK_PIVOT

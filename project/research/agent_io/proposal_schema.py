@@ -91,6 +91,25 @@ def _normalize_promotion_profile(raw: Any) -> str:
     raise ValueError(f"Unsupported promotion profile: {raw}")
 
 
+
+
+def _normalize_discovery_profile(raw: Any) -> str:
+    value = str(raw or "standard").strip().lower()
+    if value not in {"standard", "synthetic"}:
+        raise ValueError(f"Unsupported discovery profile: {raw}")
+    return value
+
+
+def _normalize_phase2_gate_profile(raw: Any) -> str:
+    value = str(raw or "auto").strip().lower()
+    if value not in {"auto", "discovery", "promotion", "synthetic"}:
+        raise ValueError(f"Unsupported phase2 gate profile: {raw}")
+    return value
+
+
+def _normalize_config_overlays(values: Any) -> List[str]:
+    return _as_str_list(values, field_name="config_overlays")
+
 def _proposal_settable_knobs() -> set[str]:
     return {
         str(row.get("name", "")).strip()
@@ -120,6 +139,10 @@ class AgentProposal:
     search_control: Dict[str, int] = field(default_factory=dict)
     artifacts: Dict[str, bool] = field(default_factory=dict)
     knobs: Dict[str, Any] = field(default_factory=dict)
+    discovery_profile: str = "standard"
+    phase2_gate_profile: str = "auto"
+    search_spec: str = "spec/search_space.yaml"
+    config_overlays: List[str] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -142,6 +165,10 @@ class AgentProposal:
             "search_control": dict(self.search_control),
             "artifacts": dict(self.artifacts),
             "knobs": dict(self.knobs),
+            "discovery_profile": self.discovery_profile,
+            "phase2_gate_profile": self.phase2_gate_profile,
+            "search_spec": self.search_spec,
+            "config_overlays": list(self.config_overlays),
         }
 
 
@@ -196,6 +223,10 @@ def load_agent_proposal(path_or_payload: str | Path | Dict[str, Any]) -> AgentPr
         search_control=dict(raw.get("search_control", {}) or {}),
         artifacts=dict(raw.get("artifacts", {}) or {}),
         knobs={str(key): value for key, value in knobs.items()},
+        discovery_profile=_normalize_discovery_profile(raw.get("discovery_profile", "standard")),
+        phase2_gate_profile=_normalize_phase2_gate_profile(raw.get("phase2_gate_profile", "auto")),
+        search_spec=str(raw.get("search_spec", "spec/search_space.yaml") or "spec/search_space.yaml").strip(),
+        config_overlays=_normalize_config_overlays(raw.get("config_overlays", [])),
     )
     _validate_proposal(proposal)
     return proposal
@@ -216,6 +247,8 @@ def _validate_proposal(proposal: AgentProposal) -> None:
         raise ValueError("directions must contain at least one direction")
     if not proposal.entry_lags:
         raise ValueError("entry_lags must contain at least one lag")
+    if not proposal.search_spec:
+        raise ValueError("search_spec must be provided")
     invalid_entry_lags = [int(lag) for lag in proposal.entry_lags if int(lag) < 1]
     if invalid_entry_lags:
         raise ValueError("entry_lags must be >= 1 to prevent same-bar entry leakage")

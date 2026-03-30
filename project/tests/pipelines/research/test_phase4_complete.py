@@ -28,6 +28,7 @@ from unittest.mock import MagicMock, patch
 import numpy as np
 import pandas as pd
 import pytest
+from project.core.exceptions import DataIntegrityError
 
 # ---------------------------------------------------------------------------
 # Phase 4.2 imports
@@ -196,12 +197,12 @@ class TestLoadRegimeConditionalCandidates:
         assert len(result) == 1
         assert result.iloc[0]["event_type"] == "VOL_SPIKE"
 
-    def test_returns_empty_on_corrupt_file(self, tmp_path):
+    def test_raises_on_corrupt_file(self, tmp_path):
         rcc_dir = tmp_path / "reports" / "phase2" / "run_bad"
         rcc_dir.mkdir(parents=True)
         (rcc_dir / "regime_conditional_candidates.parquet").write_bytes(b"NOTPARQUET")
-        result = _load_regime_conditional_candidates(run_id="run_bad", data_root=tmp_path)
-        assert result.empty
+        with pytest.raises(DataIntegrityError):
+            _load_regime_conditional_candidates(run_id="run_bad", data_root=tmp_path)
 
 
 class TestBuildNextActionsRegimeCandidates:

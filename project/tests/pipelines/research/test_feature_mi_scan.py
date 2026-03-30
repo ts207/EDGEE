@@ -20,6 +20,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from project.core.exceptions import DataIntegrityError
 from project.research.feature_mi_scan import (
     run_feature_mi_scan,
     _select_feature_columns,
@@ -394,13 +395,13 @@ class TestControllerMiPredicates:
         result = ctrl._load_mi_candidate_predicates()
         assert result == []
 
-    def test_returns_empty_on_malformed_json(self, tmp_path):
+    def test_raises_on_malformed_json(self, tmp_path):
         ctrl = _make_ctrl(tmp_path)
         mi_dir = tmp_path / "reports" / "feature_mi" / "run_1"
         mi_dir.mkdir(parents=True)
         (mi_dir / "candidate_predicates.json").write_text("NOT JSON", encoding="utf-8")
-        result = ctrl._load_mi_candidate_predicates()
-        assert result == []
+        with pytest.raises(DataIntegrityError):
+            ctrl._load_mi_candidate_predicates()
 
     def test_filters_malformed_predicate_dicts(self, tmp_path):
         ctrl = _make_ctrl(tmp_path)

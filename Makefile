@@ -149,6 +149,9 @@ golden-workflow:
 golden-synthetic-discovery:
 	$(PYTHON) -m project.scripts.run_golden_synthetic_discovery
 
+synthetic-demo:
+	$(PYTHON) -m project.scripts.run_demo_synthetic_proposal
+
 golden-certification:
 	$(PYTHON) -m project.scripts.run_certification_workflow
 

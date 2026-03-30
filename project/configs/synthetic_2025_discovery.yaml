@@ -11,6 +11,6 @@ search_min_n: 8
 required_outputs:
   - synthetic/synthetic_2025_full_year/synthetic_generation_manifest.json
   - synthetic/synthetic_2025_full_year/synthetic_regime_segments.json
-  - reports/phase2/synthetic_2025_full_year/phase2_candidates.parquet
-  - reports/phase2/synthetic_2025_full_year/phase2_diagnostics.json
+  - reports/phase2/synthetic_2025_full_year/search_engine/phase2_candidates.parquet
+  - reports/phase2/synthetic_2025_full_year/search_engine/phase2_diagnostics.json
   - reliability/golden_synthetic_discovery_summary.json

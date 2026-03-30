@@ -12,6 +12,21 @@ signal_column: flow_exhaustion_proxy_event
 parameters:
   lookback_window: 288
   z_threshold: 3.0
+  threshold_window: 2880
+  oi_drop_quantile: 0.80
+  liquidation_quantile: 0.85
+  spread_quantile: 0.70
+  return_quantile: 0.75
+  rebound_window: 6
+  reversal_window: 3
+  reversal_quantile: 0.65
+  oi_drop_abs_min: 5.0
+  liquidation_abs_min: 25.0
+  liquidation_multiplier: 0.9
+  return_abs_min: 0.0025
+  spread_abs_min: 5.0
+  rv_decay_ratio: 0.99
+  min_spacing: 24
   cooldown_bars: 12
   merge_gap_bars: 0
 canonical_family: FORCED_FLOW_AND_EXHAUSTION

@@ -241,11 +241,29 @@ def _merge_funding_rates(
     symbol: str,
     timeframe: str = "5m",
 ) -> pd.DataFrame:
+    bars_out = bars.copy()
+    existing_scaled = pd.to_numeric(
+        bars_out.get("funding_rate_scaled", pd.Series(np.nan, index=bars_out.index)),
+        errors="coerce",
+    )
+    existing_feature = pd.to_numeric(
+        bars_out.get("funding_rate_feature", pd.Series(np.nan, index=bars_out.index)),
+        errors="coerce",
+    )
+    if existing_scaled.notna().any() or existing_feature.notna().any():
+        bars_out["funding_rate_scaled"] = existing_scaled.where(
+            existing_scaled.notna(), existing_feature
+        )
+        if "funding_rate_feature" not in bars_out.columns:
+            bars_out["funding_rate_feature"] = existing_feature
+        return bars_out
+
     if funding.empty or "timestamp" not in funding.columns:
-        out = bars.copy()
-        if "funding_rate_scaled" not in out.columns:
-            out["funding_rate_scaled"] = np.nan
-        return out
+        if "funding_rate_scaled" not in bars_out.columns:
+            bars_out["funding_rate_scaled"] = np.nan
+        if "funding_rate_feature" not in bars_out.columns:
+            bars_out["funding_rate_feature"] = np.nan
+        return bars_out
 
     funding = funding.copy()
     funding["timestamp"] = ts_ns_utc(
@@ -257,17 +275,23 @@ def _merge_funding_rates(
 
     if "funding_rate_scaled" not in funding.columns and "funding_rate" in funding.columns:
         funding["funding_rate_scaled"] = funding["funding_rate"].astype(float)
+    if "funding_rate_feature" not in funding.columns and "funding_rate_scaled" in funding.columns:
+        funding["funding_rate_feature"] = funding["funding_rate_scaled"]
 
-    bars_out = bars.copy()
     bars_out["timestamp"] = ts_ns_utc(
         pd.to_datetime(bars_out["timestamp"], utc=True, errors="coerce")
     )
     bars_out = bars_out.sort_values("timestamp").reset_index(drop=True)
 
-    if "funding_rate_scaled" in funding.columns:
+    if "funding_rate_scaled" in funding.columns or "funding_rate_feature" in funding.columns:
+        merge_cols = ["timestamp"]
+        if "funding_rate_scaled" in funding.columns:
+            merge_cols.append("funding_rate_scaled")
+        if "funding_rate_feature" in funding.columns:
+            merge_cols.append("funding_rate_feature")
         merged = pd.merge_asof(
             bars_out,
-            funding[["timestamp", "funding_rate_scaled"]],
+            funding[merge_cols],
             on="timestamp",
             direction="backward",
         )
@@ -289,11 +313,16 @@ def _merge_funding_rates(
         if valid.any():
             src_ts = np.where(valid, funding_ts_ns[np.maximum(0, idx)], np.iinfo(np.int64).min)
             stale = (~valid) | ((bar_ts_ns - src_ts) > staleness_limit_ns)
-        merged.loc[stale, "funding_rate_scaled"] = np.nan
+        if "funding_rate_scaled" in merged.columns:
+            merged.loc[stale, "funding_rate_scaled"] = np.nan
+        if "funding_rate_feature" in merged.columns:
+            merged.loc[stale, "funding_rate_feature"] = np.nan
         return merged
     else:
         if "funding_rate_scaled" not in bars_out.columns:
             bars_out["funding_rate_scaled"] = np.nan
+        if "funding_rate_feature" not in bars_out.columns:
+            bars_out["funding_rate_feature"] = np.nan
         return bars_out
 
 
@@ -706,9 +735,19 @@ def build_features(
     else:
         out["oi_delta_1h"] = 0.0
 
+    # Normalize funding magnitude inputs before deriving downstream features.
+    funding_scaled = pd.to_numeric(
+        out.get("funding_rate_scaled", pd.Series(np.nan, index=out.index)),
+        errors="coerce",
+    )
+    if "funding_rate_feature" in out.columns:
+        funding_feature = pd.to_numeric(out["funding_rate_feature"], errors="coerce")
+        funding_scaled = funding_scaled.where(funding_scaled.notna(), funding_feature)
+    out["funding_rate_scaled"] = funding_scaled
+
     # Add funding absolute and percentile features
-    if "funding_rate_scaled" in out.columns:
-        funding_abs = out["funding_rate_scaled"].astype(float).abs().fillna(0.0)
+    if out["funding_rate_scaled"].notna().any():
+        funding_abs = out["funding_rate_scaled"].abs().fillna(0.0)
         out["funding_abs"] = funding_abs.shift(1)  # Lag raw magnitude too if used for thresholds
         funding_abs_window = _duration_to_bars(
             minutes=96 * _BASE_WINDOW_MINUTES,
@@ -721,13 +760,6 @@ def build_features(
     else:
         out["funding_abs"] = 0.0
         out["funding_abs_pct"] = 0.0
-
-    # Final data contract enforcement: ensure funding_rate_scaled is PIT-safe and populated
-    if "funding_rate_scaled" not in out.columns or out["funding_rate_scaled"].isna().all():
-        if "funding_rate_feature" in out.columns:
-            out["funding_rate_scaled"] = out["funding_rate_feature"]
-        else:
-            out["funding_rate_scaled"] = np.nan
 
     return _ensure_feature_contract_columns(out, timeframe=tf)
 

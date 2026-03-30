@@ -24,6 +24,7 @@ from project.spec_validation import (
     loaders,
     resolve_entry_lags,
     resolve_filter_templates,
+    resolve_templates,
     validate_search_spec_doc,
 )
 
@@ -125,6 +126,38 @@ def _build_hypotheses(
             )
 
 
+def _event_default_templates(
+    event_id: str,
+    *,
+    registry,
+    fallback_templates: List[str],
+) -> List[str]:
+    event_def = registry.get_event(event_id)
+    if event_def is None:
+        return list(fallback_templates)
+
+    raw = event_def.raw if isinstance(event_def.raw, dict) else {}
+    raw_templates = raw.get("templates")
+    if isinstance(raw_templates, (list, tuple)):
+        templates = [str(item).strip() for item in raw_templates if str(item).strip()]
+        if templates:
+            return templates
+
+    legacy_family = None
+    parameters = raw.get("parameters")
+    if isinstance(parameters, dict):
+        legacy_family = parameters.get("canonical_family")
+    if legacy_family:
+        templates = list(registry.family_execution_templates(str(legacy_family)))
+        if templates:
+            return templates
+
+    templates = list(registry.family_execution_templates(event_def.canonical_family))
+    if templates:
+        return templates
+    return list(fallback_templates)
+
+
 def load_sequence_registry() -> List[Dict[str, Any]]:
     return get_domain_registry().sequence_rows()
 
@@ -165,10 +198,8 @@ def generate_hypotheses_with_audit(
     directions = [str(d) for d in doc.get("directions", ["long", "short"])]
     entry_lags = resolve_entry_lags(doc)
     templates_raw = doc.get("templates", ["base"])
-    if isinstance(templates_raw, str):
-        templates = ["base"] if templates_raw == "*" else [templates_raw]
-    else:
-        templates = list(templates_raw)
+    use_event_templates = templates_raw == "*"
+    templates = resolve_templates(doc)
 
     raw_contexts = doc.get("contexts", {})
     contexts = _context_combinations(raw_contexts)
@@ -273,11 +304,31 @@ def generate_hypotheses_with_audit(
         type_counts[ttype] = type_counts.get(ttype, 0) + 1
         template_counts[tid] = template_counts.get(tid, 0) + 1
 
+    registry = get_domain_registry()
+
     # Build event-led
-    for spec in _build_hypotheses(
-        TriggerType.EVENT, events, horizons, directions, entry_lags, contexts, templates
-    ):
-        _add(spec)
+    if use_event_templates:
+        for event_id in events:
+            event_templates = _event_default_templates(
+                event_id,
+                registry=registry,
+                fallback_templates=templates,
+            )
+            for spec in _build_hypotheses(
+                TriggerType.EVENT,
+                [event_id],
+                horizons,
+                directions,
+                entry_lags,
+                contexts,
+                event_templates,
+            ):
+                _add(spec)
+    else:
+        for spec in _build_hypotheses(
+            TriggerType.EVENT, events, horizons, directions, entry_lags, contexts, templates
+        ):
+            _add(spec)
 
     # Build state-led
     for spec in _build_hypotheses(

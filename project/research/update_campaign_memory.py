@@ -11,6 +11,7 @@ import pandas as pd
 import numpy as np
 
 from project.core.config import get_data_root
+from project.core.exceptions import DataIntegrityError
 from project.research.search_intelligence import update_search_intelligence
 from project.research.knowledge.memory import (
     build_failures_snapshot,
@@ -383,7 +384,8 @@ def _load_regime_conditional_candidates(*, run_id: str, data_root: Path) -> pd.D
     Written by _write_regime_conditional_candidates() in phase2_search_engine.py
     or run_hypothesis_search.py. Checks both standard output paths so that
     either pipeline's artefact is found.
-    Returns an empty DataFrame on any I/O failure.
+    Returns an empty DataFrame when the artifact is absent.
+    Raises when the artifact exists but is unreadable/corrupted.
     """
     candidates = [
         data_root / "reports" / "hypothesis_search" / run_id / "regime_conditional_candidates.parquet",
@@ -394,8 +396,11 @@ def _load_regime_conditional_candidates(*, run_id: str, data_root: Path) -> pd.D
         if path.exists():
             try:
                 return pd.read_parquet(path)
-            except Exception:
-                continue
+            except Exception as exc:
+                _LOG.warning("Failed to read regime conditional candidates from %s", path, exc_info=True)
+                raise DataIntegrityError(
+                    f"Failed to read regime conditional candidates from {path}: {exc}"
+                ) from exc
     return pd.DataFrame()
 
 

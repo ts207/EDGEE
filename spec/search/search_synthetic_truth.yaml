@@ -12,6 +12,7 @@ triggers:
     - BASIS_DISLOC
     - SPOT_PERP_BASIS_SHOCK
     - FND_DISLOC
+    - FUNDING_NORMALIZATION_TRIGGER
     - TREND_ACCELERATION
     - FALSE_BREAKOUT
     - BREAKOUT_TRIGGER
@@ -19,16 +20,14 @@ triggers:
     - LIQUIDITY_STRESS_DIRECT
     - LIQUIDITY_STRESS_PROXY
     - DELEVERAGING_WAVE
+    - OI_FLUSH
+    - FORCED_FLOW_EXHAUSTION
     - POST_DELEVERAGING_REBOUND
     - CLIMAX_VOLUME_BAR
 
 contexts: {}
 
-templates:
-  - mean_reversion
-  - continuation
-  - exhaustion_reversal
-  - overshoot_repair
+templates: "*"
 
 horizons:
   - 5m

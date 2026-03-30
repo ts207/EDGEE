@@ -37,6 +37,7 @@ class BaseFundingDetector(ThresholdDetector, MarketEventDetector):
         "persistence_pct": 85.0,
         "normalization_pct": 50.0,
         "normalization_lookback": 288,
+        "min_prior_extreme_abs": 0.0004,
     }
 
     def _signed_funding(self, df: pd.DataFrame) -> pd.Series:
@@ -194,6 +195,9 @@ class FundingNormalizationDetector(BaseFundingDetector):
                 "funding_subtype": "normalization",
                 "prior_extreme_pct": float(
                     np.nan_to_num(features["prior_extreme_pct"].iloc[idx], nan=0.0)
+                ),
+                "prior_extreme_abs": float(
+                    np.nan_to_num(features["prior_extreme_abs"].iloc[idx], nan=0.0)
                 ),
             }
         )

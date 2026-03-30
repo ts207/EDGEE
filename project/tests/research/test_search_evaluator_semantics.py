@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import numpy as np
 import pandas as pd
 from pathlib import Path
@@ -78,6 +79,47 @@ def test_prepare_search_features_for_symbol_merges_event_direction_metadata(monk
     direction_col = ColumnRegistry.event_direction_cols("VOL_SHOCK")[0]
     assert direction_col in features.columns
     assert features.loc[0, direction_col] == 1.0
+
+
+def test_prepare_search_features_for_symbol_materializes_expected_zero_hit_event_columns(
+    monkeypatch,
+):
+    base = _base_features()
+
+    monkeypatch.setattr(
+        "project.research.search.search_feature_utils.load_registry_flags",
+        lambda **kwargs: pd.DataFrame(columns=["timestamp", "symbol"]),
+    )
+    monkeypatch.setattr(
+        "project.research.search.search_feature_utils.load_registry_events",
+        lambda **kwargs: pd.DataFrame(columns=["timestamp", "symbol", "event_type"]),
+    )
+
+    features = prepare_search_features_for_symbol(
+        run_id="dummy",
+        symbol="BTCUSDT",
+        timeframe="5m",
+        data_root=Path("/tmp"),
+        expected_event_ids=["VOL_SHOCK"],
+        load_features_fn=lambda **kwargs: base.copy(),
+    )
+
+    signal_col = EVENT_REGISTRY_SPECS["VOL_SHOCK"].signal_column
+    assert signal_col in features.columns
+    assert bool(features[signal_col].any()) is False
+
+    _patch_robustness(monkeypatch)
+    spec = HypothesisSpec(
+        trigger=TriggerSpec.event("VOL_SHOCK"),
+        direction="long",
+        horizon="12b",
+        template_id="continuation",
+    )
+
+    metrics = evaluate_hypothesis_batch([spec], features, min_sample_size=1)
+
+    assert bool(metrics.loc[0, "valid"]) is False
+    assert metrics.loc[0, "invalid_reason"] == "no_trigger_hits"
 
 
 def test_event_templates_use_spec_side_policy_in_canonical_evaluator(monkeypatch):
@@ -192,3 +234,29 @@ def test_evaluate_hypothesis_batch_drops_boundary_crossing_event_windows(monkeyp
 
     assert bool(metrics.loc[0, "valid"]) is False
     assert metrics.loc[0, "invalid_reason"] == "no_split_compatible_events"
+
+
+def test_evaluate_hypothesis_batch_logs_actual_invalid_reason_counts(monkeypatch, caplog):
+    _patch_robustness(monkeypatch)
+    features = _base_features()
+    signal_col = EVENT_REGISTRY_SPECS["VOL_SHOCK"].signal_column
+    features[signal_col] = False
+    features.loc[[0, 5], signal_col] = True
+
+    incompatible = HypothesisSpec(
+        trigger=TriggerSpec.event("VOL_SHOCK"),
+        direction="long",
+        horizon="12b",
+        template_id="basis_repair",
+    )
+    valid = HypothesisSpec(
+        trigger=TriggerSpec.event("VOL_SHOCK"),
+        direction="long",
+        horizon="12b",
+        template_id="continuation",
+    )
+
+    with caplog.at_level(logging.INFO, logger="project.research.search.evaluator"):
+        evaluate_hypothesis_batch([incompatible, valid], features, min_sample_size=1)
+
+    assert "1 valid, 1 invalid (incompatible_template_family=1)" in caplog.text

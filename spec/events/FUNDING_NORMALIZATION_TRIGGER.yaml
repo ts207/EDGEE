@@ -12,6 +12,7 @@ parameters:
   persistence_bars: 12
   normalization_pct: 50.0
   normalization_lookback: 96
+  min_prior_extreme_abs: 0.0004
   min_event_spacing: 96
   event_lookahead: 96
   liquidation_abs_return: 0.03

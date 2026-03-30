@@ -127,3 +127,42 @@ def test_populate_fail_reasons_falls_back_to_fail_reasons_tokens():
     out = svc.populate_fail_reasons(df)
     assert out.loc[0, "fail_gate_primary"] == "MIN_SAMPLE_SIZE_GATE"
     assert out.loc[0, "fail_reason_primary"] == "failed_MIN_SAMPLE_SIZE_GATE"
+
+
+def test_read_csv_or_parquet_logs_and_returns_empty_on_read_failure(caplog, monkeypatch, tmp_path):
+    path = tmp_path / "broken.parquet"
+    path.write_text("broken", encoding="utf-8")
+
+    def _boom(_path):
+        raise RuntimeError("bad parquet")
+
+    monkeypatch.setattr(pd, "read_parquet", _boom)
+
+    with caplog.at_level(logging.WARNING):
+        out = svc._read_csv_or_parquet(path)
+
+    assert out.empty
+    assert "Failed to read tabular artifact" in caplog.text
+
+
+def test_assign_event_split_labels_logs_when_research_mode_fails_closed(caplog, monkeypatch):
+    events = pd.DataFrame(
+        {
+            "enter_ts": pd.to_datetime(
+                ["2024-01-01T00:00:00Z", "2024-01-01T00:05:00Z", "2024-01-01T00:10:00Z"],
+                utc=True,
+            )
+        }
+    )
+
+    def _boom(*args, **kwargs):
+        raise RuntimeError("split engine broke")
+
+    monkeypatch.setattr(svc, "_validation_assign_split_labels", _boom)
+
+    with caplog.at_level(logging.WARNING):
+        out = svc.assign_event_split_labels(events, run_mode="research")
+
+    assert (out["split_label"] == "train").all()
+    assert bool(out["non_promotable"].all())
+    assert "Event split assignment failed in research mode" in caplog.text

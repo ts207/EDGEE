@@ -41,8 +41,25 @@ def _template_family_reason(spec: HypothesisSpec, registry: DomainRegistry) -> s
     operator = registry.get_operator(spec.template_id)
     if operator is None or not operator.compatible_families:
         return None
-    family = _event_family(spec, registry)
-    if family and family not in operator.compatible_families:
+    event_def = registry.get_event(spec.trigger.event_id or "")
+    if event_def is None:
+        return None
+
+    raw = event_def.raw if isinstance(event_def.raw, dict) else {}
+    raw_templates = raw.get("templates")
+    if isinstance(raw_templates, (list, tuple)):
+        normalized_templates = {str(item).strip() for item in raw_templates if str(item).strip()}
+        if spec.template_id in normalized_templates:
+            return None
+
+    family_candidates = {event_def.canonical_family}
+    parameters = raw.get("parameters")
+    if isinstance(parameters, Mapping):
+        legacy_family = str(parameters.get("canonical_family", "")).strip()
+        if legacy_family:
+            family_candidates.add(legacy_family)
+
+    if family_candidates.isdisjoint(operator.compatible_families):
         return "incompatible_template_family"
     return None
 

@@ -197,8 +197,12 @@ def _load_detector_input(
                     needs_basis = True
                 elif trigger and any(col in getattr(trigger, "required_columns", ()) for col in basis_cols):
                     needs_basis = True
-            except Exception:
-                pass
+            except Exception as exc:
+                _LOG.warning(
+                    "Failed detector preflight while inferring basis feature requirements for %s: %s",
+                    event_type,
+                    exc,
+                )
 
     if needs_basis:
         return _load_basis_features(run_id, symbol, timeframe, data_root=data_root)

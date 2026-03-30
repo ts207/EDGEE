@@ -435,6 +435,12 @@ def _resolve_requested_event_ids(
             executable_token = resolve_executable_event_alias(token)
             if executable_token in allowed_events:
                 token = executable_token
+        if token not in allowed_events:
+            log.debug(
+                "Skipping non-authoritative regime-expanded event %r during request resolution",
+                event_id,
+            )
+            continue
         if token and token not in seen:
             ordered.append(token)
             seen.add(token)

@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from project.core.exceptions import DataIntegrityError
 from project.pipelines import pipeline_provenance as prov
 
 
@@ -165,3 +166,15 @@ def test_lineage_and_metadata_helpers(tmp_path: Path, monkeypatch) -> None:
     assert profile["max_position_usd"] == 1000
     assert profile_hash != "unknown_hash"
     assert resolved_path == str(retail_path)
+
+
+def test_objective_and_profile_metadata_raise_on_malformed_specs(tmp_path: Path) -> None:
+    objective_path = tmp_path / "objective.yaml"
+    objective_path.write_text("objective:\n  [", encoding="utf-8")
+    with pytest.raises(DataIntegrityError):
+        prov.objective_spec_metadata("ignored", str(objective_path))
+
+    retail_path = tmp_path / "retail_profiles.yaml"
+    retail_path.write_text("profiles:\n  sample: [", encoding="utf-8")
+    with pytest.raises(DataIntegrityError):
+        prov.retail_profile_metadata("sample", str(retail_path))

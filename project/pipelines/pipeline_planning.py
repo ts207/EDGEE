@@ -437,6 +437,27 @@ def _experiment_trigger_hints(args: argparse.Namespace) -> tuple[set[str], set[s
     return events, regimes
 
 
+def _experiment_promotion_enabled(args: argparse.Namespace) -> bool | None:
+    experiment_config_path = str(getattr(args, "experiment_config", "") or "").strip()
+    if not experiment_config_path:
+        return None
+
+    try:
+        payload = yaml.safe_load(Path(experiment_config_path).read_text(encoding="utf-8")) or {}
+    except Exception:
+        return None
+    if not isinstance(payload, dict):
+        return None
+
+    promotion = payload.get("promotion", {})
+    if not isinstance(promotion, Mapping):
+        return None
+    enabled = promotion.get("enabled")
+    if enabled is None:
+        return None
+    return bool(enabled)
+
+
 def _requires_cross_venue_spot_pipeline(args: argparse.Namespace) -> bool:
     events, regimes = _experiment_trigger_hints(args)
     return bool(
@@ -629,6 +650,13 @@ def prepare_run_preflight(
             args.runtime_invariants_mode = "off"
         if not cli_flag_present("--emit_run_hash"):
             args.emit_run_hash = 0
+
+    experiment_promotion_enabled = _experiment_promotion_enabled(args)
+    if experiment_promotion_enabled is not None and not cli_flag_present("--run_candidate_promotion"):
+        args.run_candidate_promotion = 1 if experiment_promotion_enabled else 0
+        if not experiment_promotion_enabled and not cli_flag_present("--run_edge_registry_update"):
+            args.run_edge_registry_update = 0
+
     if str(getattr(args, "mode", "research")).strip().lower() in {"production", "certification"}:
         if not cli_flag_present("--run_phase2_conditional"):
             args.run_phase2_conditional = 1

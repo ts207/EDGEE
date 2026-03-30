@@ -57,6 +57,10 @@ def build_run_all_command(
     for key, value in sorted(run_all_overrides.items()):
         if key in {"symbols"}:
             continue
+        if key == "config" and isinstance(value, (list, tuple)):
+            for item in value:
+                cmd.extend(["--config", str(item)])
+            continue
         cmd.extend(_to_cli_tokens(f"--{key}", value))
     if plan_only:
         cmd.extend(["--plan_only", "1"])

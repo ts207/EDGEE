@@ -47,28 +47,75 @@ class RegimeSegment:
     amplitude: float
 
     def _event_truth_windows(self) -> Dict[str, list[Dict[str, str]]]:
-        if self.regime_type != "liquidity_stress":
-            return {}
         duration = self.end_ts - self.start_ts
-        shock_end = self.start_ts + (duration * 0.18)
-        stress_end = shock_end + (duration * 0.32)
-        late_stress_start = shock_end + ((stress_end - shock_end) * 0.50)
-        early_stress_end = shock_end + ((stress_end - shock_end) * 0.30)
-        windows = {
-            "DEPTH_STRESS_PROXY": [
-                {"start_ts": self.start_ts.isoformat(), "end_ts": stress_end.isoformat()},
-            ],
-            "SPREAD_REGIME_WIDENING_EVENT": [
-                {"start_ts": self.start_ts.isoformat(), "end_ts": stress_end.isoformat()},
-            ],
-            "PRICE_VOL_IMBALANCE_PROXY": [
-                {"start_ts": self.start_ts.isoformat(), "end_ts": early_stress_end.isoformat()},
-            ],
-            "ABSORPTION_PROXY": [
-                {"start_ts": late_stress_start.isoformat(), "end_ts": self.end_ts.isoformat()},
-            ],
-        }
-        return windows
+        if self.regime_type == "liquidity_stress":
+            shock_end = self.start_ts + (duration * 0.18)
+            stress_end = shock_end + (duration * 0.32)
+            late_stress_start = shock_end + ((stress_end - shock_end) * 0.50)
+            early_stress_end = shock_end + ((stress_end - shock_end) * 0.30)
+            return {
+                "DEPTH_STRESS_PROXY": [
+                    {"start_ts": self.start_ts.isoformat(), "end_ts": stress_end.isoformat()},
+                ],
+                "SPREAD_REGIME_WIDENING_EVENT": [
+                    {"start_ts": self.start_ts.isoformat(), "end_ts": stress_end.isoformat()},
+                ],
+                "PRICE_VOL_IMBALANCE_PROXY": [
+                    {
+                        "start_ts": self.start_ts.isoformat(),
+                        "end_ts": early_stress_end.isoformat(),
+                    },
+                ],
+                "ABSORPTION_PROXY": [
+                    {"start_ts": late_stress_start.isoformat(), "end_ts": self.end_ts.isoformat()},
+                ],
+            }
+        if self.regime_type == "funding_dislocation":
+            peak_start = self.start_ts + (duration * 0.08)
+            peak_end = self.start_ts + (duration * 0.70)
+            norm_start = self.start_ts + (duration * 0.20)
+            norm_end = self.end_ts + FUNDING_INTERVAL
+            return {
+                "FND_DISLOC": [
+                    {"start_ts": peak_start.isoformat(), "end_ts": peak_end.isoformat()},
+                ],
+                "FUNDING_FLIP": [
+                    {"start_ts": peak_start.isoformat(), "end_ts": peak_end.isoformat()},
+                ],
+                "FUNDING_NORMALIZATION_TRIGGER": [
+                    {"start_ts": norm_start.isoformat(), "end_ts": norm_end.isoformat()},
+                ],
+            }
+        if self.regime_type == "deleveraging_burst":
+            shock_end = self.start_ts + (duration * 0.35)
+            flow_start = self.start_ts + (duration * 0.18)
+            flow_end = self.start_ts + (duration * 0.82)
+            return {
+                "DELEVERAGING_WAVE": [
+                    {"start_ts": self.start_ts.isoformat(), "end_ts": self.end_ts.isoformat()},
+                ],
+                "OI_FLUSH": [
+                    {"start_ts": self.start_ts.isoformat(), "end_ts": shock_end.isoformat()},
+                ],
+                "FORCED_FLOW_EXHAUSTION": [
+                    {"start_ts": flow_start.isoformat(), "end_ts": flow_end.isoformat()},
+                ],
+                "CLIMAX_VOLUME_BAR": [
+                    {"start_ts": self.start_ts.isoformat(), "end_ts": shock_end.isoformat()},
+                ],
+            }
+        if self.regime_type == "post_deleveraging_rebound":
+            settle_start = self.start_ts + (duration * 0.18)
+            window_end = self.end_ts + pd.Timedelta(hours=2)
+            return {
+                "POST_DELEVERAGING_REBOUND": [
+                    {"start_ts": settle_start.isoformat(), "end_ts": window_end.isoformat()},
+                ],
+                "LIQUIDATION_EXHAUSTION_REVERSAL": [
+                    {"start_ts": settle_start.isoformat(), "end_ts": window_end.isoformat()},
+                ],
+            }
+        return {}
 
     def to_record(self) -> Dict[str, Any]:
         expectations = REGIME_EXPECTATIONS.get(self.regime_type, {})
@@ -256,8 +303,29 @@ def generate_symbol_frames(
             spread_bps[mask] += 1.5
         elif segment.regime_type == "funding_dislocation":
             fmask = _funding_mask(index, segment, funding_index)
-            funding_rate[fmask] += segment.sign * 0.00035 * segment.amplitude
-            basis_bps[mask] += segment.sign * 18.0
+            if fmask.any():
+                funding_len = int(fmask.sum())
+                extreme_level = 0.0018 * segment.amplitude
+                normalized_level = 0.00008 * max(segment.amplitude, 1.0)
+                peak_bars = max(1, int(np.ceil(funding_len * 0.50)))
+                cooloff_bars = max(0, funding_len - peak_bars)
+                funding_profile = np.concatenate(
+                    [
+                        np.full(peak_bars, extreme_level),
+                        np.linspace(
+                            extreme_level * 0.18,
+                            normalized_level,
+                            cooloff_bars,
+                            endpoint=True,
+                        ),
+                    ]
+                )[:funding_len]
+                funding_rate[fmask] += segment.sign * funding_profile
+            basis_bps[mask] += (
+                segment.sign
+                * (18.0 + (12.0 * np.sin(np.pi * np.clip(phase, 0.0, 1.0))))
+                * segment.amplitude
+            )
             volume_mult[mask] *= 1.15
             orderflow_bias[mask] += segment.sign * 0.03
         elif segment.regime_type == "trend_acceleration_exhaustion":
@@ -387,37 +455,55 @@ def generate_symbol_frames(
         elif segment.regime_type == "deleveraging_burst":
             shock_len = int(max(2, np.ceil(window_len * 0.70)))
             relief_len = max(1, window_len - shock_len)
+            crash_len = min(shock_len, max(3, int(np.ceil(window_len * 0.16))))
+            plateau_len = max(1, shock_len - crash_len)
             local = np.zeros(window_len)
-            local[:shock_len] -= 0.0023 * segment.amplitude
-            local[shock_len:] += 0.0022 * segment.amplitude
+            local[:crash_len] -= 0.0042 * segment.amplitude
+            local[crash_len:shock_len] -= 0.0020 * segment.amplitude
+            local[shock_len:] += 0.0028 * segment.amplitude
             returns[mask] += local
 
+            peak_oi_drop = base_oi * 0.18 * segment.amplitude
             oi_profile = np.concatenate(
                 [
-                    np.linspace(0.0, base_oi * 0.08 * segment.amplitude, shock_len, endpoint=False),
+                    np.linspace(0.0, peak_oi_drop * 0.78, crash_len, endpoint=False),
                     np.linspace(
-                        base_oi * 0.08 * segment.amplitude,
-                        base_oi * 0.05 * segment.amplitude,
+                        peak_oi_drop * 0.78,
+                        peak_oi_drop,
+                        plateau_len,
+                        endpoint=False,
+                    ),
+                    np.linspace(
+                        peak_oi_drop,
+                        peak_oi_drop * 0.44,
                         relief_len,
                     ),
                 ]
             )
             liq_profile = np.concatenate(
                 [
-                    np.linspace(2.5e5, 2.2e6 * segment.amplitude, shock_len, endpoint=False),
-                    np.linspace(2.0e5 * segment.amplitude, 0.0, relief_len),
+                    np.linspace(4.0e5, 3.0e6 * segment.amplitude, crash_len, endpoint=False),
+                    np.linspace(
+                        3.0e6 * segment.amplitude,
+                        1.9e6 * segment.amplitude,
+                        plateau_len,
+                        endpoint=False,
+                    ),
+                    np.linspace(3.5e5 * segment.amplitude, 0.0, relief_len),
                 ]
             )
             vol_profile = np.concatenate(
                 [
-                    np.full(shock_len, 1.35),
-                    np.linspace(1.08, 0.82, relief_len),
+                    np.full(crash_len, 1.65),
+                    np.full(plateau_len, 1.45),
+                    np.linspace(1.18, 0.82, relief_len),
                 ]
             )
             wick_profile = np.concatenate(
                 [
-                    np.full(shock_len, 1.35),
-                    np.linspace(1.30, 1.65, relief_len),
+                    np.full(crash_len, 1.65),
+                    np.full(plateau_len, 1.45),
+                    np.linspace(1.35, 1.90, relief_len),
                 ]
             )
 
@@ -425,30 +511,38 @@ def generate_symbol_frames(
             liquidation_notional[mask] += liq_profile[:window_len]
             volume_mult[mask] *= vol_profile[:window_len]
             wick_mult[mask] *= wick_profile[:window_len]
+            spread_bps[mask] += np.concatenate(
+                [
+                    np.full(crash_len, 3.8),
+                    np.full(plateau_len, 2.4),
+                    np.full(relief_len, 1.2),
+                ]
+            )[:window_len]
             orderflow_bias[mask] -= 0.12 * segment.amplitude
         elif segment.regime_type == "post_deleveraging_rebound":
             # Rebound after deleveraging: positive returns, declining volume, elevated wicks
             rebound_len = int(max(2, np.ceil(window_len * 0.60)))
             drift_len = max(1, window_len - rebound_len)
             local = np.zeros(window_len)
-            local[:rebound_len] += segment.sign * 0.0018 * segment.amplitude
-            local[rebound_len:] += segment.sign * 0.0004 * segment.amplitude
+            local[:rebound_len] += segment.sign * 0.0027 * segment.amplitude
+            local[rebound_len:] += segment.sign * 0.0007 * segment.amplitude
             returns[mask] += local
 
             vol_profile = np.concatenate(
                 [
-                    np.linspace(1.25, 0.95, rebound_len, endpoint=False),
-                    np.full(drift_len, 0.90),
+                    np.linspace(1.32, 0.96, rebound_len, endpoint=False),
+                    np.full(drift_len, 0.88),
                 ]
             )
             wick_profile = np.concatenate(
                 [
-                    np.linspace(1.45, 1.15, rebound_len, endpoint=False),
-                    np.full(drift_len, 1.05),
+                    np.linspace(1.65, 1.24, rebound_len, endpoint=False),
+                    np.full(drift_len, 1.10),
                 ]
             )
             volume_mult[mask] *= vol_profile[:window_len]
             wick_mult[mask] *= wick_profile[:window_len]
+            spread_bps[mask] = np.maximum(spread_bps[mask] - 0.8, 0.8)
             orderflow_bias[mask] += 0.10 * segment.sign * segment.amplitude
 
     close = base_price * np.exp(np.cumsum(returns))

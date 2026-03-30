@@ -18,6 +18,7 @@ from project.spec_validation.search import (
     resolve_entry_lags,
     resolve_execution_templates,
     resolve_filter_templates,
+    resolve_templates,
     validate_search_spec_doc,
 )
 
@@ -34,6 +35,7 @@ __all__ = [
     "resolve_entry_lags",
     "resolve_execution_templates",
     "resolve_filter_templates",
+    "resolve_templates",
     "run_all_validations",
     "validate_search_spec_doc",
     "validate_grammar",

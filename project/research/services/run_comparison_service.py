@@ -8,6 +8,7 @@ from typing import Any, Dict, Mapping, Sequence
 import pandas as pd
 
 from project.artifacts import phase2_diagnostics_path
+from project.core.exceptions import DataIntegrityError
 
 
 DEFAULT_DRIFT_THRESHOLDS: Dict[str, float] = {
@@ -51,9 +52,11 @@ def _read_json(path: Path) -> Dict[str, Any]:
         return {}
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return {}
-    return payload if isinstance(payload, dict) else {}
+    except (OSError, json.JSONDecodeError) as exc:
+        raise DataIntegrityError(f"Failed to read comparison json artifact {path}: {exc}") from exc
+    if not isinstance(payload, dict):
+        raise DataIntegrityError(f"Comparison json artifact {path} did not contain an object payload")
+    return payload
 
 
 def _as_int(value: Any) -> int:
@@ -75,8 +78,8 @@ def _read_parquet(path: Path) -> pd.DataFrame:
         return pd.DataFrame()
     try:
         return pd.read_parquet(path)
-    except Exception:
-        return pd.DataFrame()
+    except Exception as exc:
+        raise DataIntegrityError(f"Failed to read comparison parquet artifact {path}: {exc}") from exc
 
 
 def _series_median(df: pd.DataFrame, column: str, default: float = 0.0) -> float:

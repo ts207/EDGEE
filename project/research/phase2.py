@@ -600,6 +600,10 @@ def assign_event_split_labels(
     except Exception:
         if str(run_mode).lower() in {"production", "promotion"}:
             raise
+        log.warning(
+            "Event split assignment failed in research mode; marking rows non-promotable",
+            exc_info=True,
+        )
         out["split_label"] = "train"
         out["non_promotable"] = True
     return out
@@ -698,5 +702,6 @@ def _read_csv_or_parquet(path: Path) -> pd.DataFrame:
         if path.suffix.lower() == ".parquet" and HAS_PYARROW:
             return pd.read_parquet(path)
         return pd.read_csv(path)
-    except Exception:
+    except Exception as exc:
+        log.warning("Failed to read tabular artifact %s: %s", path, exc)
         return pd.DataFrame()

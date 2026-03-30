@@ -4,9 +4,25 @@ reports_dir: forced_flow_and_exhaustion
 events_file: forced_flow_and_exhaustion_events.parquet
 signal_column: post_deleveraging_rebound_event
 parameters:
+  threshold_window: 2880
+  oi_drop_quantile: 0.80
+  liquidation_quantile: 0.85
+  spread_quantile: 0.70
+  return_quantile: 0.75
+  wick_quantile: 0.70
   rebound_window_bars: 12
   rebound_window: 6
+  rebound_quantile: 0.70
+  reversal_window: 3
+  reversal_quantile: 0.65
+  oi_drop_abs_min: 5.0
+  liquidation_abs_min: 25.0
+  liquidation_multiplier: 0.9
+  return_abs_min: 0.0025
+  spread_abs_min: 5.0
+  cluster_window: 12
   rebound_return_min: 0.001
+  wick_ratio_min: 0.55
   rv_peak_decay_ratio: 1.01
   liq_cooldown_ratio: 0.55
   liquidation_cooldown_abs_max: 100000.0

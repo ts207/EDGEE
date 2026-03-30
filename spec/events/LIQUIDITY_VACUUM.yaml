@@ -11,11 +11,18 @@ parameters:
   profile: lenient
   min_events_calibration: 1
   shock_quantiles: 0.5,0.6,0.7
+  def_version: v1
+  shock_quantile: 0.99
+  shock_threshold_mode: rolling
   volume_window: 24
   range_window: 24
   vol_ratio_floor: 0.95
   range_multiplier: 1.05
   min_vacuum_bars: 1
+  max_vacuum_bars: 96
+  post_horizon_bars: 96
+  auc_horizon_bars: 96
+  range_expansion_threshold: 0.02
   merge_gap_bars: 2
   cooldown_bars: 12
   anchor_rule: max_intensity

@@ -165,7 +165,9 @@ def hypotheses_to_bridge_candidates(
     out["kill_switch_count"] = (
         filtered["kill_switch_count"] if "kill_switch_count" in filtered.columns else 0
     )
-    out["kill_switch_count"] = out["kill_switch_count"].astype(int)
+    out["kill_switch_count"] = pd.to_numeric(
+        out["kill_switch_count"], errors="coerce"
+    ).fillna(0).astype(int)
 
     out["delta_adverse_mean"] = filtered["mae_mean_bps"] / 10000.0
     out["delta_opportunity_mean"] = filtered["mfe_mean_bps"] / 10000.0

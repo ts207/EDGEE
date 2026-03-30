@@ -44,3 +44,31 @@ def test_compose_event_config_drops_incompatible_liquidity_template():
     assert cfg.family == "LIQUIDITY_STRESS"
     assert cfg.legacy_family
     assert cfg.templates == ("stop_run_repair",)
+
+
+def test_compose_event_config_preserves_source_spec_parameters_missing_from_unified_registry():
+    depth_cfg = compose_event_config("DEPTH_COLLAPSE")
+    assert depth_cfg.parameters["spread_weight"] == 0.45
+    assert depth_cfg.parameters["rv_weight"] == 0.35
+    assert depth_cfg.parameters["depth_weight"] == 0.2
+
+    funding_cfg = compose_event_config("FUNDING_NORMALIZATION_TRIGGER")
+    assert funding_cfg.parameters["min_prior_extreme_abs"] == 0.0004
+
+
+def test_compose_event_config_surfaces_detector_defaults_and_runtime_contract_fields():
+    flow_cfg = compose_event_config("FORCED_FLOW_EXHAUSTION")
+    assert flow_cfg.parameters["oi_drop_quantile"] == 0.88
+    assert flow_cfg.parameters["liquidation_quantile"] == 0.92
+    assert flow_cfg.parameters["rv_decay_ratio"] == 0.99
+    assert flow_cfg.parameters["min_spacing"] == 32
+
+    rebound_cfg = compose_event_config("POST_DELEVERAGING_REBOUND")
+    assert rebound_cfg.parameters["wick_quantile"] == 0.70
+    assert rebound_cfg.parameters["cluster_window"] == 12
+    assert rebound_cfg.parameters["wick_ratio_min"] == 0.55
+
+    liquidity_cfg = compose_event_config("LIQUIDITY_VACUUM")
+    assert liquidity_cfg.parameters["shock_quantile"] == 0.99
+    assert liquidity_cfg.parameters["shock_threshold_mode"] == "rolling"
+    assert liquidity_cfg.parameters["max_vacuum_bars"] == 96

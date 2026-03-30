@@ -10,6 +10,7 @@ from typing import Any, Dict, Iterable, List
 import pandas as pd
 
 from project.core.config import get_data_root
+from project.core.exceptions import DataIntegrityError
 from project.io.utils import ensure_dir, write_parquet
 from project.specs.manifest import load_run_manifest
 
@@ -520,8 +521,10 @@ def build_tested_regions_snapshot(
                 trigger_payload = _parse_json_payload(row.get("trigger_payload"))
                 if trigger_payload:
                     trigger_payload_by_hypothesis[hypothesis_id] = trigger_payload
-        except Exception:
-            trigger_payload_by_hypothesis = {}
+        except Exception as exc:
+            raise DataIntegrityError(
+                f"Failed to read expanded hypotheses from {expanded_hypotheses_path}: {exc}"
+            ) from exc
 
     records: List[Dict[str, Any]] = []
     for row in df.to_dict(orient="records"):

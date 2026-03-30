@@ -3,17 +3,25 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Awaitable, Callable, Dict, List
+from typing import Any, Awaitable, Callable, Dict, List, Mapping
 
+from project.live.context_builder import build_live_trade_context
+from project.live.decision import DecisionOutcome, decide_trade_intent
 from project.live.kill_switch import KillSwitchManager, KillSwitchReason
+from project.live.memory import append_live_episode
 from project.live.oms import (
+    LiveOrder,
     OrderManager,
     OrderType,
     OrderStatus,
     OrderSubmissionFailed,
     build_live_order_from_strategy_result,
 )
+from project.live.order_planner import build_order_plan
+from project.live.event_detector import detect_live_event
+from project.live.thesis_store import ThesisStore
 from project.live.binance_client import BinanceFuturesClient
 from project.live.state import LiveStateStore
 from project.live.execution_attribution import summarize_execution_attribution_by
@@ -94,10 +102,17 @@ class LiveEngineRunner:
         self.strategy_runtime = dict(strategy_runtime or {})
         if order_manager is None and self.runtime_mode != "trading":
             self.order_manager = OrderManager()
-        
+
         # Keep the default ledger under the canonical project live directory.
         self.incubation_ledger = IncubationLedger(PROJECT_ROOT / "live" / "incubation_ledger.json")
-        
+
+        self._latest_book_ticker_by_symbol: Dict[str, Dict[str, Any]] = {}
+        self._latest_final_kline_by_key: Dict[tuple[str, str], Dict[str, Any]] = {}
+        self._decision_outcomes: List[DecisionOutcome] = []
+        self._auto_order_sequence = 0
+        self._thesis_store = self._load_thesis_store()
+        self._thesis_memory_root = self._resolve_memory_root()
+
         self._running = False
         self._tasks: List[asyncio.Task] = []
         self._kill_switch_task: asyncio.Task | None = None
@@ -130,7 +145,39 @@ class LiveEngineRunner:
             ),
             "runtime_mode": self.runtime_mode,
             "strategy_runtime_implemented": bool(self.strategy_runtime.get("implemented", False)),
+            "thesis_runtime_loaded": bool(self._thesis_store is not None),
+            "thesis_count_loaded": (
+                len(self._thesis_store.all()) if self._thesis_store is not None else 0
+            ),
         }
+
+    def _resolve_memory_root(self) -> Path | None:
+        memory_root = str(self.strategy_runtime.get("memory_root", "")).strip()
+        if not memory_root:
+            return None
+        return Path(memory_root)
+
+    def _load_thesis_store(self) -> ThesisStore | None:
+        thesis_path = str(self.strategy_runtime.get("thesis_path", "")).strip()
+        thesis_run_id = str(self.strategy_runtime.get("thesis_run_id", "")).strip()
+        load_latest = bool(self.strategy_runtime.get("load_latest_theses", False))
+        try:
+            if thesis_path:
+                return ThesisStore.from_path(thesis_path)
+            if thesis_run_id:
+                return ThesisStore.from_run_id(thesis_run_id)
+            if load_latest:
+                return ThesisStore.latest()
+        except FileNotFoundError:
+            _LOG.warning("Configured thesis store is unavailable for live runtime.")
+            return None
+        return None
+
+    def _strategy_runtime_enabled(self) -> bool:
+        return bool(self.strategy_runtime.get("implemented", False)) and self._thesis_store is not None
+
+    def latest_trade_intents(self) -> List[DecisionOutcome]:
+        return list(self._decision_outcomes)
 
     def _ensure_runtime_mode_known(self) -> None:
         if self.runtime_mode not in {"monitor_only", "trading"}:
@@ -352,10 +399,213 @@ class LiveEngineRunner:
                 "current_vol": 0.1, # Placeholder
                 "bucket_exposures": {},
                 "active_cluster_counts": cluster_counts,
+                "available_balance": float(acc.available_balance),
+                "exchange_status": str(acc.exchange_status),
             }
+
+    @staticmethod
+    def _event_value(event: Any, key: str, default: Any = None) -> Any:
+        if isinstance(event, Mapping):
+            return event.get(key, default)
+        return getattr(event, key, default)
+
+    def _allowed_submission_actions(self) -> set[str]:
+        configured = self.strategy_runtime.get("allowed_actions")
+        if isinstance(configured, list) and configured:
+            return {str(item).strip() for item in configured if str(item).strip()}
+        return {"probe", "trade_small"}
+
+    def _build_execution_env_snapshot(self) -> Dict[str, Any]:
+        return {
+            "runtime_mode": self.runtime_mode,
+            "exchange_status": str(self.state_store.account.exchange_status),
+        }
+
+    def _current_market_snapshot(
+        self,
+        *,
+        symbol: str,
+        timeframe: str,
+        close: float,
+        timestamp: str,
+        move_bps: float,
+    ) -> Dict[str, Any]:
+        ticker = self._latest_book_ticker_by_symbol.get(str(symbol).upper(), {})
+        bid = float(ticker.get("best_bid_price", 0.0) or 0.0)
+        ask = float(ticker.get("best_ask_price", 0.0) or 0.0)
+        spread_bps = 0.0
+        mid_price = float(close)
+        if bid > 0.0 and ask > 0.0:
+            mid_price = (bid + ask) / 2.0
+            spread_bps = ((ask - bid) / mid_price) * 10_000.0 if mid_price > 0.0 else 0.0
+        return {
+            "timestamp": str(timestamp),
+            "close": float(close),
+            "last_price": float(close),
+            "mid_price": float(mid_price),
+            "spread_bps": float(spread_bps),
+            "depth_usd": float(self.strategy_runtime.get("default_depth_usd", 50_000.0) or 50_000.0),
+            "tob_coverage": float(self.strategy_runtime.get("default_tob_coverage", 0.95) or 0.95),
+            "canonical_regime": "VOLATILITY" if abs(move_bps) >= 80.0 else "TRANSITION",
+            "microstructure_regime": "healthy" if spread_bps <= 5.0 else "degraded",
+            "expected_cost_bps": float(self.strategy_runtime.get("default_expected_cost_bps", 3.0) or 3.0),
+        }
+
+    def _record_live_decision_episode(self, outcome: DecisionOutcome) -> None:
+        if self._thesis_memory_root is None:
+            return
+        payload = {
+            "timestamp": outcome.context.timestamp,
+            "symbol": outcome.context.symbol,
+            "event_family": outcome.context.event_family,
+            "event_side": outcome.context.event_side,
+            "action": outcome.trade_intent.action,
+            "thesis_id": outcome.trade_intent.thesis_id,
+            "support_score": float(outcome.trade_intent.support_score),
+            "contradiction_penalty": float(outcome.trade_intent.contradiction_penalty),
+            "confidence_band": outcome.trade_intent.confidence_band,
+        }
+        append_live_episode(self._thesis_memory_root, payload)
+
+    async def _submit_trade_intent_if_enabled(
+        self,
+        *,
+        outcome: DecisionOutcome,
+        market_state: Dict[str, Any],
+    ) -> Dict[str, Any] | None:
+        if self.runtime_mode != "trading":
+            return None
+        if not bool(self.strategy_runtime.get("auto_submit", False)):
+            return None
+        if outcome.trade_intent.action not in self._allowed_submission_actions():
+            return {
+                "accepted": False,
+                "blocked_by": "action_not_enabled",
+                "action": outcome.trade_intent.action,
+            }
+        plan = build_order_plan(
+            intent=outcome.trade_intent,
+            client_order_id=self._next_auto_order_id(outcome.context.symbol),
+            market_state=market_state | {
+                "expected_return_bps": float(
+                    outcome.ranked_matches[0].thesis.evidence.estimate_bps or 0.0
+                ),
+                "expected_adverse_bps": float(
+                    abs(outcome.ranked_matches[0].thesis.expected_response.get("stop_value", 0.0) or 0.0)
+                    * 10_000.0
+                ),
+                "expected_net_edge_bps": float(
+                    outcome.ranked_matches[0].thesis.evidence.net_expectancy_bps or 0.0
+                ),
+            },
+            portfolio_state=outcome.context.portfolio_state,
+            max_notional_fraction=float(
+                self.strategy_runtime.get("max_notional_fraction", 0.10) or 0.10
+            ),
+        )
+        if not plan.accepted or plan.order is None:
+            return {
+                "accepted": False,
+                "blocked_by": plan.blocked_by,
+                "plan": plan.plan,
+            }
+        return await self.order_manager.submit_order_async(
+            plan.order,
+            kill_switch_manager=self.kill_switch,
+            market_state=market_state,
+            max_spread_bps=float(self.strategy_runtime.get("max_spread_bps", 5.0) or 5.0),
+            min_depth_usd=float(self.strategy_runtime.get("min_depth_usd", 25_000.0) or 25_000.0),
+            min_tob_coverage=float(self.strategy_runtime.get("min_tob_coverage", 0.80) or 0.80),
+        )
+
+    def _next_auto_order_id(self, symbol: str) -> str:
+        self._auto_order_sequence += 1
+        return f"thesis-{str(symbol).lower()}-{self._auto_order_sequence:06d}"
+
+    async def _process_kline_for_thesis_runtime(self, event: Any) -> None:
+        if not self._strategy_runtime_enabled():
+            return
+        timeframe = str(self._event_value(event, "timeframe", "")).strip()
+        symbol = str(self._event_value(event, "symbol", "")).upper().strip()
+        is_final = bool(self._event_value(event, "is_final", False))
+        if not symbol or not timeframe or not is_final:
+            return
+
+        close = float(self._event_value(event, "close", 0.0) or 0.0)
+        volume = float(
+            self._event_value(event, "quote_volume", self._event_value(event, "volume", 0.0)) or 0.0
+        )
+        timestamp = self._event_value(event, "timestamp")
+        if timestamp is None:
+            timestamp = datetime.now(timezone.utc).isoformat()
+        elif hasattr(timestamp, "isoformat"):
+            timestamp = timestamp.isoformat()
+
+        prior = self._latest_final_kline_by_key.get((symbol, timeframe))
+        previous_close = float(prior.get("close", 0.0) or 0.0) if prior else None
+        supported = self.strategy_runtime.get("supported_event_families", ["VOL_SHOCK"])
+        detector = detect_live_event(
+            symbol=symbol,
+            timeframe=timeframe,
+            current_close=close,
+            previous_close=previous_close,
+            volume=volume,
+            supported_event_families=supported if isinstance(supported, list) else ["VOL_SHOCK"],
+            detector_config=self.strategy_runtime.get("event_detector", {}),
+        )
+        self._latest_final_kline_by_key[(symbol, timeframe)] = {
+            "close": close,
+            "timestamp": timestamp,
+        }
+        if detector is None:
+            return
+
+        market_state = self._current_market_snapshot(
+            symbol=symbol,
+            timeframe=timeframe,
+            close=close,
+            timestamp=str(timestamp),
+            move_bps=float(detector.features.get("move_bps", 0.0) or 0.0),
+        )
+        context = build_live_trade_context(
+            timestamp=str(timestamp),
+            symbol=symbol,
+            timeframe=timeframe,
+            detected_event=detector,
+            market_features=market_state | dict(detector.features),
+            portfolio_state=self._get_portfolio_state_for_sizing(),
+            execution_env=self._build_execution_env_snapshot(),
+        )
+        outcome = decide_trade_intent(
+            context=context,
+            thesis_store=self._thesis_store,
+            policy_config=self.strategy_runtime.get("decision_policy", {}),
+            include_pending=bool(self.strategy_runtime.get("include_pending_theses", self.runtime_mode != "trading")),
+        )
+        self._decision_outcomes.append(outcome)
+        self._decision_outcomes = self._decision_outcomes[-100:]
+        self._record_live_decision_episode(outcome)
+        await self._submit_trade_intent_if_enabled(outcome=outcome, market_state=market_state)
 
     def on_order_fill(self, client_order_id: str, fill_qty: float, fill_price: float) -> None:
         self.order_manager.on_fill(client_order_id, fill_qty=fill_qty, fill_price=fill_price)
+        if self._thesis_memory_root is not None:
+            for order in reversed(self.order_manager.order_history):
+                if order.client_order_id != client_order_id:
+                    continue
+                append_live_episode(
+                    self._thesis_memory_root,
+                    {
+                        "timestamp": order.updated_at.isoformat(),
+                        "symbol": order.symbol,
+                        "action": str(order.metadata.get("trade_intent_action", "filled")).strip(),
+                        "thesis_id": str(order.metadata.get("thesis_id", "")).strip(),
+                        "realized_net_edge_bps": float(
+                            order.metadata.get("expected_net_edge_bps", 0.0) or 0.0
+                        ),
+                    },
+                )
+                break
         self.persist_execution_quality_report()
 
     def execution_quality_summary(self) -> Dict[str, float]:
@@ -499,6 +749,7 @@ class LiveEngineRunner:
                     f"Consumed kline: {event.symbol} {event.timeframe} close={event.close} final={event.is_final}"
                 )
                 self.health_monitor.on_event(event.symbol, f"kline:{event.timeframe}")
+                await self._process_kline_for_thesis_runtime(event)
                 self.data_manager.kline_queue.task_done()
             except asyncio.CancelledError:
                 break
@@ -513,6 +764,15 @@ class LiveEngineRunner:
                 _LOG.debug(
                     f"Consumed ticker: {event.symbol} bid={event.best_bid_price} ask={event.best_ask_price}"
                 )
+                self._latest_book_ticker_by_symbol[str(event.symbol).upper()] = {
+                    "best_bid_price": float(event.best_bid_price),
+                    "best_ask_price": float(event.best_ask_price),
+                    "timestamp": (
+                        event.timestamp.isoformat()
+                        if hasattr(event.timestamp, "isoformat")
+                        else str(event.timestamp)
+                    ),
+                }
                 self.health_monitor.on_event(event.symbol, "ticker")
                 self.data_manager.ticker_queue.task_done()
             except asyncio.CancelledError:

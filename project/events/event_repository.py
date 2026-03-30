@@ -61,7 +61,8 @@ def _read_phase1_events(data_root: Path, run_id: str, spec: EventRegistrySpec) -
                 return pd.read_csv(path)
             except Exception:
                 return pd.read_parquet(path)
-        except Exception:
+        except Exception as exc:
+            _LOG.warning("Failed to read phase1 events from %s: %s", path, exc)
             continue
 
     return pd.DataFrame()

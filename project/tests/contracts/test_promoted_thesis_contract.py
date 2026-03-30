@@ -1,0 +1,53 @@
+from __future__ import annotations
+
+from project.live.contracts import PromotedThesis, ThesisEvidence, ThesisLineage
+
+
+def test_promoted_thesis_contract_model_dump() -> None:
+    thesis = PromotedThesis(
+        thesis_id="thesis::run_1::cand_1",
+        status="active",
+        symbol_scope={
+            "mode": "single_symbol",
+            "symbols": ["BTCUSDT"],
+            "candidate_symbol": "BTCUSDT",
+        },
+        timeframe="5m",
+        event_family="VOL_SHOCK",
+        event_side="long",
+        required_context={"symbol": "BTCUSDT", "event_type": "VOL_SHOCK"},
+        supportive_context={"canonical_regime": "VOLATILITY"},
+        expected_response={"direction": "long", "net_expectancy_bps": 9.0},
+        invalidation={"metric": "adverse_proxy", "operator": ">", "value": 0.02},
+        risk_notes=["direction:long"],
+        evidence=ThesisEvidence(
+            sample_size=120,
+            validation_samples=60,
+            test_samples=60,
+            estimate_bps=12.0,
+            net_expectancy_bps=9.0,
+            q_value=0.01,
+            stability_score=0.9,
+            cost_survival_ratio=1.0,
+            tob_coverage=0.95,
+            rank_score=1.0,
+            promotion_track="deploy",
+            policy_version="v1",
+            bundle_version="b1",
+        ),
+        lineage=ThesisLineage(
+            run_id="run_1",
+            candidate_id="cand_1",
+            hypothesis_id="hyp_1",
+            plan_row_id="plan_1",
+            blueprint_id="bp_1",
+            proposal_id="proposal_1",
+        ),
+    )
+
+    payload = thesis.model_dump()
+
+    assert payload["status"] == "active"
+    assert payload["timeframe"] == "5m"
+    assert payload["evidence"]["net_expectancy_bps"] == 9.0
+    assert payload["lineage"]["blueprint_id"] == "bp_1"

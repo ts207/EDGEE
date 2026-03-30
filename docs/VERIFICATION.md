@@ -52,7 +52,7 @@ Run the same contract block:
 .venv/bin/python -m project.scripts.run_researcher_verification --mode contracts
 ```
 
-Then inspect whether the changed file is one of the forbidden contract surfaces in `AGENT_CONTRACT.md`. If yes, stop and escalate instead of continuing.
+Then inspect whether the changed file is one of the forbidden contract surfaces in `agent_operating_contract.md`. If yes, stop and escalate instead of continuing.
 
 ## After Any Bounded Experiment
 

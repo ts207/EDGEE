@@ -4,7 +4,9 @@ import json
 from pathlib import Path
 
 import pandas as pd
+import pytest
 
+from project.core.exceptions import DataIntegrityError
 from project.research.services import run_comparison_service as svc
 
 
@@ -256,6 +258,38 @@ def test_compare_run_reports_reads_json_files(tmp_path):
     }
     assert out["regime_effectiveness"]["delta"]["regimes_total"] == 1
     assert out["regime_effectiveness"]["top_regime_changed"] is True
+
+
+def test_compare_run_reports_raises_on_corrupted_present_artifact(tmp_path: Path):
+    baseline_phase2 = tmp_path / "baseline_phase2.json"
+    candidate_phase2 = tmp_path / "candidate_phase2.json"
+    baseline_promo = tmp_path / "baseline_promo.json"
+    candidate_promo = tmp_path / "candidate_promo.json"
+    baseline_edge = tmp_path / "baseline_edge.parquet"
+    candidate_edge = tmp_path / "candidate_edge.parquet"
+    baseline_regime = tmp_path / "baseline_regime.json"
+    candidate_regime = tmp_path / "candidate_regime.json"
+
+    baseline_phase2.write_text("{not-json", encoding="utf-8")
+    candidate_phase2.write_text(json.dumps({}), encoding="utf-8")
+    baseline_promo.write_text(json.dumps({}), encoding="utf-8")
+    candidate_promo.write_text(json.dumps({}), encoding="utf-8")
+    baseline_regime.write_text(json.dumps({}), encoding="utf-8")
+    candidate_regime.write_text(json.dumps({}), encoding="utf-8")
+    pd.DataFrame([]).to_parquet(baseline_edge)
+    pd.DataFrame([]).to_parquet(candidate_edge)
+
+    with pytest.raises(DataIntegrityError):
+        svc.compare_run_reports(
+            baseline_phase2_path=baseline_phase2,
+            candidate_phase2_path=candidate_phase2,
+            baseline_promotion_path=baseline_promo,
+            candidate_promotion_path=candidate_promo,
+            baseline_edge_candidates_path=baseline_edge,
+            candidate_edge_candidates_path=candidate_edge,
+            baseline_regime_effectiveness_path=baseline_regime,
+            candidate_regime_effectiveness_path=candidate_regime,
+        )
 
 
 def test_build_run_comparison_compatibility_fails_closed_when_cost_identity_missing():

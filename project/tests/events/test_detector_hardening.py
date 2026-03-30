@@ -689,6 +689,38 @@ def test_funding_normalization_preserves_source_sign_and_semantic_intensity():
     assert (events["evt_signal_intensity"] > 0.0).all()
 
 
+def test_funding_normalization_ignores_low_magnitude_percentile_artifacts():
+    n = 420
+    funding_rate_scaled = np.full(n, 0.00003, dtype=float)
+    funding_abs_pct = np.full(n, 20.0, dtype=float)
+    funding_abs = np.full(n, 0.00003, dtype=float)
+    funding_rate_scaled[260:320] = 0.00035
+    funding_abs_pct[260:320] = 97.0
+    funding_abs[260:320] = 0.00035
+    funding_rate_scaled[320:] = 0.00002
+    funding_abs_pct[320:] = 25.0
+    funding_abs[320:] = 0.00002
+
+    df = pd.DataFrame(
+        {
+            "timestamp": pd.date_range("2024-01-01", periods=n, freq="5min", tz="UTC"),
+            "funding_rate_scaled": funding_rate_scaled,
+            "funding_abs_pct": funding_abs_pct,
+            "funding_abs": funding_abs,
+        }
+    )
+
+    events = FundingNormalizationDetector().detect(
+        df,
+        symbol="BTCUSDT",
+        extreme_pct=95.0,
+        normalization_pct=50.0,
+        normalization_lookback=96,
+    )
+
+    assert events.empty
+
+
 def test_support_resistance_break_is_implemented():
     n = 420
     close = np.full(n, 100.0, dtype=float)

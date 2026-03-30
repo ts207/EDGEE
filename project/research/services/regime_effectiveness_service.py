@@ -42,18 +42,6 @@ class RegimeEffectivenessArtifacts:
     summary: Dict[str, Any]
 
 
-def _resolve_phase2_candidates_path(*, run_id: str, data_root: Path) -> Path:
-    phase2_root = data_root / "reports" / "phase2" / run_id
-    candidates = [
-        phase2_root / "phase2_candidates.parquet",
-        phase2_root / "search_engine" / "phase2_candidates.parquet",
-    ]
-    for candidate in candidates:
-        if candidate.exists():
-            return candidate
-    return candidates[0]
-
-
 def _metric_column(frame: pd.DataFrame, candidates: Iterable[str]) -> str | None:
     for column in candidates:
         if column in frame.columns:
@@ -361,7 +349,7 @@ def write_regime_effectiveness_reports(
 
 
 def build_reports_for_run(*, run_id: str, data_root: Path) -> RegimeEffectivenessArtifacts:
-    phase2_path = _resolve_phase2_candidates_path(run_id=run_id, data_root=data_root)
+    phase2_path = data_root / "reports" / "phase2" / run_id / "search_engine" / "phase2_candidates.parquet"
     phase2 = read_parquet(phase2_path)
     return write_regime_effectiveness_reports(run_id=run_id, data_root=data_root, episodes=phase2)
 

@@ -11,6 +11,7 @@ from typing import Any, Dict, List, Optional
 import pandas as pd
 
 from project import PROJECT_ROOT
+from project.contracts.schemas import normalize_dataframe_for_schema
 from project.core.config import get_data_root
 from project.io.utils import ensure_dir, read_parquet, write_parquet
 from project.research.promotion import (
@@ -704,7 +705,7 @@ def execute_promotion(config: PromotionConfig) -> PromotionServiceResult:
         ).strip()
         candidate_origin_run_id = str(source_manifest.get("candidate_origin_run_id", "")).strip()
         program_id = str(source_manifest.get("program_id", config.program_id)).strip()
-        if source_run_mode in {"discovery", "research"}:
+        if source_run_mode == "discovery":
             source_run_mode = "exploratory"
         is_exploratory = source_run_mode == "exploratory"
         is_confirmatory = source_run_mode in {
@@ -883,6 +884,10 @@ def execute_promotion(config: PromotionConfig) -> PromotionServiceResult:
             [bundle_to_flat_record(bundle) for bundle in evidence_bundles]
         )
         evidence_bundle_summary = annotate_regime_metadata(evidence_bundle_summary)
+        evidence_bundle_summary = normalize_dataframe_for_schema(
+            evidence_bundle_summary,
+            "evidence_bundle_summary",
+        )
         decision_cols = [
             column
             for column in [
@@ -906,7 +911,10 @@ def execute_promotion(config: PromotionConfig) -> PromotionServiceResult:
             ]
             if column in evidence_bundle_summary.columns
         ]
-        promotion_decisions = evidence_bundle_summary.reindex(columns=decision_cols)
+        promotion_decisions = normalize_dataframe_for_schema(
+            evidence_bundle_summary.reindex(columns=decision_cols),
+            "promotion_decisions",
+        )
 
         summary_rows = pd.DataFrame(
             columns=["candidate_id", "event_type", "stage", "statistic", "threshold", "pass_fail"]
@@ -950,6 +958,20 @@ def execute_promotion(config: PromotionConfig) -> PromotionServiceResult:
             diagnostics=diagnostics,
             promotion_summary=summary_rows,
         )
+        from project.research.live_export import export_promoted_theses_for_run
+
+        thesis_export = export_promoted_theses_for_run(
+            config.run_id,
+            data_root=get_data_root(),
+            bundles=evidence_bundles,
+            promoted_df=promoted_df,
+        )
+        diagnostics["live_thesis_export"] = {
+            "output_path": str(thesis_export.output_path),
+            "thesis_count": int(thesis_export.thesis_count),
+            "active_count": int(thesis_export.active_count),
+            "pending_count": int(thesis_export.pending_count),
+        }
         finalize_manifest(manifest, "success", stats=diagnostics)
         return PromotionServiceResult(0, out_dir, audit_df, promoted_df, diagnostics)
     except Exception as exc:

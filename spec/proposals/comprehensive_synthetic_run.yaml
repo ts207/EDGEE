@@ -38,3 +38,9 @@ states:
     - OVERBOUGHT_STATE
     - CROWDING_STATE
 knobs: {}
+
+discovery_profile: synthetic
+phase2_gate_profile: synthetic
+search_spec: synthetic_truth
+config_overlays:
+  - project/configs/synthetic_comprehensive_6m.yaml

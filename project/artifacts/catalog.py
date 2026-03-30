@@ -50,6 +50,22 @@ def blueprint_dir(run_id: str, root: Path | None = None) -> Path:
     return reports_dir(root) / "strategy_blueprints" / str(run_id)
 
 
+def live_thesis_root(root: Path | None = None) -> Path:
+    return data_root(root) / "live" / "theses"
+
+
+def live_thesis_dir(run_id: str, root: Path | None = None) -> Path:
+    return live_thesis_root(root) / str(run_id)
+
+
+def promoted_theses_path(run_id: str, root: Path | None = None) -> Path:
+    return live_thesis_dir(run_id, root) / "promoted_theses.json"
+
+
+def live_thesis_index_path(root: Path | None = None) -> Path:
+    return live_thesis_root(root) / "index.json"
+
+
 def promotion_summary_path(run_id: str, root: Path | None = None) -> Path:
     return promotion_dir(run_id, root) / "promotion_summary.json"
 

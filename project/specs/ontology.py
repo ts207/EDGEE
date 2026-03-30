@@ -49,6 +49,8 @@ MATERIALIZED_STATE_COLUMNS_BY_ID: Dict[str, str] = {
     "CHOP_REGIME": "chop_regime",
     "TRENDING_STATE": "trending_state",
     "CHOP_STATE": "chop_state",
+    "OVERBOUGHT_STATE": "overbought_state",
+    "OVERSOLD_STATE": "oversold_state",
     "PULLBACK_STATE": "pullback_state",
     "FAILURE_STATE": "failure_state",
     "STRETCHED_STATE": "stretched_state",

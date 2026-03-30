@@ -531,11 +531,24 @@ def evaluate_hypothesis_batch(
         )
     )
 
+    invalid_reason_counts = (
+        df.loc[~df["valid"], "invalid_reason"]
+        .fillna("unknown")
+        .astype(str)
+        .value_counts()
+        .sort_index()
+        .to_dict()
+    )
+    invalid_summary = (
+        ", ".join(f"{reason}={count}" for reason, count in invalid_reason_counts.items())
+        if invalid_reason_counts
+        else "none"
+    )
     log.info(
-        "Evaluated %d hypotheses: %d valid, %d below min_sample_size=%d",
+        "Evaluated %d hypotheses: %d valid, %d invalid (%s)",
         len(hypotheses),
         int(df["valid"].sum()),
         int((~df["valid"]).sum()),
-        min_sample_size,
+        invalid_summary,
     )
     return df

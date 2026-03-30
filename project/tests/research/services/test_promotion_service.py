@@ -92,12 +92,21 @@ def test_run_promotion_service_smoke(monkeypatch, tmp_path):
                             "promotion_status": "promoted",
                             "promotion_track": "standard",
                         },
-                        "sample_definition": {"n_events": 100},
-                        "effect_estimates": {},
+                        "sample_definition": {
+                            "n_events": 100,
+                            "validation_samples": 50,
+                            "test_samples": 50,
+                            "symbol": "BTCUSDT",
+                        },
+                        "split_definition": {
+                            "split_scheme_id": "confirmatory",
+                            "bar_duration_minutes": 5,
+                        },
+                        "effect_estimates": {"estimate_bps": 8.0},
                         "uncertainty_estimates": {},
                         "stability_tests": {},
                         "falsification_results": {},
-                        "cost_robustness": {},
+                        "cost_robustness": {"net_expectancy_bps": 6.0},
                         "multiplicity_adjustment": {},
                     }
                 ),
@@ -122,9 +131,11 @@ def test_run_promotion_service_smoke(monkeypatch, tmp_path):
     assert any((tmp_path / "promotions").glob("promotion_statistical_audit.*"))
     assert any((tmp_path / "promotions").glob("promoted_candidates.*"))
     assert (tmp_path / "promotions" / "evidence_bundles.jsonl").exists()
+    assert (tmp_path / "live" / "theses" / "r1" / "promoted_theses.json").exists()
     assert "primary_reject_reason" in result.audit_df.columns
     assert "failed_gate_count" in result.audit_df.columns
     assert "decision_summary" in result.diagnostics
+    assert result.diagnostics["live_thesis_export"]["thesis_count"] == 1
 
 
 def test_run_promotion_service_fails_closed_when_promoted_row_lacks_evidence_bundle(

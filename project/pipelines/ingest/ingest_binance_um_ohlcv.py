@@ -32,7 +32,7 @@ Notes
   the difference between ``start`` and ``end_exclusive`` divided by
   the bar duration.  The end timestamp is exclusive to avoid
   double‑counting the last bar of the range.
-* Refer to ``docs/03_OPERATOR_WORKFLOW.md`` for a description of the
+* Refer to ``docs/research_workflow.md`` for a description of the
   ingestion stage in the broader research pipeline【681637863659256†L5-L18】.
 """
 

@@ -11,6 +11,6 @@ search_min_n: 8
 required_outputs:
   - synthetic/golden_synthetic_discovery/synthetic_generation_manifest.json
   - synthetic/golden_synthetic_discovery/synthetic_regime_segments.json
-  - reports/phase2/golden_synthetic_discovery/phase2_candidates.parquet
-  - reports/phase2/golden_synthetic_discovery/phase2_diagnostics.json
+  - reports/phase2/golden_synthetic_discovery/search_engine/phase2_candidates.parquet
+  - reports/phase2/golden_synthetic_discovery/search_engine/phase2_diagnostics.json
   - reliability/golden_synthetic_discovery_summary.json

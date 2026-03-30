@@ -9,6 +9,7 @@ from typing import Any, Dict
 import pandas as pd
 
 from project.core.config import get_data_root
+from project.core.exceptions import DataIntegrityError
 from project.domain.compiled_registry import get_domain_registry
 from project.research.experiment_engine import RegistryBundle
 from project.research.knowledge.memory import (
@@ -28,8 +29,9 @@ def _safe_read_legacy_ledger(path: Path) -> pd.DataFrame:
         return pd.DataFrame()
     try:
         return pd.read_parquet(path)
-    except Exception:
-        return pd.DataFrame()
+    except Exception as exc:
+        _LOG.warning("Failed to read legacy campaign ledger from %s", path, exc_info=True)
+        raise DataIntegrityError(f"Failed to read legacy campaign ledger from {path}: {exc}") from exc
 
 
 def _build_dynamic_quality_weights(

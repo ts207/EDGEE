@@ -119,7 +119,12 @@ def build_run_all_overrides(proposal: AgentProposal) -> Dict[str, Any]:
         "objective_name": proposal.objective_name,
         "promotion_profile": proposal.promotion_profile,
         "symbols": ",".join(proposal.symbols),
+        "discovery_profile": proposal.discovery_profile,
+        "phase2_gate_profile": proposal.phase2_gate_profile,
+        "search_spec": proposal.search_spec,
     }
+    if proposal.config_overlays:
+        overrides["config"] = list(proposal.config_overlays)
     if proposal.promotion_profile == "disabled":
         overrides["run_candidate_promotion"] = 0
     for key, value in sorted(proposal.knobs.items()):

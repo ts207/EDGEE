@@ -94,6 +94,9 @@ def prepare_funding_normalization_features(
     normalization_lookback = int(
         params.get("normalization_lookback", defaults["normalization_lookback"])
     )
+    min_prior_extreme_abs = float(
+        params.get("min_prior_extreme_abs", defaults["min_prior_extreme_abs"])
+    )
 
     recent_extreme = (
         (f_pct.shift(1) >= extreme_pct)
@@ -109,8 +112,18 @@ def prepare_funding_normalization_features(
         .max()
         .fillna(0.0)
     )
+    prior_extreme_abs = (
+        f_abs.shift(1)
+        .where(f_pct.shift(1) >= extreme_pct)
+        .rolling(window=normalization_lookback, min_periods=1)
+        .max()
+        .fillna(0.0)
+    )
     mask = (
-        (f_pct <= normalization_pct) & (f_pct.shift(1) > normalization_pct) & recent_extreme
+        (f_pct <= normalization_pct)
+        & (f_pct.shift(1) > normalization_pct)
+        & recent_extreme
+        & (prior_extreme_abs >= min_prior_extreme_abs)
     ).fillna(False)
     release_intensity = ((prior_extreme_pct - f_pct).clip(lower=0.0) / 100.0).fillna(0.0)
 
@@ -119,6 +132,7 @@ def prepare_funding_normalization_features(
         "funding_abs": f_abs,
         "funding_signed": funding_signed,
         "prior_extreme_pct": prior_extreme_pct,
+        "prior_extreme_abs": prior_extreme_abs,
         "signal_intensity": release_intensity,
         "mask": mask,
     }

@@ -758,7 +758,11 @@ def main() -> int:
             message = f"No candidates found for evaluation across all symbols for {event_type}. Skipping evaluation."
             logging.info(message)
             print(message, file=sys.stderr)
-            finalize_manifest(manifest, "success")
+            finalize_manifest(
+                manifest,
+                "warning",
+                stats={"candidate_count": 0, "evaluation_skipped": True, "skip_reason": "no_candidates"},
+            )
             return 1
 
         finalize_manifest(manifest, "success")

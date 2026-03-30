@@ -120,12 +120,16 @@ def _assert_cm_mapping_complete(symbols: List[str]) -> None:
     )
 
 
-def _assert_events_per_symbol(events_per_symbol: Dict[str, int]) -> None:
+def _assert_events_per_symbol(
+    events_per_symbol: Dict[str, int], *, fail_if_no_data: bool = True
+) -> None:
     """Raise ValueError if any symbol contributed 0 liquidation events after ingestion.
 
     Catches symbols that mapped correctly but returned no archive data (e.g. a CM
     contract with no liquidation coverage for the requested date range).
     """
+    if not fail_if_no_data:
+        return
     if not events_per_symbol:
         raise ValueError(
             "Per-symbol event validation failed [F-8]: events_per_symbol is empty — "
@@ -671,7 +675,9 @@ def main() -> int:
 
         # F-8: Post-loop — every symbol must have contributed at least one event.
         events_per_symbol = {s: int(stats["symbols"][s]["rows"]) for s in symbols}
-        _assert_events_per_symbol(events_per_symbol)
+        _assert_events_per_symbol(
+            events_per_symbol, fail_if_no_data=bool(int(args.fail_if_no_data))
+        )
 
         if int(args.fail_if_no_data) and total_rows == 0 and total_written_parts == 0:
             raise RuntimeError(

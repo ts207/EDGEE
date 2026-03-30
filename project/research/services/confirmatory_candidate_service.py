@@ -256,34 +256,11 @@ def _run_symbols(manifest: Dict[str, Any]) -> List[str]:
     return [token.strip() for token in raw.split(",") if token.strip()]
 
 
-def _resolve_phase2_candidates_path(data_root: Path, run_id: str) -> Path:
-    phase2_root = data_root / "reports" / "phase2" / run_id
-    candidates = [
-        phase2_root / "phase2_candidates.parquet",
-        phase2_root / "search_engine" / "phase2_candidates.parquet",
-    ]
-    for candidate in candidates:
-        if candidate.exists():
-            return candidate
-    return candidates[0]
-
-
 def _candidate_target_run_ids(data_root: Path) -> List[str]:
     out: List[str] = []
     reports_root = data_root / "reports" / "phase2"
-    if not reports_root.exists():
-        return out
-    seen: set[str] = set()
-    for pattern in ("*/phase2_candidates.parquet", "*/search_engine/phase2_candidates.parquet"):
-        for path in sorted(reports_root.glob(pattern)):
-            try:
-                run_id = path.relative_to(reports_root).parts[0]
-            except IndexError:
-                continue
-            if run_id in seen:
-                continue
-            seen.add(run_id)
-            out.append(run_id)
+    for path in sorted(reports_root.glob("*/search_engine/phase2_candidates.parquet")):
+        out.append(path.parent.parent.name)
     return out
 
 
@@ -402,7 +379,14 @@ def compare_confirmatory_candidates(
         / origin_run_id
         / "edge_candidates_normalized.parquet"
     )
-    target_path = _resolve_phase2_candidates_path(data_root, target_run_id)
+    target_path = (
+        data_root
+        / "reports"
+        / "phase2"
+        / target_run_id
+        / "search_engine"
+        / "phase2_candidates.parquet"
+    )
 
     origin_raw = _read_parquet(origin_path)
     target_raw = _read_parquet(target_path)
@@ -562,7 +546,14 @@ def build_adjacent_survivorship_payload(
         / origin_run_id
         / "edge_candidates_normalized.parquet"
     )
-    target_path = _resolve_phase2_candidates_path(data_root, target_run_id)
+    target_path = (
+        data_root
+        / "reports"
+        / "phase2"
+        / target_run_id
+        / "search_engine"
+        / "phase2_candidates.parquet"
+    )
     origin_raw = _read_parquet(origin_path)
     target_raw = _read_parquet(target_path)
     key_columns = _resolve_structural_key_columns(origin_raw, target_raw)

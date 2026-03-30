@@ -459,85 +459,83 @@ def build_research_stages(
             )
         )
 
-    if not experiment_plan:
-        if int(args.run_candidate_promotion) and int(args.run_phase2_conditional):
-            stages.append(
-                (
-                    "generate_negative_control_summary",
-                    project_root
-                    / "research"
-                    / "generate_negative_control_summary.py",
-                    [
-                        "--run_id",
-                        run_id,
-                        "--symbols",
-                        symbols,
-                    ],
-                )
-            )
-
-    if not experiment_plan:
-        if int(args.run_candidate_promotion) and int(args.run_phase2_conditional):
-            promotion_profile = _resolve_candidate_promotion_profile(args)
-            promotion_thresholds = _resolve_candidate_promotion_thresholds(args)
-            promote_args = [
-                "--run_id",
-                run_id,
-                "--retail_profile",
-                str(args.retail_profile),
-                "--promotion_profile",
-                promotion_profile,
-            ]
-            promote_args.extend(["--max_q_value", str(float(promotion_thresholds["max_q_value"]))])
-
-            promote_args.extend(
+    if int(args.run_candidate_promotion) and int(args.run_phase2_conditional):
+        stages.append(
+            (
+                "generate_negative_control_summary",
+                project_root
+                / "research"
+                / "generate_negative_control_summary.py",
                 [
-                    "--min_events",
-                    str(int(promotion_thresholds["min_events"])),
-                    "--min_stability_score",
-                    str(float(promotion_thresholds["min_stability_score"])),
-                    "--min_sign_consistency",
-                    str(float(promotion_thresholds["min_sign_consistency"])),
-                    "--min_cost_survival_ratio",
-                    str(float(promotion_thresholds["min_cost_survival_ratio"])),
-                    "--min_tob_coverage",
-                    str(float(promotion_thresholds["min_tob_coverage"])),
-                    "--max_negative_control_pass_rate",
-                    str(float(promotion_thresholds["max_negative_control_pass_rate"])),
-                    "--require_hypothesis_audit",
-                    str(int(args.candidate_promotion_require_hypothesis_audit)),
-                    "--allow_missing_negative_controls",
-                    str(int(args.candidate_promotion_allow_missing_negative_controls)),
-                ]
+                    "--run_id",
+                    run_id,
+                    "--symbols",
+                    symbols,
+                ],
             )
+        )
 
-            stages.append(
-                (
-                    "promote_candidates",
-                    project_root / "research" / "cli" / "promotion_cli.py",
-                    promote_args,
-                )
+    if int(args.run_candidate_promotion) and int(args.run_phase2_conditional):
+        promotion_profile = _resolve_candidate_promotion_profile(args)
+        promotion_thresholds = _resolve_candidate_promotion_thresholds(args)
+        promote_args = [
+            "--run_id",
+            run_id,
+            "--retail_profile",
+            str(args.retail_profile),
+            "--promotion_profile",
+            promotion_profile,
+        ]
+        promote_args.extend(["--max_q_value", str(float(promotion_thresholds["max_q_value"]))])
+
+        promote_args.extend(
+            [
+                "--min_events",
+                str(int(promotion_thresholds["min_events"])),
+                "--min_stability_score",
+                str(float(promotion_thresholds["min_stability_score"])),
+                "--min_sign_consistency",
+                str(float(promotion_thresholds["min_sign_consistency"])),
+                "--min_cost_survival_ratio",
+                str(float(promotion_thresholds["min_cost_survival_ratio"])),
+                "--min_tob_coverage",
+                str(float(promotion_thresholds["min_tob_coverage"])),
+                "--max_negative_control_pass_rate",
+                str(float(promotion_thresholds["max_negative_control_pass_rate"])),
+                "--require_hypothesis_audit",
+                str(int(args.candidate_promotion_require_hypothesis_audit)),
+                "--allow_missing_negative_controls",
+                str(int(args.candidate_promotion_allow_missing_negative_controls)),
+            ]
+        )
+
+        stages.append(
+            (
+                "promote_candidates",
+                project_root / "research" / "cli" / "promotion_cli.py",
+                promote_args,
             )
+        )
 
-        if (
-            int(args.run_edge_registry_update)
-            and int(args.run_candidate_promotion)
-            and int(args.run_phase2_conditional)
+    if (
+        int(args.run_edge_registry_update)
+        and int(args.run_candidate_promotion)
+        and int(args.run_phase2_conditional)
+    ):
+        registry_args = ["--run_id", run_id]
+        if script_supports_flag(
+            project_root / "research" / "update_edge_registry.py",
+            "--retail_profile",
         ):
-            registry_args = ["--run_id", run_id]
-            if script_supports_flag(
-                project_root / "research" / "update_edge_registry.py",
-                "--retail_profile",
-            ):
-                registry_args.extend(["--retail_profile", str(args.retail_profile)])
+            registry_args.extend(["--retail_profile", str(args.retail_profile)])
 
-            stages.append(
-                (
-                    "update_edge_registry",
-                project_root / "research" / "update_edge_registry.py",
-                    registry_args,
-                )
+        stages.append(
+            (
+                "update_edge_registry",
+            project_root / "research" / "update_edge_registry.py",
+                registry_args,
             )
+        )
 
     if (
         int(getattr(args, "run_campaign_memory_update", 0))

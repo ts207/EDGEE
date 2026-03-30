@@ -19,3 +19,29 @@ execution_degradation_min_samples: 4
 execution_degradation_warn_edge_bps: 0.0
 execution_degradation_block_edge_bps: -8.0
 execution_degradation_throttle_scale: 0.5
+strategy_runtime:
+  implemented: false
+  load_latest_theses: true
+  include_pending_theses: true
+  auto_submit: false
+  supported_event_families:
+    - VOL_SHOCK
+  allowed_actions:
+    - probe
+    - trade_small
+  max_notional_fraction: 0.05
+  max_spread_bps: 5.0
+  min_depth_usd: 25000.0
+  min_tob_coverage: 0.8
+  default_depth_usd: 50000.0
+  default_tob_coverage: 0.95
+  default_expected_cost_bps: 3.0
+  memory_root: artifacts/live_memory/paper
+  event_detector:
+    vol_shock_min_abs_move_bps: 35.0
+  decision_policy:
+    watch_min: 0.2
+    probe_min: 0.35
+    small_min: 0.55
+    normal_min: 0.75
+    max_contradiction_penalty: 0.45

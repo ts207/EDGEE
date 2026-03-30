@@ -13,4 +13,4 @@ search_min_n: 8
 required_outputs:
   - synthetic/synthetic_range_chop/synthetic_generation_manifest.json
   - synthetic/synthetic_range_chop/synthetic_regime_segments.json
-  - reports/phase2/synthetic_range_chop/phase2_candidates.parquet
+  - reports/phase2/synthetic_range_chop/search_engine/phase2_candidates.parquet

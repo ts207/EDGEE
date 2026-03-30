@@ -10,6 +10,7 @@ from project import PROJECT_ROOT
 from project.engine.exchange_constraints import SymbolConstraints
 from project.engine.strategy_executor import StrategyResult, calculate_strategy_returns
 from project.live.execution_attribution import build_execution_attribution_record
+from project.live.ingest.parsers import BookTickerEvent, KlineEvent
 from project.live.kill_switch import KillSwitchReason
 from project.live.oms import OrderManager, OrderType, OrderSubmissionBlocked
 from project.live.runner import LiveEngineRunner
@@ -948,3 +949,121 @@ def test_ws_client_calls_on_reconnect_exhausted_after_max_retries() -> None:
 
     asyncio.run(_run())
     assert len(exhausted_calls) == 1
+
+
+def test_live_runner_monitor_only_processes_thesis_runtime_events(tmp_path) -> None:
+    thesis_dir = tmp_path / "live" / "theses" / "run_1"
+    thesis_dir.mkdir(parents=True, exist_ok=True)
+    (thesis_dir / "promoted_theses.json").write_text(
+        json.dumps(
+            {
+                "schema_version": "promoted_theses_v1",
+                "run_id": "run_1",
+                "generated_at_utc": "2026-03-30T00:00:00Z",
+                "thesis_count": 1,
+                "active_thesis_count": 1,
+                "pending_thesis_count": 0,
+                "theses": [
+                    {
+                        "thesis_id": "thesis::run_1::cand_1",
+                        "status": "active",
+                        "symbol_scope": {
+                            "mode": "single_symbol",
+                            "symbols": ["BTCUSDT"],
+                            "candidate_symbol": "BTCUSDT",
+                        },
+                        "timeframe": "5m",
+                        "event_family": "VOL_SHOCK",
+                        "event_side": "long",
+                        "required_context": {"symbol": "BTCUSDT", "event_type": "VOL_SHOCK"},
+                        "supportive_context": {
+                            "canonical_regime": "VOLATILITY",
+                            "has_realized_oos_path": True,
+                        },
+                        "expected_response": {"direction": "long"},
+                        "invalidation": {"metric": "adverse_proxy", "operator": ">", "value": 0.02},
+                        "risk_notes": [],
+                        "evidence": {
+                            "sample_size": 120,
+                            "validation_samples": 60,
+                            "test_samples": 60,
+                            "estimate_bps": 10.0,
+                            "net_expectancy_bps": 7.0,
+                            "q_value": 0.01,
+                            "stability_score": 0.8,
+                            "cost_survival_ratio": 1.0,
+                            "tob_coverage": 0.95,
+                            "rank_score": 1.0,
+                            "promotion_track": "deploy",
+                            "policy_version": "v1",
+                            "bundle_version": "b1",
+                        },
+                        "lineage": {
+                            "run_id": "run_1",
+                            "candidate_id": "cand_1",
+                            "blueprint_id": "bp_1",
+                            "hypothesis_id": "",
+                            "plan_row_id": "",
+                            "proposal_id": "",
+                        },
+                    }
+                ],
+            },
+            indent=2,
+            sort_keys=True,
+        ),
+        encoding="utf-8",
+    )
+
+    runner = LiveEngineRunner(
+        ["btcusdt"],
+        data_manager=_DummyDataManager(),
+        strategy_runtime={
+            "implemented": True,
+            "thesis_path": str(thesis_dir / "promoted_theses.json"),
+            "include_pending_theses": False,
+            "auto_submit": False,
+            "supported_event_families": ["VOL_SHOCK"],
+            "memory_root": str(tmp_path / "memory"),
+        },
+    )
+    runner._latest_book_ticker_by_symbol["BTCUSDT"] = {
+        "best_bid_price": 99.99,
+        "best_ask_price": 100.01,
+        "timestamp": "2026-03-30T00:04:59Z",
+    }
+
+    first = KlineEvent(
+        symbol="BTCUSDT",
+        timeframe="5m",
+        timestamp=pd.Timestamp("2026-03-30T00:00:00Z"),
+        open=100.0,
+        high=100.2,
+        low=99.8,
+        close=100.0,
+        volume=10.0,
+        quote_volume=1000.0,
+        taker_base_volume=5.0,
+        is_final=True,
+    )
+    second = KlineEvent(
+        symbol="BTCUSDT",
+        timeframe="5m",
+        timestamp=pd.Timestamp("2026-03-30T00:05:00Z"),
+        open=100.0,
+        high=101.0,
+        low=99.9,
+        close=100.6,
+        volume=20.0,
+        quote_volume=2000.0,
+        taker_base_volume=10.0,
+        is_final=True,
+    )
+
+    asyncio.run(runner._process_kline_for_thesis_runtime(first))
+    asyncio.run(runner._process_kline_for_thesis_runtime(second))
+
+    outcomes = runner.latest_trade_intents()
+    assert len(outcomes) == 1
+    assert outcomes[0].trade_intent.action in {"probe", "trade_small", "trade_normal"}
+    assert (tmp_path / "memory" / "episodic_trades.jsonl").exists()

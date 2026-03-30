@@ -8,7 +8,9 @@ from project.research.campaign_controller import (
     CampaignController,
     CampaignConfig,
     CampaignSummary,
+    CampaignMemoryIntegrityError,
 )
+from project.research.knowledge.memory import ensure_memory_store
 
 
 @pytest.fixture
@@ -191,3 +193,27 @@ def test_context_for_proposal_uses_registry_dimensions(test_env):
         "vol_regime": ["low", "high"],
         "carry_state": ["funding_pos", "funding_neg"],
     }
+
+
+def test_read_memory_fails_closed_on_corrupted_json(tmp_path):
+    reg_dir = tmp_path / "registries"
+    reg_dir.mkdir()
+    for name, payload in {
+        "events.yaml": {"events": {}},
+        "templates.yaml": {"templates": {}},
+        "contexts.yaml": {"context_dimensions": {}},
+        "search_limits.yaml": {"limits": {}},
+        "states.yaml": {"states": {}},
+        "features.yaml": {"features": {}},
+        "detectors.yaml": {"detector_ownership": {}},
+    }.items():
+        (reg_dir / name).write_text(yaml.dump(payload), encoding="utf-8")
+
+    data_root = tmp_path / "data"
+    paths = ensure_memory_store("test_campaign", data_root=data_root)
+    paths.belief_state.write_text("{not-json", encoding="utf-8")
+
+    controller = CampaignController(CampaignConfig(program_id="test_campaign"), data_root, reg_dir)
+
+    with pytest.raises(CampaignMemoryIntegrityError, match="belief_state.json"):
+        controller._read_memory()
