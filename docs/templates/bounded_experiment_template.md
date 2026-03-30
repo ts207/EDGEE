@@ -186,7 +186,7 @@ Required fields:
 
 ## 4. Exact Operator Sequence
 
-See [docs/03_OPERATOR_WORKFLOW.md](/home/irene/Edge/docs/03_OPERATOR_WORKFLOW.md) for the complete step-by-step sequence.
+See [docs/03_OPERATOR_WORKFLOW.md](../03_OPERATOR_WORKFLOW.md) for the complete step-by-step sequence.
 
 Key commands:
 
@@ -294,8 +294,8 @@ Run:
 
 Useful maintained surfaces:
 
-- [docs/08_TESTING_AND_MAINTENANCE.md](/home/irene/Edge/docs/08_TESTING_AND_MAINTENANCE.md)
-- [docs/12_AUDIT_RUN_SCHEDULE.md](/home/irene/Edge/docs/12_AUDIT_RUN_SCHEDULE.md)
+- [docs/08_TESTING_AND_MAINTENANCE.md](../08_TESTING_AND_MAINTENANCE.md)
+- [docs/12_AUDIT_RUN_SCHEDULE.md](../12_AUDIT_RUN_SCHEDULE.md)
 
 ### Monthly or after major refactors
 

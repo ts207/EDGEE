@@ -49,8 +49,8 @@ make help
 
 Evidence:
 
-- [README.md](/home/irene/Edge/README.md)
-- [docs/README.md](/home/irene/Edge/docs/README.md)
+- [README.md](../README.md)
+- [docs/README.md](README.md)
 
 Pass if:
 
@@ -75,9 +75,9 @@ Commands:
 
 Evidence:
 
-- [project/contracts/pipeline_registry.py](/home/irene/Edge/project/contracts/pipeline_registry.py)
-- [project/contracts/](/home/irene/Edge/project/contracts)
-- [project/pipelines/](/home/irene/Edge/project/pipelines)
+- [project/contracts/pipeline_registry.py](../project/contracts/pipeline_registry.py)
+- [project/contracts/](../project/contracts)
+- [project/pipelines/](../project/pipelines)
 
 Pass if:
 
@@ -104,9 +104,9 @@ Commands:
 
 Evidence:
 
-- [spec/events/event_registry_unified.yaml](/home/irene/Edge/spec/events/event_registry_unified.yaml)
-- [spec/gates.yaml](/home/irene/Edge/spec/gates.yaml)
-- generated audit files under [docs/generated/](/home/irene/Edge/docs/generated)
+- [spec/events/event_registry_unified.yaml](../spec/events/event_registry_unified.yaml)
+- [spec/gates.yaml](../spec/gates.yaml)
+- generated audit files under [docs/generated/](generated)
 
 Pass if:
 
@@ -192,14 +192,14 @@ Purpose:
 
 Target run:
 
-- [codex_real_btc_vol_shock_20260328_4](/home/irene/Edge/data/runs/codex_real_btc_vol_shock_20260328_4)
+- [codex_real_btc_vol_shock_20260328_4](../data/runs/codex_real_btc_vol_shock_20260328_4)
 
 Actions:
 
-1. read [run_manifest.json](/home/irene/Edge/data/runs/codex_real_btc_vol_shock_20260328_4/run_manifest.json)
-2. read [phase2_search_engine.log](/home/irene/Edge/data/runs/codex_real_btc_vol_shock_20260328_4/phase2_search_engine.log)
-3. read [discovery_quality_summary.json](/home/irene/Edge/data/reports/phase2/codex_real_btc_vol_shock_20260328_4/discovery_quality_summary.json)
-4. read [funnel_summary.json](/home/irene/Edge/data/reports/codex_real_btc_vol_shock_20260328_4/funnel_summary.json)
+1. read [run_manifest.json](../data/runs/codex_real_btc_vol_shock_20260328_4/run_manifest.json)
+2. read [phase2_search_engine.log](../data/runs/codex_real_btc_vol_shock_20260328_4/phase2_search_engine.log)
+3. read [discovery_quality_summary.json](../data/reports/phase2/codex_real_btc_vol_shock_20260328_4/discovery_quality_summary.json)
+4. read [funnel_summary.json](../data/reports/codex_real_btc_vol_shock_20260328_4/funnel_summary.json)
 
 Pass if:
 
@@ -220,14 +220,14 @@ Purpose:
 
 Target run:
 
-- [codex_real_btc_vol_shock_202211_202212_20260328_5](/home/irene/Edge/data/runs/codex_real_btc_vol_shock_202211_202212_20260328_5)
+- [codex_real_btc_vol_shock_202211_202212_20260328_5](../data/runs/codex_real_btc_vol_shock_202211_202212_20260328_5)
 
 Actions:
 
-1. read [run_manifest.json](/home/irene/Edge/data/runs/codex_real_btc_vol_shock_202211_202212_20260328_5/run_manifest.json)
-2. read [phase2_diagnostics.json](/home/irene/Edge/data/reports/phase2/codex_real_btc_vol_shock_202211_202212_20260328_5/search_engine/phase2_diagnostics.json)
-3. inspect [phase2_candidates.parquet](/home/irene/Edge/data/reports/phase2/codex_real_btc_vol_shock_202211_202212_20260328_5/search_engine/phase2_candidates.parquet)
-4. read [funnel_summary.json](/home/irene/Edge/data/reports/codex_real_btc_vol_shock_202211_202212_20260328_5/funnel_summary.json)
+1. read [run_manifest.json](../data/runs/codex_real_btc_vol_shock_202211_202212_20260328_5/run_manifest.json)
+2. read [phase2_diagnostics.json](../data/reports/phase2/codex_real_btc_vol_shock_202211_202212_20260328_5/search_engine/phase2_diagnostics.json)
+3. inspect [phase2_candidates.parquet](../data/reports/phase2/codex_real_btc_vol_shock_202211_202212_20260328_5/search_engine/phase2_candidates.parquet)
+4. read [funnel_summary.json](../data/reports/codex_real_btc_vol_shock_202211_202212_20260328_5/funnel_summary.json)
 
 Pass if:
 
@@ -307,9 +307,9 @@ Purpose:
 
 Actions:
 
-1. inspect [spec/gates.yaml](/home/irene/Edge/spec/gates.yaml)
-2. inspect [project/specs/gates.py](/home/irene/Edge/project/specs/gates.py)
-3. inspect [project/research/search/bridge_adapter.py](/home/irene/Edge/project/research/search/bridge_adapter.py)
+1. inspect [spec/gates.yaml](../spec/gates.yaml)
+2. inspect [project/specs/gates.py](../project/specs/gates.py)
+3. inspect [project/research/search/bridge_adapter.py](../project/research/search/bridge_adapter.py)
 4. inspect candidate rows from `A09`
 
 Pass if:
@@ -329,7 +329,7 @@ Purpose:
 
 Recommended injection:
 
-- temporarily point a narrow search run at the broad [spec/search_space.yaml](/home/irene/Edge/spec/search_space.yaml) without event scoping, or
+- temporarily point a narrow search run at the broad [spec/search_space.yaml](../spec/search_space.yaml) without event scoping, or
 - remove an expected state/feature column from a copied local test fixture and run the targeted test surface
 
 Safe default command for a non-destructive injection audit:

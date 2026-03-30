@@ -5,7 +5,7 @@ This walkthrough shows how to read a real bounded run from question to interpret
 It uses:
 
 - run id: `codex_real_btc_vol_shock_202211_202212_20260328_5`
-- run manifest: [run_manifest.json](/home/irene/Edge/data/runs/codex_real_btc_vol_shock_202211_202212_20260328_5/run_manifest.json)
+- run manifest: [run_manifest.json](../data/runs/codex_real_btc_vol_shock_202211_202212_20260328_5/run_manifest.json)
 
 ## The Question
 
@@ -48,7 +48,7 @@ That matters because it proves this was a narrow research slice, not a broad all
 
 The manifest is the first artifact to inspect:
 
-- [run_manifest.json](/home/irene/Edge/data/runs/codex_real_btc_vol_shock_202211_202212_20260328_5/run_manifest.json)
+- [run_manifest.json](../data/runs/codex_real_btc_vol_shock_202211_202212_20260328_5/run_manifest.json)
 
 Key mechanical facts:
 
@@ -72,7 +72,7 @@ Mechanical conclusion at this stage:
 
 The event parquet is:
 
-- [vol_shock_relaxation_events.parquet](/home/irene/Edge/data/reports/vol_shock_relaxation/codex_real_btc_vol_shock_202211_202212_20260328_5/vol_shock_relaxation_events.parquet)
+- [vol_shock_relaxation_events.parquet](../data/reports/vol_shock_relaxation/codex_real_btc_vol_shock_202211_202212_20260328_5/vol_shock_relaxation_events.parquet)
 
 Facts from the file:
 
@@ -90,9 +90,9 @@ Interpretation:
 
 The search diagnostics are:
 
-- [phase2_diagnostics.json](/home/irene/Edge/data/reports/phase2/codex_real_btc_vol_shock_202211_202212_20260328_5/search_engine/phase2_diagnostics.json)
-- [phase2_search_engine.log](/home/irene/Edge/data/runs/codex_real_btc_vol_shock_202211_202212_20260328_5/phase2_search_engine.log)
-- resolved spec: [resolved_search_spec__VOL_SHOCK.yaml](/home/irene/Edge/data/reports/phase2/codex_real_btc_vol_shock_202211_202212_20260328_5/search_engine/resolved_search_spec__VOL_SHOCK.yaml)
+- [phase2_diagnostics.json](../data/reports/phase2/codex_real_btc_vol_shock_202211_202212_20260328_5/search_engine/phase2_diagnostics.json)
+- [phase2_search_engine.log](../data/runs/codex_real_btc_vol_shock_202211_202212_20260328_5/phase2_search_engine.log)
+- resolved spec: [resolved_search_spec__VOL_SHOCK.yaml](../data/reports/phase2/codex_real_btc_vol_shock_202211_202212_20260328_5/search_engine/resolved_search_spec__VOL_SHOCK.yaml)
 
 Important facts:
 
@@ -127,7 +127,7 @@ Statistical conclusion at this stage:
 
 Candidate output:
 
-- [phase2_candidates.parquet](/home/irene/Edge/data/reports/phase2/codex_real_btc_vol_shock_202211_202212_20260328_5/search_engine/phase2_candidates.parquet)
+- [phase2_candidates.parquet](../data/reports/phase2/codex_real_btc_vol_shock_202211_202212_20260328_5/search_engine/phase2_candidates.parquet)
 
 Top rows by `t_stat`:
 
@@ -163,8 +163,8 @@ Interpretation:
 
 Summary artifacts:
 
-- [discovery_quality_summary.json](/home/irene/Edge/data/reports/phase2/codex_real_btc_vol_shock_202211_202212_20260328_5/discovery_quality_summary.json)
-- [funnel_summary.json](/home/irene/Edge/data/reports/codex_real_btc_vol_shock_202211_202212_20260328_5/funnel_summary.json)
+- [discovery_quality_summary.json](../data/reports/phase2/codex_real_btc_vol_shock_202211_202212_20260328_5/discovery_quality_summary.json)
+- [funnel_summary.json](../data/reports/codex_real_btc_vol_shock_202211_202212_20260328_5/funnel_summary.json)
 
 Key summary facts:
 
@@ -236,11 +236,11 @@ Bad follow-up questions:
 
 If you are new, open these files in order and write one sentence after each:
 
-1. [run_manifest.json](/home/irene/Edge/data/runs/codex_real_btc_vol_shock_202211_202212_20260328_5/run_manifest.json)
-2. [vol_shock_relaxation_events.parquet](/home/irene/Edge/data/reports/vol_shock_relaxation/codex_real_btc_vol_shock_202211_202212_20260328_5/vol_shock_relaxation_events.parquet)
-3. [phase2_diagnostics.json](/home/irene/Edge/data/reports/phase2/codex_real_btc_vol_shock_202211_202212_20260328_5/search_engine/phase2_diagnostics.json)
-4. [phase2_candidates.parquet](/home/irene/Edge/data/reports/phase2/codex_real_btc_vol_shock_202211_202212_20260328_5/search_engine/phase2_candidates.parquet)
-5. [funnel_summary.json](/home/irene/Edge/data/reports/codex_real_btc_vol_shock_202211_202212_20260328_5/funnel_summary.json)
+1. [run_manifest.json](../data/runs/codex_real_btc_vol_shock_202211_202212_20260328_5/run_manifest.json)
+2. [vol_shock_relaxation_events.parquet](../data/reports/vol_shock_relaxation/codex_real_btc_vol_shock_202211_202212_20260328_5/vol_shock_relaxation_events.parquet)
+3. [phase2_diagnostics.json](../data/reports/phase2/codex_real_btc_vol_shock_202211_202212_20260328_5/search_engine/phase2_diagnostics.json)
+4. [phase2_candidates.parquet](../data/reports/phase2/codex_real_btc_vol_shock_202211_202212_20260328_5/search_engine/phase2_candidates.parquet)
+5. [funnel_summary.json](../data/reports/codex_real_btc_vol_shock_202211_202212_20260328_5/funnel_summary.json)
 
 If your five sentences do not clearly answer:
 
@@ -248,4 +248,4 @@ If your five sentences do not clearly answer:
 - what survived
 - why the survivors still failed
 
-then reread [05_ARTIFACTS_AND_INTERPRETATION.md](/home/irene/Edge/docs/05_ARTIFACTS_AND_INTERPRETATION.md) and [06_QUALITY_GATES_AND_PROMOTION.md](/home/irene/Edge/docs/06_QUALITY_GATES_AND_PROMOTION.md).
+then reread [05_ARTIFACTS_AND_INTERPRETATION.md](05_ARTIFACTS_AND_INTERPRETATION.md) and [06_QUALITY_GATES_AND_PROMOTION.md](06_QUALITY_GATES_AND_PROMOTION.md).

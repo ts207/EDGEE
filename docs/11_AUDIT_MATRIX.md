@@ -48,16 +48,16 @@ all at the same time.
 
 | Audit Unit | Key Files | Current Status | Strongest Existing Evidence | Next Audit Pass |
 | --- | --- | --- | --- | --- |
-| Operator surface | [README.md](/home/irene/Edge/README.md), [docs/README.md](/home/irene/Edge/docs/README.md), [project/research/agent_io/](/home/irene/Edge/project/research/agent_io), [project/research/knowledge/query.py](/home/irene/Edge/project/research/knowledge/query.py) | `partial` | New doc set, maintained CLI help for `execute_proposal`, `issue_proposal`, `knowledge.query` | `operator_usability` |
-| Contracts and orchestration | [project/contracts/pipeline_registry.py](/home/irene/Edge/project/contracts/pipeline_registry.py), [project/contracts/](/home/irene/Edge/project/contracts), [project/pipelines/run_all.py](/home/irene/Edge/project/pipelines/run_all.py), [project/pipelines/](/home/irene/Edge/project/pipelines) | `mapped` | Repo structure mapped; real runs reconcile at manifest level | `contract` |
-| Specs and ontology | [spec/events/event_registry_unified.yaml](/home/irene/Edge/spec/events/event_registry_unified.yaml), [spec/templates/event_template_registry.yaml](/home/irene/Edge/spec/templates/event_template_registry.yaml), [spec/search_space.yaml](/home/irene/Edge/spec/search_space.yaml), [spec/gates.yaml](/home/irene/Edge/spec/gates.yaml) | `partial` | `VOL_SHOCK` semantic drift corrected; bridge thresholds made spec-driven | `spec_code` |
-| Data and feature pipeline | [project/pipelines/ingest/](/home/irene/Edge/project/pipelines/ingest), [project/pipelines/clean/](/home/irene/Edge/project/pipelines/clean), [project/pipelines/features/](/home/irene/Edge/project/pipelines/features), [project/features/](/home/irene/Edge/project/features) | `partial` | Real bounded runs complete through features and market context | `reconciliation` |
-| Event detection | [project/features/](/home/irene/Edge/project/features), [project/events/](/home/irene/Edge/project/events), [spec/events/](/home/irene/Edge/spec/events) | `partial` | `VOL_SHOCK` detector, spec, and event artifacts were directly audited | `synthetic_truth` |
-| Runtime invariants | [project/runtime/](/home/irene/Edge/project/runtime), [spec/runtime/](/home/irene/Edge/spec/runtime) | `repaired` | Historical run [codex_real_btc_vol_shock_20260328_4](/home/irene/Edge/data/runs/codex_real_btc_vol_shock_20260328_4) failed postflight; later run [codex_real_btc_vol_shock_202211_202212_20260328_5](/home/irene/Edge/data/runs/codex_real_btc_vol_shock_202211_202212_20260328_5) passed with `0` violations | `causality` |
-| Search and statistical evaluation | [project/research/phase2_search_engine.py](/home/irene/Edge/project/research/phase2_search_engine.py), [project/research/search/](/home/irene/Edge/project/research/search), [project/research/robustness/](/home/irene/Edge/project/research/robustness) | `repaired` | Event-pinned search scoping and template compatibility were fixed and rerun | `historical_runs` |
-| Bridge and promotion | [project/research/search/bridge_adapter.py](/home/irene/Edge/project/research/search/bridge_adapter.py), [project/research/bridge_evaluate_phase2.py](/home/irene/Edge/project/research/bridge_evaluate_phase2.py), [project/research/promotion/](/home/irene/Edge/project/research/promotion) | `partial` | Bridge thresholds now come from [spec/gates.yaml](/home/irene/Edge/spec/gates.yaml); recent `VOL_SHOCK` candidates still fail bridge for substantive reasons | `stat_policy` |
-| Reliability and tests | [project/reliability/](/home/irene/Edge/project/reliability), [project/tests/](/home/irene/Edge/project/tests), [tests/](/home/irene/Edge/tests), [Makefile](/home/irene/Edge/Makefile) | `partial` | `pytest -q -m "not slow" --maxfail=1` passed; full smoke passed; maintained targets documented | `failure_injection` |
-| Artifacts and historical evidence | [data/runs/](/home/irene/Edge/data/runs), [data/reports/](/home/irene/Edge/data/reports) | `partial` | Good and bad worked examples now documented; multiple bounded historical runs available | `reconciliation` |
+| Operator surface | [README.md](../README.md), [docs/README.md](README.md), [project/research/agent_io/](../project/research/agent_io), [project/research/knowledge/query.py](../project/research/knowledge/query.py) | `partial` | New doc set, maintained CLI help for `execute_proposal`, `issue_proposal`, `knowledge.query` | `operator_usability` |
+| Contracts and orchestration | [project/contracts/pipeline_registry.py](../project/contracts/pipeline_registry.py), [project/contracts/](../project/contracts), [project/pipelines/run_all.py](../project/pipelines/run_all.py), [project/pipelines/](../project/pipelines) | `mapped` | Repo structure mapped; real runs reconcile at manifest level | `contract` |
+| Specs and ontology | [spec/events/event_registry_unified.yaml](../spec/events/event_registry_unified.yaml), [spec/templates/event_template_registry.yaml](../spec/templates/event_template_registry.yaml), [spec/search_space.yaml](../spec/search_space.yaml), [spec/gates.yaml](../spec/gates.yaml) | `partial` | `VOL_SHOCK` semantic drift corrected; bridge thresholds made spec-driven | `spec_code` |
+| Data and feature pipeline | [project/pipelines/ingest/](../project/pipelines/ingest), [project/pipelines/clean/](../project/pipelines/clean), [project/pipelines/features/](../project/pipelines/features), [project/features/](../project/features) | `partial` | Real bounded runs complete through features and market context | `reconciliation` |
+| Event detection | [project/features/](../project/features), [project/events/](../project/events), [spec/events/](../spec/events) | `partial` | `VOL_SHOCK` detector, spec, and event artifacts were directly audited | `synthetic_truth` |
+| Runtime invariants | [project/runtime/](../project/runtime), [spec/runtime/](../spec/runtime) | `repaired` | Historical run [codex_real_btc_vol_shock_20260328_4](../data/runs/codex_real_btc_vol_shock_20260328_4) failed postflight; later run [codex_real_btc_vol_shock_202211_202212_20260328_5](../data/runs/codex_real_btc_vol_shock_202211_202212_20260328_5) passed with `0` violations | `causality` |
+| Search and statistical evaluation | [project/research/phase2_search_engine.py](../project/research/phase2_search_engine.py), [project/research/search/](../project/research/search), [project/research/robustness/](../project/research/robustness) | `repaired` | Event-pinned search scoping and template compatibility were fixed and rerun | `historical_runs` |
+| Bridge and promotion | [project/research/search/bridge_adapter.py](../project/research/search/bridge_adapter.py), [project/research/bridge_evaluate_phase2.py](../project/research/bridge_evaluate_phase2.py), [project/research/promotion/](../project/research/promotion) | `partial` | Bridge thresholds now come from [spec/gates.yaml](../spec/gates.yaml); recent `VOL_SHOCK` candidates still fail bridge for substantive reasons | `stat_policy` |
+| Reliability and tests | [project/reliability/](../project/reliability), [project/tests/](../project/tests), [tests/](../tests), [Makefile](../Makefile) | `partial` | `pytest -q -m "not slow" --maxfail=1` passed; full smoke passed; maintained targets documented | `failure_injection` |
+| Artifacts and historical evidence | [data/runs/](../data/runs), [data/reports/](../data/reports) | `partial` | Good and bad worked examples now documented; multiple bounded historical runs available | `reconciliation` |
 
 ## Pass Details By Unit
 
@@ -69,9 +69,9 @@ Goal:
 
 Method:
 
-- follow [docs/00_START_HERE.md](/home/irene/Edge/docs/00_START_HERE.md)
+- follow [docs/00_START_HERE.md](00_START_HERE.md)
 - run `--help` on `knowledge.query`, `execute_proposal`, `issue_proposal`, `run_all`
-- have a new operator follow [docs/09_WORKED_EXAMPLE_VOL_SHOCK.md](/home/irene/Edge/docs/09_WORKED_EXAMPLE_VOL_SHOCK.md)
+- have a new operator follow [docs/09_WORKED_EXAMPLE_VOL_SHOCK.md](09_WORKED_EXAMPLE_VOL_SHOCK.md)
 
 Evidence to collect:
 
@@ -87,8 +87,8 @@ Goal:
 
 Method:
 
-- compare [project/contracts/pipeline_registry.py](/home/irene/Edge/project/contracts/pipeline_registry.py) against actual run artifacts
-- inspect [project/pipelines/](/home/irene/Edge/project/pipelines) for undeclared file reads or writes
+- compare [project/contracts/pipeline_registry.py](../project/contracts/pipeline_registry.py) against actual run artifacts
+- inspect [project/pipelines/](../project/pipelines) for undeclared file reads or writes
 
 Evidence to collect:
 
@@ -161,8 +161,8 @@ Method:
 
 Evidence to collect:
 
-- [codex_real_btc_vol_shock_20260328_4](/home/irene/Edge/data/runs/codex_real_btc_vol_shock_20260328_4)
-- [codex_real_btc_vol_shock_202211_202212_20260328_5](/home/irene/Edge/data/runs/codex_real_btc_vol_shock_202211_202212_20260328_5)
+- [codex_real_btc_vol_shock_20260328_4](../data/runs/codex_real_btc_vol_shock_20260328_4)
+- [codex_real_btc_vol_shock_202211_202212_20260328_5](../data/runs/codex_real_btc_vol_shock_202211_202212_20260328_5)
 
 ### 7. Search And Statistical Evaluation
 
@@ -177,8 +177,8 @@ Method:
 
 Evidence to collect:
 
-- [phase2_search_engine.log](/home/irene/Edge/data/runs/codex_real_btc_vol_shock_202211_202212_20260328_5/phase2_search_engine.log)
-- [resolved_search_spec__VOL_SHOCK.yaml](/home/irene/Edge/data/reports/phase2/codex_real_btc_vol_shock_202211_202212_20260328_5/search_engine/resolved_search_spec__VOL_SHOCK.yaml)
+- [phase2_search_engine.log](../data/runs/codex_real_btc_vol_shock_202211_202212_20260328_5/phase2_search_engine.log)
+- [resolved_search_spec__VOL_SHOCK.yaml](../data/reports/phase2/codex_real_btc_vol_shock_202211_202212_20260328_5/search_engine/resolved_search_spec__VOL_SHOCK.yaml)
 
 ### 8. Bridge And Promotion
 
@@ -188,7 +188,7 @@ Goal:
 
 Method:
 
-- trace bridge thresholds from [spec/gates.yaml](/home/irene/Edge/spec/gates.yaml) into [project/specs/gates.py](/home/irene/Edge/project/specs/gates.py) and [project/research/search/bridge_adapter.py](/home/irene/Edge/project/research/search/bridge_adapter.py)
+- trace bridge thresholds from [spec/gates.yaml](../spec/gates.yaml) into [project/specs/gates.py](../project/specs/gates.py) and [project/research/search/bridge_adapter.py](../project/research/search/bridge_adapter.py)
 - inspect surviving candidate rows and bridge failure reasons
 
 Evidence to collect:
@@ -227,8 +227,8 @@ Method:
 
 Evidence to collect:
 
-- [docs/09_WORKED_EXAMPLE_VOL_SHOCK.md](/home/irene/Edge/docs/09_WORKED_EXAMPLE_VOL_SHOCK.md)
-- [docs/10_WORKED_EXAMPLE_MECHANICAL_FAILURE.md](/home/irene/Edge/docs/10_WORKED_EXAMPLE_MECHANICAL_FAILURE.md)
+- [docs/09_WORKED_EXAMPLE_VOL_SHOCK.md](09_WORKED_EXAMPLE_VOL_SHOCK.md)
+- [docs/10_WORKED_EXAMPLE_MECHANICAL_FAILURE.md](10_WORKED_EXAMPLE_MECHANICAL_FAILURE.md)
 
 ## Recommended Full Audit Sequence
 

@@ -4,8 +4,8 @@ This document defines the trigger types supported by the hypothesis model and th
 
 Primary sources:
 
-- [project/domain/hypotheses.py](/home/irene/Edge/project/domain/hypotheses.py)
-- [project/research/agent_io/proposal_schema.py](/home/irene/Edge/project/research/agent_io/proposal_schema.py)
+- [project/domain/hypotheses.py](../project/domain/hypotheses.py)
+- [project/research/agent_io/proposal_schema.py](../project/research/agent_io/proposal_schema.py)
 
 ## Overview
 
@@ -318,8 +318,8 @@ That matches:
 
 These examples use identifiers that exist in the current registries:
 
-- event registry: [events.yaml](/home/irene/Edge/project/configs/registries/events.yaml)
-- state registry: [states.yaml](/home/irene/Edge/project/configs/registries/states.yaml)
+- event registry: [events.yaml](../project/configs/registries/events.yaml)
+- state registry: [states.yaml](../project/configs/registries/states.yaml)
 
 ### EVENT example
 
@@ -433,7 +433,7 @@ There are two useful surfaces:
 
 Primary source:
 
-- [project/domain/hypotheses.py](/home/irene/Edge/project/domain/hypotheses.py)
+- [project/domain/hypotheses.py](../project/domain/hypotheses.py)
 
 ### Proposal-style event hypothesis
 

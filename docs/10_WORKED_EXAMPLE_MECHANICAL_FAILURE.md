@@ -5,7 +5,7 @@ This walkthrough shows how to recognize a run that is not trustworthy even thoug
 It uses a historical run from March 28, 2026:
 
 - run id: `codex_real_btc_vol_shock_20260328_4`
-- manifest: [run_manifest.json](/home/irene/Edge/data/runs/codex_real_btc_vol_shock_20260328_4/run_manifest.json)
+- manifest: [run_manifest.json](../data/runs/codex_real_btc_vol_shock_20260328_4/run_manifest.json)
 
 This example is valuable because it shows a failure mode that new researchers commonly miss:
 
@@ -30,7 +30,7 @@ That sounds narrow. The failure was that the execution did not stay narrow.
 
 Open:
 
-- [run_manifest.json](/home/irene/Edge/data/runs/codex_real_btc_vol_shock_20260328_4/run_manifest.json)
+- [run_manifest.json](../data/runs/codex_real_btc_vol_shock_20260328_4/run_manifest.json)
 
 Important fields:
 
@@ -55,7 +55,7 @@ This is the first training rule:
 
 Open:
 
-- [phase2_search_engine.log](/home/irene/Edge/data/runs/codex_real_btc_vol_shock_20260328_4/phase2_search_engine.log)
+- [phase2_search_engine.log](../data/runs/codex_real_btc_vol_shock_20260328_4/phase2_search_engine.log)
 
 What the log shows:
 
@@ -83,8 +83,8 @@ If the question is narrow but the search engine expands to the global frontier, 
 
 Open:
 
-- [discovery_quality_summary.json](/home/irene/Edge/data/reports/phase2/codex_real_btc_vol_shock_20260328_4/discovery_quality_summary.json)
-- [funnel_summary.json](/home/irene/Edge/data/reports/codex_real_btc_vol_shock_20260328_4/funnel_summary.json)
+- [discovery_quality_summary.json](../data/reports/phase2/codex_real_btc_vol_shock_20260328_4/discovery_quality_summary.json)
+- [funnel_summary.json](../data/reports/codex_real_btc_vol_shock_20260328_4/funnel_summary.json)
 
 What they show:
 
@@ -111,7 +111,7 @@ If unrelated families dominate the output, the run may be statistically interest
 
 Open:
 
-- [bridge_evaluate_phase2__VOL_SHOCK_5m.log](/home/irene/Edge/data/runs/codex_real_btc_vol_shock_20260328_4/bridge_evaluate_phase2__VOL_SHOCK_5m.log)
+- [bridge_evaluate_phase2__VOL_SHOCK_5m.log](../data/runs/codex_real_btc_vol_shock_20260328_4/bridge_evaluate_phase2__VOL_SHOCK_5m.log)
 
 It says:
 

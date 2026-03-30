@@ -105,14 +105,14 @@ Current compiled counts in this workspace:
 - `10` searchable event families
 - `8` searchable state families
 
-Those counts come from the compiled domain registry exposed through [project/domain/](/home/irene/Edge/project/domain).
+Those counts come from the compiled domain registry exposed through [project/domain/](../project/domain).
 
 ## Family And Template Compatibility
 
 Family compatibility is maintained in:
 
-- [spec/templates/event_template_registry.yaml](/home/irene/Edge/spec/templates/event_template_registry.yaml)
-- [spec/events/event_registry_unified.yaml](/home/irene/Edge/spec/events/event_registry_unified.yaml)
+- [spec/templates/event_template_registry.yaml](../spec/templates/event_template_registry.yaml)
+- [spec/events/event_registry_unified.yaml](../spec/events/event_registry_unified.yaml)
 
 This matters because not every template is legal for every family. A clean search run should avoid generating obviously incompatible combinations.
 
@@ -138,13 +138,13 @@ A compact operator input that defines a bounded research run.
 
 Typical fields: `program_id`, objective, symbols, timeframe, start/end, trigger space, templates, horizons, directions, entry lags.
 
-Main surface: [project/research/agent_io/proposal_schema.py](/home/irene/Edge/project/research/agent_io/proposal_schema.py)
+Main surface: [project/research/agent_io/proposal_schema.py](../project/research/agent_io/proposal_schema.py)
 
 ### Experiment
 
 A repo-native execution config produced from a proposal. It is the translated, fully structured configuration that the pipeline actually uses.
 
-Main surfaces: [proposal_to_experiment.py](/home/irene/Edge/project/research/agent_io/proposal_to_experiment.py), [experiment_engine.py](/home/irene/Edge/project/research/experiment_engine.py)
+Main surfaces: [proposal_to_experiment.py](../project/research/agent_io/proposal_to_experiment.py), [experiment_engine.py](../project/research/experiment_engine.py)
 
 ### Run
 
@@ -156,7 +156,7 @@ A single explicit claim evaluated by the research/search layer.
 
 Examples: after `BASIS_DISLOC`, `BTCUSDT`, `short`, `12b`, `mean_reversion`.
 
-Main surface: [project/domain/hypotheses.py](/home/irene/Edge/project/domain/hypotheses.py)
+Main surface: [project/domain/hypotheses.py](../project/domain/hypotheses.py)
 
 ### Candidate
 
@@ -166,7 +166,7 @@ A hypothesis that has been evaluated and materialized into a row with metrics an
 
 An executable strategy specification describing: entry logic, exit logic, sizing, overlays, and lineage. It is the object the DSL/runtime layer interprets.
 
-Main surfaces: [project/strategy/dsl](/home/irene/Edge/project/strategy/dsl), [blueprint.py](/home/irene/Edge/project/strategy/models/blueprint.py)
+Main surfaces: [project/strategy/dsl](../project/strategy/dsl), [blueprint.py](../project/strategy/models/blueprint.py)
 
 ### Strategy
 
@@ -178,7 +178,7 @@ The condition that causes a hypothesis or strategy entry logic to activate.
 
 Supported types: `EVENT`, `STATE`, `TRANSITION`, `FEATURE_PREDICATE`, `SEQUENCE`, `INTERACTION`.
 
-Reference: [13_TRIGGER_TYPES.md](/home/irene/Edge/docs/13_TRIGGER_TYPES.md)
+Reference: [13_TRIGGER_TYPES.md](13_TRIGGER_TYPES.md)
 
 ### Artifact
 
@@ -194,7 +194,7 @@ The gating process that decides whether a candidate is eligible to move forward.
 
 Using the engine/runtime path to simulate strategy execution and produce a ledger/PnL trace.
 
-Main surface: [runner.py](/home/irene/Edge/project/engine/runner.py)
+Main surface: [runner.py](../project/engine/runner.py)
 
 This is different from the canonical search evaluator, which is a statistical trigger-conditioned evaluation path.
 

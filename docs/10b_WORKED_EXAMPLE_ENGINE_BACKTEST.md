@@ -198,7 +198,7 @@ Check available flags:
 .venv/bin/python -m project.research.compile_strategy_blueprints --help
 ```
 
-Main compiler surface: [project/research/compile_strategy_blueprints.py](/home/irene/Edge/project/research/compile_strategy_blueprints.py)
+Main compiler surface: [project/research/compile_strategy_blueprints.py](../project/research/compile_strategy_blueprints.py)
 
 ### Step 3. Inspect emitted blueprint artifacts
 
@@ -293,9 +293,9 @@ Verify:
 
 Problem usually lives in one of three places:
 
-1. research-to-blueprint translation → [compile_strategy_blueprints.py](/home/irene/Edge/project/research/compile_strategy_blueprints.py)
-2. DSL interpreter semantics → [interpreter.py](/home/irene/Edge/project/strategy/runtime/dsl_runtime/interpreter.py)
-3. execution ledger / fill mechanics → [runner.py](/home/irene/Edge/project/engine/runner.py) / [pnl.py](/home/irene/Edge/project/engine/pnl.py)
+1. research-to-blueprint translation → [compile_strategy_blueprints.py](../project/research/compile_strategy_blueprints.py)
+2. DSL interpreter semantics → [interpreter.py](../project/strategy/runtime/dsl_runtime/interpreter.py)
+3. execution ledger / fill mechanics → [runner.py](../project/engine/runner.py) / [pnl.py](../project/engine/pnl.py)
 
 ---
 
@@ -324,4 +324,4 @@ Those require both research-path artifact review **and** engine-path trace revie
 | What happens if I execute this strategy logic over bars? | Engine path (`run_engine`) |
 | Does a promoted candidate actually work as a strategy? | Both — compile then backtest |
 
-See [03_OPERATOR_WORKFLOW.md](/home/irene/Edge/docs/03_OPERATOR_WORKFLOW.md) for the full research-first workflow.
+See [03_OPERATOR_WORKFLOW.md](03_OPERATOR_WORKFLOW.md) for the full research-first workflow.

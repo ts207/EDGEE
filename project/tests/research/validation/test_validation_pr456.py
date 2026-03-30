@@ -68,6 +68,13 @@ def test_evidence_bundle_policy_and_serialization(tmp_path: Path):
         "gate_promo_hypothesis_audit": True,
         "gate_promo_oos_validation": True,
         "gate_promo_retail_viability": True,
+        "gate_promo_baseline_beats_complexity": True,
+        "gate_delayed_entry_stress": True,
+        "gate_promo_placebo_controls": True,
+        "gate_promo_dsr": True,
+        "gate_promo_robustness": True,
+        "gate_promo_regime": True,
+        "gate_promo_multiplicity_confirmatory": True,
         "cost_survival_ratio": 1.0,
         "tob_coverage": 0.95,
         "net_expectancy_bps": 16.0,
@@ -127,6 +134,31 @@ def test_build_evidence_bundle_accepts_vectorized_returns_oos_combined():
     bundle = build_evidence_bundle(row)
 
     assert bundle["metadata"]["has_realized_oos_path"] is True
+
+
+
+def test_build_evidence_bundle_accepts_legacy_serialized_returns_oos_combined():
+    row = {
+        "candidate_id": "cand_legacy",
+        "event_type": "VOL_SHOCK",
+        "returns_oos_combined": "[np.float64(0.1), np.float64(0.2)]",
+    }
+
+    bundle = build_evidence_bundle(row)
+
+    assert bundle["metadata"]["has_realized_oos_path"] is False
+    assert bundle["sample_definition"]["n_events"] == 0
+
+
+def test_build_evidence_bundle_rejects_malformed_serialized_returns_oos_combined():
+    row = {
+        "candidate_id": "cand_bad_text",
+        "event_type": "VOL_SHOCK",
+        "returns_oos_combined": "not a valid vector",
+    }
+
+    with pytest.raises(ValueError, match="serialized as text"):
+        build_evidence_bundle(row)
 
 
 def test_build_evidence_bundle_rejects_object_returns_oos_combined():

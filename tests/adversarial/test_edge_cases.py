@@ -86,11 +86,11 @@ class TestConflictingPatterns:
         config = GeneratorConfig(n_bars=640, seed=42)
         df = gen.generate_base(config)
         
-        df["depth_usd"].iloc[300:350] *= 0.5
-        df["spread_bps"].iloc[300:350] *= 0.5
-        
-        df["depth_usd"].iloc[350:400] *= 2.0
-        df["spread_bps"].iloc[350:400] *= 0.5
+        df.loc[df.index[300:350], "depth_usd"] *= 0.5
+        df.loc[df.index[300:350], "spread_bps"] *= 0.5
+
+        df.loc[df.index[350:400], "depth_usd"] *= 2.0
+        df.loc[df.index[350:400], "spread_bps"] *= 0.5
         
         assert df["depth_usd"].iloc[320] < df["depth_usd"].iloc[370]
 

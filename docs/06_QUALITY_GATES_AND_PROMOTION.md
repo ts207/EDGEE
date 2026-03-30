@@ -4,9 +4,9 @@ This repository uses multiple gate layers. You should know where a candidate die
 
 ## Gate Policy Source
 
-The maintained gate policy is [spec/gates.yaml](/home/irene/Edge/spec/gates.yaml).
+The maintained gate policy is [spec/gates.yaml](../spec/gates.yaml).
 
-Code-side accessors live in [project/specs/gates.py](/home/irene/Edge/project/specs/gates.py).
+Code-side accessors live in [project/specs/gates.py](../project/specs/gates.py).
 
 ## Phase-2 Gates
 

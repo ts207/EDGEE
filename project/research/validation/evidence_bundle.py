@@ -10,6 +10,7 @@ import pandas as pd
 from project.core.coercion import as_bool, safe_float, safe_int
 from project.domain.compiled_registry import get_domain_registry
 from project.domain.promotion.promotion_policy import PromotionPolicy
+from project.research.utils.returns_oos import normalize_returns_oos_combined
 from project.research.validation.falsification import evaluate_negative_controls
 from project.research.validation.regime_tests import build_stability_result_from_row
 from project.research.validation.schemas import EvidenceBundle, PromotionDecision
@@ -99,28 +100,7 @@ def _set_optional_bool(target: Dict[str, Any], row: Dict[str, Any], key: str, *a
 
 
 def _normalize_returns_oos_combined(value: Any) -> list[float]:
-    if value is None:
-        return []
-    if isinstance(value, (float, np.floating)) and not np.isfinite(value):
-        return []
-    if isinstance(value, str):
-        text = value.strip()
-        if not text:
-            return []
-        try:
-            value = json.loads(text)
-        except Exception as exc:
-            raise ValueError("returns_oos_combined must be a JSON array when serialized as text") from exc
-
-    if isinstance(value, dict):
-        raise ValueError("returns_oos_combined must be array-like, not an object")
-    if isinstance(value, (list, tuple, np.ndarray, pd.Series, pd.Index)):
-        vector = pd.Series(list(value), dtype="object")
-        numeric = pd.to_numeric(vector, errors="coerce")
-        return [float(item) for item in numeric[np.isfinite(numeric)].tolist()]
-    if isinstance(value, (int, np.integer, bool)):
-        raise ValueError("returns_oos_combined must be array-like, not a scalar")
-    return []
+    return normalize_returns_oos_combined(value)
 
 
 def build_evidence_bundle(

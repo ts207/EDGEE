@@ -4,8 +4,8 @@ This document lists the event inventory that exists in the repository.
 
 It is built from two canonical sources:
 
-- unified event registry: [event_registry_unified.yaml](/home/irene/Edge/spec/events/event_registry_unified.yaml)
-- runtime detector registry: [events.yaml](/home/irene/Edge/project/configs/registries/events.yaml)
+- unified event registry: [event_registry_unified.yaml](../spec/events/event_registry_unified.yaml)
+- runtime detector registry: [events.yaml](../project/configs/registries/events.yaml)
 
 Use this doc when you need to answer:
 
@@ -28,8 +28,8 @@ For each canonical family, each event line shows:
 
 Facts to keep in mind:
 
-- canonical family membership comes from [event_registry_unified.yaml](/home/irene/Edge/spec/events/event_registry_unified.yaml)
-- detector wiring comes from [events.yaml](/home/irene/Edge/project/configs/registries/events.yaml)
+- canonical family membership comes from [event_registry_unified.yaml](../spec/events/event_registry_unified.yaml)
+- detector wiring comes from [events.yaml](../project/configs/registries/events.yaml)
 - some canonical event types do not currently have a runtime detector entry
 - some runtime detector entries exist outside the canonical-family list in this doc
 
@@ -168,7 +168,7 @@ Canonical event types in this doc with no runtime detector entry shown:
 This means:
 
 - they exist in the canonical unified event model
-- but they do not currently have a detector entry in [events.yaml](/home/irene/Edge/project/configs/registries/events.yaml)
+- but they do not currently have a detector entry in [events.yaml](../project/configs/registries/events.yaml)
 
 ## Runtime-Only Event Entries
 
@@ -188,4 +188,4 @@ Examples include:
 - `SEQ_LIQ_CASCADE_THEN_EXHAUST`
 - `VOL_COMPRESSION_BREAKOUT`
 
-These are present in [events.yaml](/home/irene/Edge/project/configs/registries/events.yaml), but they are not part of the canonical family inventory in [event_registry_unified.yaml](/home/irene/Edge/spec/events/event_registry_unified.yaml).
+These are present in [events.yaml](../project/configs/registries/events.yaml), but they are not part of the canonical family inventory in [event_registry_unified.yaml](../spec/events/event_registry_unified.yaml).

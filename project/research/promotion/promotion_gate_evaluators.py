@@ -24,6 +24,7 @@ from project.research.utils.decision_safety import (
     coerce_numeric_nan,
     finite_ge,
 )
+from project.research.utils.returns_oos import normalize_returns_oos_combined
 
 
 def _quiet_float(value: Any, default: float) -> float:
@@ -41,22 +42,11 @@ def _quiet_int(value: Any, default: int) -> int:
 
 
 def _parse_returns_oos(values: Any) -> pd.Series:
-    if isinstance(values, pd.Series):
-        return pd.to_numeric(values, errors="coerce").dropna()
-    if isinstance(values, np.ndarray):
-        return pd.to_numeric(pd.Series(values.tolist()), errors="coerce").dropna()
-    if isinstance(values, (list, tuple)):
-        return pd.to_numeric(pd.Series(list(values)), errors="coerce").dropna()
-    if isinstance(values, str):
-        raw = values.strip()
-        if not raw:
-            return pd.Series(dtype=float)
-        try:
-            parsed = json.loads(raw)
-        except Exception:
-            return pd.Series(dtype=float)
-        return _parse_returns_oos(parsed)
-    return pd.Series(dtype=float)
+    try:
+        normalized = normalize_returns_oos_combined(values)
+    except ValueError:
+        return pd.Series(dtype=float)
+    return pd.to_numeric(pd.Series(normalized, dtype='float64'), errors='coerce').dropna()
 
 
 def _confirmatory_shadow_gates(

@@ -123,9 +123,9 @@ Use `docs/generated/` for current generated surfaces:
 
 ## Documentation
 
-- [docs/README.md](/home/irene/Edge/docs/README.md) — full doc index
-- [docs/03_OPERATOR_WORKFLOW.md](/home/irene/Edge/docs/03_OPERATOR_WORKFLOW.md) — canonical research loop
-- [docs/04_COMMANDS_AND_ENTRY_POINTS.md](/home/irene/Edge/docs/04_COMMANDS_AND_ENTRY_POINTS.md) — command reference
-- [docs/06_QUALITY_GATES_AND_PROMOTION.md](/home/irene/Edge/docs/06_QUALITY_GATES_AND_PROMOTION.md) — gate policy
-- [docs/08_TESTING_AND_MAINTENANCE.md](/home/irene/Edge/docs/08_TESTING_AND_MAINTENANCE.md) — test and maintenance commands
-- [docs/AGENT_CONTRACT.md](/home/irene/Edge/docs/AGENT_CONTRACT.md) — agent operating contract
+- [docs/README.md](docs/README.md) — full doc index
+- [docs/03_OPERATOR_WORKFLOW.md](docs/03_OPERATOR_WORKFLOW.md) — canonical research loop
+- [docs/04_COMMANDS_AND_ENTRY_POINTS.md](docs/04_COMMANDS_AND_ENTRY_POINTS.md) — command reference
+- [docs/06_QUALITY_GATES_AND_PROMOTION.md](docs/06_QUALITY_GATES_AND_PROMOTION.md) — gate policy
+- [docs/08_TESTING_AND_MAINTENANCE.md](docs/08_TESTING_AND_MAINTENANCE.md) — test and maintenance commands
+- [docs/AGENT_CONTRACT.md](docs/AGENT_CONTRACT.md) — agent operating contract

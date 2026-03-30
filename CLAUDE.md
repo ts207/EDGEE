@@ -40,9 +40,9 @@ Optimize for: reproducibility, post-cost robustness, contract cleanliness, narro
   --plan_only 1
 ```
 
-Full workflow: → [docs/03_OPERATOR_WORKFLOW.md](/home/irene/Edge/docs/03_OPERATOR_WORKFLOW.md)
+Full workflow: → [docs/03_OPERATOR_WORKFLOW.md](docs/03_OPERATOR_WORKFLOW.md)
 
-Full command reference: → [docs/04_COMMANDS_AND_ENTRY_POINTS.md](/home/irene/Edge/docs/04_COMMANDS_AND_ENTRY_POINTS.md)
+Full command reference: → [docs/04_COMMANDS_AND_ENTRY_POINTS.md](docs/04_COMMANDS_AND_ENTRY_POINTS.md)
 
 ## Default Policy
 
@@ -74,10 +74,10 @@ If those disagree, the disagreement is a first-class finding.
 
 ## Key Contracts And Rules
 
-- Agent operating contract: → [docs/AGENT_CONTRACT.md](/home/irene/Edge/docs/AGENT_CONTRACT.md)
-- Verification commands: → [docs/VERIFICATION.md](/home/irene/Edge/docs/VERIFICATION.md)
-- Research backlog: → [docs/RESEARCH_BACKLOG.md](/home/irene/Edge/docs/RESEARCH_BACKLOG.md)
-- Operator templates: → [docs/templates/](/home/irene/Edge/docs/templates/)
+- Agent operating contract: → [docs/AGENT_CONTRACT.md](docs/AGENT_CONTRACT.md)
+- Verification commands: → [docs/VERIFICATION.md](docs/VERIFICATION.md)
+- Research backlog: → [docs/RESEARCH_BACKLOG.md](docs/RESEARCH_BACKLOG.md)
+- Operator templates: → [docs/templates/](docs/templates)
 
 ## Repository Landmarks
 

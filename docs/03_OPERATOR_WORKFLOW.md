@@ -10,7 +10,7 @@ Default policy:
 
 - use the change-management lane only for structural changes to architecture, schemas, routing semantics, storage semantics, or identity lineage
 - use the bounded experiment lane for normal progress
-- follow [docs/templates/bounded_experiment_template.md](/home/irene/Edge/docs/templates/bounded_experiment_template.md) for the standing research loop, required artifacts, promotion gates, and governance cadence
+- follow [docs/templates/bounded_experiment_template.md](templates/bounded_experiment_template.md) for the standing research loop, required artifacts, promotion gates, and governance cadence
 
 ---
 
@@ -228,7 +228,7 @@ Self-comparison is not a substantive review.
 
 ## Direct CLI Workflow
 
-If you are not using the proposal layer, [project/pipelines/run_all.py](/home/irene/Edge/project/pipelines/run_all.py) is the end-to-end orchestrator.
+If you are not using the proposal layer, [project/pipelines/run_all.py](../project/pipelines/run_all.py) is the end-to-end orchestrator.
 
 Useful direct controls from `run_all --help`:
 
