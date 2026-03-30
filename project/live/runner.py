@@ -95,10 +95,8 @@ class LiveEngineRunner:
         if order_manager is None and self.runtime_mode != "trading":
             self.order_manager = OrderManager()
         
-        # Phase 5: Incubation Ledger
-        self.incubation_ledger = IncubationLedger(
-            PROJECT_ROOT / "project" / "live" / "incubation_ledger.json"
-        )
+        # Keep the default ledger under the canonical project live directory.
+        self.incubation_ledger = IncubationLedger(PROJECT_ROOT / "live" / "incubation_ledger.json")
         
         self._running = False
         self._tasks: List[asyncio.Task] = []

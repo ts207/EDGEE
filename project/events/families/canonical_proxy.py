@@ -12,6 +12,7 @@ from project.events.sparsify import sparsify_mask
 from project.events.thresholding import rolling_quantile_threshold, rolling_mean_std_zscore
 from project.events.event_aliases import resolve_event_alias
 from project.research.analyzers import run_analyzer_suite
+from project.spec_registry import load_event_spec
 
 
 def _numeric_series(df: pd.DataFrame, column: str, *, default: float = 0.0) -> pd.Series:
@@ -26,6 +27,26 @@ def _history_ready(df: pd.DataFrame, min_history_bars: int) -> pd.Series:
 
 def _safe_ratio(numerator: pd.Series, denominator: pd.Series) -> pd.Series:
     return (numerator / denominator.replace(0.0, np.nan)).replace([np.inf, -np.inf], np.nan)
+
+
+def _event_params(event_type: str) -> dict[str, Any]:
+    spec = load_event_spec(event_type)
+    params = spec.get("parameters", {}) if isinstance(spec, dict) else {}
+    return dict(params) if isinstance(params, dict) else {}
+
+
+def _rolling_window(event_type: str, params: dict[str, Any]) -> tuple[dict[str, Any], int]:
+    spec_params = _event_params(event_type)
+    window = int(
+        params.get(
+            "window",
+            params.get(
+                "lookback_window",
+                spec_params.get("window", spec_params.get("lookback_window", 288)),
+            ),
+        )
+    )
+    return spec_params, window
 
 
 class _CanonicalProxyBase(ThresholdDetector):
@@ -353,11 +374,14 @@ class DepthStressProxyDetector(_CanonicalProxyBase):
             event_type=self.event_type,
             required=("spread_zscore", "rv_96", "micro_depth_depletion"),
         )
+        spec_params, window = _rolling_window(self.event_type, params)
         spread = _numeric_series(df, "spread_zscore")
         rv = _numeric_series(df, "rv_96")
         depth_depletion = _numeric_series(df, "micro_depth_depletion")
-        window = int(params.get("window", 288))
         min_history_bars = int(params.get("min_history_bars", 288))
+        spread_weight = float(params.get("spread_weight", spec_params.get("spread_weight", 0.45)))
+        rv_weight = float(params.get("rv_weight", spec_params.get("rv_weight", 0.35)))
+        depth_weight = float(params.get("depth_weight", spec_params.get("depth_weight", 0.20)))
 
         spread_q = rolling_quantile_threshold(
             spread.ffill(),
@@ -376,9 +400,9 @@ class DepthStressProxyDetector(_CanonicalProxyBase):
             window=window,
         )
         stress_score = (
-            _safe_ratio(spread, spread_q) * 0.45
-            + _safe_ratio(rv_z.clip(lower=0.0), rv_q) * 0.35
-            + _safe_ratio(depth_depletion, depth_q) * 0.20
+            _safe_ratio(spread, spread_q) * spread_weight
+            + _safe_ratio(rv_z.clip(lower=0.0), rv_q) * rv_weight
+            + _safe_ratio(depth_depletion, depth_q) * depth_weight
         )
         stress_q = rolling_quantile_threshold(
             stress_score.ffill().replace([np.inf, -np.inf], np.nan).fillna(0.0),
@@ -438,7 +462,7 @@ class DepthCollapseDetector(DepthStressProxyDetector):
         spread_jump = features["spread"].diff().abs().fillna(0.0)
         depth_jump = features["depth_depletion"].diff().abs().fillna(0.0)
         collapse_impulse = (spread_jump + depth_jump).astype(float)
-        window = int(params.get("window", 288))
+        _, window = _rolling_window(self.event_type, params)
         collapse_q = rolling_quantile_threshold(
             collapse_impulse.ffill(),
             quantile=float(params.get("collapse_quantile", self.DEFAULT_COLLAPSE_QUANTILE)),

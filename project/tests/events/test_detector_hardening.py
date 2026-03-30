@@ -118,6 +118,138 @@ def test_direct_liquidity_stress_requires_canonical_wide_spread_when_present():
     assert not mask.any()
 
 
+def test_zscore_stretch_uses_spec_quantile_and_windows(monkeypatch):
+    import project.events.families.statistical as statistical_family
+    from project.events.thresholding import rolling_mean_std_zscore
+
+    df = create_mock_data()
+
+    monkeypatch.setattr(
+        statistical_family,
+        "load_event_spec",
+        lambda event_type: {
+            "parameters": {
+                "lookback_window": 48,
+                "threshold_window": 120,
+                "min_periods": 24,
+                "zscore_quantile": 0.75,
+            }
+        }
+        if event_type == "ZSCORE_STRETCH"
+        else {},
+    )
+
+    features = statistical_family.ZScoreStretchDetector().prepare_features(df)
+    px_z = rolling_mean_std_zscore(df["close"].pct_change(12).fillna(0.0), window=48)
+    px_abs = px_z.abs()
+    expected = px_abs.rolling(120, min_periods=24).quantile(0.75).shift(1)
+
+    pd.testing.assert_series_equal(features["px_abs"], px_abs, check_names=False)
+    pd.testing.assert_series_equal(features["px_threshold"], expected, check_names=False)
+
+
+def test_depth_stress_proxy_uses_spec_weights(monkeypatch):
+    import project.events.families.canonical_proxy as canonical_proxy_family
+
+    df = create_mock_data()
+    df["spread_zscore"] = np.linspace(0.5, 3.5, len(df))
+    df["micro_depth_depletion"] = np.linspace(0.1, 0.9, len(df))
+
+    monkeypatch.setattr(
+        canonical_proxy_family,
+        "load_event_spec",
+        lambda event_type: {
+            "parameters": {
+                "spread_weight": 0.50,
+                "rv_weight": 0.30,
+                "depth_weight": 0.20,
+            }
+        }
+        if event_type == "DEPTH_STRESS_PROXY"
+        else {},
+    )
+
+    features = canonical_proxy_family.DepthStressProxyDetector().prepare_features(df)
+    expected = (
+        canonical_proxy_family._safe_ratio(features["spread"], features["spread_q"]) * 0.50
+        + canonical_proxy_family._safe_ratio(features["rv_z"].clip(lower=0.0), features["rv_q"])
+        * 0.30
+        + canonical_proxy_family._safe_ratio(features["depth_depletion"], features["depth_q"])
+        * 0.20
+    )
+
+    pd.testing.assert_series_equal(features["stress_score"], expected, check_names=False)
+
+
+def test_depth_collapse_uses_spec_lookback_window(monkeypatch):
+    import project.events.families.canonical_proxy as canonical_proxy_family
+    from project.events.thresholding import rolling_mean_std_zscore, rolling_quantile_threshold
+
+    df = create_mock_data()
+    df["spread_zscore"] = np.linspace(0.5, 3.5, len(df))
+    df["micro_depth_depletion"] = np.linspace(0.1, 0.9, len(df))
+
+    monkeypatch.setattr(
+        canonical_proxy_family,
+        "load_event_spec",
+        lambda event_type: {
+            "parameters": {
+                "lookback_window": 64,
+                "collapse_quantile": 0.80,
+                "spread_weight": 0.45,
+                "rv_weight": 0.35,
+                "depth_weight": 0.20,
+            }
+        }
+        if event_type == "DEPTH_COLLAPSE"
+        else {},
+    )
+
+    features = canonical_proxy_family.DepthCollapseDetector().prepare_features(df)
+    expected_rv_z = rolling_mean_std_zscore(df["rv_96"].ffill(), window=64)
+    collapse_impulse = (
+        features["spread"].diff().abs().fillna(0.0) + features["depth_depletion"].diff().abs().fillna(0.0)
+    ).astype(float)
+    expected_collapse_q = rolling_quantile_threshold(
+        collapse_impulse.ffill(), quantile=0.80, window=64
+    )
+
+    pd.testing.assert_series_equal(features["rv_z"], expected_rv_z, check_names=False)
+    pd.testing.assert_series_equal(features["collapse_q"], expected_collapse_q, check_names=False)
+
+
+def test_statistical_spec_load_errors_are_not_suppressed(monkeypatch):
+    import project.events.families.statistical as statistical_family
+
+    df = create_mock_data()
+
+    monkeypatch.setattr(
+        statistical_family,
+        "load_event_spec",
+        lambda event_type: (_ for _ in ()).throw(ValueError("broken spec")),
+    )
+
+    with pytest.raises(ValueError, match="broken spec"):
+        statistical_family.ZScoreStretchDetector().prepare_features(df)
+
+
+def test_canonical_proxy_spec_load_errors_are_not_suppressed(monkeypatch):
+    import project.events.families.canonical_proxy as canonical_proxy_family
+
+    df = create_mock_data()
+    df["spread_zscore"] = np.linspace(0.5, 3.5, len(df))
+    df["micro_depth_depletion"] = np.linspace(0.1, 0.9, len(df))
+
+    monkeypatch.setattr(
+        canonical_proxy_family,
+        "load_event_spec",
+        lambda event_type: (_ for _ in ()).throw(ValueError("broken spec")),
+    )
+
+    with pytest.raises(ValueError, match="broken spec"):
+        canonical_proxy_family.DepthStressProxyDetector().prepare_features(df)
+
+
 def test_depth_collapse_requires_canonical_wide_spread_when_present():
     detector = DepthCollapseDetector()
     index = pd.RangeIndex(2)

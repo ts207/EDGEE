@@ -6,6 +6,7 @@ import json
 import pandas as pd
 import pytest
 
+from project import PROJECT_ROOT
 from project.engine.exchange_constraints import SymbolConstraints
 from project.engine.strategy_executor import StrategyResult, calculate_strategy_returns
 from project.live.execution_attribution import build_execution_attribution_record
@@ -69,6 +70,13 @@ def test_live_runner_exposes_persistent_session_metadata(tmp_path) -> None:
     assert runner.session_metadata["execution_quality_report_path"] == str(report_path)
     assert runner.session_metadata["runtime_mode"] == "monitor_only"
     assert runner.session_metadata["strategy_runtime_implemented"] is False
+
+
+def test_live_runner_uses_canonical_default_incubation_ledger_path() -> None:
+    runner = LiveEngineRunner(["btcusdt"], data_manager=_DummyDataManager())
+
+    assert runner.incubation_ledger.path == PROJECT_ROOT / "live" / "incubation_ledger.json"
+    assert "/project/project/" not in str(runner.incubation_ledger.path)
 
 
 def test_live_runner_periodic_account_sync_updates_state() -> None:

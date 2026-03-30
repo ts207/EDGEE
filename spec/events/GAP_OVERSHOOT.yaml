@@ -6,6 +6,7 @@ signal_column: gap_overshoot_event
 parameters:
   lookback_window: 288
   band_z_threshold: 3.0
+  return_quantile: 0.995
   cooldown_bars: 12
   merge_gap_bars: 0
 canonical_family: STATISTICAL_DISLOCATION

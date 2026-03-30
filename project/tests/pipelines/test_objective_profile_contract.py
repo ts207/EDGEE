@@ -150,3 +150,83 @@ def test_low_capital_contract_enforced_when_objective_requires_it(tmp_path):
     assert contract.require_low_capital_contract is True
     with pytest.raises(ValueError, match="low-capital contract missing required fields"):
         assert_low_capital_contract(contract, stage_name="unit_test")
+
+
+def test_objective_profile_contract_rejects_manifest_objective_path_outside_repo(tmp_path):
+    repo_root = tmp_path / "repo"
+    project_root = repo_root / "project"
+    data_root = repo_root / "data"
+    spec_root = repo_root / "spec" / "objectives"
+    configs_root = project_root / "configs"
+    run_dir = data_root / "runs" / "r4"
+    spec_root.mkdir(parents=True)
+    configs_root.mkdir(parents=True)
+    run_dir.mkdir(parents=True)
+
+    (spec_root / "retail_profitability.yaml").write_text(
+        "objective:\n  id: retail_profitability\n",
+        encoding="utf-8",
+    )
+    (configs_root / "retail_profiles.yaml").write_text(
+        "profiles:\n  capital_constrained:\n    require_top_book_coverage: 0.8\n",
+        encoding="utf-8",
+    )
+    external_objective = tmp_path / "external_objective.yaml"
+    external_objective.write_text("objective:\n  id: external\n", encoding="utf-8")
+    (run_dir / "run_manifest.json").write_text(
+        json.dumps(
+            {
+                "objective_name": "retail_profitability",
+                "objective_spec_path": str(external_objective),
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="objective_spec_path must stay within active repo root"):
+        resolve_objective_profile_contract(
+            project_root=project_root,
+            data_root=data_root,
+            run_id="r4",
+            required=True,
+        )
+
+
+def test_objective_profile_contract_rejects_missing_manifest_profile_path(tmp_path):
+    repo_root = tmp_path / "repo"
+    project_root = repo_root / "project"
+    data_root = repo_root / "data"
+    spec_root = repo_root / "spec" / "objectives"
+    configs_root = project_root / "configs"
+    run_dir = data_root / "runs" / "r5"
+    spec_root.mkdir(parents=True)
+    configs_root.mkdir(parents=True)
+    run_dir.mkdir(parents=True)
+
+    (spec_root / "retail_profitability.yaml").write_text(
+        "objective:\n  id: retail_profitability\n",
+        encoding="utf-8",
+    )
+    (configs_root / "retail_profiles.yaml").write_text(
+        "profiles:\n  capital_constrained:\n    require_top_book_coverage: 0.8\n",
+        encoding="utf-8",
+    )
+    missing_profile = project_root / "configs" / "missing_profiles.yaml"
+    (run_dir / "run_manifest.json").write_text(
+        json.dumps(
+            {
+                "objective_name": "retail_profitability",
+                "retail_profile_name": "capital_constrained",
+                "retail_profile_spec_path": str(missing_profile),
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(FileNotFoundError, match="run manifest retail_profile_spec_path missing"):
+        resolve_objective_profile_contract(
+            project_root=project_root,
+            data_root=data_root,
+            run_id="r5",
+            required=True,
+        )

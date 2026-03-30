@@ -230,6 +230,36 @@ def _load_run_manifest(data_root: Path, run_id: str) -> Dict[str, Any]:
     return payload if isinstance(payload, dict) else {}
 
 
+def _resolve_source_path(
+    *,
+    raw_path: str,
+    base_root: Path,
+    field_name: str,
+    source_name: str,
+    require_exists: bool,
+    require_within_repo: bool,
+) -> str:
+    candidate = Path(str(raw_path).strip())
+    if not candidate.is_absolute():
+        candidate = (base_root / candidate).resolve()
+    else:
+        candidate = candidate.resolve()
+
+    repo_root = base_root.resolve()
+    if require_within_repo:
+        try:
+            candidate.relative_to(repo_root)
+        except ValueError as exc:
+            raise ValueError(
+                f"{source_name} {field_name} must stay within active repo root {repo_root}: {candidate}"
+            ) from exc
+
+    if require_exists and not candidate.exists():
+        raise FileNotFoundError(f"{source_name} {field_name} missing: {candidate}")
+
+    return str(candidate)
+
+
 def _resolve_objective_name(*, explicit: str | None, run_manifest: Dict[str, Any]) -> str:
     name = str(explicit or "").strip()
     if name:
@@ -259,15 +289,37 @@ def _resolve_objective_spec_path(
     explicit: str | None,
     run_manifest: Dict[str, Any],
 ) -> str:
+    repo_root = project_root.parent
     if explicit and str(explicit).strip():
-        return str(Path(str(explicit).strip()).resolve())
+        return _resolve_source_path(
+            raw_path=str(explicit).strip(),
+            base_root=repo_root,
+            field_name="objective_spec_path",
+            source_name="explicit",
+            require_exists=False,
+            require_within_repo=False,
+        )
     from_manifest = str(run_manifest.get("objective_spec_path", "")).strip()
     if from_manifest:
-        return str(Path(from_manifest).resolve())
+        return _resolve_source_path(
+            raw_path=from_manifest,
+            base_root=repo_root,
+            field_name="objective_spec_path",
+            source_name="run manifest",
+            require_exists=True,
+            require_within_repo=True,
+        )
     from_env = str(os.getenv(DEFAULT_OBJECTIVE_SPEC_ENV_VAR, "")).strip()
     if from_env:
-        return str(Path(from_env).resolve())
-    return str((project_root.parent / "spec" / "objectives" / f"{objective_name}.yaml").resolve())
+        return _resolve_source_path(
+            raw_path=from_env,
+            base_root=repo_root,
+            field_name="objective_spec_path",
+            source_name=DEFAULT_OBJECTIVE_SPEC_ENV_VAR,
+            require_exists=True,
+            require_within_repo=False,
+        )
+    return str((repo_root / "spec" / "objectives" / f"{objective_name}.yaml").resolve())
 
 
 def _resolve_retail_profiles_spec_path(
@@ -276,14 +328,36 @@ def _resolve_retail_profiles_spec_path(
     explicit: str | None,
     run_manifest: Dict[str, Any],
 ) -> str:
+    repo_root = project_root.parent
     if explicit and str(explicit).strip():
-        return str(Path(str(explicit).strip()).resolve())
+        return _resolve_source_path(
+            raw_path=str(explicit).strip(),
+            base_root=repo_root,
+            field_name="retail_profile_spec_path",
+            source_name="explicit",
+            require_exists=False,
+            require_within_repo=False,
+        )
     from_manifest = str(run_manifest.get("retail_profile_spec_path", "")).strip()
     if from_manifest:
-        return str(Path(from_manifest).resolve())
+        return _resolve_source_path(
+            raw_path=from_manifest,
+            base_root=repo_root,
+            field_name="retail_profile_spec_path",
+            source_name="run manifest",
+            require_exists=True,
+            require_within_repo=True,
+        )
     from_env = str(os.getenv(DEFAULT_RETAIL_PROFILES_SPEC_ENV_VAR, "")).strip()
     if from_env:
-        return str(Path(from_env).resolve())
+        return _resolve_source_path(
+            raw_path=from_env,
+            base_root=repo_root,
+            field_name="retail_profile_spec_path",
+            source_name=DEFAULT_RETAIL_PROFILES_SPEC_ENV_VAR,
+            require_exists=True,
+            require_within_repo=False,
+        )
     return str((project_root / "configs" / "retail_profiles.yaml").resolve())
 
 

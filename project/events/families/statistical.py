@@ -5,6 +5,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 from project.domain.compiled_registry import get_domain_registry
+from project.spec_registry import load_event_spec
 
 from project.events.detectors.threshold import ThresholdDetector
 from project.events.detectors.composite import CompositeDetector
@@ -24,6 +25,24 @@ def _band_params() -> tuple[int, int, float]:
     min_periods = int(params.get("min_periods", max(24, lookback // 4)))
     mult = float(params.get("band_std_mult", params.get("band_z_threshold", 2.0)))
     return lookback, min_periods, mult
+
+
+def _event_params(event_type: str) -> dict[str, Any]:
+    spec = load_event_spec(event_type)
+    params = spec.get("parameters", {}) if isinstance(spec, dict) else {}
+    return dict(params) if isinstance(params, dict) else {}
+
+
+def _stat_windows(
+    event_type: str, params: dict[str, Any]
+) -> tuple[dict[str, Any], int, int, int]:
+    spec_params = _event_params(event_type)
+    lookback_window = int(params.get("lookback_window", spec_params.get("lookback_window", 288)))
+    threshold_window = int(
+        params.get("threshold_window", spec_params.get("threshold_window", lookback_window * 10))
+    )
+    min_periods = int(params.get("min_periods", spec_params.get("min_periods", max(24, threshold_window // 10))))
+    return spec_params, lookback_window, threshold_window, min_periods
 
 
 class StatisticalBase(ThresholdDetector):
@@ -60,17 +79,29 @@ class ZScoreStretchDetector(StatisticalBase):
 
     def prepare_features(self, df: pd.DataFrame, **params: Any) -> dict[str, pd.Series]:
         close = df["close"]
-        px_z = rolling_mean_std_zscore(close.pct_change(12).fillna(0.0), window=288)
+        spec_params, lookback_window, threshold_window, min_periods = _stat_windows(
+            self.event_type, params
+        )
+        px_z = rolling_mean_std_zscore(
+            close.pct_change(12).fillna(0.0), window=lookback_window
+        )
         px_abs = px_z.abs()
-        px_q96 = px_abs.rolling(2880, min_periods=288).quantile(0.96).shift(1)
-        return {"px_abs": px_abs, "px_q96": px_q96}
+        zscore_quantile = float(
+            params.get("zscore_quantile", spec_params.get("zscore_quantile", 0.96))
+        )
+        px_threshold = (
+            px_abs.rolling(threshold_window, min_periods=min_periods)
+            .quantile(zscore_quantile)
+            .shift(1)
+        )
+        return {"px_abs": px_abs, "px_threshold": px_threshold}
 
     def compute_raw_mask(
         self, df: pd.DataFrame, *, features: dict[str, pd.Series], **params: Any
     ) -> pd.Series:
         px_abs = features["px_abs"]
-        px_q96 = features["px_q96"]
-        threshold = px_q96.where(px_q96 >= 2.0, 2.0)
+        px_threshold = features["px_threshold"]
+        threshold = px_threshold.where(px_threshold >= 2.0, 2.0)
         return (px_abs >= threshold).fillna(False)
 
     def compute_intensity(
@@ -112,21 +143,34 @@ class OvershootDetector(StatisticalBase):
     def prepare_features(self, df: pd.DataFrame, **params: Any) -> dict[str, pd.Series]:
         close = df["close"]
         rv_96 = df["rv_96"].ffill()
-        rv_z = rolling_mean_std_zscore(rv_96, window=288)
-        px_z = rolling_mean_std_zscore(close.pct_change(12).fillna(0.0), window=288)
+        spec_params, lookback_window, threshold_window, min_periods = _stat_windows(
+            self.event_type, params
+        )
+        rv_z = rolling_mean_std_zscore(rv_96, window=lookback_window)
+        px_z = rolling_mean_std_zscore(close.pct_change(12).fillna(0.0), window=lookback_window)
         px_abs = px_z.abs()
-        px_q95 = px_abs.rolling(2880, min_periods=288).quantile(0.95).shift(1)
-        rv_q95 = rv_z.rolling(2880, min_periods=288).quantile(0.95).shift(1)
-        return {"rv_z": rv_z, "px_abs": px_abs, "px_q95": px_q95, "rv_q95": rv_q95}
+        price_quantile = float(
+            params.get("price_quantile", spec_params.get("price_quantile", 0.95))
+        )
+        rv_quantile = float(params.get("rv_quantile", spec_params.get("rv_quantile", 0.95)))
+        px_threshold = (
+            px_abs.rolling(threshold_window, min_periods=min_periods)
+            .quantile(price_quantile)
+            .shift(1)
+        )
+        rv_threshold = (
+            rv_z.rolling(threshold_window, min_periods=min_periods).quantile(rv_quantile).shift(1)
+        )
+        return {"rv_z": rv_z, "px_abs": px_abs, "px_threshold": px_threshold, "rv_threshold": rv_threshold}
 
     def compute_raw_mask(
         self, df: pd.DataFrame, *, features: dict[str, pd.Series], **params: Any
     ) -> pd.Series:
         rv_z = features["rv_z"]
         px_abs = features["px_abs"]
-        px_q95 = features["px_q95"]
-        rv_q95 = features["rv_q95"]
-        return ((rv_z.shift(1) >= rv_q95).fillna(False) & (px_abs >= px_q95).fillna(False)).fillna(
+        px_threshold = features["px_threshold"]
+        rv_threshold = features["rv_threshold"]
+        return ((rv_z.shift(1) >= rv_threshold).fillna(False) & (px_abs >= px_threshold).fillna(False)).fillna(
             False
         )
 
@@ -141,13 +185,21 @@ class GapOvershootDetector(StatisticalBase):
 
     def prepare_features(self, df: pd.DataFrame, **params: Any) -> dict[str, pd.Series]:
         ret_abs = df["close"].pct_change(1).abs()
-        ret_q995 = ret_abs.rolling(2880, min_periods=288).quantile(0.995).shift(1)
-        return {"ret_abs": ret_abs, "ret_q995": ret_q995}
+        spec_params, _, threshold_window, min_periods = _stat_windows(self.event_type, params)
+        return_quantile = float(
+            params.get("return_quantile", spec_params.get("return_quantile", 0.995))
+        )
+        ret_threshold = (
+            ret_abs.rolling(threshold_window, min_periods=min_periods)
+            .quantile(return_quantile)
+            .shift(1)
+        )
+        return {"ret_abs": ret_abs, "ret_threshold": ret_threshold}
 
     def compute_raw_mask(
         self, df: pd.DataFrame, *, features: dict[str, pd.Series], **params: Any
     ) -> pd.Series:
-        return (features["ret_abs"] >= features["ret_q995"]).fillna(False)
+        return (features["ret_abs"] >= features["ret_threshold"]).fillna(False)
 
     def compute_intensity(
         self, df: pd.DataFrame, *, features: dict[str, pd.Series], **params: Any

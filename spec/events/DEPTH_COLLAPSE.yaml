@@ -7,6 +7,9 @@ signal_column: depth_collapse_event
 parameters:
   lookback_window: 288
   z_threshold: 3.0
+  spread_weight: 0.45
+  rv_weight: 0.35
+  depth_weight: 0.2
   cooldown_bars: 12
   merge_gap_bars: 0
   min_volume_quantile: 0.2
