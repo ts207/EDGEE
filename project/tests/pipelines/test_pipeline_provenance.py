@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
+
+import pytest
 
 from project.pipelines import pipeline_provenance as prov
 
@@ -67,6 +70,67 @@ def test_manifest_roundtrip_and_resume_resolution(tmp_path: Path, monkeypatch) -
     assert ontology_hash == "abc"
     assert existing["failed_stage_instance"] == "stage2"
     assert resume_from_index == 1
+
+
+def test_resume_resolution_rejects_manifest_with_external_effective_config(tmp_path: Path) -> None:
+    data_root = tmp_path / "data"
+    manifest_dir = data_root / "runs" / "run-1"
+    manifest_dir.mkdir(parents=True)
+    manifest_path = manifest_dir / "run_manifest.json"
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "ontology_spec_hash": "abc",
+                "effective_config_hash": "cfg",
+                "failed_stage_instance": "stage2",
+                "effective_config_path": "/tmp/external/effective_config.json",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="effective_config_path points outside active root"):
+        prov.resolve_existing_manifest_state(
+            existing_manifest_path=manifest_path,
+            ontology_hash="abc",
+            effective_config_hash="cfg",
+            allow_ontology_hash_mismatch=False,
+            planned_stage_instances=["stage1", "stage2", "stage3"],
+            resume_from_failed_stage=True,
+        )
+
+
+def test_resume_resolution_rejects_manifest_with_missing_repo_spec_path(tmp_path: Path) -> None:
+    data_root = tmp_path / "data"
+    manifest_dir = data_root / "runs" / "run-1"
+    manifest_dir.mkdir(parents=True)
+    manifest_path = manifest_dir / "run_manifest.json"
+    effective_config_path = manifest_dir / "effective_config.json"
+    effective_config_path.write_text('{"ok": true}\n', encoding="utf-8")
+    missing_objective = prov.PROJECT_ROOT.parent / "spec" / "objectives" / "missing_resume_test.yaml"
+
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "ontology_spec_hash": "abc",
+                "effective_config_hash": "cfg",
+                "failed_stage_instance": "stage2",
+                "effective_config_path": str(effective_config_path),
+                "objective_spec_path": str(missing_objective),
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(FileNotFoundError, match="objective_spec_path missing"):
+        prov.resolve_existing_manifest_state(
+            existing_manifest_path=manifest_path,
+            ontology_hash="abc",
+            effective_config_hash="cfg",
+            allow_ontology_hash_mismatch=False,
+            planned_stage_instances=["stage1", "stage2", "stage3"],
+            resume_from_failed_stage=True,
+        )
 
 
 

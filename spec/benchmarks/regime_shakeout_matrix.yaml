@@ -22,7 +22,7 @@ defaults:
     - long
     - short
   entry_lags:
-    - 0
+    - 1
   search_control:
     max_hypotheses_total: 96
     max_hypotheses_per_template: 48

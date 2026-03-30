@@ -350,7 +350,7 @@ def build_shakeout_proposal_payload(
         "templates": list(slice_def.templates),
         "horizons_bars": list(defaults.get("horizons_bars", [12, 24])),
         "directions": list(defaults.get("directions", ["long", "short"])),
-        "entry_lags": list(defaults.get("entry_lags", [0])),
+        "entry_lags": list(defaults.get("entry_lags", [1])),
         "contexts": dict(slice_def.contexts),
         "search_control": dict(defaults.get("search_control", {})),
         "artifacts": dict(defaults.get("artifacts", {})),

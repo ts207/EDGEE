@@ -72,9 +72,9 @@ done < <(git ls-files)
 echo "[hygiene] checking root directory clutter..."
 # Allowed files in root
 allowed_root=(
-  "CLAUDE.md" "GEMINI.md" "README.md" "CONTRIBUTING.md" "Makefile"
+  "AGENTS.md" "CLAUDE.md" "GEMINI.md" "README.md" "CONTRIBUTING.md" "Makefile"
   "pyproject.toml" "pyrightconfig.json" "pytest.ini" "requirements-dev.txt" "constraints.lock"
-  ".gitignore" ".dockerignore" ".editorconfig" "LICENSE" "LICENSE.md"
+  "research_backlog.csv" ".gitignore" ".dockerignore" ".editorconfig" "LICENSE" "LICENSE.md"
 )
 # Check for unexpected files in root (non-directories)
 for f in *; do

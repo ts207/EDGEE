@@ -361,6 +361,66 @@ def build_initial_run_manifest(**fields) -> Dict[str, object]:
     return dict(fields)
 
 
+def _validate_manifest_path_within_root(
+    raw_path: object,
+    *,
+    field_name: str,
+    base_root: Path,
+    require_exists: bool,
+) -> None:
+    value = str(raw_path or "").strip()
+    if not value or value == "in_memory":
+        return
+
+    candidate = Path(value)
+    if not candidate.is_absolute():
+        candidate = (base_root / candidate).resolve()
+    else:
+        candidate = candidate.resolve()
+
+    root = base_root.resolve()
+    try:
+        candidate.relative_to(root)
+    except ValueError as exc:
+        raise ValueError(
+            f"Resume manifest {field_name} points outside active root {root}: {candidate}"
+        ) from exc
+
+    if require_exists and not candidate.exists():
+        raise FileNotFoundError(f"Resume manifest {field_name} missing: {candidate}")
+
+
+def _validate_resume_manifest_provenance(
+    existing_manifest: Dict[str, object],
+    *,
+    existing_manifest_path: Path,
+) -> None:
+    if not existing_manifest:
+        return
+
+    data_root = existing_manifest_path.parents[2]
+    repo_root = PROJECT_ROOT.parent
+
+    _validate_manifest_path_within_root(
+        existing_manifest.get("effective_config_path", ""),
+        field_name="effective_config_path",
+        base_root=data_root,
+        require_exists=True,
+    )
+    _validate_manifest_path_within_root(
+        existing_manifest.get("objective_spec_path", ""),
+        field_name="objective_spec_path",
+        base_root=repo_root,
+        require_exists=True,
+    )
+    _validate_manifest_path_within_root(
+        existing_manifest.get("retail_profile_spec_path", ""),
+        field_name="retail_profile_spec_path",
+        base_root=repo_root,
+        require_exists=True,
+    )
+
+
 def resolve_existing_manifest_state(
     *,
     existing_manifest_path: Path,
@@ -397,6 +457,11 @@ def resolve_existing_manifest_state(
             and existing_effective_config_hash != effective_config_hash
         ):
             existing_manifest = {}
+        if resume_from_failed_stage and existing_manifest:
+            _validate_resume_manifest_provenance(
+                existing_manifest,
+                existing_manifest_path=existing_manifest_path,
+            )
 
     resume_from_index = 0
     if resume_from_failed_stage and existing_manifest:
