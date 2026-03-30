@@ -10,7 +10,7 @@ from project.research.services import confirmatory_candidate_service as svc
 def test_compare_confirmatory_candidates_matches_by_structural_key(tmp_path):
     data_root = tmp_path / "data"
     origin_dir = data_root / "reports" / "edge_candidates" / "origin_run"
-    target_dir = data_root / "reports" / "phase2" / "target_run" / "search_engine"
+    target_dir = data_root / "reports" / "phase2" / "target_run"
     origin_dir.mkdir(parents=True, exist_ok=True)
     target_dir.mkdir(parents=True, exist_ok=True)
 
@@ -131,9 +131,7 @@ def test_plan_confirmatory_window_reports_missing_forward_month(tmp_path):
     data_root = tmp_path / "data"
     (data_root / "runs" / "origin_run").mkdir(parents=True, exist_ok=True)
     (data_root / "runs" / "older_run").mkdir(parents=True, exist_ok=True)
-    (data_root / "reports" / "phase2" / "older_run" / "search_engine").mkdir(
-        parents=True, exist_ok=True
-    )
+    (data_root / "reports" / "phase2" / "older_run").mkdir(parents=True, exist_ok=True)
     (
         data_root
         / "lake"
@@ -173,7 +171,6 @@ def test_plan_confirmatory_window_reports_missing_forward_month(tmp_path):
         / "reports"
         / "phase2"
         / "older_run"
-        / "search_engine"
         / "phase2_candidates.parquet",
         index=False,
     )
@@ -200,7 +197,7 @@ def test_plan_confirmatory_window_reports_missing_forward_month(tmp_path):
 def test_adjacent_survivorship_classifies_fail_reasons(tmp_path):
     data_root = tmp_path / "data"
     origin_dir = data_root / "reports" / "edge_candidates" / "origin_run"
-    target_dir = data_root / "reports" / "phase2" / "target_run" / "search_engine"
+    target_dir = data_root / "reports" / "phase2" / "target_run"
     origin_dir.mkdir(parents=True, exist_ok=True)
     target_dir.mkdir(parents=True, exist_ok=True)
 
@@ -315,7 +312,7 @@ def test_build_confirmatory_workflow_payload_blocks_when_forward_data_missing(tm
 def test_build_confirmatory_workflow_payload_recommends_promotion_review_for_strict_pass(tmp_path):
     data_root = tmp_path / "data"
     origin_dir = data_root / "reports" / "edge_candidates" / "origin_run"
-    target_dir = data_root / "reports" / "phase2" / "target_run" / "search_engine"
+    target_dir = data_root / "reports" / "phase2" / "target_run"
     origin_dir.mkdir(parents=True, exist_ok=True)
     target_dir.mkdir(parents=True, exist_ok=True)
     (data_root / "runs" / "origin_run").mkdir(parents=True, exist_ok=True)
@@ -416,7 +413,7 @@ def test_build_confirmatory_workflow_payload_recommends_promotion_review_for_str
 def test_build_confirmatory_workflow_payload_blocks_missing_cost_identity(tmp_path):
     data_root = tmp_path / "data"
     origin_dir = data_root / "reports" / "edge_candidates" / "origin_run"
-    target_dir = data_root / "reports" / "phase2" / "target_run" / "search_engine"
+    target_dir = data_root / "reports" / "phase2" / "target_run"
     origin_dir.mkdir(parents=True, exist_ok=True)
     target_dir.mkdir(parents=True, exist_ok=True)
     (data_root / "runs" / "origin_run").mkdir(parents=True, exist_ok=True)

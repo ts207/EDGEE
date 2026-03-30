@@ -843,7 +843,7 @@ def _historical_phase2_candidate_paths(data_root: Path, *, current_run_id: str) 
     if not reports_root.exists():
         return []
     discovered: list[Path] = []
-    patterns = ["*/search_engine/phase2_candidates.parquet", "*/phase2_candidates.parquet"]
+    patterns = ["*/phase2_candidates.parquet", "*/search_engine/phase2_candidates.parquet"]
     for pattern in patterns:
         for path in reports_root.glob(pattern):
             run_id = _candidate_run_id_from_phase2_path(path)

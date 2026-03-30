@@ -170,8 +170,8 @@ Stop if the validated plan widens beyond the intended mechanism or regime.
 Read in this order:
 
 1. `data/runs/<run_id>/run_manifest.json`
-2. `data/reports/phase2/<run_id>/search_engine/phase2_diagnostics.json`
-3. `data/reports/phase2/<run_id>/search_engine/phase2_candidates.parquet`
+2. `data/reports/phase2/<run_id>/phase2_diagnostics.json`
+3. `data/reports/phase2/<run_id>/phase2_candidates.parquet`
 4. `data/reports/promotions/<run_id>/promotion_diagnostics.json`
 5. promotion tables and evidence bundles
 6. blueprint/spec artifacts if any candidate was promoted

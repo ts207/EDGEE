@@ -13,5 +13,5 @@ search_min_n: 8
 required_outputs:
   - synthetic/synthetic_2021_bull/synthetic_generation_manifest.json
   - synthetic/synthetic_2021_bull/synthetic_regime_segments.json
-  - reports/phase2/synthetic_2021_bull/search_engine/phase2_candidates.parquet
+  - reports/phase2/synthetic_2021_bull/phase2_candidates.parquet
   - reliability/golden_synthetic_discovery_summary.json

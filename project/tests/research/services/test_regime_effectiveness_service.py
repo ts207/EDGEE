@@ -6,6 +6,7 @@ from pathlib import Path
 import pandas as pd
 
 from project.research.services.regime_effectiveness_service import (
+    build_reports_for_run,
     compute_regime_effectiveness,
     write_regime_effectiveness_reports,
 )
@@ -93,3 +94,25 @@ def test_regime_effectiveness_writer_emits_run_scoped_artifacts(tmp_path):
     }
     written = {path.name for path in Path(artifacts.output_dir).iterdir()}
     assert expected.issubset(written)
+
+
+def test_build_reports_for_run_accepts_flat_phase2_layout(tmp_path):
+    run_id = "demo_run"
+    phase2_dir = tmp_path / "reports" / "phase2" / run_id
+    phase2_dir.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(
+        [
+            {
+                "event_type": "CROSS_ASSET_DESYNC_EVENT",
+                "symbol": "BTCUSDT",
+                "timestamp": "2024-01-01T00:00:00Z",
+                "duration_bars": 4,
+                "horizon": "24b",
+                "after_cost_expectancy": 0.0015,
+            }
+        ]
+    ).to_parquet(phase2_dir / "phase2_candidates.parquet", index=False)
+
+    artifacts = build_reports_for_run(run_id=run_id, data_root=tmp_path)
+
+    assert artifacts.output_dir == tmp_path / "reports" / "regime_effectiveness" / run_id
