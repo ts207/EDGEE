@@ -13,12 +13,14 @@ def resolve_search_profile(
     discovery_profile: str,
     search_spec: str,
     min_n: int,
-    min_t_stat: float,
+    min_t_stat: float | None,
 ) -> Dict[str, Any]:
     profile = str(discovery_profile or "standard").strip().lower()
     resolved_search_spec = str(search_spec or DEFAULT_SEARCH_SPEC).strip() or DEFAULT_SEARCH_SPEC
     resolved_min_n = int(min_n)
-    resolved_min_t_stat = float(min_t_stat)
+    resolved_min_t_stat = (
+        DEFAULT_MIN_T_STAT if min_t_stat is None else float(min_t_stat)
+    )
 
     if profile == "synthetic":
         if resolved_search_spec in {"", DEFAULT_SEARCH_SPEC, "spec/search_space.yaml"}:

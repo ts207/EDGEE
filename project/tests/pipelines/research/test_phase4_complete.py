@@ -38,6 +38,7 @@ from project.research.phase2_search_engine import (
     _REGIME_CANDIDATE_COLUMNS,
 )
 from project.research.update_campaign_memory import (
+    _build_belief_state,
     _build_next_actions,
     _load_regime_conditional_candidates,
 )
@@ -204,6 +205,23 @@ class TestLoadRegimeConditionalCandidates:
         with pytest.raises(DataIntegrityError):
             _load_regime_conditional_candidates(run_id="run_bad", data_root=tmp_path)
 
+    def test_prefers_flat_phase2_artifact_over_legacy_nested_path(self, tmp_path):
+        flat_dir = tmp_path / "reports" / "phase2" / "run_pref" 
+        nested_dir = flat_dir / "search_engine"
+        flat_dir.mkdir(parents=True, exist_ok=True)
+        nested_dir.mkdir(parents=True, exist_ok=True)
+        pd.DataFrame([{"event_type": "NESTED"}]).to_parquet(
+            nested_dir / "regime_conditional_candidates.parquet", index=False
+        )
+        pd.DataFrame([{"event_type": "FLAT"}]).to_parquet(
+            flat_dir / "regime_conditional_candidates.parquet", index=False
+        )
+
+        result = _load_regime_conditional_candidates(run_id="run_pref", data_root=tmp_path)
+
+        assert len(result) == 1
+        assert result.iloc[0]["event_type"] == "FLAT"
+
 
 class TestBuildNextActionsRegimeCandidates:
 
@@ -288,6 +306,114 @@ class TestBuildNextActionsRegimeCandidates:
         regime_entries = [e for e in result["explore_adjacent"]
                           if e.get("reason") == "strong regime slice despite weak aggregate result"]
         assert len(regime_entries) <= 5
+
+    def test_regime_entries_are_deduped_and_blank_recommended_scope_is_skipped(self):
+        regime_df = pd.DataFrame([
+            {
+                "event_type": "VOL_SHOCK", "template_id": "continuation", "direction": "short",
+                "horizon": "24b", "entry_lag": 2, "trigger_key": "event:VOL_SHOCK",
+                "t_stat": 0.9, "mean_return_bps": 4.1, "robustness_score": 0.3, "context_json": "{}",
+            },
+            {
+                "event_type": "VOL_SHOCK", "template_id": "continuation", "direction": "short",
+                "horizon": "24b", "entry_lag": 2, "trigger_key": "event:VOL_SHOCK",
+                "t_stat": 0.8, "mean_return_bps": 3.8, "robustness_score": 0.3, "context_json": "{}",
+            },
+        ])
+        result = _build_next_actions(
+            reflection={"recommended_next_experiment": json.dumps({"event_type": "", "primary_fail_gate": ""})},
+            tested_regions=pd.DataFrame(),
+            failures=pd.DataFrame(),
+            exploit_top_k=3,
+            repair_top_k=3,
+            regime_conditional_candidates=regime_df,
+        )
+        regime_entries = [e for e in result["explore_adjacent"]
+                          if e.get("reason") == "strong regime slice despite weak aggregate result"]
+        assert len(regime_entries) == 1
+        assert regime_entries[0]["proposed_scope"]["event_type"] == "VOL_SHOCK"
+        assert "best_regime" not in regime_entries[0]["proposed_scope"]
+        assert "contexts" not in regime_entries[0]["proposed_scope"]
+
+    def test_hold_reflection_suppresses_exploit_queue(self):
+        tested_regions = pd.DataFrame([
+            {
+                "event_type": "VOL_SHOCK",
+                "trigger_type": "EVENT",
+                "template_id": "continuation",
+                "direction": "short",
+                "horizon": "24b",
+                "entry_lag": 2,
+                "context_json": "{}",
+                "region_key": "rk1",
+                "after_cost_expectancy": 1.0,
+                "q_value": 0.2,
+                "gate_promo_statistical": False,
+            }
+        ])
+        result = _build_next_actions(
+            reflection={"recommended_next_action": "hold"},
+            tested_regions=tested_regions,
+            failures=pd.DataFrame(),
+            exploit_top_k=3,
+            repair_top_k=3,
+            regime_conditional_candidates=pd.DataFrame(),
+        )
+        assert result["exploit"] == []
+
+
+class TestBuildBeliefState:
+
+    def test_hold_reflection_suppresses_promising_regions(self):
+        tested_regions = pd.DataFrame([
+            {
+                "event_type": "VOL_SHOCK",
+                "trigger_type": "EVENT",
+                "template_id": "continuation",
+                "direction": "short",
+                "horizon": "24b",
+                "entry_lag": 2,
+                "context_json": "{}",
+                "region_key": "rk1",
+                "after_cost_expectancy": 1.0,
+                "q_value": 0.2,
+                "gate_promo_statistical": False,
+            }
+        ])
+        result = _build_belief_state(
+            tested_regions=tested_regions,
+            failures=pd.DataFrame(),
+            reflection={"recommended_next_action": "hold", "statistical_outcome": "no_signal"},
+            promising_top_k=3,
+            avoid_top_k=3,
+            repair_top_k=3,
+        )
+        assert result["promising_regions"] == []
+
+    def test_superseded_or_invalid_failures_do_not_surface_as_open_repairs(self):
+        failures = pd.DataFrame([
+            {
+                "stage": "None",
+                "failure_class": "run_failed_stage",
+                "failure_detail": "",
+                "superseded_by_run_id": "",
+            },
+            {
+                "stage": "phase2_search_engine",
+                "failure_class": "stage_failed",
+                "failure_detail": "boom",
+                "superseded_by_run_id": "resolved_run",
+            },
+        ])
+        result = _build_belief_state(
+            tested_regions=pd.DataFrame(),
+            failures=failures,
+            reflection={},
+            promising_top_k=3,
+            avoid_top_k=3,
+            repair_top_k=3,
+        )
+        assert result["open_repairs"] == []
 
 
 # ===========================================================================

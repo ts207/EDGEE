@@ -168,6 +168,7 @@ def test_main_short_circuits_when_expectancy_reports_no_evidence(tmp_path, monke
         ),
         encoding="utf-8",
     )
+    monkeypatch.setenv("BACKTEST_DATA_ROOT", str(tmp_path))
     monkeypatch.setattr(traps, "get_data_root", lambda: tmp_path)
 
     rc = traps.main(
@@ -186,3 +187,10 @@ def test_main_short_circuits_when_expectancy_reports_no_evidence(tmp_path, monke
     assert payload["skipped"] is True
     assert payload["skip_reason"] == "expectancy_analysis_reported_no_evidence"
     assert payload["survivors"] == []
+    manifest = json.loads(
+        (tmp_path / "runs" / "smoke_run" / "validate_expectancy_traps.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert manifest["status"] == "success"
+    assert manifest["stats"]["skip_reason"] == "expectancy_analysis_reported_no_evidence"

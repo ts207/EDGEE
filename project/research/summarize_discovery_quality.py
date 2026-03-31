@@ -11,6 +11,7 @@ from typing import Dict, List
 
 import pandas as pd
 
+from project.specs.manifest import finalize_manifest, start_manifest
 
 def _utc_now_iso() -> str:
     DATA_ROOT = get_data_root()
@@ -42,6 +43,7 @@ def _parse_args() -> argparse.Namespace:
         help="Optional output path for funnel summary (default: data/reports/<run_id>/funnel_summary.json).",
     )
     parser.add_argument("--top_fail_reasons", type=int, default=10)
+    parser.add_argument("--log_path", default="")
     return parser.parse_args()
 
 
@@ -683,32 +685,49 @@ def main() -> int:
         if args.funnel_out_path
         else DATA_ROOT / "reports" / args.run_id / "funnel_summary.json"
     )
+    outputs = [{"path": str(out_path)}, {"path": str(funnel_out_path)}]
+    if args.log_path:
+        outputs.append({"path": str(args.log_path)})
+    manifest = start_manifest("summarize_discovery_quality", args.run_id, vars(args), [], outputs)
 
-    payload = build_summary(
-        run_id=args.run_id,
-        phase2_root=phase2_root,
-        top_fail_reasons=int(args.top_fail_reasons),
-    )
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
-
-    funnel_payload = _build_funnel_payload(payload, top_fail_reasons=int(args.top_fail_reasons))
-    funnel_out_path.parent.mkdir(parents=True, exist_ok=True)
-    funnel_out_path.write_text(
-        json.dumps(funnel_payload, indent=2, sort_keys=True), encoding="utf-8"
-    )
-
-    print(
-        json.dumps(
-            {
-                "run_id": args.run_id,
-                "out_path": str(out_path),
-                "funnel_out_path": str(funnel_out_path),
-            },
-            sort_keys=True,
+    try:
+        payload = build_summary(
+            run_id=args.run_id,
+            phase2_root=phase2_root,
+            top_fail_reasons=int(args.top_fail_reasons),
         )
-    )
-    return 0
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+
+        funnel_payload = _build_funnel_payload(payload, top_fail_reasons=int(args.top_fail_reasons))
+        funnel_out_path.parent.mkdir(parents=True, exist_ok=True)
+        funnel_out_path.write_text(
+            json.dumps(funnel_payload, indent=2, sort_keys=True), encoding="utf-8"
+        )
+
+        print(
+            json.dumps(
+                {
+                    "run_id": args.run_id,
+                    "out_path": str(out_path),
+                    "funnel_out_path": str(funnel_out_path),
+                },
+                sort_keys=True,
+            )
+        )
+        finalize_manifest(
+            manifest,
+            "success",
+            stats={
+                "event_family_count": int(len(payload.get("event_families", []))),
+                "total_candidates": int(payload.get("total_candidates", 0) or 0),
+                "gate_pass_count": int(payload.get("gate_pass_count", 0) or 0),
+            },
+        )
+        return 0
+    except Exception as exc:
+        finalize_manifest(manifest, "failed", error=str(exc), stats={})
+        raise
 
 
 if __name__ == "__main__":

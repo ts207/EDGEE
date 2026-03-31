@@ -23,6 +23,7 @@ import numpy as np
 import pandas as pd
 
 from project.core.config import get_data_root
+from project.specs.gates import load_gates_spec, select_phase2_gate_spec
 from project.research.search.generator import generate_hypotheses_with_audit
 from project.research.search.distributed_runner import run_distributed_search
 from project.research.search.bridge_adapter import (
@@ -35,6 +36,17 @@ from project.io.utils import write_parquet
 
 
 LOG = logging.getLogger(__name__)
+
+
+def _resolve_search_min_t_stat(explicit_min_t_stat: float | None) -> float:
+    if explicit_min_t_stat is not None:
+        return float(explicit_min_t_stat)
+    phase2_gates = select_phase2_gate_spec(
+        load_gates_spec(Path(__file__).resolve().parents[2]),
+        mode="research",
+        gate_profile="auto",
+    )
+    return float(phase2_gates.get("min_t_stat", 1.5))
 
 
 # ---------------------------------------------------------------------------
@@ -310,7 +322,7 @@ def _make_parser() -> argparse.ArgumentParser:
         help="0 = auto (cpu_count)",
     )
     parser.add_argument("--chunk_size", type=int, default=256)
-    parser.add_argument("--min_t_stat", type=float, default=1.5)
+    parser.add_argument("--min_t_stat", type=float, default=None)
     parser.add_argument("--min_n", type=int, default=30)
     parser.add_argument("--use_context_quality", type=int, default=1)
     parser.add_argument(
@@ -364,6 +376,7 @@ def main() -> int:
     symbols = [s.strip().upper() for s in str(args.symbols).split(",") if s.strip()]
     n_workers = args.n_workers if args.n_workers > 0 else None
     search_space_path = Path(args.search_space_path) if args.search_space_path else None
+    resolved_min_t_stat = _resolve_search_min_t_stat(args.min_t_stat)
 
     features = _load_all_features(symbols, args.run_id, args.timeframe, data_root)
     try:
@@ -428,13 +441,13 @@ def main() -> int:
     _write_regime_conditional_candidates_from_breakdown(metrics, regime_breakdown, out_dir)
     _, gate_failures = split_bridge_candidates(
         metrics,
-        min_t_stat=args.min_t_stat,
+        min_t_stat=resolved_min_t_stat,
         min_n=args.min_n,
     )
     _write_evaluation_artifacts(out_dir, metrics, gate_failures)
 
     passing = (
-        int((metrics["t_stat"].abs() >= args.min_t_stat).sum())
+        int((metrics["t_stat"].abs() >= resolved_min_t_stat).sum())
         if (not metrics.empty and "t_stat" in metrics.columns)
         else 0
     )
@@ -468,7 +481,7 @@ def main() -> int:
     if int(args.run_bridge_adapter) and not metrics.empty:
         candidates = hypotheses_to_bridge_candidates(
             metrics,
-            min_t_stat=args.min_t_stat,
+            min_t_stat=resolved_min_t_stat,
             min_n=args.min_n,
         )
         write_parquet(candidates, out_dir / "bridge_candidates.parquet")

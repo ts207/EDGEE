@@ -15,6 +15,7 @@ import pandas as pd
 import numpy as np
 from project import PROJECT_ROOT
 
+from project.core.logging_utils import build_stage_log_handlers
 from project.core.timeframes import normalize_timeframe
 from project.io.utils import ensure_dir, write_parquet
 from project.research.services.pathing import bridge_event_out_dir
@@ -774,10 +775,7 @@ def main() -> int:
     parser.add_argument("--log_path", default=None)
     args = parser.parse_args()
 
-    log_handlers = [logging.StreamHandler(sys.stdout)]
-    if args.log_path:
-        ensure_dir(Path(args.log_path).parent)
-        log_handlers.append(logging.FileHandler(args.log_path))
+    log_handlers = build_stage_log_handlers(args.log_path)
     logging.basicConfig(
         level=logging.INFO, handlers=log_handlers, format="%(asctime)s %(levelname)s %(message)s"
     )

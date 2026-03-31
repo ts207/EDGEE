@@ -263,6 +263,40 @@ def test_update_edge_registry_falls_back_to_promotion_statistical_audit(monkeypa
     assert latest_snapshot.exists()
 
 
+def test_update_edge_registry_prefers_statistical_audit_when_both_paths_exist(
+    monkeypatch,
+    tmp_path,
+):
+    data_root = tmp_path / "data"
+    monkeypatch.setattr(update_edge_registry, "get_data_root", lambda: data_root)
+
+    _write_run_manifest(data_root, "r_both")
+    _write_promotions(data_root, "r_both", 0.01)
+    promo_dir = data_root / "reports" / "promotions" / "r_both"
+    pd.DataFrame(
+        [
+            {
+                "candidate_id": "cand_r_both",
+                "event_type": "NEW_EVENT",
+                "template_id": "mean_reversion",
+                "direction_rule": "contrarian",
+                "signal_polarity_logic": "shock_up_short_shock_down_long",
+                "promotion_score": 0.95,
+                "promotion_decision": "promoted",
+                "effect_shrunk_state": 0.03,
+                "stability_score": 0.5,
+            }
+        ]
+    ).to_parquet(promo_dir / "promotion_statistical_audit.parquet", index=False)
+
+    rc = update_edge_registry.main(["--run_id", "r_both"])
+
+    assert rc == 0
+    summary_path = data_root / "runs" / "r_both" / "research" / "edge_registry_summary.json"
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    assert summary["paths"]["promotion_audit_path"].endswith("promotion_statistical_audit.parquet")
+
+
 def test_update_edge_registry_noops_on_empty_promotion_artifacts(monkeypatch, tmp_path):
     data_root = tmp_path / "data"
     monkeypatch.setattr(update_edge_registry, "get_data_root", lambda: data_root)

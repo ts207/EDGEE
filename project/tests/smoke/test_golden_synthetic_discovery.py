@@ -19,7 +19,7 @@ class _Completed:
 def test_golden_synthetic_discovery_workflow_writes_summary(tmp_path: Path, monkeypatch) -> None:
     def _fake_runner(*, data_root: Path, argv: list[str]):
         run_id = argv[argv.index("--run_id") + 1]
-        out_dir = data_root / "reports" / "phase2" / run_id / "search_engine"
+        out_dir = data_root / "reports" / "phase2" / run_id
         ensure_dir(out_dir)
         write_parquet(
             pd.DataFrame([{"event_type": "CROSS_VENUE_DESYNC", "candidate_id": "cand-1"}]),
@@ -67,7 +67,7 @@ def test_golden_synthetic_discovery_applies_narrowing_overrides(
     def _fake_runner(*, data_root: Path, argv: list[str]):
         captured["argv"] = list(argv)
         run_id = argv[argv.index("--run_id") + 1]
-        out_dir = data_root / "reports" / "phase2" / run_id / "search_engine"
+        out_dir = data_root / "reports" / "phase2" / run_id
         ensure_dir(out_dir)
         write_parquet(pd.DataFrame(), out_dir / "phase2_candidates.parquet")
         (out_dir / "phase2_diagnostics.json").write_text(

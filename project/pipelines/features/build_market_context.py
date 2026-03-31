@@ -14,6 +14,7 @@ from project.core.config import get_data_root
 from project.core.context_quality import summarize_context_quality
 from project.core.feature_registry import ensure_market_context_feature_definitions_registered
 from project.core.feature_schema import feature_dataset_dir_name
+from project.core.logging_utils import build_stage_log_handlers
 from project.features.context_states import (
     calculate_ms_funding_probabilities,
     calculate_ms_liq_probabilities,
@@ -302,10 +303,7 @@ def main() -> int:
 
     data_root = get_data_root()
 
-    log_handlers = [logging.StreamHandler(sys.stdout)]
-    if args.log_path:
-        ensure_dir(Path(args.log_path).parent)
-        log_handlers.append(logging.FileHandler(args.log_path))
+    log_handlers = build_stage_log_handlers(args.log_path)
     logging.basicConfig(
         level=logging.INFO, handlers=log_handlers, format="%(asctime)s %(levelname)s %(message)s"
     )

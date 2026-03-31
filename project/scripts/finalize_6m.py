@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from project.research.services.pathing import resolve_phase2_candidates_path, resolve_phase2_diagnostics_path
 from project.scripts.run_golden_workflow import load_workflow_config
 from project.scripts.validate_synthetic_detector_truth import validate_detector_truth
 from project.scripts.run_golden_synthetic_discovery import _candidate_summary
@@ -18,15 +19,11 @@ truth_validation = validate_detector_truth(
     run_id=run_id,
     truth_map_path=truth_map_path,
 )
-search_diag_path = (
-    root / "reports" / "phase2" / run_id / "search_engine" / "phase2_diagnostics.json"
-)
+search_diag_path = resolve_phase2_diagnostics_path(data_root=root, run_id=run_id)
 search_diag = (
     json.loads(search_diag_path.read_text(encoding="utf-8")) if search_diag_path.exists() else {}
 )
-candidate_summary = _candidate_summary(
-    root / "reports" / "phase2" / run_id / "search_engine" / "phase2_candidates.parquet"
-)
+candidate_summary = _candidate_summary(resolve_phase2_candidates_path(data_root=root, run_id=run_id))
 
 payload = {
     "workflow_id": str(config.get("workflow_id", "golden_synthetic_discovery_v1")),

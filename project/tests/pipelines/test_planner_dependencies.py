@@ -107,3 +107,40 @@ def test_select_profitable_strategies_waits_for_strategy_candidates():
     deps = _resolve_dependencies("select_profitable_strategies", stage_names)
 
     assert deps == ["build_strategy_candidates"]
+
+
+def test_update_edge_registry_waits_for_edge_exports_when_promotion_is_disabled():
+    from project.pipelines.planner import _resolve_dependencies
+
+    stage_names = [
+        "phase2_search_engine",
+        "export_edge_candidates",
+        "update_edge_registry",
+    ]
+
+    deps = _resolve_dependencies("update_edge_registry", stage_names)
+
+    assert deps == ["export_edge_candidates"]
+
+
+def test_finalize_experiment_waits_for_research_tail_outputs():
+    from project.pipelines.planner import _resolve_dependencies
+
+    stage_names = [
+        "phase2_search_engine",
+        "summarize_discovery_quality",
+        "export_edge_candidates",
+        "update_edge_registry",
+        "update_campaign_memory",
+        "analyze_conditional_expectancy",
+        "validate_expectancy_traps",
+        "generate_recommendations_checklist",
+        "finalize_experiment",
+    ]
+
+    deps = _resolve_dependencies("finalize_experiment", stage_names)
+
+    assert "phase2_search_engine" in deps
+    assert "summarize_discovery_quality" in deps
+    assert "update_campaign_memory" in deps
+    assert "generate_recommendations_checklist" in deps

@@ -18,6 +18,19 @@ from project.research.gating import bh_adjust
 log = logging.getLogger(__name__)
 
 
+def _resolve_multiplicity_p_value_column(frame: pd.DataFrame) -> str:
+    """Return the operative p-value column for multiplicity controls.
+
+    `p_value_for_fdr` is the canonical input column for BH/BY. In raw evaluator
+    output it is just the unadjusted p-value; later stages may replace it with a
+    shrunk or otherwise transformed value intended for multiplicity control.
+    """
+    for candidate in ("p_value_for_fdr", "p_value_raw", "p_value"):
+        if candidate in frame.columns:
+            return candidate
+    raise KeyError("raw_df must contain one of p_value_for_fdr, p_value_raw, or p_value")
+
+
 def make_family_id(
     symbol: str,
     event_type: str,
@@ -134,7 +147,7 @@ def apply_multiplicity_controls(
     if eligible.empty:
         return out
 
-    p_col = "p_value_for_fdr" if "p_value_for_fdr" in eligible.columns else "p_value"
+    p_col = _resolve_multiplicity_p_value_column(eligible)
 
     # 1. Family Simes p-values
     family_simes = (

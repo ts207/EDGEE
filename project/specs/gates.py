@@ -113,6 +113,7 @@ def resolve_phase2_gate_params(
     if not isinstance(timeframe_consensus_timeframes, list):
         timeframe_consensus_timeframes = ["1m", "5m", "15m"]
     return {
+        "min_t_stat": float(_pick("min_t_stat", 1.5)),
         "max_q_value": float(_pick("max_q_value", 0.05)),
         "min_after_cost_expectancy_bps": float(_pick("min_after_cost_expectancy_bps", 0.1)),
         "min_sample_size": int(_pick("min_sample_size", 0) or 0),

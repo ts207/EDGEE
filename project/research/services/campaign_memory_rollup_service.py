@@ -15,6 +15,19 @@ def _top_records(frame: pd.DataFrame, sort_col: str, *, limit: int = 5) -> list[
     return frame.sort_values(sort_col, ascending=False).head(int(limit)).to_dict(orient="records")
 
 
+def _active_failures(frame: pd.DataFrame) -> pd.DataFrame:
+    if frame.empty:
+        return frame
+    out = frame.copy()
+    if "stage" in out.columns:
+        out = out[
+            ~out["stage"].astype(str).str.strip().str.lower().isin({"", "none", "null", "nan"})
+        ]
+    if "superseded_by_run_id" in out.columns:
+        out = out[out["superseded_by_run_id"].astype(str).str.strip() == ""]
+    return out.reset_index(drop=True)
+
+
 def build_campaign_memory_rollup(
     *,
     program_id: str,
@@ -68,8 +81,9 @@ def build_campaign_memory_rollup(
                 )
 
     unresolved_repairs = []
-    if not failures.empty:
-        unresolved_repairs = failures.head(int(top_k)).to_dict(orient="records")
+    active_failures = _active_failures(failures)
+    if not active_failures.empty:
+        unresolved_repairs = active_failures.head(int(top_k)).to_dict(orient="records")
 
     return {
         "schema_version": "campaign_memory_rollup_v1",

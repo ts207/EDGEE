@@ -69,3 +69,17 @@ def test_apply_multiplicity_controls_research_excludes_low_sample_rows():
     assert bool(low["multiplicity_pool_eligible"]) is False
     assert bool(eligible["multiplicity_pool_eligible"]) is True
     assert int(eligible["num_tests_event_family"]) == 1
+
+
+def test_apply_multiplicity_controls_falls_back_to_raw_p_value_column() -> None:
+    raw_df = pd.DataFrame(
+        [
+            {"candidate_id": "cand_1", "family_id": "fam_a", "p_value_raw": 0.01},
+            {"candidate_id": "cand_2", "family_id": "fam_b", "p_value_raw": 0.90},
+        ]
+    )
+
+    out = apply_multiplicity_controls(raw_df=raw_df, max_q=0.05)
+
+    assert "q_value" in out.columns
+    assert float(out.loc[out["candidate_id"] == "cand_1", "q_value"].iloc[0]) <= 0.05

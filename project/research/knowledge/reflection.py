@@ -179,6 +179,7 @@ def _classify_statistical_outcome(
     mechanical_outcome: str,
     promotion_audit: pd.DataFrame,
     edge_candidates: pd.DataFrame,
+    phase2_candidates: pd.DataFrame,
     discovery_summary: Dict[str, Any],
 ) -> Dict[str, Any]:
     candidate_count = 0
@@ -217,8 +218,19 @@ def _classify_statistical_outcome(
                 series = pd.to_numeric(edge_candidates[column], errors="coerce").fillna(0)
                 if not series.empty:
                     sample_floor = max(sample_floor, int(series.max()))
+    elif not phase2_candidates.empty:
+        candidate_count = int(len(phase2_candidates))
+        if "event_type" in phase2_candidates.columns:
+            top_event = _dominant_value(phase2_candidates["event_type"])
+        if "primary_fail_gate" in phase2_candidates.columns:
+            primary_fail_gate = _dominant_value(phase2_candidates["primary_fail_gate"])
+        for column in ("n_events", "sample_size", "validation_samples", "test_samples", "n"):
+            if column in phase2_candidates.columns:
+                series = pd.to_numeric(phase2_candidates[column], errors="coerce").fillna(0)
+                if not series.empty:
+                    sample_floor = max(sample_floor, int(series.max()))
     elif discovery_summary:
-        candidate_count = _int_like(discovery_summary.get("total_candidates", 0))
+        candidate_count = _int_like(discovery_summary.get("phase2_candidates", 0))
 
     if (
         mechanical_outcome in {"mechanical_failure", "artifact_contract_failure"}
@@ -478,6 +490,9 @@ def build_run_reflection(
     discovery_summary = _read_json(
         reports_root / "phase2" / run_id / "discovery_quality_summary.json"
     )
+    phase2_candidates = _read_optional_table(
+        reports_root / "phase2" / run_id / "phase2_candidates.parquet"
+    )
     promotion_audit = _read_optional_table(
         reports_root / "promotions" / run_id / "promotion_statistical_audit.parquet"
     )
@@ -508,6 +523,7 @@ def build_run_reflection(
         mechanical_outcome=str(mechanical["outcome"]),
         promotion_audit=promotion_audit,
         edge_candidates=edge_candidates,
+        phase2_candidates=phase2_candidates,
         discovery_summary=discovery_summary,
     )
     anomalies = _detect_anomalies(

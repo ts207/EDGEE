@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from project.events.event_repository import _read_phase1_events
+from project.events.event_repository import _read_phase1_events, merge_registry_events
 from project.events.event_specs import EventRegistrySpec
 
 
@@ -31,3 +31,34 @@ def test_read_phase1_events_logs_read_failures(monkeypatch, tmp_path, caplog):
 
     assert out.empty
     assert "Failed to read phase1 events" in caplog.text
+
+
+def test_merge_registry_events_handles_all_na_columns_without_warning(caplog):
+    existing = pd.DataFrame(
+        [
+            {
+                "timestamp": "2026-01-01T00:00:00Z",
+                "symbol": "BTCUSDT",
+                "event_type": "A",
+                "event_id": "a1",
+                "unused": pd.NA,
+            }
+        ]
+    )
+    incoming = pd.DataFrame(
+        [
+            {
+                "timestamp": "2026-01-01T00:05:00Z",
+                "symbol": "BTCUSDT",
+                "event_type": "B",
+                "event_id": "b1",
+                "unused": pd.NA,
+            }
+        ]
+    )
+
+    with caplog.at_level(logging.WARNING):
+        out = merge_registry_events(existing=existing, incoming=incoming, selected_event_types=None)
+
+    assert len(out) == 1
+    assert caplog.records == []

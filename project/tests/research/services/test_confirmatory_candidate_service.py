@@ -556,3 +556,119 @@ def test_compare_confirmatory_candidates_requires_entry_lag_match(tmp_path):
 
     assert "entry_lag_bars" in payload["structural_key_columns"]
     assert payload["matched_summary"]["matched_structural_rows"] == 0
+
+
+def test_plan_confirmatory_window_discovers_flat_phase2_targets(tmp_path):
+    data_root = tmp_path / "data"
+    (data_root / "runs" / "origin_run").mkdir(parents=True, exist_ok=True)
+    (data_root / "runs" / "target_run").mkdir(parents=True, exist_ok=True)
+    (data_root / "runs" / "origin_run" / "run_manifest.json").write_text(
+        json.dumps(
+            {
+                "run_id": "origin_run",
+                "start": "2025-01-01",
+                "end": "2025-01-31",
+                "normalized_symbols": ["BTCUSDT"],
+            }
+        ),
+        encoding="utf-8",
+    )
+    (data_root / "runs" / "target_run" / "run_manifest.json").write_text(
+        json.dumps(
+            {
+                "run_id": "target_run",
+                "start": "2025-02-01",
+                "end": "2025-02-28",
+                "normalized_symbols": ["BTCUSDT"],
+            }
+        ),
+        encoding="utf-8",
+    )
+    (
+        data_root
+        / "lake"
+        / "raw"
+        / "binance"
+        / "perp"
+        / "BTCUSDT"
+        / "funding"
+        / "year=2025"
+        / "month=01"
+    ).mkdir(parents=True, exist_ok=True)
+    (
+        data_root
+        / "lake"
+        / "raw"
+        / "binance"
+        / "perp"
+        / "BTCUSDT"
+        / "funding"
+        / "year=2025"
+        / "month=02"
+    ).mkdir(parents=True, exist_ok=True)
+    (data_root / "reports" / "phase2" / "target_run").mkdir(parents=True, exist_ok=True)
+    pd.DataFrame([{"candidate_id": "flat"}]).to_parquet(
+        data_root / "reports" / "phase2" / "target_run" / "phase2_candidates.parquet",
+        index=False,
+    )
+
+    payload = svc.plan_confirmatory_window(
+        data_root=data_root,
+        origin_run_id="origin_run",
+    )
+
+    assert [row["run_id"] for row in payload["target_runs_considered"]] == ["target_run"]
+    assert payload["nearest_forward_local_target"]["run_id"] == "target_run"
+
+
+def test_compare_confirmatory_candidates_supports_flat_phase2_layout(tmp_path):
+    data_root = tmp_path / "data"
+    origin_dir = data_root / "reports" / "edge_candidates" / "origin_run"
+    target_dir = data_root / "reports" / "phase2" / "target_run"
+    origin_dir.mkdir(parents=True, exist_ok=True)
+    target_dir.mkdir(parents=True, exist_ok=True)
+
+    pd.DataFrame(
+        [
+            {
+                "candidate_id": "origin_1",
+                "symbol": "BTCUSDT",
+                "event_type": "STATE_CHOP_STATE",
+                "direction": "long",
+                "rule_template": "continuation",
+                "horizon": "60m",
+                "gate_bridge_tradable": "pass",
+                "q_value": 0.01,
+            }
+        ]
+    ).to_parquet(origin_dir / "edge_candidates_normalized.parquet", index=False)
+    pd.DataFrame(
+        [
+            {
+                "candidate_id": "target_a",
+                "symbol": "BTCUSDT",
+                "event_type": "STATE_CHOP_STATE",
+                "direction": "long",
+                "rule_template": "continuation",
+                "horizon": "60m",
+                "gate_oos_validation": True,
+                "gate_after_cost_positive": True,
+                "gate_after_cost_stressed_positive": True,
+                "gate_bridge_tradable": True,
+                "gate_multiplicity": True,
+                "gate_c_regime_stable": True,
+                "gate_multiplicity_strict": True,
+                "q_value": 0.03,
+            }
+        ]
+    ).to_parquet(target_dir / "phase2_candidates.parquet", index=False)
+
+    payload = svc.compare_confirmatory_candidates(
+        data_root=data_root,
+        origin_run_id="origin_run",
+        target_run_id="target_run",
+    )
+
+    assert payload["target_summary"]["candidate_count"] == 1
+    assert payload["matched_summary"]["matched_structural_rows"] == 1
+    assert payload["target_path"].endswith("/reports/phase2/target_run/phase2_candidates.parquet")

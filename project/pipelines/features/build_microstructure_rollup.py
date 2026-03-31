@@ -140,6 +140,9 @@ def main(argv=None) -> int:
     parser.add_argument("--start", default=None)
     parser.add_argument("--end", default=None)
     parser.add_argument("--out_dir", default=None)
+    parser.add_argument("--timeframe", default="5m")
+    parser.add_argument("--force", type=int, default=0)
+    parser.add_argument("--log_path", default=None)
     args = parser.parse_args(argv if argv is not None else sys.argv[1:])
 
     out_dir = (
@@ -200,3 +203,7 @@ def main(argv=None) -> int:
 def build_microstructure_rollup(bars: pd.DataFrame, symbol: str) -> pd.DataFrame:
     """Public API wrapper."""
     return _build_rollup(symbol, bars)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -174,3 +174,98 @@ def test_validate_symbol_logs_single_drift_summary(monkeypatch, tmp_path, caplog
         "Drift detected in 'y': KS p-value = 0.0200",
     ]
     assert "BTCUSDT feature drift summary: 2 flagged columns (x, y)" in caplog.text
+
+
+def test_validate_symbol_ignores_optional_feed_columns_without_source(monkeypatch, tmp_path):
+    data_root = tmp_path / "data"
+    symbol = "BTCUSDT"
+    run_id = "r_optional"
+    _write_csv(
+        data_root / "lake" / "runs" / run_id / "cleaned" / "perp" / symbol / "bars_5m" / "bars.csv",
+        pd.DataFrame({"gap_len": [0.0, 0.0, 0.0], "is_gap": [0, 0, 0]}),
+    )
+    feature_dir = (
+        data_root
+        / "lake"
+        / "runs"
+        / run_id
+        / "features"
+        / "perp"
+        / symbol
+        / "5m"
+        / feature_dataset_dir_name()
+    )
+    _write_csv(
+        feature_dir / "run.csv",
+        pd.DataFrame(
+            {
+                "spot_close": [None, None, None],
+                "basis_bps": [None, None, None],
+                "basis_zscore": [None, None, None],
+                "cross_exchange_spread_z": [None, None, None],
+                "basis_spot_coverage": [0.0, 0.0, 0.0],
+                "liquidation_notional": [0.0, 0.0, 0.0],
+                "liquidation_count": [0.0, 0.0, 0.0],
+                "funding_missing": [0.0, 0.0, 0.0],
+                "imbalance": [0.0, 0.0, 0.0],
+                "revision_lag_bars": [0, 0, 0],
+                "revision_lag_minutes": [0, 0, 0],
+            }
+        ),
+    )
+    monkeypatch.setattr(integrity, "detect_feature_drift", lambda *_args, **_kwargs: [])
+
+    issues = integrity.validate_symbol(data_root, run_id, symbol, timeframe="5m")
+
+    assert "features" not in issues
+
+
+def test_validate_symbol_flags_spot_dependent_nans_when_spot_source_exists(monkeypatch, tmp_path):
+    data_root = tmp_path / "data"
+    symbol = "BTCUSDT"
+    run_id = "r_spot"
+    feature_dir = (
+        data_root
+        / "lake"
+        / "runs"
+        / run_id
+        / "features"
+        / "perp"
+        / symbol
+        / "5m"
+        / feature_dataset_dir_name()
+    )
+    _write_csv(
+        feature_dir / "run.csv",
+        pd.DataFrame(
+            {
+                "spot_close": [None, None, 100.0],
+                "basis_bps": [None, None, 10.0],
+                "basis_zscore": [None, None, 1.0],
+                "cross_exchange_spread_z": [None, None, 1.0],
+            }
+        ),
+    )
+    _write_csv(
+        data_root
+        / "lake"
+        / "raw"
+        / "binance"
+        / "spot"
+        / symbol
+        / "ohlcv_5m"
+        / "spot.csv",
+        pd.DataFrame({"timestamp": ["2024-01-01T00:00:00Z"], "close": [100.0]}),
+    )
+    monkeypatch.setattr(integrity, "detect_feature_drift", lambda *_args, **_kwargs: [])
+
+    issues = integrity.validate_symbol(
+        data_root,
+        run_id,
+        symbol,
+        timeframe="5m",
+        nan_threshold=0.5,
+    )
+
+    assert "features" in issues
+    assert any("spot_close" in issue for issue in issues["features"])

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from types import SimpleNamespace
 
 import pandas as pd
@@ -322,6 +323,14 @@ def test_kpi_payload_hydrates_from_promotion_statistical_audit_when_missing(tmp_
     assert checklist._metric_value(hydrated, "oos_sign_consistency") == 0.75
     assert checklist._metric_value(hydrated, "turnover_proxy_mean") == 1.0
     assert checklist._metric_value(hydrated, "max_drawdown_pct") == -0.2
+
+
+def test_metric_value_treats_missing_kpi_as_default_without_warning(caplog) -> None:
+    with caplog.at_level(logging.WARNING):
+        out = checklist._metric_value({"metrics": {"trade_count": {"value": None}}}, "trade_count")
+
+    assert out == 0.0
+    assert caplog.records == []
 
 
 def test_main_writes_warning_manifest_and_exits_zero_on_keep_research(tmp_path, monkeypatch):

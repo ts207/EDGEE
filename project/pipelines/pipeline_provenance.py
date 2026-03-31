@@ -192,17 +192,26 @@ def _get_data_root() -> Path:
     return Path(os.getenv("BACKTEST_DATA_ROOT", PROJECT_ROOT.parent / "data"))
 
 
-def write_run_manifest(run_id: str, manifest: Dict[str, object]) -> None:
+def write_run_manifest(
+    run_id: str,
+    manifest: Dict[str, object],
+    *,
+    data_root: Path | None = None,
+) -> None:
     """Writes the run manifest to disk."""
-    path = _get_data_root() / "runs" / run_id / "run_manifest.json"
+    path = Path(data_root or _get_data_root()) / "runs" / run_id / "run_manifest.json"
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as f:
         json.dump(manifest, f, indent=2, sort_keys=True)
 
 
-def read_run_manifest(run_id: str) -> Dict[str, object]:
+def read_run_manifest(
+    run_id: str,
+    *,
+    data_root: Path | None = None,
+) -> Dict[str, object]:
     """Reads the run manifest from disk."""
-    root = _get_data_root()
+    root = Path(data_root or _get_data_root())
     path = root / "runs" / run_id / "run_manifest.json"
     if not path.exists():
         return {}
@@ -227,7 +236,7 @@ def reconcile_run_manifest_from_stage_manifests(
         except Exception:
             run_manifest = {}
     else:
-        run_manifest = read_run_manifest(run_id)
+        run_manifest = read_run_manifest(run_id, data_root=root)
     if not run_manifest:
         return {}
 
@@ -304,7 +313,7 @@ def reconcile_run_manifest_from_stage_manifests(
         run_manifest["failed_stage_instance"] = None
         if stage_finished_times:
             run_manifest["finished_at"] = max(stage_finished_times)
-    write_run_manifest(run_id, run_manifest)
+    write_run_manifest(run_id, run_manifest, data_root=root)
     return run_manifest
 
 

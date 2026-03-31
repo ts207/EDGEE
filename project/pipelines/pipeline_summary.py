@@ -24,6 +24,14 @@ def load_kpi_source_frame(run_id: str) -> Tuple[Optional[Any], Optional[str], Op
         return None, None, None
 
     candidate_paths = [
+        (
+            report_dir / "promotions" / run_id / "promotion_statistical_audit.parquet",
+            "promotion_audit",
+        ),
+        (
+            report_dir / "promotions" / run_id / "promotion_statistical_audit.csv",
+            "promotion_audit",
+        ),
         (report_dir / "promotions" / run_id / "promotion_audit.parquet", "promotion_audit"),
         (report_dir / "promotions" / run_id / "promotion_audit.csv", "promotion_audit"),
         (report_dir / "promotions" / run_id / "promoted_candidates.parquet", "promoted_candidates"),

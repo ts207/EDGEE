@@ -129,10 +129,28 @@ def _build_summary(program_id: str, tested_regions: pd.DataFrame, *, top_k: int)
         ranked["_gate_rank"] = ranked["gate_promo_statistical"].apply(_gate_rank)
     else:
         ranked["_gate_rank"] = 0
+    ranked["_after_cost_expectancy"] = pd.to_numeric(
+        ranked.get("after_cost_expectancy", pd.Series(dtype=float)),
+        errors="coerce",
+    )
+    ranked["_q_value"] = pd.to_numeric(
+        ranked.get("q_value", pd.Series(dtype=float)),
+        errors="coerce",
+    )
+    statistically_supported = ranked["_gate_rank"] >= 2
+    if "_q_value" in ranked.columns:
+        statistically_supported = statistically_supported | (
+            ranked["_q_value"].notna() & (ranked["_q_value"] <= 0.10)
+        )
+    ranked = ranked[
+        statistically_supported
+        & ranked["_after_cost_expectancy"].notna()
+        & (ranked["_after_cost_expectancy"] > 0)
+    ].copy()
 
     summary["top_performing_regions"] = (
         ranked.sort_values(
-            ["_gate_rank", "after_cost_expectancy", "q_value"],
+            ["_gate_rank", "_after_cost_expectancy", "_q_value"],
             ascending=[False, False, True],
         )
         .head(int(top_k))[

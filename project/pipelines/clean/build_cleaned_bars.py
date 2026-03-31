@@ -26,6 +26,7 @@ from project.specs.manifest import (
     start_manifest,
     validate_input_provenance,
 )
+from project.core.logging_utils import build_stage_log_handlers
 from project.core.validation import (
     FUNDING_SCALE_NAME_TO_MULTIPLIER,
     assert_funding_event_grid,
@@ -230,10 +231,7 @@ def main() -> int:
     bars_dataset = bars_dataset_name(timeframe)
     ohlcv_dataset = ohlcv_dataset_name(timeframe)
 
-    log_handlers = [logging.StreamHandler(sys.stdout)]
-    if args.log_path:
-        ensure_dir(Path(args.log_path).parent)
-        log_handlers.append(logging.FileHandler(args.log_path))
+    log_handlers = build_stage_log_handlers(args.log_path)
     logging.basicConfig(
         level=logging.INFO, handlers=log_handlers, format="%(asctime)s %(levelname)s %(message)s"
     )

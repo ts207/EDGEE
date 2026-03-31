@@ -11,6 +11,7 @@ from typing import Dict, List
 
 import pandas as pd
 
+from project.core.logging_utils import build_stage_log_handlers
 from project.events.registry import (
     EVENT_REGISTRY_SPECS,
     assert_event_specs_available,
@@ -50,9 +51,7 @@ def main() -> int:
     args = parser.parse_args()
 
     # Configure logging
-    log_handlers = [logging.StreamHandler(sys.stdout)]
-    if args.log_path:
-        log_handlers.append(logging.FileHandler(args.log_path))
+    log_handlers = build_stage_log_handlers(args.log_path)
     logging.basicConfig(
         level=logging.INFO, handlers=log_handlers, format="%(asctime)s %(levelname)s %(message)s"
     )
@@ -177,7 +176,7 @@ def main() -> int:
             # Ensure timestamp itself is int64
             events["timestamp"] = (
                 pd.to_datetime(events["timestamp"], utc=True, errors="coerce")
-                .view("int64") // 10**6
+                .astype("int64") // 10**6
             )
             for _ts_col in (
                 "phenom_enter_ts",
@@ -193,7 +192,7 @@ def main() -> int:
                     ts_ser = pd.to_datetime(events[_ts_col], utc=True, errors="coerce")
                     # Fallback to main timestamp where values are NaT
                     ts_ser = ts_ser.fillna(pd.to_datetime(events["timestamp"], unit="ms", utc=True))
-                    events[_ts_col] = ts_ser.view("int64") // 10**6
+                    events[_ts_col] = ts_ser.astype("int64") // 10**6
 
             logging.info("Validating events against EventRegistrySchema")
             EventRegistrySchema.validate(events)

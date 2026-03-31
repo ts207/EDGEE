@@ -174,3 +174,34 @@ def test_build_run_reflection_marks_sample_limited_runs_as_inconclusive(tmp_path
     assert reflection["statistical_outcome"] == "inconclusive_due_to_sample"
     assert reflection["recommended_next_action"] == "rerun_same_scope"
     assert next_experiment["event_type"] == "FND_DISLOC"
+
+
+def test_build_run_reflection_uses_final_phase2_candidates_not_discovery_total(tmp_path, monkeypatch):
+    data_root = tmp_path
+    run_id = "r4"
+    reports_root = data_root / "reports"
+    (reports_root / "phase2" / run_id).mkdir(parents=True, exist_ok=True)
+
+    _write_run_manifest(
+        data_root,
+        run_id,
+        {
+            "planned_stages": ["phase2_search_engine"],
+            "status": "success",
+        },
+    )
+    (reports_root / "phase2" / run_id / "discovery_quality_summary.json").write_text(
+        json.dumps({"total_candidates": 32, "phase2_candidates": 0}),
+        encoding="utf-8",
+    )
+    pd.DataFrame([]).to_parquet(
+        reports_root / "phase2" / run_id / "phase2_candidates.parquet",
+        index=False,
+    )
+
+    monkeypatch.setenv("BACKTEST_DATA_ROOT", str(data_root))
+    reflection = build_run_reflection(run_id=run_id)
+
+    assert reflection["candidate_count"] == 0
+    assert reflection["statistical_outcome"] == "no_signal"
+    assert reflection["recommended_next_action"] == "hold"

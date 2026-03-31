@@ -8,6 +8,7 @@ from project.specs.gates import load_gates_spec, resolve_phase2_gate_params, sel
 
 def test_resolve_phase2_gate_params_applies_event_override():
     gate_v1_phase2 = {
+        "min_t_stat": 1.5,
         "max_q_value": 0.05,
         "min_after_cost_expectancy_bps": 0.1,
         "min_sample_size": 50,
@@ -23,6 +24,7 @@ def test_resolve_phase2_gate_params_applies_event_override():
     }
 
     cfg = resolve_phase2_gate_params(gate_v1_phase2, "OI_SPIKE_NEGATIVE")
+    assert cfg["min_t_stat"] == 1.5
     assert cfg["max_q_value"] == 0.05
     assert cfg["min_after_cost_expectancy_bps"] == 0.0
     assert cfg["conservative_cost_multiplier"] == 1.1
@@ -60,14 +62,15 @@ def test_select_phase2_gate_spec_auto_production_uses_promotion_profile():
 
 def test_select_phase2_gate_spec_supports_synthetic_profile():
     gates_spec = {
-        "gate_v1_phase2": {"max_q_value": 0.05, "min_sample_size": 50},
+        "gate_v1_phase2": {"min_t_stat": 1.5, "max_q_value": 0.05, "min_sample_size": 50},
         "gate_v1_phase2_profiles": {
-            "synthetic": {"max_q_value": 0.35, "min_sample_size": 8},
+            "synthetic": {"min_t_stat": 0.25, "max_q_value": 0.35, "min_sample_size": 8},
         },
     }
     selected = p2_spec._select_phase2_gate_spec(
         gates_spec, mode="research", gate_profile="synthetic"
     )
+    assert selected["min_t_stat"] == 0.25
     assert selected["max_q_value"] == 0.35
     assert selected["min_sample_size"] == 8
     assert selected["_resolved_profile"] == "synthetic"

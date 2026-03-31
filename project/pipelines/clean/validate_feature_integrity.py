@@ -23,6 +23,32 @@ from project.eval.drift_detection import detect_feature_drift
 
 LOGGER = logging.getLogger(__name__)
 
+_CONSTANT_OK_COLUMNS = {
+    "funding_missing",
+    "gap_len",
+    "is_gap",
+    "revision_lag_bars",
+    "revision_lag_minutes",
+}
+_TOB_DEPENDENT_COLUMNS = {
+    "imbalance",
+    "tob_coverage",
+}
+_SPOT_DEPENDENT_COLUMNS = {
+    "basis_bps",
+    "basis_spot_coverage",
+    "basis_zscore",
+    "cross_exchange_spread_z",
+    "spot_close",
+}
+_LIQUIDATION_DEPENDENT_COLUMNS = {
+    "liquidation_count",
+    "liquidation_notional",
+}
+_OI_DEPENDENT_COLUMNS = {
+    "oi_notional",
+}
+
 
 def _report_path(data_root: Path, *, run_id: str, timeframe: str) -> Path:
     return (
@@ -54,8 +80,73 @@ def _summarize_drift_flags(symbol: str, drift_flags: List[Dict[str, float]]) -> 
     )
 
 
-def check_nans(df: pd.DataFrame, threshold: float = 0.05) -> List[str]:
+def _has_source_artifacts(candidates: list[Path]) -> bool:
+    source_dir = choose_partition_dir(candidates)
+    if not source_dir:
+        return False
+    return bool(list_parquet_files(source_dir))
+
+
+def _ignored_feature_columns(
+    *,
+    data_root: Path,
+    run_id: str,
+    symbol: str,
+    timeframe: str,
+) -> tuple[set[str], set[str]]:
+    ignored_nan_columns: set[str] = set()
+    ignored_constant_columns = set(_CONSTANT_OK_COLUMNS)
+
+    spot_candidates = [
+        run_scoped_lake_path(data_root, run_id, "cleaned", "spot", symbol, f"bars_{timeframe}"),
+        data_root / "lake" / "cleaned" / "spot" / symbol / f"bars_{timeframe}",
+        run_scoped_lake_path(data_root, run_id, "raw", "binance", "spot", symbol, f"ohlcv_{timeframe}"),
+        data_root / "lake" / "raw" / "binance" / "spot" / symbol / f"ohlcv_{timeframe}",
+    ]
+    if not _has_source_artifacts(spot_candidates):
+        ignored_nan_columns.update(_SPOT_DEPENDENT_COLUMNS)
+        ignored_constant_columns.update(_SPOT_DEPENDENT_COLUMNS)
+
+    liquidation_candidates = [
+        run_scoped_lake_path(data_root, run_id, "raw", "binance", "perp", symbol, "liquidations"),
+        data_root / "lake" / "raw" / "binance" / "perp" / symbol / "liquidations",
+        run_scoped_lake_path(data_root, run_id, "raw", "binance", "perp", symbol, "liquidation_snapshot"),
+        data_root / "lake" / "raw" / "binance" / "perp" / symbol / "liquidation_snapshot",
+    ]
+    if not _has_source_artifacts(liquidation_candidates):
+        ignored_nan_columns.update(_LIQUIDATION_DEPENDENT_COLUMNS)
+        ignored_constant_columns.update(_LIQUIDATION_DEPENDENT_COLUMNS)
+
+    oi_candidates = [
+        run_scoped_lake_path(data_root, run_id, "raw", "binance", "perp", symbol, "open_interest", timeframe),
+        data_root / "lake" / "raw" / "binance" / "perp" / symbol / "open_interest" / timeframe,
+        run_scoped_lake_path(data_root, run_id, "raw", "binance", "perp", symbol, "open_interest"),
+        data_root / "lake" / "raw" / "binance" / "perp" / symbol / "open_interest",
+    ]
+    if not _has_source_artifacts(oi_candidates):
+        ignored_nan_columns.update(_OI_DEPENDENT_COLUMNS)
+        ignored_constant_columns.update(_OI_DEPENDENT_COLUMNS)
+
+    tob_candidates = [
+        run_scoped_lake_path(data_root, run_id, "cleaned", "perp", symbol, "tob_5m_agg"),
+        data_root / "lake" / "cleaned" / "perp" / symbol / "tob_5m_agg",
+    ]
+    if not _has_source_artifacts(tob_candidates):
+        ignored_constant_columns.update(_TOB_DEPENDENT_COLUMNS)
+
+    return ignored_nan_columns, ignored_constant_columns
+
+
+def check_nans(
+    df: pd.DataFrame,
+    threshold: float = 0.05,
+    *,
+    ignored_columns: set[str] | None = None,
+) -> List[str]:
+    ignored = ignored_columns or set()
     nan_pcts = df.isna().mean()
+    if ignored:
+        nan_pcts = nan_pcts.drop(labels=[col for col in ignored if col in nan_pcts.index])
     failing_cols = nan_pcts[nan_pcts > threshold]
     return [
         f"Column '{col}' has {pct:.2%} NaNs (threshold {threshold:.2%})"
@@ -63,13 +154,19 @@ def check_nans(df: pd.DataFrame, threshold: float = 0.05) -> List[str]:
     ]
 
 
-def check_constant_values(df: pd.DataFrame) -> List[str]:
+def check_constant_values(
+    df: pd.DataFrame,
+    *,
+    ignored_columns: set[str] | None = None,
+) -> List[str]:
+    ignored = ignored_columns or set()
     num_df = df.select_dtypes(include=[np.number])
     if num_df.empty:
         return []
     nunique = num_df.nunique()
     all_nan = num_df.isna().all()
     constant_cols = nunique[(nunique <= 1) & (~all_nan)].index
+    constant_cols = [col for col in constant_cols if col not in ignored]
     return [f"Column '{col}' is constant." for col in constant_cols]
 
 
@@ -125,7 +222,8 @@ def validate_symbol(
         df_bars = read_parquet(list_parquet_files(bars_dir))
         if not df_bars.empty:
             bars_issues = check_nans(df_bars, threshold=nan_threshold) + check_constant_values(
-                df_bars
+                df_bars,
+                ignored_columns={"gap_len", "is_gap"},
             )
             if bars_issues:
                 symbol_issues["bars"] = bars_issues
@@ -142,10 +240,16 @@ def validate_symbol(
     if features_dir:
         df_feats = read_parquet(list_parquet_files(features_dir))
         if not df_feats.empty:
+            ignored_nan_columns, ignored_constant_columns = _ignored_feature_columns(
+                data_root=data_root,
+                run_id=run_id,
+                symbol=symbol,
+                timeframe=timeframe,
+            )
             feature_quality_summary = summarize_feature_quality(df_feats)
             feat_issues = (
-                check_nans(df_feats, threshold=nan_threshold)
-                + check_constant_values(df_feats)
+                check_nans(df_feats, threshold=nan_threshold, ignored_columns=ignored_nan_columns)
+                + check_constant_values(df_feats, ignored_columns=ignored_constant_columns)
                 + check_outliers(df_feats, z_threshold=z_threshold)
             )
 

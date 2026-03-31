@@ -233,3 +233,8 @@ def test_reconcile_run_manifest_respects_explicit_data_root(tmp_path, monkeypatc
     reconciled = provenance.reconcile_run_manifest_from_stage_manifests(run_id, data_root=data_root)
 
     assert reconciled["status"] == "success"
+    persisted = json.loads(
+        (data_root / "runs" / run_id / "run_manifest.json").read_text(encoding="utf-8")
+    )
+    assert persisted["status"] == "success"
+    assert not (tmp_path / "wrong_data" / "runs" / run_id / "run_manifest.json").exists()

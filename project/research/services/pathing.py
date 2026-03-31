@@ -29,6 +29,47 @@ def phase2_diagnostics_path(
     return phase2_run_dir(data_root=data_root, run_id=run_id) / "phase2_diagnostics.json"
 
 
+def resolve_phase2_artifact(
+    *,
+    data_root: Path,
+    run_id: str,
+    filename: str,
+) -> Path:
+    run_dir = phase2_run_dir(data_root=data_root, run_id=run_id)
+    candidates = [
+        run_dir / str(filename),
+        run_dir / "search_engine" / str(filename),
+    ]
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    return candidates[0]
+
+
+def resolve_phase2_candidates_path(
+    *,
+    data_root: Path,
+    run_id: str,
+) -> Path:
+    return resolve_phase2_artifact(
+        data_root=data_root,
+        run_id=run_id,
+        filename="phase2_candidates.parquet",
+    )
+
+
+def resolve_phase2_diagnostics_path(
+    *,
+    data_root: Path,
+    run_id: str,
+) -> Path:
+    return resolve_phase2_artifact(
+        data_root=data_root,
+        run_id=run_id,
+        filename="phase2_diagnostics.json",
+    )
+
+
 def phase2_hypotheses_dir(
     *,
     data_root: Path,

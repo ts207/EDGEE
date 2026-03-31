@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pandas as pd
 import yaml
 
+import project.research.phase2_search_engine as search_engine
 from project.research.phase2_search_engine import (
     _classify_metrics_counts,
+    _resolve_search_min_t_stat,
     _write_event_scoped_search_spec,
 )
 
@@ -70,3 +73,53 @@ def test_classify_metrics_counts_separates_min_sample_rejections() -> None:
     assert valid_metrics_rows == 2
     assert rejected_by_min_n == 1
     assert rejected_invalid_metrics == 1
+
+
+def test_resolve_search_min_t_stat_uses_phase2_gate_default_when_cli_omitted() -> None:
+    assert _resolve_search_min_t_stat(explicit_min_t_stat=None, phase2_gates={"min_t_stat": 1.75}) == 1.75
+
+
+def test_resolve_search_min_t_stat_prefers_explicit_cli_override() -> None:
+    assert _resolve_search_min_t_stat(explicit_min_t_stat=2.25, phase2_gates={"min_t_stat": 1.75}) == 2.25
+
+
+def test_main_writes_real_manifest(tmp_path: Path, monkeypatch) -> None:
+    run_id = "phase2_manifest_run"
+    monkeypatch.setenv("BACKTEST_DATA_ROOT", str(tmp_path))
+
+    def _fake_run(**kwargs) -> int:
+        out_dir = kwargs["out_dir"]
+        out_dir.mkdir(parents=True, exist_ok=True)
+        pd.DataFrame(
+            [{"candidate_id": "cand_1", "event_type": "VOL_SHOCK", "edge_score": 1.0}]
+        ).to_parquet(
+            search_engine.phase2_candidates_path(run_id=run_id, data_root=tmp_path), index=False
+        )
+        (out_dir / "regime_conditional_candidates.parquet").parent.mkdir(parents=True, exist_ok=True)
+        pd.DataFrame([{"candidate_id": "adj_1"}]).to_parquet(
+            out_dir / "regime_conditional_candidates.parquet",
+            index=False,
+        )
+        search_engine.phase2_diagnostics_path(run_id=run_id, data_root=tmp_path).write_text(
+            json.dumps(
+                {
+                    "hypotheses_generated": 4,
+                    "valid_metrics_rows": 4,
+                    "rejected_hypotheses": 3,
+                    "final_candidate_count": 1,
+                }
+            ),
+            encoding="utf-8",
+        )
+        return 0
+
+    monkeypatch.setattr(search_engine, "run", _fake_run)
+
+    rc = search_engine.main(["--run_id", run_id, "--symbols", "BTCUSDT", "--data_root", str(tmp_path)])
+
+    assert rc == 0
+    manifest = json.loads((tmp_path / "runs" / run_id / "phase2_search_engine.json").read_text())
+    assert manifest["status"] == "success"
+    assert manifest["stats"]["final_candidate_count"] == 1
+    assert manifest["stats"]["candidate_rows"] == 1
+    assert manifest["stats"]["regime_conditional_candidate_rows"] == 1

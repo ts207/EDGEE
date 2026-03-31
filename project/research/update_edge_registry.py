@@ -402,18 +402,18 @@ def main(argv: List[str] | None = None) -> int:
     audit_path = (
         Path(args.promotion_audit_path)
         if args.promotion_audit_path
-        else DATA_ROOT / "reports" / "promotions" / args.run_id / "promotion_audit.parquet"
+        else DATA_ROOT / "reports" / "promotions" / args.run_id / "promotion_statistical_audit.parquet"
     )
     if not audit_path.exists() and not args.promotion_audit_path:
-        statistical_audit_path = (
+        legacy_audit_path = (
             DATA_ROOT
             / "reports"
             / "promotions"
             / args.run_id
-            / "promotion_statistical_audit.parquet"
+            / "promotion_audit.parquet"
         )
-        if statistical_audit_path.exists():
-            audit_path = statistical_audit_path
+        if legacy_audit_path.exists():
+            audit_path = legacy_audit_path
     capital_footprint_path = (
         Path(args.promotion_capital_footprint_path)
         if args.promotion_capital_footprint_path

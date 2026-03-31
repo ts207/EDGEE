@@ -20,8 +20,10 @@ import pandas as pd
 import yaml
 
 from project import PROJECT_ROOT
+from project.core.logging_utils import build_stage_log_handlers
 from project.domain.compiled_registry import get_domain_registry
 from project.spec_registry import load_yaml_path
+from project.specs.manifest import finalize_manifest, start_manifest
 from project.specs.gates import load_gates_spec, select_bridge_gate_spec, select_phase2_gate_spec
 from project.research.search.profile import resolve_search_profile
 from project.research.search.generator import generate_hypotheses_with_audit
@@ -59,6 +61,8 @@ _DEFAULT_BROAD_SEARCH_SPECS = {
     "search_space.yaml",
     "spec/search_space.yaml",
 }
+
+_DEFAULT_PHASE2_MIN_T_STAT = 1.5
 
 
 def _is_default_broad_search_spec(search_spec: str) -> bool:
@@ -209,12 +213,26 @@ def _merge_rejection_reason_counts(
     return counts
 
 
+def _resolve_search_min_t_stat(
+    *,
+    explicit_min_t_stat: float | None,
+    phase2_gates: Mapping[str, Any],
+) -> float:
+    if explicit_min_t_stat is not None:
+        return float(explicit_min_t_stat)
+    raw = phase2_gates.get("min_t_stat", _DEFAULT_PHASE2_MIN_T_STAT)
+    return float(raw)
+
+
 # Phase 4.2 — regime-conditional candidate discovery signal columns
 _REGIME_CANDIDATE_COLUMNS = [
+    "hypothesis_id",
     "event_type",
     "template_id",
     "direction",
     "horizon",
+    "entry_lag",
+    "entry_lag_bars",
     "trigger_key",
     "t_stat",
     "mean_return_bps",
@@ -288,10 +306,13 @@ def _write_regime_conditional_candidates(
             event_type = tkey
 
         out_rows.append({
+            "hypothesis_id": str(row.get("hypothesis_id", "")),
             "event_type": event_type,
             "template_id": str(row.get("template_id", "")),
             "direction": str(row.get("direction", "")),
             "horizon": str(row.get("horizon", "")),
+            "entry_lag": int(row.get("entry_lag", row.get("entry_lag_bars", 0)) or 0),
+            "entry_lag_bars": int(row.get("entry_lag_bars", row.get("entry_lag", 0)) or 0),
             "trigger_key": tkey,
             "t_stat": float(row.get(t_col, 0.0)),
             "mean_return_bps": float(row.get(ret_col, 0.0)),
@@ -362,7 +383,7 @@ def run(
     gate_profile: str = "auto",
     search_spec: str = "full",
     chunk_size: int = 500,
-    min_t_stat: float = 1.5,
+    min_t_stat: float | None = None,
     min_n: int = 30,
     search_budget: Optional[int] = None,
     experiment_config: Optional[str] = None,
@@ -385,11 +406,21 @@ def run(
     diagnostics_path = phase2_diagnostics_path(data_root=data_root, run_id=run_id)
     symbols_requested = [s.strip().upper() for s in str(symbols).split(",") if s.strip()]
     timeframe = str(timeframe or "5m").strip().lower() or "5m"
+    gates_spec = load_gates_spec(PROJECT_ROOT.parent)
+    phase2_gates = select_phase2_gate_spec(
+        gates_spec,
+        mode="research",
+        gate_profile=str(gate_profile or "auto"),
+    )
+    bridge_gates = select_bridge_gate_spec(gates_spec)
     search_profile = resolve_search_profile(
         discovery_profile=discovery_profile,
         search_spec=search_spec,
         min_n=min_n,
-        min_t_stat=min_t_stat,
+        min_t_stat=_resolve_search_min_t_stat(
+            explicit_min_t_stat=min_t_stat,
+            phase2_gates=phase2_gates,
+        ),
     )
     resolved_search_spec = _write_event_scoped_search_spec(
         search_spec=str(search_profile["search_spec"]),
@@ -398,12 +429,6 @@ def run(
     )
     resolved_min_n = int(search_profile["min_n"])
     resolved_min_t_stat = float(search_profile["min_t_stat"])
-    phase2_gates = select_phase2_gate_spec(
-        load_gates_spec(PROJECT_ROOT.parent),
-        mode="research",
-        gate_profile=str(gate_profile or "auto"),
-    )
-    bridge_gates = select_bridge_gate_spec(load_gates_spec(PROJECT_ROOT.parent))
     multiplicity_max_q = float(phase2_gates.get("max_q_value", 0.05))
 
     # 1. Load data and evaluate symbols
@@ -833,7 +858,7 @@ def main(argv=None) -> int:
     parser.add_argument("--search_spec", default="spec/search_space.yaml")
     parser.add_argument("--phase2_event_type", default="")
     parser.add_argument("--chunk_size", type=int, default=500)
-    parser.add_argument("--min_t_stat", type=float, default=1.5)
+    parser.add_argument("--min_t_stat", type=float, default=None)
     parser.add_argument("--min_n", type=int, default=30)
     parser.add_argument("--search_budget", type=int, default=None)
     parser.add_argument("--use_context_quality", type=int, default=1)
@@ -844,11 +869,13 @@ def main(argv=None) -> int:
     parser.add_argument(
         "--registry_root", default="project/configs/registries", help="Root for event registries."
     )
+    parser.add_argument("--log_path", default=None)
 
     args = parser.parse_args(argv)
 
     logging.basicConfig(
         level=logging.INFO,
+        handlers=build_stage_log_handlers(args.log_path),
         format="%(asctime)s %(levelname)s %(name)s %(message)s",
     )
 
@@ -856,25 +883,69 @@ def main(argv=None) -> int:
 
     data_root = Path(args.data_root) if args.data_root else get_data_root()
     out_dir = phase2_run_dir(data_root=data_root, run_id=args.run_id)
+    candidate_path = phase2_candidates_path(run_id=args.run_id, data_root=data_root)
+    diagnostics_path = phase2_diagnostics_path(run_id=args.run_id, data_root=data_root)
+    regime_candidates_path = out_dir / "regime_conditional_candidates.parquet"
+    outputs = [
+        {"path": str(candidate_path)},
+        {"path": str(diagnostics_path)},
+        {"path": str(regime_candidates_path)},
+    ]
+    if args.log_path:
+        outputs.append({"path": str(args.log_path)})
+    manifest = start_manifest("phase2_search_engine", args.run_id, vars(args), [], outputs)
 
-    return run(
-        run_id=args.run_id,
-        symbols=args.symbols,
-        data_root=data_root,
-        out_dir=out_dir,
-        timeframe=args.timeframe,
-        discovery_profile=args.discovery_profile,
-        gate_profile=args.gate_profile,
-        search_spec=args.search_spec,
-        chunk_size=args.chunk_size,
-        min_t_stat=args.min_t_stat,
-        min_n=args.min_n,
-        search_budget=args.search_budget,
-        use_context_quality=bool(int(args.use_context_quality)),
-        experiment_config=args.experiment_config,
-        registry_root=args.registry_root,
-        phase2_event_type=args.phase2_event_type,
-    )
+    rc = 1
+    stats: dict[str, object] = {}
+    try:
+        rc = run(
+            run_id=args.run_id,
+            symbols=args.symbols,
+            data_root=data_root,
+            out_dir=out_dir,
+            timeframe=args.timeframe,
+            discovery_profile=args.discovery_profile,
+            gate_profile=args.gate_profile,
+            search_spec=args.search_spec,
+            chunk_size=args.chunk_size,
+            min_t_stat=args.min_t_stat,
+            min_n=args.min_n,
+            search_budget=args.search_budget,
+            use_context_quality=bool(int(args.use_context_quality)),
+            experiment_config=args.experiment_config,
+            registry_root=args.registry_root,
+            phase2_event_type=args.phase2_event_type,
+        )
+        if diagnostics_path.exists():
+            try:
+                diagnostics_payload = json.loads(diagnostics_path.read_text(encoding="utf-8"))
+                for key in (
+                    "hypotheses_generated",
+                    "valid_metrics_rows",
+                    "rejected_hypotheses",
+                    "final_candidate_count",
+                ):
+                    if key in diagnostics_payload:
+                        stats[key] = diagnostics_payload[key]
+            except Exception:
+                pass
+        if candidate_path.exists():
+            try:
+                stats["candidate_rows"] = int(len(pd.read_parquet(candidate_path)))
+            except Exception:
+                pass
+        if regime_candidates_path.exists():
+            try:
+                stats["regime_conditional_candidate_rows"] = int(
+                    len(pd.read_parquet(regime_candidates_path))
+                )
+            except Exception:
+                pass
+        finalize_manifest(manifest, "success" if rc == 0 else "failed", stats=stats)
+        return rc
+    except Exception as exc:
+        finalize_manifest(manifest, "failed", error=str(exc), stats=stats)
+        raise
 
 
 if __name__ == "__main__":

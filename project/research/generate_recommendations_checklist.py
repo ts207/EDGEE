@@ -77,7 +77,10 @@ def _load_json(path: Path) -> Dict[str, Any]:
 
 
 def _metric_value(payload: Dict[str, Any], name: str, default: float = 0.0) -> float:
-    return safe_float(payload.get("metrics", {}).get(name, {}).get("value"), default)
+    value = payload.get("metrics", {}).get(name, {}).get("value")
+    if value is None:
+        return float(default)
+    return safe_float(value, default, context=f"kpi_metric:{name}")
 
 
 def _read_table(parquet_path: Path, csv_path: Path) -> pd.DataFrame:

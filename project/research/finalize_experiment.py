@@ -12,7 +12,9 @@ import sys
 import pandas as pd
 from project.core.config import get_data_root
 from project.core.exceptions import DataIntegrityError
+from project.core.logging_utils import build_stage_log_handlers
 from project.artifacts import phase2_candidates_path
+from project.specs.manifest import finalize_manifest, start_manifest
 
 _LOG = logging.getLogger(__name__)
 
@@ -192,6 +194,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--run_id", required=True)
     parser.add_argument("--program_id", required=True)
     parser.add_argument("--data_root", default=None)
+    parser.add_argument("--log_path", default=None)
     return parser
 
 
@@ -199,7 +202,35 @@ def main(argv=None):
     parser = build_parser()
     args = parser.parse_args(argv)
     data_root = Path(args.data_root) if args.data_root else get_data_root()
-    return int(finalize_experiment(data_root, args.program_id, args.run_id))
+    logging.basicConfig(
+        level=logging.INFO,
+        handlers=build_stage_log_handlers(args.log_path),
+        format="%(asctime)s %(levelname)s %(name)s %(message)s",
+    )
+    exp_dir = data_root / "artifacts" / "experiments" / args.program_id / args.run_id
+    outputs = [{"path": str(exp_dir / "summary.json")}]
+    if args.log_path:
+        outputs.append({"path": str(args.log_path)})
+    manifest = start_manifest("finalize_experiment", args.run_id, vars(args), [], outputs)
+    try:
+        rc = int(finalize_experiment(data_root, args.program_id, args.run_id))
+        stats: dict[str, object] = {}
+        summary_path = exp_dir / "summary.json"
+        if summary_path.exists():
+            try:
+                summary_payload = json.loads(summary_path.read_text(encoding="utf-8"))
+                stats = {
+                    key: summary_payload[key]
+                    for key in ("total_hypotheses", "evaluated_hypotheses", "passed_hypotheses")
+                    if key in summary_payload
+                }
+            except Exception:
+                stats = {}
+        finalize_manifest(manifest, "success" if rc == 0 else "failed", stats=stats)
+        return rc
+    except Exception as exc:
+        finalize_manifest(manifest, "failed", error=str(exc), stats={})
+        raise
 
 
 if __name__ == "__main__":

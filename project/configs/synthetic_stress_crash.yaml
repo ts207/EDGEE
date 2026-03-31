@@ -13,4 +13,4 @@ search_min_n: 8
 required_outputs:
   - synthetic/synthetic_stress_crash/synthetic_generation_manifest.json
   - synthetic/synthetic_stress_crash/synthetic_regime_segments.json
-  - reports/phase2/synthetic_stress_crash/search_engine/phase2_candidates.parquet
+  - reports/phase2/synthetic_stress_crash/phase2_candidates.parquet

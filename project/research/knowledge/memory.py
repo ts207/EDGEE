@@ -24,6 +24,7 @@ from project.research.knowledge.schemas import (
     stable_hash,
 )
 from project.research.search.bridge_adapter import canonical_bridge_event_type
+from project.research.services.pathing import resolve_phase2_candidates_path
 
 # Phase 1.3 — gate names that indicate each failure cause class.
 # Used by classify_failure_cause() to populate failure_cause_class on tested regions.
@@ -424,7 +425,13 @@ def _canonical_event_type_from_trigger(
         return existing_event_type
     normalized_type = str(trigger_type or "").strip().lower()
     if normalized_type == "event":
-        return str(trigger_payload.get("event_id", "") or "").strip().upper()
+        event_id = str(trigger_payload.get("event_id", "") or "").strip().upper()
+        if event_id:
+            return event_id
+        trigger_text = str(trigger_key or "").strip()
+        if trigger_text.lower().startswith("event:"):
+            return trigger_text.split(":", 1)[1].strip().upper()
+        return trigger_text.upper()
     if normalized_type == "state":
         state_id = str(trigger_payload.get("state_id", "") or "").strip().upper()
         if state_id:
@@ -458,14 +465,20 @@ def build_tested_regions_snapshot(
     data_root: Path | None = None,
 ) -> pd.DataFrame:
     resolved_data_root = Path(data_root) if data_root is not None else get_data_root()
+    manifest_path = resolved_data_root / "runs" / run_id / "run_manifest.json"
+    if manifest_path.exists():
+        try:
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except Exception:
+            manifest = {}
+    else:
+        manifest = load_run_manifest(run_id)
+        if not isinstance(manifest, dict):
+            manifest = {}
     # Prioritize high-fidelity discovery metrics for research runs
-    phase2_path = (
-        resolved_data_root
-        / "reports"
-        / "phase2"
-        / run_id
-        / "search_engine"
-        / "phase2_candidates.parquet"
+    phase2_path = resolve_phase2_candidates_path(
+        data_root=resolved_data_root,
+        run_id=run_id,
     )
     promotion_path = (
         resolved_data_root
@@ -500,18 +513,46 @@ def build_tested_regions_snapshot(
                 break
 
     if df.empty:
+        hypothesis_root = resolved_data_root / "reports" / "phase2" / run_id / "hypotheses"
+        evaluated_frames: list[pd.DataFrame] = []
+        if hypothesis_root.exists():
+            for evaluated_path in sorted(hypothesis_root.glob("*/evaluated_hypotheses.parquet")):
+                evaluated_df = _read_best_available(evaluated_path)
+                if not evaluated_df.empty:
+                    symbol_scope = evaluated_path.parent.name
+                    evaluated_df = evaluated_df.copy()
+                    if "symbol" not in evaluated_df.columns:
+                        evaluated_df["symbol"] = symbol_scope
+                    evaluated_frames.append(evaluated_df)
+        if evaluated_frames:
+            df = pd.concat(evaluated_frames, ignore_index=True)
+
+    if df.empty:
         return pd.DataFrame(columns=TESTED_REGION_COLUMNS)
 
-    expanded_hypotheses_path = (
-        resolved_data_root
-        / "artifacts"
-        / "experiments"
-        / program_id
-        / run_id
-        / "expanded_hypotheses.parquet"
-    )
+    expanded_hypotheses_path = None
+    experiment_config_path = (
+        manifest.get("config_resolution", {}) if isinstance(manifest.get("config_resolution"), dict) else {}
+    ).get("experiment_config_path")
+    if experiment_config_path:
+        experiment_path = Path(str(experiment_config_path))
+        candidate = experiment_path.parent / "expanded_hypotheses.parquet"
+        if candidate.exists():
+            expanded_hypotheses_path = candidate
+    if expanded_hypotheses_path is None:
+        legacy_candidate = (
+            resolved_data_root
+            / "artifacts"
+            / "experiments"
+            / program_id
+            / run_id
+            / "expanded_hypotheses.parquet"
+        )
+        if legacy_candidate.exists():
+            expanded_hypotheses_path = legacy_candidate
+
     trigger_payload_by_hypothesis: Dict[str, Dict[str, Any]] = {}
-    if expanded_hypotheses_path.exists():
+    if expanded_hypotheses_path is not None and expanded_hypotheses_path.exists():
         try:
             expanded_hypotheses = pd.read_parquet(expanded_hypotheses_path)
             for row in expanded_hypotheses.to_dict(orient="records"):
@@ -557,7 +598,9 @@ def build_tested_regions_snapshot(
         )
         payload = {
             "program_id": program_id,
-            "symbol_scope": str(row.get("symbol", row.get("symbols", ""))).strip(),
+            "symbol_scope": str(
+                row.get("symbol", row.get("symbols", manifest.get("normalized_symbols", "")))
+            ).strip(),
             "event_type": event_type,
             "trigger_type": trigger_type,
             "template_id": str(row.get("template_id", row.get("template", ""))).strip(),
@@ -597,23 +640,43 @@ def build_tested_regions_snapshot(
                     row.get("promotion_decision", row.get("eval_status", "evaluated"))
                 ).strip()
                 or "evaluated",
-                "train_n_obs": int(row.get("train_n_obs", row.get("sample_size", 0)) or 0),
+                "train_n_obs": int(
+                    row.get("train_n_obs", row.get("n", row.get("sample_size", 0))) or 0
+                ),
                 "validation_n_obs": int(
                     row.get("validation_n_obs", row.get("validation_samples", 0)) or 0
                 ),
                 "test_n_obs": int(row.get("test_n_obs", row.get("test_samples", 0)) or 0),
-                "q_value": pd.to_numeric(row.get("q_value"), errors="coerce"),
+                "q_value": pd.to_numeric(
+                    row.get(
+                        "q_value",
+                        row.get(
+                            "p_value_adj",
+                            row.get(
+                                "p_value_for_fdr",
+                                row.get("p_value_raw"),
+                            ),
+                        ),
+                    ),
+                    errors="coerce",
+                ),
                 "mean_return_bps": pd.to_numeric(
                     row.get(
                         "mean_return_bps",
-                        row.get("bridge_validation_after_cost_bps", row.get("net_expectancy_bps")),
+                        row.get(
+                            "cost_adjusted_return_bps",
+                            row.get("bridge_validation_after_cost_bps", row.get("net_expectancy_bps")),
+                        ),
                     ),
                     errors="coerce",
                 ),
                 "after_cost_expectancy": pd.to_numeric(
                     row.get(
                         "after_cost_expectancy",
-                        row.get("after_cost_expectancy_per_trade", row.get("net_expectancy_bps")),
+                        row.get(
+                            "cost_adjusted_return_bps",
+                            row.get("after_cost_expectancy_per_trade", row.get("net_expectancy_bps")),
+                        ),
                     ),
                     errors="coerce",
                 ),
@@ -673,7 +736,10 @@ def build_failures_snapshot(
     else:
         manifest = load_run_manifest(run_id)
     rows: List[Dict[str, Any]] = []
-    failed_stage = str(manifest.get("failed_stage", "")).strip()
+    raw_failed_stage = manifest.get("failed_stage", "")
+    failed_stage = str(raw_failed_stage).strip() if raw_failed_stage is not None else ""
+    if failed_stage.lower() in {"none", "null"}:
+        failed_stage = ""
     if failed_stage:
         rows.append(
             {

@@ -206,6 +206,7 @@ def run_stage(
     env["BACKTEST_RUN_ID"] = run_id
     env["BACKTEST_STAGE_INSTANCE_ID"] = stage_instance_id
     env["BACKTEST_FEATURE_SCHEMA_VERSION"] = feature_schema_version
+    env["BACKTEST_STAGE_STDOUT_CAPTURED"] = "1"
     if current_pipeline_session_id:
         env["BACKTEST_PIPELINE_SESSION_ID"] = current_pipeline_session_id
 

@@ -7,6 +7,8 @@ from typing import Any, Dict, List
 
 import pandas as pd
 
+from project.research.services.pathing import resolve_phase2_candidates_path
+
 
 BASE_STRUCTURAL_KEY_COLUMNS = ["symbol", "event_type", "direction", "rule_template", "horizon"]
 STRICT_OPTIONAL_STRUCTURAL_KEY_COLUMNS = [
@@ -259,8 +261,12 @@ def _run_symbols(manifest: Dict[str, Any]) -> List[str]:
 def _candidate_target_run_ids(data_root: Path) -> List[str]:
     out: List[str] = []
     reports_root = data_root / "reports" / "phase2"
-    for path in sorted(reports_root.glob("*/search_engine/phase2_candidates.parquet")):
-        out.append(path.parent.parent.name)
+    if not reports_root.exists():
+        return out
+    for run_dir in sorted(path for path in reports_root.iterdir() if path.is_dir()):
+        candidate_path = resolve_phase2_candidates_path(data_root=data_root, run_id=run_dir.name)
+        if candidate_path.exists():
+            out.append(run_dir.name)
     return out
 
 
@@ -380,12 +386,7 @@ def compare_confirmatory_candidates(
         / "edge_candidates_normalized.parquet"
     )
     target_path = (
-        data_root
-        / "reports"
-        / "phase2"
-        / target_run_id
-        / "search_engine"
-        / "phase2_candidates.parquet"
+        resolve_phase2_candidates_path(data_root=data_root, run_id=target_run_id)
     )
 
     origin_raw = _read_parquet(origin_path)
@@ -547,12 +548,7 @@ def build_adjacent_survivorship_payload(
         / "edge_candidates_normalized.parquet"
     )
     target_path = (
-        data_root
-        / "reports"
-        / "phase2"
-        / target_run_id
-        / "search_engine"
-        / "phase2_candidates.parquet"
+        resolve_phase2_candidates_path(data_root=data_root, run_id=target_run_id)
     )
     origin_raw = _read_parquet(origin_path)
     target_raw = _read_parquet(target_path)

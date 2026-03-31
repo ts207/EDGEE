@@ -12,6 +12,6 @@ search_budget: 256
 required_outputs:
   - synthetic/{run_id}/synthetic_generation_manifest.json
   - synthetic/{run_id}/synthetic_regime_segments.json
-  - reports/phase2/{run_id}/search_engine/phase2_candidates.parquet
-  - reports/phase2/{run_id}/search_engine/phase2_diagnostics.json
+  - reports/phase2/{run_id}/phase2_candidates.parquet
+  - reports/phase2/{run_id}/phase2_diagnostics.json
   - reliability/golden_synthetic_discovery_summary.json

@@ -49,7 +49,10 @@ def main() -> int:
     parser.add_argument("--review", help="Path to benchmark_review.json")
     parser.add_argument("--cert", help="Path to benchmark_certification.json")
     parser.add_argument("--conf-plan", help="Path to confirmatory_window_plan.json")
-    parser.add_argument("--audit", help="Path to promotion_audit.parquet or .csv")
+    parser.add_argument(
+        "--audit",
+        help="Path to promotion_statistical_audit.parquet/.csv or legacy promotion_audit.parquet/.csv",
+    )
     parser.add_argument("--out-dir", help="Directory to save JSON and MD reports.")
     args = parser.parse_args()
 

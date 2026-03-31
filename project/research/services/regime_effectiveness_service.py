@@ -12,6 +12,7 @@ from project.core.config import get_data_root
 from project.events.ontology_deconfliction import deconflict_event_episodes
 from project.io.utils import ensure_dir, read_parquet, write_parquet
 from project.research.regime_routing import annotate_regime_metadata, recommended_bucket_for_regime
+from project.research.services.pathing import resolve_phase2_candidates_path
 
 
 RETURN_COLUMNS = (
@@ -349,7 +350,7 @@ def write_regime_effectiveness_reports(
 
 
 def build_reports_for_run(*, run_id: str, data_root: Path) -> RegimeEffectivenessArtifacts:
-    phase2_path = data_root / "reports" / "phase2" / run_id / "search_engine" / "phase2_candidates.parquet"
+    phase2_path = resolve_phase2_candidates_path(data_root=data_root, run_id=run_id)
     phase2 = read_parquet(phase2_path)
     return write_regime_effectiveness_reports(run_id=run_id, data_root=data_root, episodes=phase2)
 

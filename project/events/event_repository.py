@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
+import warnings
 from pathlib import Path
 from typing import Dict, Iterable, List, Sequence
 
@@ -84,7 +85,13 @@ def collect_registry_events(
 
     if not rows:
         return _empty_registry_events()
-    out = pd.concat(rows, ignore_index=True)
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore",
+            message="The behavior of DataFrame concatenation with empty or all-NA entries is deprecated.*",
+            category=FutureWarning,
+        )
+        out = pd.concat(rows, ignore_index=True)
     out = out.sort_values(["timestamp", "symbol", "event_type", "event_id"]).reset_index(drop=True)
     return out[REGISTRY_EVENT_COLUMNS]
 
@@ -108,6 +115,8 @@ def merge_registry_events(
     else:
         existing_kept = _empty_registry_events()
         incoming_replacement = incoming_norm
+    existing_kept = existing_kept.dropna(axis=1, how="all")
+    incoming_replacement = incoming_replacement.dropna(axis=1, how="all")
     if existing_kept.empty:
         merged = incoming_replacement.copy()
     elif incoming_replacement.empty:

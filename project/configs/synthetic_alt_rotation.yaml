@@ -13,4 +13,4 @@ search_min_n: 8
 required_outputs:
   - synthetic/synthetic_alt_rotation/synthetic_generation_manifest.json
   - synthetic/synthetic_alt_rotation/synthetic_regime_segments.json
-  - reports/phase2/synthetic_alt_rotation/search_engine/phase2_candidates.parquet
+  - reports/phase2/synthetic_alt_rotation/phase2_candidates.parquet

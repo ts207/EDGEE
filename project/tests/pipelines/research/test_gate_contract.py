@@ -24,6 +24,7 @@ def test_select_phase2_gate_spec_auto_profiles():
 
 def test_resolve_phase2_gate_params_applies_event_override():
     phase2_cfg = {
+        "min_t_stat": 1.5,
         "max_q_value": 0.05,
         "min_after_cost_expectancy_bps": 0.1,
         "min_sample_size": 50,
@@ -39,6 +40,7 @@ def test_resolve_phase2_gate_params_applies_event_override():
     }
 
     cfg = gates.resolve_phase2_gate_params(phase2_cfg, "LIQUIDITY_VACUUM")
+    assert cfg["min_t_stat"] == 1.5
     assert cfg["max_q_value"] == 0.05
     assert cfg["min_after_cost_expectancy_bps"] == -5.0
     assert cfg["conservative_cost_multiplier"] == 1.0

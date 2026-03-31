@@ -4,6 +4,7 @@ import argparse
 import importlib
 import json
 from pathlib import Path
+import tempfile
 from typing import Any, Dict
 
 import yaml
@@ -151,16 +152,29 @@ def translate_and_validate_proposal(
         base_dir.mkdir(parents=True, exist_ok=True)
         resolved_config_path = base_dir / f"{proposal.program_id}_proposal_experiment.yaml"
     resolved_config_path.parent.mkdir(parents=True, exist_ok=True)
-    resolved_config_path.write_text(
-        yaml.safe_dump(experiment_config, sort_keys=False),
-        encoding="utf-8",
-    )
+    rendered_config = yaml.safe_dump(experiment_config, sort_keys=False)
 
-    plan = _build_experiment_plan(
-        resolved_config_path,
-        registry_root,
-        out_dir=out_dir,
-    )
+    with tempfile.NamedTemporaryFile(
+        mode="w",
+        suffix=".yaml",
+        prefix=f".{resolved_config_path.stem}__staged__",
+        dir=str(resolved_config_path.parent),
+        delete=False,
+        encoding="utf-8",
+    ) as handle:
+        handle.write(rendered_config)
+        staged_config_path = Path(handle.name)
+
+    try:
+        plan = _build_experiment_plan(
+            staged_config_path,
+            registry_root,
+            out_dir=out_dir,
+        )
+        staged_config_path.replace(resolved_config_path)
+    finally:
+        staged_config_path.unlink(missing_ok=True)
+
     run_all_overrides = build_run_all_overrides(proposal)
     return {
         "proposal": proposal.to_dict(),

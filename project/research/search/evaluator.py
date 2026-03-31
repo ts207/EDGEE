@@ -129,6 +129,8 @@ def _null_row(spec: HypothesisSpec, n: int, reason: str = "unknown") -> Dict[str
             "cost_adjusted_return_bps": 0.0,
             "p_value": 1.0,
             "p_value_raw": 1.0,
+            # Raw evaluator output has no shrinkage-specific multiplicity input yet,
+            # so the FDR input defaults to the raw p-value contract.
             "p_value_for_fdr": 1.0,
             "mae_mean_bps": 0.0,
             "mfe_mean_bps": 0.0,
@@ -487,6 +489,9 @@ def evaluate_hypothesis_batch(
                 "cost_adjusted_return_bps": round(cost_adj_bps, 4),
                 "p_value": round(p_value, 8),
                 "p_value_raw": round(p_value, 8),
+                # Downstream shrinkage/scoring stages may replace this with a
+                # different multiplicity-input p-value. At the evaluator stage
+                # it is intentionally the raw p-value.
                 "p_value_for_fdr": round(p_value, 8),
                 "mae_mean_bps": round(mae_mean * 10_000.0, 4),
                 "mfe_mean_bps": round(mfe_mean * 10_000.0, 4),

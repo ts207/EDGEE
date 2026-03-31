@@ -152,10 +152,10 @@ The coordinator is always in exactly one of these states:
 | `VALIDATE_DRIFT` | Hypotheses received | All drift checks pass | `COMPILE` |
 | `COMPILE` | Drift-free hypotheses | Compiled proposal received | `TRANSLATE` |
 | `TRANSLATE` | Compiled proposal | Translation command succeeds | `PLAN` |
-| `PLAN` | Translation succeeded | Plan-only command succeeds | `REVIEW` |
-| `REVIEW` | Plan succeeded | User approves | `EXECUTE` |
-| `EXECUTE` | User approved | Run completes | `GATHER` (new cycle) |
-| `STOP` | Kill decision, or max cycles reached | Ledger updated | terminal |
+| `PLAN` | Translation succeeded | Plan-only command succeeds | `AUTO_GATE` |
+| `AUTO_GATE` | Plan succeeded | All 5 preconditions pass | `EXECUTE` |
+| `EXECUTE` | Auto-gate passed | Run completes | `GATHER` (new cycle) |
+| `STOP` | Kill decision, gate failure, or max cycles reached | Ledger updated | terminal |
 
 Transitions that loop back:
 - `VALIDATE_DRIFT` → `FORMULATE`: drift detected (max 2 cycles)
@@ -167,7 +167,7 @@ Transitions that stop:
 - `TRIAGE` → `STOP`: analyst recommends kill with high confidence
 - `TRIAGE` → `STOP`: pipeline failure that requires human intervention
 - `VALIDATE_DRIFT` → `STOP`: 2 revision cycles exhausted, escalate to user
-- `REVIEW` → `STOP`: user declines execution
+- `AUTO_GATE` → `STOP`: any precondition fails (see Auto-Execution Gate below)
 
 ## Full Workflow Sequence
 
@@ -201,14 +201,155 @@ Transitions that stop:
       │
 12. COORDINATOR runs plan-only command            [state: PLAN]
       │
-13. COORDINATOR presents plan to user             [state: REVIEW]
+13. COORDINATOR evaluates auto-execution gate     [state: AUTO_GATE]
+    - All 5 preconditions must pass (see below)
+    - If ANY fails: STOP, log which precondition failed
       │
-14. On approval: COORDINATOR runs execution       [state: EXECUTE]
+14. AUTO: COORDINATOR runs execution              [state: EXECUTE]
       │
 15. COORDINATOR updates campaign ledger
       │
 16. Return to step 2 with new run_id             [state: GATHER]
 ```
+
+## Auto-Execution Gate
+
+The coordinator auto-executes ONLY when ALL five preconditions are true.
+If any precondition fails, the coordinator MUST stop and report which failed.
+No partial passes. No overrides. No "close enough".
+
+### Precondition 1: Drift checks pass
+
+Every drift check in the Scope Drift Prevention table returned clean.
+
+Evaluate:
+```
+drift_clean = (
+    no new symbols beyond original proposal
+    AND no date window expansion
+    AND all templates valid for event family
+    AND all events from intended trigger family
+    AND all horizons in supported set
+    AND regime unchanged (or new hypothesis version created)
+    AND no new context dimensions without justification
+)
+```
+
+Fail action: STOP. Report the specific drift type and value. Do not execute.
+
+### Precondition 2: Compiler validation passes
+
+The compiler agent returned a compiled proposal without rejection.
+All compiler validation rules passed:
+- Events exist in `spec/events/canonical_event_registry.yaml`
+- Templates valid for event family per `spec/templates/event_template_registry.yaml`
+- Horizons parseable by `project/core/constants.py:parse_horizon_bars`
+- Regime exists in `spec/events/regime_routing.yaml`
+- Entry lags >= 1
+- Search control within `project/configs/registries/search_limits.yaml` limits
+- No forbidden knobs set
+- YAML parses cleanly
+
+Evaluate:
+```
+compiler_clean = (
+    compiler returned proposal without REJECT
+    AND plan review checklist has no unchecked items
+)
+```
+
+Fail action: STOP. Report the specific validation failure. Route back to
+mechanism_hypothesis if the failure is in the hypothesis (max 2 cycles).
+Escalate to user if the failure is in repo configuration.
+
+### Precondition 3: Plan-only succeeds
+
+The plan-only command (`execute_proposal --plan_only 1`) exited with return
+code 0 and produced a valid `validated_plan.json`.
+
+Evaluate:
+```
+plan_clean = (
+    plan_only command exit code == 0
+    AND validated_plan.json exists at expected path
+    AND validated_plan.json contains program_id matching proposal
+    AND estimated_hypothesis_count > 0
+)
+```
+
+Fail action: STOP. Read stderr/stdout. If the error is a proposal schema
+mismatch, route back to compiler. If the error is a repo/data issue, route
+to PATCH_REPO. If unclear, escalate to user.
+
+### Precondition 4: No repo/data defect is active
+
+The repo is in a clean, testable state with no known blocking defects.
+
+Evaluate:
+```
+repo_clean = (
+    `make test-fast` passes (exit code 0)
+    AND no uncommitted changes to forbidden files
+    AND no active PATCH_REPO state from a prior cycle
+    AND campaign ledger does not show an unresolved defect from prior cycle
+)
+```
+
+Fail action: STOP. If `make test-fast` fails, diagnose and fix before
+executing. If forbidden files have uncommitted changes, escalate to user.
+If a prior-cycle defect is unresolved, resolve it first or escalate.
+
+Run `make test-fast` BEFORE every auto-execution, not just on first cycle.
+This catches regressions introduced by local fixes during PATCH_REPO.
+
+### Precondition 5: Revision-cycle limit not exceeded
+
+The current hypothesis has not already been through 2 revision cycles
+(VALIDATE_DRIFT → FORMULATE or COMPILE → FORMULATE loops).
+
+Evaluate:
+```
+revision_ok = (
+    revision_count_for_current_hypothesis < 2
+)
+```
+
+Fail action: STOP. The hypothesis has been revised twice and still has
+issues. Escalate to user with the full revision history — both the
+original and each revision, with the specific rejection reason for each.
+
+### Gate Decision
+
+```
+auto_execute = (
+    drift_clean
+    AND compiler_clean
+    AND plan_clean
+    AND repo_clean
+    AND revision_ok
+)
+
+if auto_execute:
+    proceed to EXECUTE
+else:
+    proceed to STOP
+    log: which precondition(s) failed
+    log: recommended recovery action
+    update campaign ledger with gate failure
+```
+
+### Gate Failure Logging
+
+When the auto-gate fails, record in the campaign ledger:
+
+| Field | Value |
+|-------|-------|
+| cycle | current cycle number |
+| gate_result | FAIL |
+| failed_precondition | 1-5 (which one) |
+| failure_detail | specific error |
+| recovery_action | what the coordinator recommends |
+| requires_human | yes / no |
 
 ## Campaign Ledger
 
@@ -253,3 +394,8 @@ After each complete cycle, the coordinator should:
 | Translation command fails | Read error, fix proposal if obvious, else escalate |
 | Plan-only command fails | Read error, check proposal against schema, escalate if unclear |
 | Execution fails mid-pipeline | Invoke analyst on partial results |
+| Auto-gate precondition 1 fails (drift) | Stop. Report drift. Do not execute. |
+| Auto-gate precondition 2 fails (compiler) | Route to mechanism_hypothesis or escalate |
+| Auto-gate precondition 3 fails (plan) | Diagnose: proposal error → compiler; repo error → PATCH_REPO |
+| Auto-gate precondition 4 fails (repo/data) | Run `make test-fast`, fix or escalate |
+| Auto-gate precondition 5 fails (revisions) | Stop. Escalate with full revision history. |

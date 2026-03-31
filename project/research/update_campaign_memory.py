@@ -25,6 +25,7 @@ from project.research.knowledge.memory import (
     write_memory_table,
 )
 from project.research.knowledge.reflection import build_run_reflection
+from project.research.knowledge.schemas import canonical_json
 from project.research.services.campaign_memory_rollup_service import write_campaign_memory_rollup
 from project.specs.manifest import finalize_manifest, load_run_manifest, start_manifest
 
@@ -41,6 +42,33 @@ def _merge_by_keys(existing: pd.DataFrame, incoming: pd.DataFrame, keys: list[st
     if present_keys:
         out = out.drop_duplicates(subset=present_keys, keep="last").reset_index(drop=True)
     return out
+
+
+_MISSING_STAGE_TOKENS = frozenset({"", "none", "null", "nan"})
+
+
+def _has_valid_stage(value: Any) -> bool:
+    return str(value).strip().lower() not in _MISSING_STAGE_TOKENS
+
+
+def _sanitize_failures(failures: pd.DataFrame) -> pd.DataFrame:
+    if failures.empty:
+        return failures
+    cleaned = failures.copy()
+    if "stage" in cleaned.columns:
+        cleaned = cleaned[cleaned["stage"].apply(_has_valid_stage)]
+    return cleaned.reset_index(drop=True)
+
+
+def _active_failures(failures: pd.DataFrame) -> pd.DataFrame:
+    if failures.empty:
+        return failures
+    active = _sanitize_failures(failures)
+    if "superseded_by_run_id" in active.columns:
+        active = active[
+            active["superseded_by_run_id"].astype(str).str.strip() == ""
+        ]
+    return active.reset_index(drop=True)
 
 
 def mark_failures_superseded(
@@ -133,7 +161,13 @@ def _build_belief_state(
     repair_top_k: int,
 ) -> Dict[str, Any]:
     promising_regions = []
-    if not tested_regions.empty:
+    recommended_next_action = str(reflection.get("recommended_next_action", "")).strip()
+    statistical_outcome = str(reflection.get("statistical_outcome", "")).strip()
+    suppress_promising_regions = (
+        recommended_next_action in {"hold", "repair_pipeline", "kill"}
+        or statistical_outcome == "no_signal"
+    )
+    if not suppress_promising_regions and not tested_regions.empty:
         ranked = tested_regions.copy()
         if "gate_promo_statistical" in ranked.columns:
             ranked["_gate_rank"] = ranked["gate_promo_statistical"].apply(_gate_rank)
@@ -170,7 +204,7 @@ def _build_belief_state(
                     region[key] = source.get(key)
 
     avoid_regions = []
-    if not tested_regions.empty:
+    if not tested_regions.empty and "primary_fail_gate" in tested_regions.columns:
         # Phase 1.3 — probabilistic avoidance: only block on high-confidence,
         # non-mechanical failures with adequate sample size.
         # A low-confidence or mechanical failure should route to repair, not closure.
@@ -224,10 +258,11 @@ def _build_belief_state(
     except Exception as exc:
         _LOG.warning("Failed to propagate aggregate avoidance signals: %s", exc)
 
+    open_failures = _active_failures(failures)
     open_repairs = []
-    if not failures.empty:
+    if not open_failures.empty:
         open_repairs = (
-            failures[
+            open_failures[
                 [c for c in ["stage", "failure_class", "failure_detail"] if c in failures.columns]
             ]
             .head(int(repair_top_k))
@@ -259,7 +294,12 @@ def _build_next_actions(
     so the controller's follow-up run targets the specific regime.
     """
     exploit = []
-    if not tested_regions.empty:
+    recommended_next_action = str(reflection.get("recommended_next_action", "")).strip()
+    allow_exploit = recommended_next_action in {
+        "exploit_promising_region",
+        "explore_adjacent_region",
+    }
+    if allow_exploit and not tested_regions.empty:
         ranked_df = tested_regions.copy()
         if "gate_promo_statistical" in ranked_df.columns:
             ranked_df["_gate_rank"] = ranked_df["gate_promo_statistical"].apply(_gate_rank)
@@ -298,9 +338,10 @@ def _build_next_actions(
             .to_dict(orient="records")
         )
 
+    active_failures = _active_failures(failures)
     repair = []
-    if not failures.empty:
-        repair = failures.head(int(repair_top_k))[
+    if not active_failures.empty:
+        repair = active_failures.head(int(repair_top_k))[
             [c for c in ["stage", "failure_class", "failure_detail"] if c in failures.columns]
         ].to_dict(orient="records")
 
@@ -325,22 +366,35 @@ def _build_next_actions(
                 ["priority_score", "best_regime_t_stat", "best_regime_mean_return_bps"],
                 ascending=[False, False, False],
             )
+        seen_scopes: set[str] = set()
         for row in ranked.head(max(1, int(exploit_top_k))).to_dict(orient="records"):
             pinned_contexts = _parse_best_regime_contexts(row.get("best_regime"))
+            merged_contexts = _merge_contexts(
+                _coerce_contexts(row.get("context_json")),
+                pinned_contexts,
+            )
             proposed_scope = {
                 "event_type": str(row.get("event_type", "")).strip(),
                 "trigger_type": str(row.get("trigger_type", "EVENT")).strip().upper() or "EVENT",
                 "template_id": str(row.get("template_id", "")).strip(),
                 "direction": str(row.get("direction", "")).strip(),
                 "horizon": str(row.get("horizon", "")).strip(),
-                "entry_lag": int(row.get("entry_lag", 0) or 0),
-                "contexts": _merge_contexts(
-                    _coerce_contexts(row.get("context_json")),
-                    pinned_contexts,
-                ),
-                "best_regime": str(row.get("best_regime", "")).strip(),
-                "source_hypothesis_id": str(row.get("hypothesis_id", "")).strip(),
+                "entry_lag": int(row.get("entry_lag", row.get("entry_lag_bars", 0)) or 0),
             }
+            if merged_contexts:
+                proposed_scope["contexts"] = merged_contexts
+            best_regime = str(row.get("best_regime", "")).strip()
+            if best_regime:
+                proposed_scope["best_regime"] = best_regime
+            source_hypothesis_id = str(row.get("hypothesis_id", "")).strip()
+            if source_hypothesis_id:
+                proposed_scope["source_hypothesis_id"] = source_hypothesis_id
+            if not proposed_scope["event_type"] or not proposed_scope["template_id"]:
+                continue
+            scope_key = canonical_json(proposed_scope)
+            if scope_key in seen_scopes:
+                continue
+            seen_scopes.add(scope_key)
             explore_adjacent.append(
                 {
                     "reason": "strong regime slice despite weak aggregate result",
@@ -349,7 +403,10 @@ def _build_next_actions(
                 }
             )
 
-    if recommended_experiment:
+    if recommended_experiment and any(
+        str(recommended_experiment.get(key, "")).strip()
+        for key in ("event_type", "template_id", "primary_fail_gate")
+    ):
         explore_adjacent.append(
             {
                 "reason": str(reflection.get("recommended_next_action", "")),
@@ -388,9 +445,9 @@ def _load_regime_conditional_candidates(*, run_id: str, data_root: Path) -> pd.D
     Raises when the artifact exists but is unreadable/corrupted.
     """
     candidates = [
+        data_root / "reports" / "phase2" / run_id / "regime_conditional_candidates.parquet",
         data_root / "reports" / "hypothesis_search" / run_id / "regime_conditional_candidates.parquet",
         data_root / "reports" / "phase2" / run_id / "search_engine" / "regime_conditional_candidates.parquet",
-        data_root / "reports" / "phase2" / run_id / "regime_conditional_candidates.parquet",
     ]
     for path in candidates:
         if path.exists():
@@ -505,12 +562,15 @@ def update_campaign_memory(
         incoming_failures,
         ["run_id", "stage", "failure_class", "artifact_path"],
     )
+    failures = _sanitize_failures(failures)
 
     # Phase 2.4 — Supersession tracking.
     # If the current run produced no failures for stages that were previously
     # failing, mark those old failure records as superseded so the controller's
     # repair queue no longer proposes them.
-    existing_failures = read_memory_table(program_id, "failures", data_root=data_root)
+    existing_failures = _sanitize_failures(
+        read_memory_table(program_id, "failures", data_root=data_root)
+    )
     if not existing_failures.empty and "stage" in existing_failures.columns:
         stages_that_failed_before = set(
             existing_failures[

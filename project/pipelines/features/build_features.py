@@ -13,6 +13,7 @@ from typing import Optional, Sequence
 import numpy as np
 import pandas as pd
 
+from project.core.logging_utils import build_stage_log_handlers
 from project.core.validation import ts_ns_utc
 from project.core.feature_registry import ensure_core_feature_definitions_registered
 from project.core.feature_quality import summarize_feature_quality
@@ -816,10 +817,7 @@ def main() -> int:
 
     data_root = get_data_root()
 
-    log_handlers = [logging.StreamHandler(sys.stdout)]
-    if args.log_path:
-        ensure_dir(Path(args.log_path).parent)
-        log_handlers.append(logging.FileHandler(args.log_path))
+    log_handlers = build_stage_log_handlers(args.log_path)
     logging.basicConfig(
         level=logging.INFO, handlers=log_handlers, format="%(asctime)s %(levelname)s %(message)s"
     )

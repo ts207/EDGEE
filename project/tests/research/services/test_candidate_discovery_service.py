@@ -1198,3 +1198,63 @@ def test_apply_historical_frontier_multiple_testing_penalizes_prior_reruns(tmp_p
     assert widened["q_value_run_local"].tolist() == pytest.approx([0.02, 0.02])
     assert widened["q_value"].tolist() == pytest.approx([0.04, 0.04])
     assert widened["correction_scope_policy"].iloc[0] == "historical_frontier_bh"
+
+
+def test_apply_historical_frontier_multiple_testing_dedupes_flat_and_nested_prior_run(
+    tmp_path: Path,
+):
+    data_root = tmp_path / "data"
+    nested_dir = data_root / "reports" / "phase2" / "prior_run" / "search_engine"
+    flat_dir = data_root / "reports" / "phase2" / "prior_run"
+    nested_dir.mkdir(parents=True, exist_ok=True)
+    flat_dir.mkdir(parents=True, exist_ok=True)
+    hist = pd.DataFrame(
+        [
+            {
+                "candidate_id": "hist_1",
+                "event_type": "OI_FLUSH",
+                "horizon": "24b",
+                "p_value_raw": 0.03,
+            },
+            {
+                "candidate_id": "hist_2",
+                "event_type": "OI_FLUSH",
+                "horizon": "24b",
+                "p_value_raw": 0.04,
+            },
+        ]
+    )
+    hist.to_parquet(nested_dir / "phase2_candidates.parquet", index=False)
+    hist.to_parquet(flat_dir / "phase2_candidates.parquet", index=False)
+
+    current = svc._apply_validation_multiple_testing(
+        pd.DataFrame(
+            [
+                {
+                    "candidate_id": "curr_1",
+                    "run_id": "current_run",
+                    "event_type": "OI_FLUSH",
+                    "symbol": "BTCUSDT",
+                    "horizon": "24b",
+                    "p_value_raw": 0.01,
+                },
+                {
+                    "candidate_id": "curr_2",
+                    "run_id": "current_run",
+                    "event_type": "OI_FLUSH",
+                    "symbol": "ETHUSDT",
+                    "horizon": "24b",
+                    "p_value_raw": 0.02,
+                },
+            ]
+        )
+    )
+
+    widened = svc._apply_historical_frontier_multiple_testing(
+        current,
+        data_root=data_root,
+        current_run_id="current_run",
+    )
+
+    assert widened["historical_frontier_test_count"].iloc[0] == 4
+    assert widened["q_value"].tolist() == pytest.approx([0.04, 0.04])

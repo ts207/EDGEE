@@ -13,6 +13,7 @@ import numpy as np
 import pandas as pd
 
 from project.core.feature_schema import feature_dataset_dir_name
+from project.specs.manifest import finalize_manifest, start_manifest
 from project.io.utils import (
     choose_partition_dir,
     ensure_dir,
@@ -652,6 +653,7 @@ def main(argv: List[str] | None = None) -> int:
     parser.add_argument("--stability_tstat_delta", type=float, default=0.5)
     parser.add_argument("--capacity_min_events_per_day", type=float, default=0.5)
     parser.add_argument("--out_dir", default=None)
+    parser.add_argument("--log_path", default=None)
     args = parser.parse_args(argv)
     args = _apply_gate_profile_defaults(args)
 
@@ -662,234 +664,264 @@ def main(argv: List[str] | None = None) -> int:
         Path(args.out_dir) if args.out_dir else DATA_ROOT / "reports" / "expectancy" / args.run_id
     )
     ensure_dir(out_dir)
-    expectancy_payload = load_expectancy_payload(out_dir / "conditional_expectancy.json")
-    if expectancy_payload and not bool(expectancy_payload.get("expectancy_exists", False)):
-        return write_empty_robustness_payload(
-            out_dir=out_dir,
-            run_id=args.run_id,
-            symbols=symbols,
-            horizons=horizons,
-            skip_reason="expectancy_analysis_reported_no_evidence",
-        )
+    outputs = [{"path": str(out_dir / "conditional_expectancy_robustness.json")}]
+    if args.log_path:
+        outputs.append({"path": str(args.log_path)})
+    manifest = start_manifest("validate_expectancy_traps", args.run_id, vars(args), [], outputs)
 
-    leakage = {}
-    all_bar_df = []
-    all_event_rows: List[Dict[str, object]] = []
-    event_summary_rows: List[Dict[str, object]] = []
-
-    for symbol in symbols:
-        df = _load_symbol_features(symbol, run_id=args.run_id)
-        df = _build_features(df, args.htf_window, args.htf_lookback, args.funding_pct_window)
-        leakage[symbol] = _leakage_check(df, args.htf_window, args.htf_lookback)
-        events = _extract_compression_events(
-            df, symbol=symbol, max_duration=args.max_event_duration
-        )
-        rows = _event_rows(
-            df,
-            events,
-            horizons=horizons,
-            expansion_lookahead=args.expansion_lookahead,
-            mfe_horizon=args.mfe_horizon,
-        )
-        all_event_rows.extend(rows)
-        all_bar_df.append(df)
-
-        breakout_count = sum(1 for e in events if e.end_reason == "breakout")
-        event_summary_rows.append(
-            {
-                "symbol": symbol,
-                "event_count": len(events),
-                "breakout_end_count": breakout_count,
-                "breakout_end_rate": float(breakout_count / len(events)) if events else 0.0,
-            }
-        )
-
-    master_bars = pd.concat(all_bar_df, ignore_index=True)
-    events_df = pd.DataFrame(all_event_rows, columns=EVENT_ROW_COLUMNS)
-    if not events_df.empty:
-        events_df["enter_ts"] = pd.to_datetime(events_df["enter_ts"], utc=True, errors="coerce")
-        events_df["split_label"] = build_walk_forward_split_labels(events_df, time_col="enter_ts")
-
-    split_overlap = _split_overlap_diagnostics(events_df, embargo_bars=args.embargo_bars)
-
-    conditions = ["compression", "compression_plus_htf_trend", "compression_plus_funding_low"]
-    trap_rows = []
-    split_rows = []
-    tail_rows = []
-    symmetry_rows = []
-    expansion_rows = []
-
-    rng = np.random.default_rng(11)
-
-    for condition in conditions:
-        for horizon in horizons:
-            bar_stats = _bar_condition_stats(master_bars, condition, horizon)
-            event_frame, ret_col = _event_condition_frame(events_df, condition, horizon)
-            event_series = (
-                event_frame[ret_col] if ret_col in event_frame else pd.Series(dtype=float)
+    try:
+        expectancy_payload = load_expectancy_payload(out_dir / "conditional_expectancy.json")
+        if expectancy_payload and not bool(expectancy_payload.get("expectancy_exists", False)):
+            rc = write_empty_robustness_payload(
+                out_dir=out_dir,
+                run_id=args.run_id,
+                symbols=symbols,
+                horizons=horizons,
+                skip_reason="expectancy_analysis_reported_no_evidence",
             )
-            event_stats = distribution_stats(event_series)
-            robust_fields = _robust_row_fields(
-                event_frame=event_frame,
-                ret_col=ret_col,
-                condition=condition,
-                horizon=int(horizon),
-                hac_max_lag=int(args.robust_hac_max_lag),
-                bootstrap_block_size=int(args.robust_bootstrap_block_size),
-                bootstrap_iters=int(args.robust_bootstrap_iters),
-                bootstrap_seed=int(args.robust_bootstrap_seed),
-                oos_min_samples=int(args.oos_min_samples),
-                require_oos_positive=int(args.require_oos_positive),
-                require_oos_sign_consistency=int(args.require_oos_sign_consistency),
+            finalize_manifest(
+                manifest,
+                "success",
+                stats={
+                    "skipped": True,
+                    "skip_reason": "expectancy_analysis_reported_no_evidence",
+                    "survivor_count": 0,
+                },
             )
+            return rc
 
-            trap_rows.append(
+        leakage = {}
+        all_bar_df = []
+        all_event_rows: List[Dict[str, object]] = []
+        event_summary_rows: List[Dict[str, object]] = []
+
+        for symbol in symbols:
+            df = _load_symbol_features(symbol, run_id=args.run_id)
+            df = _build_features(df, args.htf_window, args.htf_lookback, args.funding_pct_window)
+            leakage[symbol] = _leakage_check(df, args.htf_window, args.htf_lookback)
+            events = _extract_compression_events(
+                df, symbol=symbol, max_duration=args.max_event_duration
+            )
+            rows = _event_rows(
+                df,
+                events,
+                horizons=horizons,
+                expansion_lookahead=args.expansion_lookahead,
+                mfe_horizon=args.mfe_horizon,
+            )
+            all_event_rows.extend(rows)
+            all_bar_df.append(df)
+
+            breakout_count = sum(1 for e in events if e.end_reason == "breakout")
+            event_summary_rows.append(
                 {
-                    "condition": condition,
-                    "horizon": horizon,
-                    "bar_samples": bar_stats["samples"],
-                    "bar_mean": bar_stats["mean_return"],
-                    "bar_t": bar_stats["t_stat"],
-                    "event_samples": event_stats["samples"],
-                    "event_mean": event_stats["mean_return"],
-                    "event_t": event_stats["t_stat"],
-                    **robust_fields,
+                    "symbol": symbol,
+                    "event_count": len(events),
+                    "breakout_end_count": breakout_count,
+                    "breakout_end_rate": float(breakout_count / len(events)) if events else 0.0,
                 }
             )
 
-            year_split = _split_sign_report(event_frame, "year", ret_col)
-            vol_split = _split_sign_report(event_frame, "vol_q", ret_col)
-            bull_split = _split_sign_report(event_frame, "bull_bear", ret_col)
+        master_bars = pd.concat(all_bar_df, ignore_index=True)
+        events_df = pd.DataFrame(all_event_rows, columns=EVENT_ROW_COLUMNS)
+        if not events_df.empty:
+            events_df["enter_ts"] = pd.to_datetime(events_df["enter_ts"], utc=True, errors="coerce")
+            events_df["split_label"] = build_walk_forward_split_labels(events_df, time_col="enter_ts")
 
-            split_rows.append(
-                {
-                    "condition": condition,
-                    "horizon": horizon,
-                    "year_stable_sign": year_split["stable_sign"],
-                    "vol_q_stable_sign": vol_split["stable_sign"],
-                    "bull_bear_stable_sign": bull_split["stable_sign"],
-                    "year_means": year_split["groups"],
-                    "vol_q_means": vol_split["groups"],
-                    "bull_bear_means": bull_split["groups"],
-                }
-            )
+        split_overlap = _split_overlap_diagnostics(events_df, embargo_bars=args.embargo_bars)
 
-            tail = tail_report(
-                event_frame[ret_col] if ret_col in event_frame else pd.Series(dtype=float)
-            )
-            tail_rows.append(
-                {
-                    "condition": condition,
-                    "horizon": horizon,
-                    "mean": event_stats["mean_return"],
-                    "median": tail["median"],
-                    "p25": tail["p25"],
-                    "p75": tail["p75"],
-                    "top_1pct_contribution": tail["top_1pct_contribution"],
-                    "top_5pct_contribution": tail["top_5pct_contribution"],
-                }
-            )
+        conditions = ["compression", "compression_plus_htf_trend", "compression_plus_funding_low"]
+        trap_rows = []
+        split_rows = []
+        tail_rows = []
+        symmetry_rows = []
+        expansion_rows = []
 
-            if condition == "compression_plus_htf_trend":
-                base = event_frame[ret_col].dropna()
-                opp = -base
-                rand_sign = pd.Series(rng.choice([-1.0, 1.0], size=len(base)), index=base.index)
-                rnd = base.abs() * rand_sign
-                symmetry_rows.append(
+        rng = np.random.default_rng(11)
+
+        for condition in conditions:
+            for horizon in horizons:
+                bar_stats = _bar_condition_stats(master_bars, condition, horizon)
+                event_frame, ret_col = _event_condition_frame(events_df, condition, horizon)
+                event_series = (
+                    event_frame[ret_col] if ret_col in event_frame else pd.Series(dtype=float)
+                )
+                event_stats = distribution_stats(event_series)
+                robust_fields = _robust_row_fields(
+                    event_frame=event_frame,
+                    ret_col=ret_col,
+                    condition=condition,
+                    horizon=int(horizon),
+                    hac_max_lag=int(args.robust_hac_max_lag),
+                    bootstrap_block_size=int(args.robust_bootstrap_block_size),
+                    bootstrap_iters=int(args.robust_bootstrap_iters),
+                    bootstrap_seed=int(args.robust_bootstrap_seed),
+                    oos_min_samples=int(args.oos_min_samples),
+                    require_oos_positive=int(args.require_oos_positive),
+                    require_oos_sign_consistency=int(args.require_oos_sign_consistency),
+                )
+
+                trap_rows.append(
                     {
                         "condition": condition,
                         "horizon": horizon,
-                        "base_mean": float(base.mean()) if len(base) else 0.0,
-                        "base_t": distribution_stats(base)["t_stat"],
-                        "opposite_mean": float(opp.mean()) if len(opp) else 0.0,
-                        "opposite_t": distribution_stats(opp)["t_stat"],
-                        "random_mean": float(rnd.mean()) if len(rnd) else 0.0,
-                        "random_t": distribution_stats(rnd)["t_stat"],
+                        "bar_samples": bar_stats["samples"],
+                        "bar_mean": bar_stats["mean_return"],
+                        "bar_t": bar_stats["t_stat"],
+                        "event_samples": event_stats["samples"],
+                        "event_mean": event_stats["mean_return"],
+                        "event_t": event_stats["t_stat"],
+                        **robust_fields,
                     }
                 )
 
-        cond_all, _ = _event_condition_frame(events_df, condition, horizons[0])
-        cond_all = (
-            cond_all.drop_duplicates(
-                subset=[
-                    "symbol",
-                    "year",
-                    "vol_q",
-                    "bull_bear",
-                    "time_to_expansion_bars",
-                    "mfe_post_end",
-                    "trend_state",
-                    "funding_bucket",
-                    "end_reason",
-                    "breakout_dir",
-                ]
+                year_split = _split_sign_report(event_frame, "year", ret_col)
+                vol_split = _split_sign_report(event_frame, "vol_q", ret_col)
+                bull_split = _split_sign_report(event_frame, "bull_bear", ret_col)
+
+                split_rows.append(
+                    {
+                        "condition": condition,
+                        "horizon": horizon,
+                        "year_stable_sign": year_split["stable_sign"],
+                        "vol_q_stable_sign": vol_split["stable_sign"],
+                        "bull_bear_stable_sign": bull_split["stable_sign"],
+                        "year_means": year_split["groups"],
+                        "vol_q_means": vol_split["groups"],
+                        "bull_bear_means": bull_split["groups"],
+                    }
+                )
+
+                tail = tail_report(
+                    event_frame[ret_col] if ret_col in event_frame else pd.Series(dtype=float)
+                )
+                tail_rows.append(
+                    {
+                        "condition": condition,
+                        "horizon": horizon,
+                        "mean": event_stats["mean_return"],
+                        "median": tail["median"],
+                        "p25": tail["p25"],
+                        "p75": tail["p75"],
+                        "top_1pct_contribution": tail["top_1pct_contribution"],
+                        "top_5pct_contribution": tail["top_5pct_contribution"],
+                    }
+                )
+
+                if condition == "compression_plus_htf_trend":
+                    base = event_frame[ret_col].dropna()
+                    opp = -base
+                    rand_sign = pd.Series(rng.choice([-1.0, 1.0], size=len(base)), index=base.index)
+                    rnd = base.abs() * rand_sign
+                    symmetry_rows.append(
+                        {
+                            "condition": condition,
+                            "horizon": horizon,
+                            "base_mean": float(base.mean()) if len(base) else 0.0,
+                            "base_t": distribution_stats(base)["t_stat"],
+                            "opposite_mean": float(opp.mean()) if len(opp) else 0.0,
+                            "opposite_t": distribution_stats(opp)["t_stat"],
+                            "random_mean": float(rnd.mean()) if len(rnd) else 0.0,
+                            "random_t": distribution_stats(rnd)["t_stat"],
+                        }
+                    )
+
+            cond_all, _ = _event_condition_frame(events_df, condition, horizons[0])
+            cond_all = (
+                cond_all.drop_duplicates(
+                    subset=[
+                        "symbol",
+                        "year",
+                        "vol_q",
+                        "bull_bear",
+                        "time_to_expansion_bars",
+                        "mfe_post_end",
+                        "trend_state",
+                        "funding_bucket",
+                        "end_reason",
+                        "breakout_dir",
+                    ]
+                )
+                if not cond_all.empty
+                else cond_all
             )
-            if not cond_all.empty
-            else cond_all
+            expansion_rows.append(
+                {
+                    "condition": condition,
+                    "events": int(len(cond_all)),
+                    "time_to_expansion_median": float(cond_all["time_to_expansion_bars"].median())
+                    if not cond_all.empty
+                    else np.nan,
+                    "time_to_expansion_p25": float(cond_all["time_to_expansion_bars"].quantile(0.25))
+                    if not cond_all.empty
+                    else np.nan,
+                    "time_to_expansion_p75": float(cond_all["time_to_expansion_bars"].quantile(0.75))
+                    if not cond_all.empty
+                    else np.nan,
+                    "mfe_median": float(cond_all["mfe_post_end"].median())
+                    if not cond_all.empty
+                    else np.nan,
+                    "mfe_mean": float(cond_all["mfe_post_end"].mean())
+                    if not cond_all.empty
+                    else np.nan,
+                    "breakout_align_rate": float(cond_all["breakout_aligns_htf"].dropna().mean())
+                    if not cond_all.empty
+                    else np.nan,
+                }
+            )
+
+        trap_df = pd.DataFrame(trap_rows)
+        trap_df = apply_robust_survivor_gates(
+            trap_df,
+            min_samples=int(args.min_samples),
+            legacy_tstat_threshold=float(args.tstat_threshold),
+            robust_hac_t_threshold=float(args.robust_hac_t_threshold),
+            bootstrap_alpha=float(args.robust_bootstrap_alpha),
+            fdr_q=float(args.robust_fdr_q),
+            oos_min_samples=int(args.oos_min_samples),
+            require_oos_positive=int(args.require_oos_positive),
+            require_oos_sign_consistency=int(args.require_oos_sign_consistency),
         )
-        expansion_rows.append(
-            {
-                "condition": condition,
-                "events": int(len(cond_all)),
-                "time_to_expansion_median": float(cond_all["time_to_expansion_bars"].median())
-                if not cond_all.empty
-                else np.nan,
-                "time_to_expansion_p25": float(cond_all["time_to_expansion_bars"].quantile(0.25))
-                if not cond_all.empty
-                else np.nan,
-                "time_to_expansion_p75": float(cond_all["time_to_expansion_bars"].quantile(0.75))
-                if not cond_all.empty
-                else np.nan,
-                "mfe_median": float(cond_all["mfe_post_end"].median())
-                if not cond_all.empty
-                else np.nan,
-                "mfe_mean": float(cond_all["mfe_post_end"].mean())
-                if not cond_all.empty
-                else np.nan,
-                "breakout_align_rate": float(cond_all["breakout_aligns_htf"].dropna().mean())
-                if not cond_all.empty
-                else np.nan,
-            }
+
+        stability = _parameter_stability_diagnostics(
+            trap_df,
+            base_min_samples=args.min_samples,
+            base_tstat_threshold=args.tstat_threshold,
+            sample_delta=args.stability_sample_delta,
+            tstat_delta=args.stability_tstat_delta,
+        )
+        capacity = capacity_diagnostics(
+            events_df, symbols=symbols, min_events_per_day=args.capacity_min_events_per_day
         )
 
-    trap_df = pd.DataFrame(trap_rows)
-    trap_df = apply_robust_survivor_gates(
-        trap_df,
-        min_samples=int(args.min_samples),
-        legacy_tstat_threshold=float(args.tstat_threshold),
-        robust_hac_t_threshold=float(args.robust_hac_t_threshold),
-        bootstrap_alpha=float(args.robust_bootstrap_alpha),
-        fdr_q=float(args.robust_fdr_q),
-        oos_min_samples=int(args.oos_min_samples),
-        require_oos_positive=int(args.require_oos_positive),
-        require_oos_sign_consistency=int(args.require_oos_sign_consistency),
-    )
+        payload = {
+            "run_id": args.run_id,
+            "symbols": symbols,
+            "horizons": horizons,
+            "stability_diagnostics": stability,
+            "capacity_diagnostics": capacity,
+            "survivors": trap_df[trap_df["gate_robust_survivor"]].to_dict(orient="records"),
+        }
 
-    stability = _parameter_stability_diagnostics(
-        trap_df,
-        base_min_samples=args.min_samples,
-        base_tstat_threshold=args.tstat_threshold,
-        sample_delta=args.stability_sample_delta,
-        tstat_delta=args.stability_tstat_delta,
-    )
-    capacity = capacity_diagnostics(
-        events_df, symbols=symbols, min_events_per_day=args.capacity_min_events_per_day
-    )
+        json_path = out_dir / "conditional_expectancy_robustness.json"
+        json_path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
 
-    payload = {
-        "run_id": args.run_id,
-        "symbols": symbols,
-        "horizons": horizons,
-        "stability_diagnostics": stability,
-        "capacity_diagnostics": capacity,
-        "survivors": trap_df[trap_df["gate_robust_survivor"]].to_dict(orient="records"),
-    }
-
-    json_path = out_dir / "conditional_expectancy_robustness.json"
-    json_path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
-
-    print(f"Wrote {json_path}")
-    return 0
+        print(f"Wrote {json_path}")
+        finalize_manifest(
+            manifest,
+            "success",
+            stats={
+                "skipped": False,
+                "split_overlap_rows": int(len(split_overlap)),
+                "event_rows": int(len(events_df)),
+                "trap_rows": int(len(trap_df)),
+                "survivor_count": int(len(payload["survivors"])),
+            },
+        )
+        return 0
+    except Exception as exc:
+        finalize_manifest(manifest, "failed", error=str(exc), stats={})
+        raise
 
 
 if __name__ == "__main__":

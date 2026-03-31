@@ -253,3 +253,71 @@ def test_update_campaign_memory_preserves_non_event_trigger_payload(tmp_path):
     assert row["event_type"] == "SEQUENCE_SEQ_ABC"
     payload = json.loads(row["trigger_payload_json"])
     assert payload["events"] == ["VOL_SPIKE", "OI_FLUSH"]
+
+
+def test_update_campaign_memory_scrubs_stale_invalid_repairs(monkeypatch, tmp_path):
+    data_root = tmp_path / "data"
+    monkeypatch.setattr(update_campaign_memory, "get_data_root", lambda: data_root)
+
+    run_id = "r_clean_repairs"
+    program_id = "btc_campaign"
+    _write_run_manifest(data_root, run_id, program_id=program_id)
+
+    edge_dir = data_root / "reports" / "edge_candidates" / run_id
+    edge_dir.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame([]).to_parquet(edge_dir / "edge_candidates_normalized.parquet", index=False)
+
+    promo_dir = data_root / "reports" / "promotions" / run_id
+    promo_dir.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame([]).to_parquet(promo_dir / "promotion_statistical_audit.parquet", index=False)
+
+    phase2_dir = data_root / "reports" / "phase2" / run_id
+    phase2_dir.mkdir(parents=True, exist_ok=True)
+    (phase2_dir / "discovery_quality_summary.json").write_text(
+        json.dumps({"phase2_candidates": 0, "total_candidates": 0}),
+        encoding="utf-8",
+    )
+
+    memory_root = data_root / "artifacts" / "experiments" / program_id / "memory"
+    memory_root.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(
+        [
+            {
+                "run_id": "old_run",
+                "program_id": program_id,
+                "stage": "None",
+                "failure_class": "run_failed_stage",
+                "failure_detail": "",
+                "artifact_path": "/tmp/None.json",
+                "is_mechanical": True,
+                "is_repeated": False,
+                "superseded_by_run_id": run_id,
+            }
+        ]
+    ).to_parquet(memory_root / "failures.parquet", index=False)
+
+    rc = update_campaign_memory.main(
+        [
+            "--run_id",
+            run_id,
+            "--program_id",
+            program_id,
+            "--data_root",
+            str(data_root),
+        ]
+    )
+    assert rc == 0
+
+    failures = pd.read_parquet(memory_root / "failures.parquet")
+    assert failures.empty
+
+    belief_state = json.loads((memory_root / "belief_state.json").read_text(encoding="utf-8"))
+    next_actions = json.loads((memory_root / "next_actions.json").read_text(encoding="utf-8"))
+    rollup = json.loads(
+        (data_root / "artifacts" / "experiments" / program_id / "campaign_memory_rollup.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert belief_state["open_repairs"] == []
+    assert next_actions["repair"] == []
+    assert rollup["unresolved_repairs"] == []
