@@ -195,8 +195,12 @@ def test_edge_metrics_uses_edge_candidates_parquet_first(tmp_path):
         / "reports"
         / "promotions"
         / "r5"
-        / "promotion_audit.parquet",
-        promotion_audit_csv_path=tmp_path / "reports" / "promotions" / "r5" / "promotion_audit.csv",
+        / "promotion_statistical_audit.parquet",
+        promotion_audit_csv_path=tmp_path
+        / "reports"
+        / "promotions"
+        / "r5"
+        / "promotion_statistical_audit.csv",
         promotion_summary_path=tmp_path
         / "reports"
         / "promotions"
@@ -232,8 +236,8 @@ def test_edge_metrics_prefers_promoted_candidates_artifact_for_promotion_counts(
         edge_json_path=edge_dir / "edge_candidates_normalized.json",
         promoted_candidates_parquet_path=promo_dir / "promoted_candidates.parquet",
         promoted_candidates_csv_path=promo_dir / "promoted_candidates.csv",
-        promotion_audit_parquet_path=promo_dir / "promotion_audit.parquet",
-        promotion_audit_csv_path=promo_dir / "promotion_audit.csv",
+        promotion_audit_parquet_path=promo_dir / "promotion_statistical_audit.parquet",
+        promotion_audit_csv_path=promo_dir / "promotion_statistical_audit.csv",
         promotion_summary_path=promo_dir / "promotion_summary.json",
     )
 
@@ -243,7 +247,7 @@ def test_edge_metrics_prefers_promoted_candidates_artifact_for_promotion_counts(
     assert metrics["bridge_tradable_promoted"] == 0
 
 
-def test_edge_metrics_falls_back_to_promotion_audit_when_edge_export_missing(tmp_path):
+def test_edge_metrics_falls_back_to_promotion_statistical_audit_when_edge_export_missing(tmp_path):
     promo_dir = tmp_path / "reports" / "promotions" / "r6"
     promo_dir.mkdir(parents=True, exist_ok=True)
     pd.DataFrame(
@@ -252,7 +256,7 @@ def test_edge_metrics_falls_back_to_promotion_audit_when_edge_export_missing(tmp
             {"promotion_decision": "rejected", "gate_bridge_tradable": True},
             {"promotion_decision": "promoted", "gate_bridge_tradable": False},
         ]
-    ).to_parquet(promo_dir / "promotion_audit.parquet", index=False)
+    ).to_parquet(promo_dir / "promotion_statistical_audit.parquet", index=False)
 
     metrics = checklist._edge_candidate_metrics(
         edge_parquet_path=tmp_path
@@ -272,8 +276,8 @@ def test_edge_metrics_falls_back_to_promotion_audit_when_edge_export_missing(tmp
         / "edge_candidates_normalized.json",
         promoted_candidates_parquet_path=promo_dir / "promoted_candidates.parquet",
         promoted_candidates_csv_path=promo_dir / "promoted_candidates.csv",
-        promotion_audit_parquet_path=promo_dir / "promotion_audit.parquet",
-        promotion_audit_csv_path=promo_dir / "promotion_audit.csv",
+        promotion_audit_parquet_path=promo_dir / "promotion_statistical_audit.parquet",
+        promotion_audit_csv_path=promo_dir / "promotion_statistical_audit.csv",
         promotion_summary_path=promo_dir / "promotion_summary.json",
     )
 
@@ -284,7 +288,7 @@ def test_edge_metrics_falls_back_to_promotion_audit_when_edge_export_missing(tmp
     assert metrics["bridge_tradable_promoted"] == 1
 
 
-def test_kpi_payload_hydrates_from_promotion_audit_when_missing(tmp_path):
+def test_kpi_payload_hydrates_from_promotion_statistical_audit_when_missing(tmp_path):
     promo_dir = tmp_path / "reports" / "promotions" / "r7"
     promo_dir.mkdir(parents=True, exist_ok=True)
     pd.DataFrame(
@@ -304,12 +308,12 @@ def test_kpi_payload_hydrates_from_promotion_audit_when_missing(tmp_path):
                 "naive_max_drawdown": -0.20,
             },
         ]
-    ).to_parquet(promo_dir / "promotion_audit.parquet", index=False)
+    ).to_parquet(promo_dir / "promotion_statistical_audit.parquet", index=False)
 
     hydrated = checklist._hydrate_kpi_payload_with_promotion_fallback(
         kpi_payload={"metrics": {}},
-        promotion_audit_parquet_path=promo_dir / "promotion_audit.parquet",
-        promotion_audit_csv_path=promo_dir / "promotion_audit.csv",
+        promotion_audit_parquet_path=promo_dir / "promotion_statistical_audit.parquet",
+        promotion_audit_csv_path=promo_dir / "promotion_statistical_audit.csv",
     )
 
     assert hydrated["hydrated_with_promotion_fallback"] is True

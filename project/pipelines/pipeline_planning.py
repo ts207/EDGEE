@@ -701,6 +701,9 @@ def prepare_run_preflight(
             args.run_expectancy_analysis = 1
         if not cli_flag_present("--run_expectancy_robustness"):
             args.run_expectancy_robustness = 1
+    if expectancy_tail_requested and int(getattr(args, "run_phase2_conditional", 0)):
+        if not cli_flag_present("--run_edge_registry_update"):
+            args.run_edge_registry_update = 1
     if int(getattr(args, "run_candidate_promotion", 0)) and int(
         getattr(args, "run_phase2_conditional", 0)
     ):

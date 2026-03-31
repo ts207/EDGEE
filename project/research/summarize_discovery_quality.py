@@ -60,6 +60,15 @@ def _load_candidates(path: Path) -> pd.DataFrame:
     return pd.DataFrame()
 
 
+def _event_type_from_trigger_key(value: object) -> str:
+    token = str(value or "").strip()
+    if not token:
+        return ""
+    if ":" in token:
+        token = token.split(":", 1)[1]
+    return token.strip().upper()
+
+
 def _phase2_event_roots(phase2_root: Path) -> Dict[str, list[Path]]:
     event_roots: Dict[str, list[Path]] = defaultdict(list)
     if not phase2_root.exists():
@@ -134,6 +143,133 @@ def _split_fail_reasons(series: pd.Series) -> List[str]:
             if reason:
                 out.append(reason)
     return out
+
+
+def _build_summary_from_flat_phase2_layout(
+    *, run_id: str, phase2_root: Path, top_fail_reasons: int
+) -> dict | None:
+    candidate_frames: Dict[str, List[pd.DataFrame]] = defaultdict(list)
+    evaluated_frames: Dict[str, List[pd.DataFrame]] = defaultdict(list)
+    failure_frames: Dict[str, List[pd.DataFrame]] = defaultdict(list)
+    source_files: Dict[str, str] = {}
+
+    flat_candidates = _load_candidates(phase2_root / "phase2_candidates.csv")
+    if flat_candidates.empty:
+        flat_candidates = _load_candidates(phase2_root / "phase2_candidates.parquet")
+    if not flat_candidates.empty and "event_type" in flat_candidates.columns:
+        for event_type, frame in flat_candidates.groupby(flat_candidates["event_type"].astype(str)):
+            family = str(event_type).strip().upper()
+            if not family:
+                continue
+            candidate_frames[family].append(frame.copy())
+            source_files[family] = str(phase2_root)
+
+    hypotheses_root = phase2_root / "hypotheses"
+    if hypotheses_root.exists():
+        for symbol_dir in sorted(child for child in hypotheses_root.iterdir() if child.is_dir()):
+            evaluated_path = symbol_dir / "evaluated_hypotheses.parquet"
+            if evaluated_path.exists():
+                evaluated = pd.read_parquet(evaluated_path)
+                if not evaluated.empty and "trigger_key" in evaluated.columns:
+                    work = evaluated.copy()
+                    work["event_type"] = work["trigger_key"].map(_event_type_from_trigger_key)
+                    for event_type, frame in work.groupby(work["event_type"].astype(str)):
+                        family = str(event_type).strip().upper()
+                        if not family:
+                            continue
+                        evaluated_frames[family].append(frame.copy())
+                        source_files.setdefault(family, str(evaluated_path))
+
+            failures_path = symbol_dir / "gate_failures.parquet"
+            if failures_path.exists():
+                failures = pd.read_parquet(failures_path)
+                if not failures.empty and "trigger_key" in failures.columns:
+                    work = failures.copy()
+                    work["event_type"] = work["trigger_key"].map(_event_type_from_trigger_key)
+                    for event_type, frame in work.groupby(work["event_type"].astype(str)):
+                        family = str(event_type).strip().upper()
+                        if not family:
+                            continue
+                        failure_frames[family].append(frame.copy())
+                        source_files.setdefault(family, str(failures_path))
+
+    families = set(candidate_frames) | set(evaluated_frames) | set(failure_frames)
+    if not families:
+        return None
+
+    by_event_family: Dict[str, Dict[str, object]] = {}
+    family_fail_counter: Dict[str, Counter[str]] = defaultdict(Counter)
+    global_fail_counter: Counter[str] = Counter()
+
+    for family in sorted(families):
+        candidate_frame = (
+            pd.concat(candidate_frames[family], ignore_index=True)
+            if candidate_frames.get(family)
+            else pd.DataFrame()
+        )
+        evaluated_frame = (
+            pd.concat(evaluated_frames[family], ignore_index=True)
+            if evaluated_frames.get(family)
+            else pd.DataFrame()
+        )
+        failure_frame = (
+            pd.concat(failure_frames[family], ignore_index=True)
+            if failure_frames.get(family)
+            else pd.DataFrame()
+        )
+
+        family_row = _family_defaults()
+        if not candidate_frame.empty:
+            summary = _event_summary(candidate_frame)
+            family_row.update(summary)
+            family_row["phase2_candidates"] = int(len(candidate_frame))
+            family_row["phase2_gate_all_pass"] = int(_gate_pass_series(candidate_frame).sum())
+            _apply_bridge_metrics_from_frame(family_row, candidate_frame)
+        else:
+            total = int(len(evaluated_frame))
+            fail_count = int(len(failure_frame))
+            pass_count = max(0, total - fail_count)
+            family_row["total_candidates"] = total
+            family_row["gate_pass_count"] = pass_count
+            family_row["gate_pass_rate"] = float(pass_count / total) if total else 0.0
+
+        fail_reasons = _split_fail_reasons(
+            failure_frame.get("gate_failure_reason", pd.Series(dtype=str))
+        )
+        family_fail_counter[family].update(fail_reasons)
+        global_fail_counter.update(fail_reasons)
+        by_event_family[family] = family_row
+
+    for family, counter in family_fail_counter.items():
+        by_event_family.setdefault(family, _family_defaults())
+        by_event_family[family]["top_failure_reasons"] = [
+            {"reason": reason, "count": int(count)}
+            for reason, count in counter.most_common(max(0, int(top_fail_reasons)))
+        ]
+
+    event_families = sorted(by_event_family.keys())
+    total_candidates = int(
+        sum(int(by_event_family[family].get("total_candidates", 0)) for family in event_families)
+    )
+    gate_pass_count = int(
+        sum(int(by_event_family[family].get("gate_pass_count", 0)) for family in event_families)
+    )
+
+    return {
+        "run_id": run_id,
+        "generated_at": _utc_now_iso(),
+        "phase2_root": str(phase2_root),
+        "source_files": source_files,
+        "event_families": event_families,
+        "total_candidates": total_candidates,
+        "gate_pass_count": gate_pass_count,
+        "gate_pass_rate": float(gate_pass_count / total_candidates) if total_candidates else 0.0,
+        "top_fail_reasons": [
+            {"reason": reason, "count": int(count)}
+            for reason, count in global_fail_counter.most_common(max(0, int(top_fail_reasons)))
+        ],
+        "by_event_family": by_event_family,
+    }
 
 
 def _gate_pass_series(df: pd.DataFrame) -> pd.Series:
@@ -219,6 +355,13 @@ def build_summary(*, run_id: str, phase2_root: Path, top_fail_reasons: int) -> d
     DATA_ROOT = get_data_root()
     event_roots = _phase2_event_roots(phase2_root)
     if not event_roots:
+        flat_summary = _build_summary_from_flat_phase2_layout(
+            run_id=run_id,
+            phase2_root=phase2_root,
+            top_fail_reasons=top_fail_reasons,
+        )
+        if flat_summary is not None:
+            return flat_summary
         print(f"[WARN] No phase2 event directories found for run_id={run_id}: {phase2_root}")
         return {
             "run_id": run_id,

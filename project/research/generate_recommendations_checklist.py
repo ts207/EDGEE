@@ -94,6 +94,10 @@ def _read_table(parquet_path: Path, csv_path: Path) -> pd.DataFrame:
     return pd.DataFrame()
 
 
+def _existing_manifest_inputs(paths: list[Path]) -> list[dict[str, str]]:
+    return [{"path": str(path)} for path in paths if path.exists()]
+
+
 def _apply_checklist_gate_profile(args: argparse.Namespace) -> argparse.Namespace:
     profile = str(getattr(args, "gate_profile", "custom")).strip().lower()
     if profile in {"discovery", "synthetic"}:
@@ -392,15 +396,17 @@ def main() -> int:
     out_dir = Path(args.out_dir) if args.out_dir else runs_root / args.run_id / "research_checklist"
     checklist_out_path = out_dir / "checklist.json"
     release_signoff_out_path = out_dir / "release_signoff.json"
-    inputs = [
-        {"path": str(expectancy_path)},
-        {"path": str(robustness_path)},
-        {"path": str(manifest_path)},
-        {"path": str(kpi_path)},
-        {"path": str(edge_dir / "edge_candidates_normalized.parquet")},
-        {"path": str(promo_dir / "promoted_candidates.parquet")},
-        {"path": str(promo_dir / "promotion_statistical_audit.parquet")},
-    ]
+    inputs = _existing_manifest_inputs(
+        [
+            expectancy_path,
+            robustness_path,
+            manifest_path,
+            kpi_path,
+            edge_dir / "edge_candidates_normalized.parquet",
+            promo_dir / "promoted_candidates.parquet",
+            promo_dir / "promotion_statistical_audit.parquet",
+        ]
+    )
     outputs = [
         {"path": str(checklist_out_path if args.out_dir else checklist_path(args.run_id, runs_root.parent))},
         {
@@ -421,8 +427,8 @@ def main() -> int:
             edge_json_path=edge_dir / "edge_candidates_normalized.json",
             promoted_candidates_parquet_path=promo_dir / "promoted_candidates.parquet",
             promoted_candidates_csv_path=promo_dir / "promoted_candidates.csv",
-            promotion_audit_parquet_path=promo_dir / "promotion_audit.parquet",
-            promotion_audit_csv_path=promo_dir / "promotion_audit.csv",
+            promotion_audit_parquet_path=promo_dir / "promotion_statistical_audit.parquet",
+            promotion_audit_csv_path=promo_dir / "promotion_statistical_audit.csv",
             promotion_summary_path=promotion_summary_path(args.run_id, reports_root.parent),
         )
         payload = _build_payload(
@@ -437,8 +443,8 @@ def main() -> int:
 
         kpi_payload = _hydrate_kpi_payload_with_promotion_fallback(
             kpi_payload=_load_json(kpi_path),
-            promotion_audit_parquet_path=promo_dir / "promotion_audit.parquet",
-            promotion_audit_csv_path=promo_dir / "promotion_audit.csv",
+            promotion_audit_parquet_path=promo_dir / "promotion_statistical_audit.parquet",
+            promotion_audit_csv_path=promo_dir / "promotion_statistical_audit.csv",
         )
         payload["release_signoff"] = _build_release_signoff(
             run_id=args.run_id,

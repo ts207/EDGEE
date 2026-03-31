@@ -14,7 +14,7 @@ import json
 import logging
 import sys
 from pathlib import Path
-from typing import Optional
+from typing import Any, Mapping, Optional
 
 import pandas as pd
 import yaml
@@ -190,6 +190,23 @@ def _classify_metrics_counts(
         int(len(metrics)) - valid_metrics_rows - rejected_by_min_n,
     )
     return valid_metrics_rows, rejected_invalid_metrics, rejected_by_min_n
+
+
+def _merge_rejection_reason_counts(
+    base_counts: Mapping[str, Any],
+    *,
+    rejected_invalid_metrics: int,
+    rejected_by_min_n: int,
+    rejected_by_min_t_stat: int,
+) -> dict[str, int]:
+    counts = {str(reason): int(count) for reason, count in dict(base_counts).items()}
+    if rejected_invalid_metrics:
+        counts["invalid_metrics"] = counts.get("invalid_metrics", 0) + int(rejected_invalid_metrics)
+    if rejected_by_min_n:
+        counts["min_sample_size"] = counts.get("min_sample_size", 0) + int(rejected_by_min_n)
+    if rejected_by_min_t_stat:
+        counts["min_t_stat"] = counts.get("min_t_stat", 0) + int(rejected_by_min_t_stat)
+    return counts
 
 
 # Phase 4.2 — regime-conditional candidate discovery signal columns
@@ -391,6 +408,7 @@ def run(
 
     # 1. Load data and evaluate symbols
     all_candidates = []
+    regime_conditional_inputs = []
     symbol_diagnostics = []
 
     total_feature_rows = 0
@@ -493,8 +511,10 @@ def run(
         total_feasible_hypotheses += int(
             generation_audit.get("counts", {}).get("feasible", len(hypotheses))
         )
-        total_rejected_hypotheses += int(generation_audit.get("counts", {}).get("rejected", 0))
-        for reason, count in dict(generation_audit.get("rejection_reason_counts", {})).items():
+        generation_rejected_hypotheses = int(generation_audit.get("counts", {}).get("rejected", 0))
+        total_rejected_hypotheses += generation_rejected_hypotheses
+        generation_rejection_reason_counts = dict(generation_audit.get("rejection_reason_counts", {}))
+        for reason, count in generation_rejection_reason_counts.items():
             aggregated_rejection_reasons[str(reason)] = aggregated_rejection_reasons.get(
                 str(reason), 0
             ) + int(count)
@@ -516,10 +536,8 @@ def run(
                     event_flag_columns_merged=int(len(sym_flags.columns)),
                     hypotheses_generated=0,
                     feasible_hypotheses=0,
-                    rejected_hypotheses=int(generation_audit.get("counts", {}).get("rejected", 0)),
-                    rejection_reason_counts=dict(
-                        generation_audit.get("rejection_reason_counts", {})
-                    ),
+                    rejected_hypotheses=generation_rejected_hypotheses,
+                    rejection_reason_counts=generation_rejection_reason_counts,
                     metrics_rows=0,
                     valid_metrics_rows=0,
                     rejected_invalid_metrics=0,
@@ -564,10 +582,8 @@ def run(
                     feasible_hypotheses=int(
                         generation_audit.get("counts", {}).get("feasible", len(hypotheses))
                     ),
-                    rejected_hypotheses=int(generation_audit.get("counts", {}).get("rejected", 0)),
-                    rejection_reason_counts=dict(
-                        generation_audit.get("rejection_reason_counts", {})
-                    ),
+                    rejected_hypotheses=generation_rejected_hypotheses,
+                    rejection_reason_counts=generation_rejection_reason_counts,
                     metrics_rows=0,
                     valid_metrics_rows=0,
                     rejected_invalid_metrics=0,
@@ -606,6 +622,36 @@ def run(
                 )
             ).sum()
         )
+        post_eval_rejected_hypotheses = (
+            int(rejected_invalid_metrics) + int(rejected_by_min_n) + int(rejected_by_min_t_stat)
+        )
+        total_rejected_hypotheses += post_eval_rejected_hypotheses
+        symbol_rejection_reason_counts = _merge_rejection_reason_counts(
+            generation_rejection_reason_counts,
+            rejected_invalid_metrics=rejected_invalid_metrics,
+            rejected_by_min_n=rejected_by_min_n,
+            rejected_by_min_t_stat=rejected_by_min_t_stat,
+        )
+        if rejected_invalid_metrics:
+            aggregated_rejection_reasons["invalid_metrics"] = (
+                aggregated_rejection_reasons.get("invalid_metrics", 0)
+                + int(rejected_invalid_metrics)
+            )
+        if rejected_by_min_n:
+            aggregated_rejection_reasons["min_sample_size"] = (
+                aggregated_rejection_reasons.get("min_sample_size", 0) + int(rejected_by_min_n)
+            )
+        if rejected_by_min_t_stat:
+            aggregated_rejection_reasons["min_t_stat"] = (
+                aggregated_rejection_reasons.get("min_t_stat", 0) + int(rejected_by_min_t_stat)
+            )
+
+        regime_conditional_source = metrics[
+            valid_mask
+            & (pd.to_numeric(metrics.get("n", 0), errors="coerce").fillna(0) >= int(resolved_min_n))
+        ].copy()
+        if not regime_conditional_source.empty:
+            regime_conditional_inputs.append(regime_conditional_source)
 
         # 4. Convert to bridge candidates
         candidates, gate_failures = split_bridge_candidates(
@@ -684,8 +730,10 @@ def run(
                 feasible_hypotheses=int(
                     generation_audit.get("counts", {}).get("feasible", len(hypotheses))
                 ),
-                rejected_hypotheses=int(generation_audit.get("counts", {}).get("rejected", 0)),
-                rejection_reason_counts=dict(generation_audit.get("rejection_reason_counts", {})),
+                rejected_hypotheses=int(
+                    generation_rejected_hypotheses + post_eval_rejected_hypotheses
+                ),
+                rejection_reason_counts=symbol_rejection_reason_counts,
                 metrics_rows=int(len(metrics)),
                 valid_metrics_rows=valid_metrics_rows,
                 rejected_invalid_metrics=rejected_invalid_metrics,
@@ -723,7 +771,12 @@ def run(
     # campaign controller can target with a context-conditioned follow-up run.
     # The controller reads this artefact in _build_next_actions() and injects
     # matching entries into the explore_adjacent queue.
-    _write_regime_conditional_candidates(final_df, out_dir)
+    regime_conditional_df = (
+        pd.concat(regime_conditional_inputs, ignore_index=True)
+        if regime_conditional_inputs
+        else pd.DataFrame()
+    )
+    _write_regime_conditional_candidates(regime_conditional_df, out_dir)
 
     main_diag = build_search_engine_diagnostics(
         run_id=run_id,

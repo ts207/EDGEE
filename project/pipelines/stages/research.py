@@ -517,11 +517,7 @@ def build_research_stages(
             )
         )
 
-    if (
-        int(args.run_edge_registry_update)
-        and int(args.run_candidate_promotion)
-        and int(args.run_phase2_conditional)
-    ):
+    if int(args.run_edge_registry_update) and int(args.run_phase2_conditional):
         registry_args = ["--run_id", run_id]
         if script_supports_flag(
             project_root / "research" / "update_edge_registry.py",

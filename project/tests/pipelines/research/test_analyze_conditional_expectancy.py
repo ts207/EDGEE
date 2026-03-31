@@ -57,6 +57,8 @@ def test_analyze_conditional_expectancy_writes_payload_from_edge_registry(monkey
         )
     )
     assert payload["expectancy_exists"] is True
+    assert payload["registry_exists"] is True
+    assert payload["skip_reason"] == ""
     assert payload["edge_count"] == 2
     assert payload["summary"]["promoted_edges"] == 1
     assert payload["expectancy_evidence"][0]["edge_id"] == "e1"
@@ -76,5 +78,7 @@ def test_analyze_conditional_expectancy_handles_missing_registry(monkeypatch, tm
         )
     )
     assert payload["expectancy_exists"] is False
+    assert payload["registry_exists"] is False
+    assert payload["skip_reason"] == "missing_edge_registry"
     assert payload["edge_count"] == 0
     assert payload["expectancy_evidence"] == []

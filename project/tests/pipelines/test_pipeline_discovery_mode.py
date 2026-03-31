@@ -596,3 +596,48 @@ def test_preflight_disables_promotion_when_experiment_config_turns_it_off(tmp_pa
     assert args.run_edge_registry_update == 0
     assert "promote_candidates" not in stage_names
     assert "update_edge_registry" not in stage_names
+
+
+def test_preflight_enables_edge_registry_update_for_expectancy_tail_without_promotion(tmp_path):
+    from project.pipelines.pipeline_planning import prepare_run_preflight
+    from project.pipelines.stages.utils import script_supports_flag
+
+    project_root = Path(__file__).parents[3] / "project"
+
+    args = _make_args(
+        run_id="r_expectancy",
+        symbols="BTCUSDT",
+        start="2022-11-01",
+        end="2022-12-31",
+        objective_name="retail_profitability",
+        objective_spec=None,
+        retail_profiles_spec=None,
+        force=0,
+        allow_missing_funding=0,
+        enable_cross_venue_spot_pipeline=0,
+        runtime_invariants_mode="warn",
+        emit_run_hash=0,
+        determinism_replay_checks=0,
+        oms_replay_checks=0,
+        performance_mode=0,
+        run_candidate_promotion=0,
+        run_edge_registry_update=0,
+        run_expectancy_analysis=1,
+        run_expectancy_robustness=1,
+        run_recommendations_checklist=1,
+        run_strategy_blueprint_compiler=0,
+        run_strategy_builder=0,
+    )
+
+    preflight = prepare_run_preflight(
+        args=args,
+        project_root=project_root,
+        data_root=project_root.parent / "data",
+        cli_flag_present=lambda _flag: False,
+        run_id_default=lambda: "unused",
+        script_supports_flag=script_supports_flag,
+    )
+
+    stage_names = list(preflight["stages"].keys())
+    assert args.run_edge_registry_update == 1
+    assert "update_edge_registry" in stage_names

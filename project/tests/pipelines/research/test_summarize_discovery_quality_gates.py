@@ -164,3 +164,39 @@ def test_build_summary_counts_embedded_search_engine_bridge_results(tmp_path, mo
     assert family["bridge_evaluable"] == 2
     assert family["bridge_pass_val"] == 1
     assert family["gate_pass_count"] == 1
+
+
+def test_build_summary_falls_back_to_flat_hypothesis_audits(tmp_path, monkeypatch):
+    run_id = "test_run_flat_hypotheses"
+    phase2_root = tmp_path / "reports" / "phase2" / run_id
+    hypothesis_dir = phase2_root / "hypotheses" / "BTCUSDT"
+    hypothesis_dir.mkdir(parents=True, exist_ok=True)
+
+    evaluated = pd.DataFrame(
+        [
+            {"trigger_key": "event:VOL_SHOCK", "t_stat": 0.9, "valid": True},
+            {"trigger_key": "event:VOL_SHOCK", "t_stat": 0.7, "valid": True},
+            {"trigger_key": "event:RANGE_BREAKOUT", "t_stat": 0.4, "valid": True},
+        ]
+    )
+    failures = pd.DataFrame(
+        [
+            {"trigger_key": "event:VOL_SHOCK", "gate_failure_reason": "min_t_stat"},
+            {"trigger_key": "event:RANGE_BREAKOUT", "gate_failure_reason": "min_t_stat"},
+        ]
+    )
+    evaluated.to_parquet(hypothesis_dir / "evaluated_hypotheses.parquet", index=False)
+    failures.to_parquet(hypothesis_dir / "gate_failures.parquet", index=False)
+
+    monkeypatch.setattr(summarize_discovery_quality, "get_data_root", lambda: tmp_path)
+    payload = summarize_discovery_quality.build_summary(
+        run_id=run_id,
+        phase2_root=phase2_root,
+        top_fail_reasons=5,
+    )
+
+    assert payload["event_families"] == ["RANGE_BREAKOUT", "VOL_SHOCK"]
+    assert payload["by_event_family"]["VOL_SHOCK"]["total_candidates"] == 2
+    assert payload["by_event_family"]["VOL_SHOCK"]["gate_pass_count"] == 1
+    assert payload["by_event_family"]["RANGE_BREAKOUT"]["total_candidates"] == 1
+    assert payload["top_fail_reasons"] == [{"reason": "min_t_stat", "count": 2}]

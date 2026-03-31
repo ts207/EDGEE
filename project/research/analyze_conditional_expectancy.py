@@ -48,6 +48,7 @@ def _build_payload(
     run_id: str,
     registry_df: pd.DataFrame,
     registry_path: Path,
+    registry_exists: bool,
     symbols: list[str],
     retail_profile: str,
     top_k: int,
@@ -58,7 +59,9 @@ def _build_payload(
             "symbols": symbols,
             "retail_profile": retail_profile,
             "expectancy_exists": False,
+            "registry_exists": bool(registry_exists),
             "edge_count": 0,
+            "skip_reason": "" if registry_exists else "missing_edge_registry",
             "source_registry_path": str(registry_path),
             "summary": {
                 "tested_edges": 0,
@@ -112,6 +115,8 @@ def _build_payload(
         "symbols": symbols,
         "retail_profile": retail_profile,
         "expectancy_exists": bool(len(evidence) > 0),
+        "registry_exists": bool(registry_exists),
+        "skip_reason": "",
         "edge_count": int(len(work)),
         "source_registry_path": str(registry_path),
         "summary": {
@@ -147,6 +152,7 @@ def main(argv: list[str] | None = None) -> int:
     ensure_dir(out_dir)
 
     symbols = [s.strip().upper() for s in str(args.symbols).split(",") if s.strip()]
+    registry_exists = registry_path.exists()
     manifest = start_manifest(
         "analyze_conditional_expectancy",
         args.run_id,
@@ -166,6 +172,7 @@ def main(argv: list[str] | None = None) -> int:
             args.run_id,
             registry_df,
             registry_path,
+            registry_exists,
             symbols,
             str(args.retail_profile),
             int(args.top_k),
@@ -181,6 +188,7 @@ def main(argv: list[str] | None = None) -> int:
             "success",
             stats={
                 "expectancy_exists": bool(payload["expectancy_exists"]),
+                "registry_exists": bool(payload["registry_exists"]),
                 "edge_count": int(payload["edge_count"]),
                 "evidence_count": int(len(payload["expectancy_evidence"])),
             },
