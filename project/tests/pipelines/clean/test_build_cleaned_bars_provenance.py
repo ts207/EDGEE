@@ -64,6 +64,7 @@ def test_build_cleaned_validates_input_provenance(monkeypatch, tmp_path):
         captured["inputs"] = inputs
 
     monkeypatch.setattr(build_cleaned_bars, "get_data_root", lambda: tmp_path / "data")
+    monkeypatch.setattr(build_cleaned_bars, "choose_partition_dir", lambda _candidates: Path("dummy_dir"))
     monkeypatch.setattr(build_cleaned_bars, "list_parquet_files", fake_list_parquet_files)
     monkeypatch.setattr(build_cleaned_bars, "read_parquet", fake_read_parquet)
     monkeypatch.setattr(build_cleaned_bars, "start_manifest", fake_start_manifest)

@@ -2,6 +2,10 @@
 
 Governed event-driven crypto research engine. Proposal → plan → run → artifacts → diagnosis → hypothesis → next proposal.
 
+## PAI Mode Override
+
+Use **NATIVE MODE** for all tasks in this project, including research, analysis, diagnosis, and investigation. Do NOT load the Algorithm file. The Edge workflow is structured enough that the Algorithm overhead is unnecessary here.
+
 ## Commands
 
 ```bash

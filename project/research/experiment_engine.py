@@ -257,7 +257,7 @@ def export_experiment_artifacts(
         "context_slice",
     ]:
         if column not in frame.columns:
-            frame[column] = None
+            frame[column] = pd.Series(dtype="string")
 
     from project.io.utils import write_parquet
 

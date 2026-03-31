@@ -165,8 +165,27 @@ def check_hypothesis_feasibility(
                 ColumnRegistry.interaction_cols(t.interaction_id or ""), available_columns
             )
             if column is None:
-                reasons.append("missing_interaction_column")
-                details["interaction_id"] = t.interaction_id or ""
+                # Check if we can compute it dynamically from source events
+                source_events = []
+                if t.left:
+                    source_events.append(t.left)
+                if t.right:
+                    source_events.append(t.right)
+
+                missing_sources = []
+                for eid in source_events:
+                    spec_event = registry.get_event(eid)
+                    signal_col = spec_event.signal_column if spec_event else None
+                    if not _existing_column(
+                        ColumnRegistry.event_cols(eid, signal_col=signal_col),
+                        available_columns,
+                    ):
+                        missing_sources.append(eid)
+
+                if missing_sources:
+                    reasons.append("missing_interaction_column")
+                    details["interaction_id"] = t.interaction_id or ""
+                    details["missing_sources"] = missing_sources
     else:
         reasons.append("unsupported_trigger_type")
 
