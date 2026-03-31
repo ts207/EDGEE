@@ -26,6 +26,6 @@ tests:
     criteria: lift(ML_filter) > 1.2
 artifacts:
   - type: pipeline
-    path: project/pipelines/research/phase2_candidate_discovery.py
+    path: project/research/phase2_search_engine.py
   - type: model_storage
     path: data/lake/models/

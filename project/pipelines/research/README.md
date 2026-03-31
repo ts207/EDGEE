@@ -24,13 +24,20 @@ This directory contains research-facing CLI entrypoints, stage scripts, and adap
 
 ## Canonical Event Discovery Chain
 
-Current stage naming is:
+Current planner-owned stage naming is:
 
 - `analyze_events__{EVENT}_{tf}`
 - `build_event_registry__{EVENT}_{tf}`
 - `canonicalize_event_episodes__{EVENT}_{tf}`
-- `phase2_conditional_hypotheses__{EVENT}_{tf}`
-- `bridge_evaluate_phase2__{EVENT}_{tf}`
+- `phase2_search_engine`
+
+Legacy compatibility surfaces still exist for replay, debugging, and older artifacts:
+
+- `phase2_candidate_discovery.py`
+- historical manifest names such as `phase2_conditional_hypotheses__{EVENT}_{tf}`
+- historical bridge manifest names such as `bridge_evaluate_phase2__{EVENT}_{tf}`
+
+The canonical source-of-truth discovery stage for new planning, manifests, and contract checks is `phase2_search_engine`.
 
 ## Do Not Reintroduce
 

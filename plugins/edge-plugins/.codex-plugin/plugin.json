@@ -1,10 +1,10 @@
 {
   "name": "edge-plugins",
   "version": "0.1.0",
-  "description": "Project-local Codex plugin for the Edge research platform.",
+  "description": "Project-local Codex plugin scaffold for the Edge research platform. No external MCP servers or app entries are configured in this snapshot.",
   "author": {
     "name": "irene",
-    "email": "you@example.com",
+    "email": "irene@local.invalid",
     "url": "https://github.com/ts207/Edge"
   },
   "homepage": "https://github.com/ts207/Edge",
@@ -24,7 +24,7 @@
   "interface": {
     "displayName": "Edge Plugins",
     "shortDescription": "Repo workflows for Edge research and runtime work.",
-    "longDescription": "Project-local plugin scaffold for Edge, focused on event detectors, specs, research pipelines, and verification workflows.",
+    "longDescription": "Project-local plugin scaffold for Edge, focused on event detectors, specs, research pipelines, and verification workflows. This snapshot packages local skills and scripts only; external MCP servers and app registrations remain intentionally unconfigured.",
     "developerName": "Edge",
     "category": "Developer Tools",
     "capabilities": [

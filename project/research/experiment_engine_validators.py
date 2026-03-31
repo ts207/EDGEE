@@ -390,7 +390,11 @@ def _resolve_requested_event_ids(
     registries: RegistryBundle,
 ) -> List[str]:
     allowed_events = registries.events.get("events", {})
-    requested_events = [str(event_id).strip() for event_id in request.trigger_space.events.get("include", []) if str(event_id).strip()]
+    explicit_events = [
+        str(event_id).strip()
+        for event_id in request.trigger_space.events.get("include", [])
+        if str(event_id).strip()
+    ]
     requested_regimes = [
         str(regime).strip().upper()
         for regime in getattr(request.trigger_space, "canonical_regimes", [])
@@ -411,10 +415,62 @@ def _resolve_requested_event_ids(
         for value in getattr(request.trigger_space, "evidence_modes", [])
         if str(value).strip()
     }
-    if not requested_regimes:
-        return requested_events
 
     registry = get_domain_registry()
+
+    def _normalize_event_id(event_id: str) -> str:
+        token = str(event_id).strip()
+        if token not in allowed_events:
+            executable_token = resolve_executable_event_alias(token)
+            if executable_token in allowed_events:
+                token = executable_token
+        return token
+
+    def _validate_event_constraints(event_id: str) -> None:
+        spec = registry.get_event(event_id)
+        if spec is None:
+            return
+        canonical_regime = str(getattr(spec, "canonical_regime", "") or "").strip().upper()
+        subtype = str(getattr(spec, "subtype", "") or "").strip().lower()
+        phase = str(getattr(spec, "phase", "") or "").strip().lower()
+        evidence_mode = str(getattr(spec, "evidence_mode", "") or "").strip().lower()
+        if requested_regimes and canonical_regime not in requested_regimes:
+            raise ValueError(
+                "Explicit event "
+                f"'{event_id}' does not belong to requested canonical_regimes {requested_regimes}; "
+                f"registry canonical_regime is '{canonical_regime or '?'}'."
+            )
+        if subtypes and subtype not in subtypes:
+            raise ValueError(
+                f"Explicit event '{event_id}' does not match requested subtypes {sorted(subtypes)}; "
+                f"registry subtype is '{subtype or '?'}'."
+            )
+        if phases and phase not in phases:
+            raise ValueError(
+                f"Explicit event '{event_id}' does not match requested phases {sorted(phases)}; "
+                f"registry phase is '{phase or '?'}'."
+            )
+        if evidence_modes and evidence_mode not in evidence_modes:
+            raise ValueError(
+                f"Explicit event '{event_id}' does not match requested evidence_modes {sorted(evidence_modes)}; "
+                f"registry evidence_mode is '{evidence_mode or '?'}'."
+            )
+
+    ordered: list[str] = []
+    seen: set[str] = set()
+
+    if explicit_events:
+        for event_id in explicit_events:
+            token = _normalize_event_id(event_id)
+            _validate_event_constraints(token)
+            if token and token not in seen:
+                ordered.append(token)
+                seen.add(token)
+        return ordered
+
+    if not requested_regimes:
+        return ordered
+
     for regime in requested_regimes:
         for event_id in registry.get_event_ids_for_regime(regime, executable_only=True):
             spec = registry.get_event(event_id)
@@ -426,24 +482,16 @@ def _resolve_requested_event_ids(
                 continue
             if evidence_modes and str(spec.evidence_mode).strip().lower() not in evidence_modes:
                 continue
-            requested_events.append(event_id)
-    ordered: list[str] = []
-    seen: set[str] = set()
-    for event_id in requested_events:
-        token = str(event_id).strip()
-        if token not in allowed_events:
-            executable_token = resolve_executable_event_alias(token)
-            if executable_token in allowed_events:
-                token = executable_token
-        if token not in allowed_events:
-            log.debug(
-                "Skipping non-authoritative regime-expanded event %r during request resolution",
-                event_id,
-            )
-            continue
-        if token and token not in seen:
-            ordered.append(token)
-            seen.add(token)
+            token = _normalize_event_id(event_id)
+            if token not in allowed_events:
+                log.debug(
+                    "Skipping non-authoritative regime-expanded event %r during request resolution",
+                    event_id,
+                )
+                continue
+            if token and token not in seen:
+                ordered.append(token)
+                seen.add(token)
     return ordered
 
 

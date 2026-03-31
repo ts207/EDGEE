@@ -32,7 +32,7 @@ trigger_space:
     include:
       - VOL_SHOCK
   canonical_regimes:
-    - VOLATILITY_EXPANSION
+    - VOLATILITY_TRANSITION
 
 templates:
   - continuation

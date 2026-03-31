@@ -198,17 +198,15 @@ STAGE_FAMILY_REGISTRY: tuple[StageFamilyContract, ...] = (
     StageFamilyContract(
         family="phase2_discovery",
         stage_patterns=(
-            "phase2_conditional_hypotheses*",
-            "bridge_evaluate_phase2*",
-            "summarize_discovery_quality",
             "phase2_search_engine",
+            "summarize_discovery_quality",
+            "analyze_interaction_lift",
             "finalize_experiment",
         ),
         script_patterns=(
-            "research/cli/candidate_discovery_cli.py",
-            "research/bridge_evaluate_phase2.py",
-            "research/summarize_discovery_quality.py",
             "research/phase2_search_engine.py",
+            "research/summarize_discovery_quality.py",
+            "research/analyze_interaction_lift.py",
             "research/finalize_experiment.py",
         ),
     ),
@@ -381,32 +379,16 @@ STAGE_ARTIFACT_REGISTRY: tuple[StageArtifactContract, ...] = (
         external_inputs=("phase2.event_registry.{event_type}",),
     ),
     StageArtifactContract(
-        stage_patterns=("phase2_conditional_hypotheses*",),
-        inputs=("phase2.event_episodes.{event_type}", "features.perp.v2"),
-        optional_inputs=("context.market_state", "context.microstructure"),
-        outputs=("phase2.candidates.{event_type}",),
-        external_inputs=(
-            "phase2.event_episodes.{event_type}",
-            "features.perp.v2",
-            "context.market_state",
-            "context.microstructure",
-        ),
-    ),
-    StageArtifactContract(
-        stage_patterns=("bridge_evaluate_phase2*",),
-        inputs=("phase2.candidates.{event_type}",),
-        outputs=(
-            "phase2.bridge_metrics.{event_type}",
-            "phase2.bridge_summary.{event_type}",
-            "phase2.bridge_enriched_candidates.{event_type}",
-        ),
-        external_inputs=("phase2.candidates.{event_type}",),
-    ),
-    StageArtifactContract(
         stage_patterns=("phase2_search_engine",),
         inputs=("features.perp.v2",),
         outputs=("phase2.candidates.search",),
         external_inputs=("features.perp.v2",),
+    ),
+    StageArtifactContract(
+        stage_patterns=("analyze_interaction_lift",),
+        inputs=("phase2.candidates.*",),
+        outputs=("research.interaction_lift",),
+        external_inputs=("phase2.candidates.*",),
     ),
     StageArtifactContract(
         stage_patterns=("finalize_experiment",),
@@ -571,8 +553,6 @@ def _event_type_from_stage(stage_name: str, base_args: List[str]) -> str:
     prefixes = (
         "build_event_registry_",
         "canonicalize_event_episodes_",
-        "phase2_conditional_hypotheses_",
-        "bridge_evaluate_phase2_",
     )
     for prefix in prefixes:
         if stage_name.startswith(prefix):

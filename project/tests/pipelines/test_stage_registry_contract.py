@@ -64,9 +64,14 @@ def test_stage_plan_contract_validation():
             ["--event_type", "LIQUIDITY_VACUUM"],
         ),
         (
-            "phase2_conditional_hypotheses_LIQUIDITY_VACUUM",
-            PROJECT_ROOT / "research" / "cli" / "candidate_discovery_cli.py",
-            ["--event_type", "LIQUIDITY_VACUUM"],
+            "phase2_search_engine",
+            PROJECT_ROOT / "research" / "phase2_search_engine.py",
+            [],
+        ),
+        (
+            "analyze_interaction_lift",
+            PROJECT_ROOT / "research" / "analyze_interaction_lift.py",
+            [],
         ),
         (
             "promote_candidates",
@@ -136,6 +141,38 @@ def test_stage_dataflow_dag_valid():
         (
             "build_features_5m",
             PROJECT_ROOT / "pipelines" / "features" / "build_features.py",
+            [],
+        ),
+    ]
+    issues = stage_registry.validate_stage_dataflow_dag(stages)
+    assert issues == []
+
+
+def test_stage_dataflow_dag_accepts_phase2_search_engine_and_interaction_lift():
+    stages = [
+        (
+            "ingest_binance_um_ohlcv_5m",
+            PROJECT_ROOT / "pipelines" / "ingest" / "ingest_binance_um_ohlcv.py",
+            [],
+        ),
+        (
+            "build_cleaned_5m",
+            PROJECT_ROOT / "pipelines" / "clean" / "build_cleaned_bars.py",
+            [],
+        ),
+        (
+            "build_features_5m",
+            PROJECT_ROOT / "pipelines" / "features" / "build_features.py",
+            [],
+        ),
+        (
+            "phase2_search_engine",
+            PROJECT_ROOT / "research" / "phase2_search_engine.py",
+            [],
+        ),
+        (
+            "analyze_interaction_lift",
+            PROJECT_ROOT / "research" / "analyze_interaction_lift.py",
             [],
         ),
     ]

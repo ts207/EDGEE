@@ -209,7 +209,7 @@ def execute_candidate_discovery(config: CandidateDiscoveryConfig) -> CandidateDi
     out_dir = config.resolved_out_dir()
     ensure_dir(out_dir)
     manifest = start_manifest(
-        "phase2_candidate_discovery", config.run_id, config.manifest_params(), [], []
+        "phase2_search_engine", config.run_id, config.manifest_params(), [], []
     )
     hyp_registry = HypothesisRegistry()
     symbol_candidates: Dict[str, pd.DataFrame] = {}

@@ -7,12 +7,15 @@ from __future__ import annotations
 from typing import List
 
 from project.domain.compiled_registry import get_domain_registry
+from project.core.constants import parse_horizon_bars
 from project.research.search.feasibility import check_hypothesis_feasibility
 from project.domain.hypotheses import HypothesisSpec, TriggerType
 from project.research.context_labels import canonicalize_context_label
 
 VALID_DIRECTIONS = {"long", "short", "both"}
-VALID_HORIZONS = {"1m", "5m", "15m", "30m", "60m", "1h", "4h", "1d"}
+# Canonical labels kept for diagnostics and backward-compatible documentation.
+CANONICAL_HORIZON_LABELS = {"1m", "5m", "15m", "30m", "60m", "1h", "4h", "1d"}
+VALID_HORIZONS = CANONICAL_HORIZON_LABELS
 VALID_OPERATORS = {">=", "<=", ">", "<", "=="}
 
 
@@ -28,8 +31,13 @@ def validate_hypothesis_spec(spec: HypothesisSpec) -> List[str]:
             f"Invalid direction {spec.direction!r}. Must be one of {sorted(VALID_DIRECTIONS)}"
         )
 
-    if spec.horizon not in VALID_HORIZONS:
-        errors.append(f"Invalid horizon {spec.horizon!r}. Must be one of {sorted(VALID_HORIZONS)}")
+    try:
+        parse_horizon_bars(spec.horizon)
+    except Exception:
+        errors.append(
+            f"Invalid horizon {spec.horizon!r}. Must be parseable by parse_horizon_bars(), "
+            f"for example one of {sorted(CANONICAL_HORIZON_LABELS)} or an arbitrary bar count like '72'/'72b'"
+        )
 
     if not spec.template_id or not spec.template_id.strip():
         errors.append("template_id must not be empty")

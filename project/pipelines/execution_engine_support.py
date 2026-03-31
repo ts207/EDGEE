@@ -302,6 +302,8 @@ def compute_stage_input_hash(
 
 
 def is_phase2_stage(stage_name: str) -> bool:
-    return stage_name == "phase2_conditional_hypotheses" or stage_name.startswith(
-        "phase2_conditional_hypotheses_"
+    return (
+        stage_name == "phase2_search_engine"
+        or stage_name == "phase2_conditional_hypotheses"
+        or stage_name.startswith("phase2_conditional_hypotheses_")
     )

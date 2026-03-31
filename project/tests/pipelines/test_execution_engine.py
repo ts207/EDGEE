@@ -10,6 +10,11 @@ import pytest
 import project.pipelines.execution_engine as engine
 
 
+def test_stage_cache_scope_treats_phase2_search_engine_as_phase2():
+    assert engine.is_phase2_stage("phase2_search_engine") is True
+    assert engine.is_phase2_stage("build_features_5m") is False
+
+
 def test_run_stage_cache_hit_short_circuits_subprocess(monkeypatch, tmp_path):
     run_id = "cache_hit_run"
     data_root = tmp_path / "data"

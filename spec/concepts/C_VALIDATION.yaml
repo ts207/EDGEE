@@ -26,7 +26,7 @@ tests:
     criteria: empty-candidate validation paths preserve success manifests and do not abort orchestration
 artifacts:
   - type: pipeline
-    path: project/pipelines/research/phase2_candidate_discovery.py
+    path: project/research/phase2_search_engine.py
   - type: pipeline
     path: project/pipelines/research/bridge_evaluate_phase2.py
   - type: report

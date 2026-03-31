@@ -241,7 +241,7 @@ def test_ordered_run_ids_prefers_created_at_over_row_encounter_order() -> None:
     assert _ordered_run_ids(df) == ["run_old", "run_new"]
 
 
-def test_resolve_requested_event_ids_drops_non_authoritative_regime_expansion(
+def test_resolve_requested_event_ids_expands_regime_only_requests_and_drops_non_authoritative_events(
     registry_root, monkeypatch
 ):
     request = AgentExperimentRequest(
@@ -279,7 +279,12 @@ def test_resolve_requested_event_ids_drops_non_authoritative_regime_expansion(
             return ["VOL_SPIKE", "PRICE_VOL_IMBALANCE_PROXY"]
 
         def get_event(self, event_id: str):
-            return SimpleNamespace(subtype="", phase="", evidence_mode="")
+            return SimpleNamespace(
+                canonical_regime="LIQUIDITY_STRESS",
+                subtype="",
+                phase="",
+                evidence_mode="",
+            )
 
     monkeypatch.setattr(
         "project.research.experiment_engine_validators.get_domain_registry",
@@ -287,3 +292,110 @@ def test_resolve_requested_event_ids_drops_non_authoritative_regime_expansion(
     )
 
     assert _resolve_requested_event_ids(request, registries) == ["VOL_SPIKE"]
+
+
+def test_resolve_requested_event_ids_keeps_explicit_events_authoritative_when_regime_matches(
+    registry_root, monkeypatch
+):
+    request = AgentExperimentRequest(
+        program_id="test",
+        run_mode="research",
+        description="",
+        instrument_scope=InstrumentScope(
+            instrument_classes=["crypto"],
+            symbols=["BTCUSDT"],
+            timeframe="1m",
+            start="2024-01-01",
+            end="2024-01-02",
+        ),
+        trigger_space=TriggerSpace(
+            allowed_trigger_types=["EVENT"],
+            events={"include": ["VOL_SPIKE"]},
+            canonical_regimes=["LIQUIDITY_STRESS"],
+        ),
+        templates=TemplateSelection(include=["continuation"]),
+        evaluation=EvaluationConfig(horizons_bars=[10], directions=["long"], entry_lags=[1]),
+        contexts=ContextSelection(include={}),
+        search_control=SearchControl(
+            max_hypotheses_total=10,
+            max_hypotheses_per_template=10,
+            max_hypotheses_per_event_family=10,
+        ),
+        promotion=PromotionConfig(enabled=False),
+    )
+    registries = RegistryBundle(registry_root)
+
+    class _RegistryStub:
+        def get_event_ids_for_regime(self, regime: str, executable_only: bool = True):
+            assert regime == "LIQUIDITY_STRESS"
+            assert executable_only is True
+            return ["VOL_SPIKE", "LIQ_GAP"]
+
+        def get_event(self, event_id: str):
+            return SimpleNamespace(
+                canonical_regime="LIQUIDITY_STRESS",
+                subtype="",
+                phase="",
+                evidence_mode="",
+            )
+
+    monkeypatch.setattr(
+        "project.research.experiment_engine_validators.get_domain_registry",
+        lambda: _RegistryStub(),
+    )
+
+    assert _resolve_requested_event_ids(request, registries) == ["VOL_SPIKE"]
+
+
+def test_resolve_requested_event_ids_rejects_explicit_event_regime_mismatch(
+    registry_root, monkeypatch
+):
+    request = AgentExperimentRequest(
+        program_id="test",
+        run_mode="research",
+        description="",
+        instrument_scope=InstrumentScope(
+            instrument_classes=["crypto"],
+            symbols=["BTCUSDT"],
+            timeframe="1m",
+            start="2024-01-01",
+            end="2024-01-02",
+        ),
+        trigger_space=TriggerSpace(
+            allowed_trigger_types=["EVENT"],
+            events={"include": ["VOL_SPIKE"]},
+            canonical_regimes=["VOLATILITY_EXPANSION"],
+        ),
+        templates=TemplateSelection(include=["continuation"]),
+        evaluation=EvaluationConfig(horizons_bars=[10], directions=["long"], entry_lags=[1]),
+        contexts=ContextSelection(include={}),
+        search_control=SearchControl(
+            max_hypotheses_total=10,
+            max_hypotheses_per_template=10,
+            max_hypotheses_per_event_family=10,
+        ),
+        promotion=PromotionConfig(enabled=False),
+    )
+    registries = RegistryBundle(registry_root)
+
+    class _RegistryStub:
+        def get_event_ids_for_regime(self, regime: str, executable_only: bool = True):
+            assert regime == "VOLATILITY_EXPANSION"
+            assert executable_only is True
+            return ["LIQ_GAP"]
+
+        def get_event(self, event_id: str):
+            return SimpleNamespace(
+                canonical_regime="LIQUIDITY_STRESS",
+                subtype="",
+                phase="",
+                evidence_mode="",
+            )
+
+    monkeypatch.setattr(
+        "project.research.experiment_engine_validators.get_domain_registry",
+        lambda: _RegistryStub(),
+    )
+
+    with pytest.raises(ValueError, match="does not belong to requested canonical_regimes"):
+        _resolve_requested_event_ids(request, registries)

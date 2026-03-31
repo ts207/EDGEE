@@ -28,11 +28,16 @@ from project.spec_registry.search_space import (
 _LOG = logging.getLogger(__name__)
 
 _QUALITY_SCORES: Dict[str, float] = _QUALITY_SCORES_MAP
+_CANONICAL_REPAIR_STAGE_ALIASES: Dict[str, str] = {
+    "phase2_candidate_discovery": "phase2_search_engine",
+    "phase2_conditional_hypotheses": "phase2_search_engine",
+    "bridge_evaluate_phase2": "phase2_search_engine",
+}
+
 _REPAIR_STAGE_DEFAULT_EVENTS: Dict[str, str] = {
     "build_event_registry": "VOL_SHOCK",
     "analyze_events": "VOL_SHOCK",
-    "phase2_candidate_discovery": "VOL_SHOCK",
-    "bridge_evaluate_phase2": "VOL_SHOCK",
+    "phase2_search_engine": "VOL_SHOCK",
 }
 
 
@@ -134,8 +139,22 @@ def _event_from_failure_detail(failure_detail: Any, enabled_events: List[str]) -
     return ""
 
 
+def _normalize_repair_stage_name(stage: str) -> str:
+    raw = str(stage or "").strip().lower()
+    if not raw:
+        return ""
+    base = raw.split("__", 1)[0]
+    return _CANONICAL_REPAIR_STAGE_ALIASES.get(base, base)
+
+
+def _preferred_default_repair_event(enabled_events: List[str]) -> str:
+    if "VOL_SHOCK" in enabled_events:
+        return "VOL_SHOCK"
+    return sorted(enabled_events)[0] if enabled_events else ""
+
+
 def _repair_event_for_stage(stage: str, enabled_events: List[str]) -> str:
-    candidate = _REPAIR_STAGE_DEFAULT_EVENTS.get(str(stage or "").strip().lower(), "")
+    candidate = _REPAIR_STAGE_DEFAULT_EVENTS.get(_normalize_repair_stage_name(stage), "")
     if candidate and candidate in enabled_events:
         return candidate
     return ""
@@ -419,7 +438,7 @@ class CampaignController:
         if not event_type:
             event_type = _repair_event_for_stage(stage, enabled)
         if not event_type:
-            event_type = "ZSCORE_STRETCH"
+            event_type = _preferred_default_repair_event(enabled)
 
         return self._build_proposal(
             events=[event_type],

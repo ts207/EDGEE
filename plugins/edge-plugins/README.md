@@ -27,3 +27,6 @@ Main surfaces:
 - `scripts/edge_show_run_artifacts.sh` for canonical artifact-path inspection
 
 The plugin is local to this repository and does not create marketplace entries unless requested separately.
+
+
+No external MCP servers or app registrations are configured in this snapshot.

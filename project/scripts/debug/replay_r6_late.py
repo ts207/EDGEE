@@ -1,5 +1,14 @@
 from __future__ import annotations
 
+"""Replay the late-stage research chain from recorded manifests.
+
+This helper is intentionally compatibility-oriented: historical run folders may
+contain per-event bridge manifests with suffixed names, while newer planner-
+owned discovery uses the unsuffixed `phase2_search_engine` stage. The replay
+path therefore discovers existing bridge manifests from the run folder instead
+of assuming a fixed timeframe suffix.
+"""
+
 import json
 import subprocess
 import sys
@@ -47,17 +56,29 @@ def _stage_key(stage_file: Path) -> str:
     return stem
 
 
+def _bridge_stage_files(events: list[str], run_dir: Path) -> list[Path]:
+    stage_files: list[Path] = []
+    for event in events:
+        matches = sorted(run_dir.glob(f"bridge_evaluate_phase2__{event}_*.json"))
+        if matches:
+            stage_files.extend(matches)
+            continue
+        fallback = run_dir / "bridge_evaluate_phase2.json"
+        if fallback.exists():
+            stage_files.append(fallback)
+            continue
+        raise FileNotFoundError(
+            f"Missing bridge manifest for {event}: expected bridge_evaluate_phase2__{event}_*.json or {fallback}"
+        )
+    return stage_files
+
+
 def _stage_sequence() -> list[Path]:
     promo_audit = pd.read_parquet(
         Path("data/reports/promotions") / RUN_ID / "promotion_statistical_audit.parquet"
     )
     events = sorted(set(promo_audit["event_type"].astype(str)))
-    bridge_stage_files = []
-    for event in events:
-        path = RUN_DIR / f"bridge_evaluate_phase2__{event}_5m.json"
-        if not path.exists():
-            raise FileNotFoundError(f"Missing bridge manifest for {event}: {path}")
-        bridge_stage_files.append(path)
+    bridge_stage_files = _bridge_stage_files(events, RUN_DIR)
 
     return bridge_stage_files + [
         RUN_DIR / "export_edge_candidates.json",

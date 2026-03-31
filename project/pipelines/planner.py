@@ -35,6 +35,9 @@ def _upsert_cli_flag(base_args: List[str], flag: str, value: str) -> None:
 # Explicit Dependency Mapping
 # Patterns can use {tf} as a placeholder for timeframe, {event} for event type.
 # String literals match exactly.
+# `phase2_search_engine` is the canonical planner-owned phase-2 discovery stage.
+# Legacy per-event phase-2 stage names remain only for compatibility with
+# historical artifacts, replay tooling, and old tests.
 DEPENDENCY_PATTERNS: List[Tuple[str, List[str]]] = [
     ("build_cleaned_{tf}", ["ingest_binance_um_ohlcv_{tf}"]),
     ("build_cleaned_{tf}_spot", ["ingest_binance_spot_ohlcv_{tf}"]),
