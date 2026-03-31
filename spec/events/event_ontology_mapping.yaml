@@ -2,36 +2,37 @@ version: 1
 kind: event_ontology_mapping
 metadata:
   status: authoritative
-  notes: >
-    Staged compatibility ontology mapping. Raw event_type values remain executable;
+  notes: 'Staged compatibility ontology mapping. Raw event_type values remain executable;
     canonical_regime and layer metadata define the production ontology.
+
+    '
 allowed_values:
   layer:
-    - canonical
-    - composite
-    - context_tag
-    - strategy_construct
-    - research_placeholder
+  - canonical
+  - composite
+  - context_tag
+  - strategy_construct
+  - research_placeholder
   disposition:
-    - keep
-    - merge
-    - rename
-    - demote
-    - delete
+  - keep
+  - merge
+  - rename
+  - demote
+  - delete
   evidence_mode:
-    - direct
-    - proxy
-    - hybrid
-    - inferred_cross_asset
-    - sequence_confirmed
-    - contextual
-    - statistical
+  - direct
+  - proxy
+  - hybrid
+  - inferred_cross_asset
+  - sequence_confirmed
+  - contextual
+  - statistical
 events:
   ABSORPTION_PROXY:
     canonical_regime: LIQUIDITY_STRESS
     subtype: absorption
     phase: persistence
-    evidence_mode: proxy
+    evidence_mode: hybrid
     layer: canonical
     disposition: merge
     asset_scope: single_asset
@@ -39,7 +40,8 @@ events:
     deconflict_priority: 80
     research_only: false
     strategy_only: false
-    notes: Proxy absorption evidence for liquidity-stress episodes.
+    notes: 'Hybrid liquidity-stress evidence: direct imbalance-stall confirmation
+      combined with spread and RV stress.'
   BAND_BREAK:
     canonical_regime: STATISTICAL_STRETCH_OVERSHOOT
     subtype: band_break
@@ -200,7 +202,7 @@ events:
     canonical_regime: LIQUIDITY_STRESS
     subtype: depth_collapse
     phase: collapse
-    evidence_mode: proxy
+    evidence_mode: hybrid
     layer: canonical
     disposition: merge
     asset_scope: single_asset
@@ -208,7 +210,8 @@ events:
     deconflict_priority: 80
     research_only: false
     strategy_only: false
-    notes: Proxy depth-stress surface merged into liquidity stress.
+    notes: 'Hybrid liquidity-stress evidence: direct micro-depth depletion combined
+      with spread and RV stress.'
   FAILED_CONTINUATION:
     canonical_regime: TREND_FAILURE_EXHAUSTION
     subtype: failed_continuation
@@ -252,7 +255,7 @@ events:
     canonical_regime: TREND_FAILURE_EXHAUSTION
     subtype: flow_exhaustion
     phase: exhaustion
-    evidence_mode: proxy
+    evidence_mode: hybrid
     layer: canonical
     disposition: merge
     asset_scope: single_asset
@@ -260,7 +263,8 @@ events:
     deconflict_priority: 70
     research_only: false
     strategy_only: false
-    notes: Proxy-only forced-flow exhaustion evidence.
+    notes: 'Hybrid exhaustion evidence: liquidation and OI unwind confirmation combined
+      with price and volatility exhaustion.'
   FND_DISLOC:
     canonical_regime: BASIS_FUNDING_DISLOCATION
     subtype: funding_dislocation
@@ -460,7 +464,7 @@ events:
     canonical_regime: LIQUIDITY_STRESS
     subtype: liquidity_stress
     phase: shock
-    evidence_mode: proxy
+    evidence_mode: hybrid
     layer: canonical
     disposition: merge
     asset_scope: single_asset
@@ -468,7 +472,7 @@ events:
     deconflict_priority: 80
     research_only: false
     strategy_only: false
-    notes: Proxy evidence mode for liquidity stress.
+    notes: "Hybrid liquidity-stress evidence: direct book stress when available plus bar-range expansion and optional trade-flow collapse confirmation."
   LIQUIDITY_VACUUM:
     canonical_regime: LIQUIDITY_STRESS
     subtype: liquidity_vacuum
@@ -577,7 +581,7 @@ events:
     canonical_regime: LIQUIDITY_STRESS
     subtype: price_vol_imbalance
     phase: shock
-    evidence_mode: proxy
+    evidence_mode: hybrid
     layer: canonical
     disposition: merge
     asset_scope: single_asset
@@ -585,7 +589,7 @@ events:
     deconflict_priority: 80
     research_only: false
     strategy_only: false
-    notes: Proxy liquidity-stress evidence via price/volume imbalance.
+    notes: Hybrid liquidity-stress evidence via synchronized return, realized-volatility, volume, and flow-pressure imbalance.
   PULLBACK_PIVOT:
     canonical_regime: TREND_CONTINUATION
     subtype: pullback_pivot
@@ -897,7 +901,8 @@ events:
     deconflict_priority: 80
     research_only: false
     strategy_only: false
-    notes: Canonical volatility shock; current detector implementation also models relaxation boundary.
+    notes: Canonical volatility shock; current detector implementation also models
+      relaxation boundary.
   VOL_SPIKE:
     canonical_regime: VOLATILITY_EXPANSION
     subtype: vol_spike
@@ -915,7 +920,7 @@ events:
     canonical_regime: LIQUIDITY_STRESS
     subtype: wick_reversal
     phase: recovery
-    evidence_mode: proxy
+    evidence_mode: hybrid
     layer: canonical
     disposition: merge
     asset_scope: single_asset
@@ -923,7 +928,7 @@ events:
     deconflict_priority: 80
     research_only: false
     strategy_only: false
-    notes: Proxy wick-based recovery within liquidity stress.
+    notes: "Hybrid liquidity-stress recovery evidence: wick and reclaim structure confirmed by realized-volume expansion."
   ZSCORE_STRETCH:
     canonical_regime: STATISTICAL_STRETCH_OVERSHOOT
     subtype: zscore_stretch

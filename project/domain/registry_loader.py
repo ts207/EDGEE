@@ -13,6 +13,7 @@ from project.domain.models import (
 from project.spec_registry import (
     load_gates_spec,
     load_state_registry,
+    load_event_contract_overrides,
     load_unified_event_registry,
     load_yaml_relative,
     load_yaml_path,
@@ -36,6 +37,8 @@ def _merge_event_rows(unified: Dict[str, Any]) -> Dict[str, EventDefinition]:
     defaults = unified.get("defaults", {})
     families = unified.get("families", {})
     unified_events = unified.get("events", {})
+    contract_overrides_payload = load_event_contract_overrides()
+    contract_overrides = contract_overrides_payload.get("events", {}) if isinstance(contract_overrides_payload, dict) else {}
     out: Dict[str, EventDefinition] = {}
 
     event_types = set()
@@ -62,7 +65,12 @@ def _merge_event_rows(unified: Dict[str, Any]) -> Dict[str, EventDefinition]:
         
         if isinstance(unified_row, dict):
             row.update(unified_row)
-            
+        override_row = contract_overrides.get(event_type, {}) if isinstance(contract_overrides, dict) else {}
+        if isinstance(override_row, dict):
+            for key, value in override_row.items():
+                if key != "parameters" and value not in (None, "", [], {}):
+                    row[key] = value
+
         parameters = {}
         default_params = defaults.get("parameters", {}) if isinstance(defaults, dict) else {}
         family_params = {}
@@ -79,7 +87,9 @@ def _merge_event_rows(unified: Dict[str, Any]) -> Dict[str, EventDefinition]:
             parameters.update(family_params)
         if isinstance(row.get("parameters"), dict):
             parameters.update(row["parameters"])
-            
+        if isinstance(override_row, dict) and isinstance(override_row.get("parameters"), dict):
+            parameters.update(override_row["parameters"])
+
         row["parameters"] = parameters
         spec_path = str((_event_spec_dir() / f"{event_type}.yaml").resolve())
         
@@ -105,6 +115,11 @@ def _merge_event_rows(unified: Dict[str, Any]) -> Dict[str, EventDefinition]:
             disposition=str(row.get("disposition", "")).strip(),
             layer=str(row.get("layer", "")).strip(),
             notes=str(row.get("notes", "")).strip(),
+            tier=str(row.get("tier", "")).strip().upper(),
+            operational_role=str(row.get("operational_role", "")).strip(),
+            deployment_disposition=str(row.get("deployment_disposition", "")).strip(),
+            runtime_category=str(row.get("runtime_category", "active_runtime_event")).strip() or "active_runtime_event",
+            maturity_scores=dict(row.get("maturity_scores", {})) if isinstance(row.get("maturity_scores"), dict) else {},
             parameters=dict(parameters),
             raw=dict(row),
             spec_path=spec_path,

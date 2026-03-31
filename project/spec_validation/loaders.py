@@ -19,29 +19,18 @@ def load_yaml(path: Path) -> Dict[str, Any]:
 
 
 def load_ontology_events() -> Dict[str, Dict[str, Any]]:
-    events = {}
-    event_dirs = [SPEC_DIR / "events", ONTOLOGY_DIR / "events"]
-    for event_dir in event_dirs:
-        if not event_dir.exists():
-            continue
-        for p in event_dir.rglob("*.yaml"):
-            spec = load_yaml(p)
-            if not isinstance(spec, dict):
-                continue
-            kind = str(spec.get("kind", "")).strip().lower() if isinstance(spec, dict) else ""
-            if kind in {
-                "event_unified_registry",
-                "canonical_event_registry",
-                "event_config_defaults",
-                "event_family_defaults",
-            }:
-                continue
-            if not any(str(spec.get(key, "")).strip() for key in ("event_type", "canonical_family")):
-                continue
-            if not any(str(spec.get(key, "")).strip() for key in ("family", "canonical_family")):
-                continue
-            event_id = str(spec.get("event_type", p.stem)).strip() or p.stem
-            events[event_id] = spec
+    from project.events.contract_registry import load_active_event_contracts
+
+    events: Dict[str, Dict[str, Any]] = {}
+    for event_type, contract in load_active_event_contracts().items():
+        raw = dict(contract.get("raw", {}))
+        raw.setdefault("event_type", event_type)
+        raw.setdefault("canonical_family", contract.get("canonical_family", ""))
+        raw.setdefault("canonical_regime", contract.get("canonical_regime", ""))
+        raw.setdefault("family", contract.get("canonical_family", ""))
+        raw.setdefault("tier", contract.get("tier", ""))
+        raw.setdefault("operational_role", contract.get("operational_role", ""))
+        events[event_type] = raw
     return events
 
 

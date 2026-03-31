@@ -30,5 +30,5 @@ def test_annotate_regime_metadata_adds_bucket_and_routing_profile():
     assert annotated.loc[0, "canonical_regime"] == "LIQUIDITY_STRESS"
     assert annotated.loc[0, "regime_bucket"] == "trade_generating"
     assert annotated.loc[0, "routing_profile_id"] == routing_entry_for_regime("LIQUIDITY_STRESS").routing_profile_id
-    assert annotated.loc[1, "evidence_mode"] == "proxy"
+    assert annotated.loc[1, "evidence_mode"] == "hybrid"
     assert annotated.loc[2, "recommended_bucket"] == "trade_filtering"

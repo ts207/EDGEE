@@ -35,7 +35,7 @@ def prepare_funding_persistence_features(
     accel = f_abs - f_abs.shift(accel_lookback)
     accel = accel.where(accel > 0.0)
     accel_rank = percentile_rank_historical(
-        accel, window=threshold_window, min_periods=max(24, accel_lookback)
+        accel, window=threshold_window, min_periods=max(1, min(threshold_window, max(24, accel_lookback)))
     )
     accel_raw = ((accel_rank >= accel_pct) & (accel_rank.shift(1) < accel_pct)).fillna(False)
 

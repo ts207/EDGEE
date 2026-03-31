@@ -120,6 +120,11 @@ def load_state_registry() -> Dict[str, Any]:
     return load_yaml_relative("spec/states/state_registry.yaml")
 
 
+@functools.lru_cache(maxsize=1)
+def load_event_contract_overrides() -> Dict[str, Any]:
+    return load_yaml_relative("spec/events/event_contract_overrides.yaml")
+
+
 @functools.lru_cache(maxsize=None)
 def load_runtime_spec(name: str) -> Dict[str, Any]:
     normalized = str(name).strip().lower()
@@ -343,6 +348,7 @@ def clear_caches() -> None:
     load_event_ontology_mapping.cache_clear()
     load_template_registry.cache_clear()
     load_state_registry.cache_clear()
+    load_event_contract_overrides.cache_clear()
     load_runtime_spec.cache_clear()
     load_blueprint_policy_spec.cache_clear()
     load_hypothesis_spec.cache_clear()

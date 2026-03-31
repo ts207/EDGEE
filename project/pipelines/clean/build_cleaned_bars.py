@@ -262,7 +262,7 @@ def main() -> int:
                 data_root / "lake" / "raw" / "binance" / market / symbol / ohlcv_dataset,
             ]
             raw_dir = choose_partition_dir(raw_dir_candidates)
-            raw_files = list_parquet_files(raw_dir) if raw_dir else []
+            raw_files = list_parquet_files(raw_dir)
 
             # Accept both "funding" (new ingest) and "fundingRate" (legacy ingest path)
             funding_files: list = []
@@ -277,12 +277,11 @@ def main() -> int:
                             data_root / "lake" / "raw" / "binance" / market / symbol / _subdir,
                         ]
                     )
-                    if _candidate:
-                        _files = list_parquet_files(_candidate)
-                        if _files:
-                            funding_dir = _candidate
-                            funding_files = _files
-                            break
+                    _files = list_parquet_files(_candidate)
+                    if _files:
+                        funding_dir = _candidate
+                        funding_files = _files
+                        break
 
             raw = read_parquet(raw_files)
             funding = (

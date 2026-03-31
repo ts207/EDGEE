@@ -8,6 +8,7 @@ from typing import Dict, List, Optional
 
 from project.domain.hypotheses import HypothesisSpec, TriggerSpec
 from project.domain.compiled_registry import get_domain_registry
+from project.events.governance import event_matches_filters
 from project.events.event_aliases import resolve_executable_event_alias
 from project.research.context_labels import canonicalize_context_label
 from project.research.experiment_engine_schema import (
@@ -415,6 +416,21 @@ def _resolve_requested_event_ids(
         for value in getattr(request.trigger_space, "evidence_modes", [])
         if str(value).strip()
     }
+    tiers = {
+        str(value).strip().upper()
+        for value in getattr(request.trigger_space, "tiers", [])
+        if str(value).strip()
+    }
+    operational_roles = {
+        str(value).strip().lower()
+        for value in getattr(request.trigger_space, "operational_roles", [])
+        if str(value).strip()
+    }
+    deployment_dispositions = {
+        str(value).strip().lower()
+        for value in getattr(request.trigger_space, "deployment_dispositions", [])
+        if str(value).strip()
+    }
 
     registry = get_domain_registry()
 
@@ -431,10 +447,13 @@ def _resolve_requested_event_ids(
         if spec is None:
             return
         canonical_regime = str(getattr(spec, "canonical_regime", "") or "").strip().upper()
+        canonical_family = str(getattr(spec, "canonical_family", "") or "").strip().upper()
+        legacy_family = str(getattr(spec, "legacy_family", "") or "").strip().upper()
+        runtime_family = str(allowed_events.get(event_id, {}).get("family", "") or "").strip().upper()
         subtype = str(getattr(spec, "subtype", "") or "").strip().lower()
         phase = str(getattr(spec, "phase", "") or "").strip().lower()
         evidence_mode = str(getattr(spec, "evidence_mode", "") or "").strip().lower()
-        if requested_regimes and canonical_regime not in requested_regimes:
+        if requested_regimes and not ({canonical_regime, canonical_family, legacy_family, runtime_family} & set(requested_regimes)):
             raise ValueError(
                 "Explicit event "
                 f"'{event_id}' does not belong to requested canonical_regimes {requested_regimes}; "
@@ -455,6 +474,16 @@ def _resolve_requested_event_ids(
                 f"Explicit event '{event_id}' does not match requested evidence_modes {sorted(evidence_modes)}; "
                 f"registry evidence_mode is '{evidence_mode or '?'}'."
             )
+        if not event_matches_filters(
+            event_id,
+            tiers=tiers,
+            roles=operational_roles,
+            deployment_dispositions=deployment_dispositions,
+        ):
+            raise ValueError(
+                f"Explicit event '{event_id}' does not satisfy requested governance filters "
+                f"tiers={sorted(tiers)} roles={sorted(operational_roles)} dispositions={sorted(deployment_dispositions)}."
+            )
 
     ordered: list[str] = []
     seen: set[str] = set()
@@ -471,8 +500,24 @@ def _resolve_requested_event_ids(
     if not requested_regimes:
         return ordered
 
+    governance_filtered = bool(tiers or operational_roles or deployment_dispositions)
+
+    def _requested_event_ids_for_regime(regime: str) -> tuple[str, ...]:
+        matches = registry.get_event_ids_for_regime(regime, executable_only=not governance_filtered)
+        if matches:
+            return matches
+        matches = registry.get_event_ids_for_family(regime)
+        if matches:
+            return matches
+        runtime_matches = [
+            event_id
+            for event_id, meta in allowed_events.items()
+            if str(meta.get("family", "") or "").strip().upper() == regime
+        ]
+        return tuple(sorted(runtime_matches))
+
     for regime in requested_regimes:
-        for event_id in registry.get_event_ids_for_regime(regime, executable_only=True):
+        for event_id in _requested_event_ids_for_regime(regime):
             spec = registry.get_event(event_id)
             if spec is None:
                 continue
@@ -481,6 +526,13 @@ def _resolve_requested_event_ids(
             if phases and str(spec.phase).strip().lower() not in phases:
                 continue
             if evidence_modes and str(spec.evidence_mode).strip().lower() not in evidence_modes:
+                continue
+            if not event_matches_filters(
+                event_id,
+                tiers=tiers,
+                roles=operational_roles,
+                deployment_dispositions=deployment_dispositions,
+            ):
                 continue
             token = _normalize_event_id(event_id)
             if token not in allowed_events:

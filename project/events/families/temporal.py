@@ -122,15 +122,6 @@ class FundingTimestampDetector(ThresholdDetector):
 
     def prepare_features(self, df: pd.DataFrame, **params: Any) -> dict[str, pd.Series]:
         ts = pd.to_datetime(df["timestamp"], utc=True, errors="coerce")
-        funding = (
-            pd.to_numeric(df.get("funding_rate_scaled"), errors="coerce")
-            if "funding_rate_scaled" in df.columns
-            else pd.Series(0.0, index=df.index)
-        )
-        return {"ts": ts, "funding": funding}
-
-    def prepare_features(self, df: pd.DataFrame, **params: Any) -> dict[str, pd.Series]:
-        ts = pd.to_datetime(df["timestamp"], utc=True, errors="coerce")
         funding = df["funding_rate_scaled"].fillna(0.0) if "funding_rate_scaled" in df.columns else pd.Series(0.0, index=df.index)
         features = {"ts": ts, "funding": funding}
 

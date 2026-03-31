@@ -28,6 +28,11 @@ class EventDefinition:
     disposition: str = ""
     layer: str = ""
     notes: str = ""
+    tier: str = ""
+    operational_role: str = ""
+    deployment_disposition: str = ""
+    runtime_category: str = "active_runtime_event"
+    maturity_scores: Dict[str, Any] = field(default_factory=dict)
     parameters: Dict[str, Any] = field(default_factory=dict)
     raw: Dict[str, Any] = field(default_factory=dict)
     spec_path: str = ""
@@ -209,11 +214,20 @@ class DomainRegistry:
             sorted(
                 event_type
                 for event_type, spec in self.event_definitions.items()
-                if not spec.is_composite
+                if spec.runtime_category == "active_runtime_event"
+                and not spec.is_composite
                 and not spec.is_context_tag
                 and not spec.is_strategy_construct
             )
         )
+
+    def get_event_ids_for_tier(self, tier: str) -> tuple[str, ...]:
+        normalized = str(tier).strip().upper()
+        return tuple(sorted(event_type for event_type, spec in self.event_definitions.items() if str(spec.tier).upper() == normalized))
+
+    def get_event_ids_for_role(self, role: str) -> tuple[str, ...]:
+        normalized = str(role).strip().lower()
+        return tuple(sorted(event_type for event_type, spec in self.event_definitions.items() if str(spec.operational_role).strip().lower() == normalized))
 
     def get_state_ids_for_family(self, family_name: str) -> tuple[str, ...]:
         family = str(family_name).strip().upper()

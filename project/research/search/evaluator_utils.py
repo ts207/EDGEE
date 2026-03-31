@@ -91,75 +91,6 @@ def excursion_stats(
     return pd.Series(maes, index=mask[mask].index), pd.Series(mfes, index=mask[mask].index)
 
 
-def _interaction_mask(t: Any, features: pd.DataFrame) -> pd.Series:
-    """
-    Dynamically compute interaction mask if the column is missing.
-    """
-    iid = t.interaction_id or ""
-    cols = ColumnRegistry.interaction_cols(iid)
-    for col in cols:
-        if col in features.columns:
-            vals = features[col]
-            return vals.where(vals.notna(), False).astype(bool)
-
-    # Fallback: compute dynamically
-    # Interaction detection requires knowing which events happened when.
-    # In search features, events are often materialized as boolean columns: 'event:{ID}'.
-    from project.events.interaction_analyzer import detect_interactions
-
-    # We need a long-format event dataframe for detect_interactions
-    event_ids = []
-    if hasattr(t, "left") and t.left:
-        event_ids.append(t.left)
-    if hasattr(t, "right") and t.right:
-        event_ids.append(t.right)
-
-    if not event_ids:
-        return pd.Series(False, index=features.index)
-
-    # 1. Try to find these events in boolean columns
-    long_events = []
-    for eid in event_ids:
-        spec_event = EVENT_REGISTRY_SPECS.get(eid.upper())
-        signal_col = spec_event.signal_column if spec_event else None
-        cols = ColumnRegistry.event_cols(eid, signal_col=signal_col)
-        col = next((c for c in cols if c in features.columns), None)
-        if col:
-            mask = features[col].where(features[col].notna(), False).astype(bool)
-            hits = features[mask].copy()
-            if not hits.empty:
-                hits["event_type"] = eid
-                hits["signal_ts"] = hits.index
-                long_events.append(hits[["symbol", "event_type", "signal_ts"]])
-
-    if not long_events:
-        log.debug("No source events found in features for interaction %r", iid)
-        return pd.Series(False, index=features.index)
-
-    try:
-        df_long = pd.concat(long_events, ignore_index=True)
-        int_df = detect_interactions(
-            df=df_long,
-            left_id=t.left,
-            right_id=t.right,
-            op=t.op,
-            lag=t.lag,
-            interaction_name=iid,
-        )
-        if int_df.empty:
-            return pd.Series(False, index=features.index)
-
-        # Map signal_ts back to features.index (which is timestamp)
-        mask = features.index.isin(int_df["signal_ts"])
-        return pd.Series(mask, index=features.index)
-    except Exception as e:
-        log.warning("Failed to dynamically compute interaction %r: %s", iid, e)
-        return pd.Series(False, index=features.index)
-
-    log.debug("Interaction column for %r not found in features and cannot be computed", iid)
-    return pd.Series(False, index=features.index)
-
-
 def trigger_mask(spec: HypothesisSpec, features: pd.DataFrame) -> pd.Series:
     """
     Resolve a trigger to a boolean mask over the feature table rows.
@@ -240,7 +171,13 @@ def trigger_mask(spec: HypothesisSpec, features: pd.DataFrame) -> pd.Series:
         return false_mask
 
     if ttype == TriggerType.INTERACTION:
-        return _interaction_mask(t, features)
+        cols = ColumnRegistry.interaction_cols(t.interaction_id or "")
+        for col in cols:
+            if col in features.columns:
+                vals = features[col]
+                return vals.where(vals.notna(), False).astype(bool)
+        log.debug("Interaction column for %r not found in features", t.interaction_id)
+        return false_mask
 
     return false_mask
 

@@ -6,6 +6,7 @@ from pathlib import Path
 import numpy as np
 
 from project.core.coercion import as_bool
+from project.events.governance import promotion_event_metadata
 from project.core.exceptions import PromotionDecisionError
 from project.research.promotion.promotion_decision_support import (
     _apply_bundle_policy_result,
@@ -104,11 +105,21 @@ def evaluate_row(
         q_value = coerce_numeric_nan(row.get("q_value"))
         q_value_program = coerce_numeric_nan(row.get("q_value_program"))
 
-        is_descriptive = as_bool(row.get("event_is_descriptive", False))
-        is_trade_trigger = as_bool(row.get("event_is_trade_trigger", True))
+        governance = promotion_event_metadata(event_type, row)
+        is_descriptive = bool(governance.get("event_is_descriptive", False))
+        is_trade_trigger = bool(governance.get("event_is_trade_trigger", True))
         if is_descriptive or not is_trade_trigger:
             reasons.add_pair(
-                reject_reason="descriptive_only_event",
+                reject_reason=(
+                    str(governance.get("promotion_block_reason", "")).replace("=", "_")
+                    or "descriptive_only_event"
+                ),
+                promo_fail_reason="gate_promo_event_discipline",
+                category="event_discipline",
+            )
+        if bool(governance.get("requires_stronger_evidence", False)) and bool(is_reduced_evidence):
+            reasons.add_pair(
+                reject_reason="stronger_evidence_required",
                 promo_fail_reason="gate_promo_event_discipline",
                 category="event_discipline",
             )
@@ -262,6 +273,17 @@ def evaluate_row(
             "is_continuation_template_family"
         ]
         result["gate_bridge_tradable"] = "pass" if continuation_eval["bridge_tradable"] else "fail"
+        result.update(
+            {
+                "event_contract_tier": str(governance.get("tier", "")),
+                "event_operational_role": str(governance.get("operational_role", "")),
+                "event_deployment_disposition": str(governance.get("deployment_disposition", "")),
+                "event_runtime_category": str(governance.get("runtime_category", "")),
+                "event_is_descriptive": bool(is_descriptive),
+                "event_is_trade_trigger": bool(is_trade_trigger),
+                "event_requires_stronger_evidence": bool(governance.get("requires_stronger_evidence", False)),
+            }
+        )
 
         merged_for_bundle = dict(row)
         merged_for_bundle.update(result)

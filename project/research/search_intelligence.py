@@ -11,6 +11,7 @@ import pandas as pd
 from project.core.config import get_data_root
 from project.core.exceptions import DataIntegrityError
 from project.domain.compiled_registry import get_domain_registry
+from project.events.governance import default_planning_event_ids, event_matches_filters
 from project.research.experiment_engine import RegistryBundle
 from project.research.knowledge.memory import (
     ensure_memory_store,
@@ -209,9 +210,15 @@ def _build_frontier(
                 isinstance(cfg, dict)
                 and str(cfg.get("enabled", True)).strip().lower() in {"0", "false", "no"}
             )
+            and event_matches_filters(
+                str(event_id).strip(),
+                tiers=("A", "B"),
+                roles=("trigger", "confirm"),
+                trade_trigger_eligible=True,
+            )
         ]
     else:
-        enabled_events = list(domain_registry.default_executable_event_ids())
+        enabled_events = list(default_planning_event_ids(domain_registry.default_executable_event_ids()))
     tested_events = set(
         tested_regions.get("event_type", pd.Series(dtype="object")).astype(str).unique()
     )

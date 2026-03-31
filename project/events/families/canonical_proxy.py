@@ -54,6 +54,7 @@ class _CanonicalProxyBase(ThresholdDetector):
     timeframe_minutes = 5
     default_severity = "moderate"
     min_spacing = 6
+    evidence_tier = "proxy"
     EXTREME_THRESHOLD = 4.0
     MAJOR_THRESHOLD = 2.5
 
@@ -74,7 +75,7 @@ class _CanonicalProxyBase(ThresholdDetector):
         return {
             "family": "canonical_proxy",
             "source_event_type": self.source_event_type,
-            "evidence_tier": "proxy",
+            "evidence_tier": self.evidence_tier,
         }
 
 
@@ -88,6 +89,7 @@ def _require_columns(df: pd.DataFrame, *, event_type: str, required: tuple[str, 
 class PriceVolImbalanceProxyDetector(_CanonicalProxyBase):
     event_type = "PRICE_VOL_IMBALANCE_PROXY"
     source_event_type = "ORDERFLOW_IMBALANCE_SHOCK"
+    evidence_tier = "hybrid"
     required_columns = _CanonicalProxyBase.required_columns + ("volume", "rv_96")
     min_spacing = 48
     signal_profile = "price_volume_imbalance"
@@ -158,7 +160,7 @@ class PriceVolImbalanceProxyDetector(_CanonicalProxyBase):
     def compute_raw_mask(
         self, df: pd.DataFrame, *, features: dict[str, pd.Series], **params: Any
     ) -> pd.Series:
-        del df, params
+        del df
         return (
             features["history_ready"]
             & (features["ret_abs"] >= features["ret_q"]).fillna(False)
@@ -177,12 +179,18 @@ class PriceVolImbalanceProxyDetector(_CanonicalProxyBase):
 class WickReversalProxyDetector(_CanonicalProxyBase):
     event_type = "WICK_REVERSAL_PROXY"
     source_event_type = "SWEEP_STOPRUN"
+    evidence_tier = "hybrid"
     signal_profile = "wick_reversal"
     DEFAULT_WICK_QUANTILE = 0.97
     DEFAULT_DOMINANCE_QUANTILE = 0.85
     DEFAULT_RECLAIM_QUANTILE = 0.80
     DEFAULT_RET_QUANTILE = 0.90
     DEFAULT_RANGE_QUANTILE = 0.90
+    DEFAULT_VOLUME_QUANTILE = 0.90
+    DEFAULT_SIGNAL_COMPONENTS = 6.0
+    DEFAULT_STRUCTURE_SCORE_THRESHOLD = 2.60
+    DEFAULT_RANGE_RATIO_THRESHOLD = 1.75
+    DEFAULT_VOLUME_Z_FLOOR = 2.0
 
     def prepare_features(self, df: pd.DataFrame, **params: Any) -> dict[str, pd.Series]:
         close = _numeric_series(df, "close")
@@ -201,6 +209,8 @@ class WickReversalProxyDetector(_CanonicalProxyBase):
         wick_dominance = _safe_ratio(dominant_wick, wick_total).fillna(0.0)
         reclaim = (1.0 - _safe_ratio((close - open_proxy).abs(), bar_range)).clip(lower=0.0, upper=1.0)
         ret_abs = close.pct_change(1).abs()
+        volume = _numeric_series(df, "volume")
+        volume_z = rolling_mean_std_zscore(volume.ffill(), window=int(params.get("window", 288)))
 
         window = int(params.get("window", 288))
         min_history_bars = int(params.get("min_history_bars", 288))
@@ -229,6 +239,11 @@ class WickReversalProxyDetector(_CanonicalProxyBase):
             quantile=float(params.get("range_quantile", self.DEFAULT_RANGE_QUANTILE)),
             window=window,
         )
+        volume_q = rolling_quantile_threshold(
+            volume_z.clip(lower=0.0),
+            quantile=float(params.get("volume_quantile", self.DEFAULT_VOLUME_QUANTILE)),
+            window=window,
+        ).fillna(0.0)
         history_ready = _history_ready(df, min_history_bars)
         signal = (
             _safe_ratio(wick_ratio, wick_q)
@@ -236,7 +251,8 @@ class WickReversalProxyDetector(_CanonicalProxyBase):
             + _safe_ratio(reclaim, reclaim_q)
             + _safe_ratio(ret_abs, ret_q)
             + _safe_ratio(bar_range, range_q)
-        ) / 5.0
+            + _safe_ratio(volume_z.clip(lower=0.0), volume_q)
+        ) / self.DEFAULT_SIGNAL_COMPONENTS
 
         return {
             "open_proxy": open_proxy,
@@ -248,11 +264,13 @@ class WickReversalProxyDetector(_CanonicalProxyBase):
             "wick_dominance": wick_dominance,
             "reclaim": reclaim,
             "ret_abs": ret_abs,
+            "volume_z": volume_z,
             "wick_q": wick_q,
             "dominance_q": dominance_q,
             "reclaim_q": reclaim_q,
             "ret_q": ret_q,
             "range_q": range_q,
+            "volume_q": volume_q,
             "history_ready": history_ready,
             "signal": signal,
         }
@@ -260,14 +278,26 @@ class WickReversalProxyDetector(_CanonicalProxyBase):
     def compute_raw_mask(
         self, df: pd.DataFrame, *, features: dict[str, pd.Series], **params: Any
     ) -> pd.Series:
-        del df, params
+        del df
+        structure_score = (
+            _safe_ratio(features["wick_ratio"], features["wick_q"])
+            + _safe_ratio(features["wick_dominance"], features["dominance_q"])
+            + _safe_ratio(features["reclaim"], features["reclaim_q"])
+        ).fillna(0.0)
+        range_ratio = _safe_ratio(features["bar_range"], features["range_q"]).fillna(0.0)
+        volume_floor = float(params.get("volume_z_floor", self.DEFAULT_VOLUME_Z_FLOOR))
+        structure_threshold = float(
+            params.get("structure_score_threshold", self.DEFAULT_STRUCTURE_SCORE_THRESHOLD)
+        )
+        range_threshold = float(
+            params.get("range_ratio_threshold", self.DEFAULT_RANGE_RATIO_THRESHOLD)
+        )
+        volume_threshold = features["volume_q"].where(features["volume_q"] >= volume_floor, volume_floor)
         return (
             features["history_ready"]
-            & (features["wick_ratio"] >= features["wick_q"]).fillna(False)
-            & (features["wick_dominance"] >= features["dominance_q"]).fillna(False)
-            & (features["reclaim"] >= features["reclaim_q"]).fillna(False)
-            & (features["ret_abs"] >= features["ret_q"]).fillna(False)
-            & (features["bar_range"] >= features["range_q"]).fillna(False)
+            & (structure_score >= structure_threshold).fillna(False)
+            & (range_ratio >= range_threshold).fillna(False)
+            & (features["volume_z"] >= volume_threshold).fillna(False)
         ).fillna(False)
 
     def compute_intensity(
@@ -280,6 +310,7 @@ class WickReversalProxyDetector(_CanonicalProxyBase):
 class AbsorptionProxyDetector(_CanonicalProxyBase):
     event_type = "ABSORPTION_PROXY"
     source_event_type = "ABSORPTION_EVENT"
+    evidence_tier = "hybrid"
     min_spacing = 96
     signal_profile = "liquidity_absorption"
     DEFAULT_SPREAD_QUANTILE = 0.965
@@ -342,7 +373,7 @@ class AbsorptionProxyDetector(_CanonicalProxyBase):
     def compute_raw_mask(
         self, df: pd.DataFrame, *, features: dict[str, pd.Series], **params: Any
     ) -> pd.Series:
-        del df, params
+        del df
         return (
             features["history_ready"]
             & (features["spread"] >= features["spread_hi"]).fillna(False)
@@ -361,6 +392,7 @@ class AbsorptionProxyDetector(_CanonicalProxyBase):
 class DepthStressProxyDetector(_CanonicalProxyBase):
     event_type = "DEPTH_STRESS_PROXY"
     source_event_type = "DEPTH_COLLAPSE"
+    evidence_tier = "hybrid"
     min_spacing = 96
     signal_profile = "depth_stress"
     DEFAULT_SPREAD_QUANTILE = 0.99
@@ -426,7 +458,7 @@ class DepthStressProxyDetector(_CanonicalProxyBase):
     def compute_raw_mask(
         self, df: pd.DataFrame, *, features: dict[str, pd.Series], **params: Any
     ) -> pd.Series:
-        del df, params
+        del df
         return (
             features["history_ready"]
             & (features["spread"] >= features["spread_q"]).fillna(False)
@@ -514,8 +546,9 @@ class SweepStopRunDetector(WickReversalProxyDetector):
     def prepare_features(self, df: pd.DataFrame, **params: Any) -> dict[str, pd.Series]:
         features = super().prepare_features(df, **params)
         sweep_dominance = features["wick_dominance"]
-        body_ratio = 1.0 - features["reclaim"]
-        sweep_confirm = _safe_ratio(sweep_dominance, body_ratio + 1e-9)
+        body_ratio = (1.0 - features["reclaim"]).clip(lower=0.0, upper=1.0)
+        range_ratio = _safe_ratio(features["bar_range"], features["range_q"]).fillna(0.0)
+        sweep_confirm = (sweep_dominance * range_ratio * features["reclaim"]).clip(lower=0.0)
         window = int(params.get("window", 288))
         sweep_q = rolling_quantile_threshold(
             sweep_confirm.ffill().replace([np.inf, -np.inf], np.nan).fillna(0.0),
@@ -523,7 +556,8 @@ class SweepStopRunDetector(WickReversalProxyDetector):
             window=window,
         )
         features.update({
-            "body_ratio": body_ratio.clip(lower=0.0, upper=1.0),
+            "body_ratio": body_ratio,
+            "range_ratio": range_ratio,
             "sweep_confirm": sweep_confirm,
             "sweep_q": sweep_q,
         })
@@ -536,7 +570,6 @@ class SweepStopRunDetector(WickReversalProxyDetector):
         return (
             base_mask
             & (features["sweep_confirm"] >= features["sweep_q"]).fillna(False)
-            & (features["body_ratio"] <= (1.0 - features["reclaim_q"]).fillna(0.0)).fillna(False)
         ).fillna(False)
 
     def compute_intensity(

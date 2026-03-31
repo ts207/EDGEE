@@ -59,7 +59,7 @@ def test_regime_effectiveness_computes_metrics_and_excludes_non_canonical_layers
     assert artifacts.summary["recommended_bucket_counts"]["trade_generating"] == 2
     stability = artifacts.direct_proxy_stability.set_index("canonical_regime").loc["LIQUIDITY_STRESS"]
     assert stability["direct_count"] == 1
-    assert stability["proxy_count"] == 1
+    assert stability["proxy_count"] == 0
     main = artifacts.main_scorecard.sort_values(["evidence_mode"]).reset_index(drop=True)
     assert json.loads(main.loc[0, "forward_return_profile"]) != {}
     assert "resolved_cost_bps" in json.loads(main.loc[0, "execution_impact_profile"])

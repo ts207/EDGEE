@@ -85,20 +85,18 @@ def _family_from_module(module_name: str) -> str:
     return parts[-1] if len(parts) >= 1 else module_name
 
 
+def _evidence_tier(event_type: str) -> str:
+    spec = EVENT_REGISTRY_SPECS.get(event_type)
+    token = str(getattr(spec, "evidence_mode", "") or "").strip().lower()
+    return token or "unspecified"
+
+
 def _maturity_tier(detector_cls: type[BaseEventDetector]) -> str:
     doc = (inspect.getdoc(detector_cls) or "").lower()
     source = inspect.getsource(detector_cls).lower()
-    module_name = str(detector_cls.__module__).lower()
-    event_name = str(getattr(detector_cls, "event_type", "")).lower()
 
     if "stub detector" in doc or "stub detector" in source:
         return "placeholder"
-    if (
-        "canonical_proxy" in module_name
-        or "proxy" in event_name
-        or "evidence_tier': 'proxy'" in source
-    ):
-        return "proxy"
     if "milestone-6 liquidity stress detector" in doc or "liquidity stress detector" in doc:
         return "production"
     if "dynamic_quantile_floor" in source or "rolling_robust_zscore" in source:
@@ -129,6 +127,7 @@ def _detector_row(event_type: str) -> Dict[str, Any]:
         "path": _module_path(detector_cls.__module__),
         "class_name": detector_cls.__name__,
         "maturity_tier": _maturity_tier(detector_cls),
+        "evidence_tier": _evidence_tier(event_type),
         "required_columns": list(getattr(detector_cls, "required_columns", ())),
     }
 
@@ -199,9 +198,12 @@ def run_audit() -> Dict[str, Any]:
             )
 
     maturity_counts: Dict[str, int] = {}
+    evidence_tier_counts: Dict[str, int] = {}
     for row in rows:
         maturity = str(row["maturity_tier"])
         maturity_counts[maturity] = int(maturity_counts.get(maturity, 0)) + 1
+        evidence = str(row.get("evidence_tier", "unspecified"))
+        evidence_tier_counts[evidence] = int(evidence_tier_counts.get(evidence, 0)) + 1
 
     summary = {
         "schema_version": DETECTOR_AUDIT_SCHEMA_VERSION,
@@ -213,6 +215,7 @@ def run_audit() -> Dict[str, Any]:
         "error_count": sum(1 for issue in issues if issue["severity"] == "error"),
         "warning_count": sum(1 for issue in issues if issue["severity"] == "warning"),
         "maturity_counts": maturity_counts,
+        "evidence_tier_counts": evidence_tier_counts,
     }
     return {
         "summary": summary,
@@ -238,6 +241,10 @@ def render_markdown(report: Dict[str, Any]) -> str:
     for key in sorted(summary["maturity_counts"]):
         lines.append(f"- `{key}`: {summary['maturity_counts'][key]}")
 
+    lines.extend(["", "## Evidence Tier Counts", ""])
+    for key in sorted(summary.get("evidence_tier_counts", {})):
+        lines.append(f"- `{key}`: {summary['evidence_tier_counts'][key]}")
+
     lines.extend(["", "## Issues", ""])
     if not report["issues"]:
         lines.append("- None")
@@ -249,7 +256,7 @@ def render_markdown(report: Dict[str, Any]) -> str:
     lines.extend(["", "## Detector Inventory", ""])
     for row in report["detectors"]:
         lines.append(
-            f"- `{row['event_type']}`: `{row['maturity_tier']}` via `{row['class_name'] or 'missing'}`"
+            f"- `{row['event_type']}`: maturity=`{row['maturity_tier']}`, evidence=`{row.get('evidence_tier', 'unspecified')}` via `{row['class_name'] or 'missing'}`"
         )
     return "\n".join(lines) + "\n"
 

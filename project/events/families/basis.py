@@ -43,7 +43,7 @@ class BasisDislocationDetector(DislocationDetector):
 
     def prepare_features(self, df: pd.DataFrame, **params: Any) -> dict[str, pd.Series]:
         lookback_window = int(params.get("lookback_window", params.get("basis_lookback", self.DEFAULT_LOOKBACK)))
-        min_periods = int(params.get("min_periods", max(24, lookback_window // 10)))
+        min_periods = int(params.get("min_periods", max(1, min(lookback_window, max(24, lookback_window // 10)))))
         close_perp = pd.to_numeric(df["close_perp"], errors="coerce")
         close_spot = pd.to_numeric(df["close_spot"], errors="coerce").replace(0.0, np.nan)
         basis_bps = (close_perp - close_spot) / close_spot * 10000.0

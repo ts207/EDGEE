@@ -14,6 +14,9 @@ from project.events.families.canonical_proxy import (
     WickReversalProxyDetector,
 )
 from project.events.families.temporal import CopulaPairsTradingDetector
+from project.events.detectors.exhaustion import FlowExhaustionDetector
+from project.events.detectors.liquidity import ProxyLiquidityStressDetector
+from project.tests.synthetic_truth.scenarios.factory import ScenarioFactory
 
 
 def _proxy_frame(n: int = 640) -> pd.DataFrame:
@@ -161,3 +164,66 @@ def test_copula_pairs_universe_expanded_and_detector_uses_pair_close() -> None:
     out = CopulaPairsTradingDetector().detect(frame, symbol="BTCUSDT")
     assert not out.empty
     assert "COPULA_PAIRS_TRADING" in set(out["event_type"].astype(str))
+
+
+def test_promoted_compatibility_detectors_emit_hybrid_evidence_metadata() -> None:
+    frame = _proxy_frame()
+    price = PriceVolImbalanceProxyDetector()
+    absorption = AbsorptionProxyDetector()
+    depth = DepthStressProxyDetector()
+    wick = WickReversalProxyDetector()
+    price_meta = price.compute_metadata(0, price.prepare_features(frame))
+    absorption_meta = absorption.compute_metadata(0, absorption.prepare_features(frame))
+    depth_meta = depth.compute_metadata(0, depth.prepare_features(frame))
+    wick_meta = wick.compute_metadata(0, wick.prepare_features(frame))
+
+    flow_frame = frame.copy()
+    flow_frame["oi_delta_1h"] = np.concatenate([
+        np.zeros(len(flow_frame) - 10),
+        np.linspace(-12.0, -30.0, 10),
+    ])
+    flow_frame["liquidation_notional"] = np.concatenate([
+        np.full(len(flow_frame) - 10, 1.0),
+        np.linspace(40.0, 120.0, 10),
+    ])
+    flow = FlowExhaustionDetector()
+    flow_meta = flow.compute_metadata(0, flow.prepare_features(flow_frame))
+
+    liquidity_frame = pd.DataFrame(
+        {
+            "timestamp": pd.date_range("2024-01-01", periods=len(frame), freq="5min", tz="UTC"),
+            "close": frame["close"],
+            "high": frame["high"],
+            "low": frame["low"],
+            "depth_usd": np.linspace(150000.0, 120000.0, len(frame)),
+            "spread_bps": np.linspace(8.0, 12.0, len(frame)),
+            "ms_imbalance_24": np.linspace(-0.15, 0.15, len(frame)),
+            "ms_spread_state": np.full(len(frame), 2.0),
+        }
+    )
+    liquidity = ProxyLiquidityStressDetector()
+    liquidity_meta = liquidity.compute_metadata(0, liquidity.prepare_features(liquidity_frame))
+
+    assert price_meta["evidence_tier"] == "hybrid"
+    assert absorption_meta["evidence_tier"] == "hybrid"
+    assert depth_meta["evidence_tier"] == "hybrid"
+    assert wick_meta["evidence_tier"] == "hybrid"
+    assert flow_meta["evidence_tier"] == "hybrid"
+    assert liquidity_meta["evidence_tier"] == "hybrid"
+
+
+def test_hybridized_remaining_compatibility_events_fire_on_positive_synthetic_scenarios() -> None:
+    for event_type in ("LIQUIDITY_STRESS_PROXY", "WICK_REVERSAL_PROXY"):
+        frame, _ = ScenarioFactory.for_event(event_type, "positive").create()
+        detector = ProxyLiquidityStressDetector() if event_type == "LIQUIDITY_STRESS_PROXY" else WickReversalProxyDetector()
+        out = detector.detect(frame, symbol="BTCUSDT")
+        assert not out.empty
+        assert event_type in set(out["event_type"].astype(str))
+
+
+def test_hybridized_remaining_compatibility_events_stay_quiet_on_negative_synthetic_scenarios() -> None:
+    for event_type in ("LIQUIDITY_STRESS_PROXY", "WICK_REVERSAL_PROXY"):
+        frame, _ = ScenarioFactory.for_event(event_type, "negative").create()
+        detector = ProxyLiquidityStressDetector() if event_type == "LIQUIDITY_STRESS_PROXY" else WickReversalProxyDetector()
+        out = detector.detect(frame, symbol="BTCUSDT")
+        assert out.empty

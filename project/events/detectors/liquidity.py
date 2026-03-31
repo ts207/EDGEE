@@ -141,13 +141,17 @@ class DirectLiquidityStressDetector(BaseLiquidityStressDetector):
             else pd.Series(0.0, index=df.index)
         )
         imbalance = pd.to_numeric(imbalance_raw, errors="coerce").fillna(0.0).astype(float)
-        canonical_spread_wide = state_at_least(
-            df,
-            "ms_spread_state",
-            1.0,
-            min_confidence=float(params.get("context_min_confidence", 0.55)),
-            max_entropy=float(params.get("context_max_entropy", 0.90)),
-        )
+        if "ms_spread_state" in df.columns:
+            canonical_spread_wide = state_at_least(
+                df,
+                "ms_spread_state",
+                1.0,
+                default_if_absent=True,
+                min_confidence=float(params.get("context_min_confidence", 0.55)),
+                max_entropy=float(params.get("context_max_entropy", 0.90)),
+            )
+        else:
+            canonical_spread_wide = pd.Series(True, index=df.index, dtype=bool)
 
         # micro_spread_stress is already a ratio, but we compute rolling medians for consistency
         # with the Base class which expects raw units to be compared against medians.
@@ -168,32 +172,70 @@ class DirectLiquidityStressDetector(BaseLiquidityStressDetector):
 
 
 class ProxyLiquidityStressDetector(BaseLiquidityStressDetector):
-    """Liquidity stress detector using indirect OHLCV proxies."""
+    """Compatibility liquidity-stress detector using hybrid evidence.
+
+    The detector keeps the legacy event surface but upgrades it from pure proxy
+    logic to a blended contract: direct order-book stress when available
+    (depth_usd/spread_bps) plus bar-range expansion and optional trade-flow
+    collapse confirmation from OHLCV inputs.
+    """
 
     event_type = "LIQUIDITY_STRESS_PROXY"
-    required_columns = ("timestamp", "close", "high", "low", "quote_volume")
+    required_columns = ("timestamp", "close", "high", "low")
+    default_proxy_range_spike_threshold = 1.25
+    default_proxy_volume_collapse_threshold = 0.80
 
     def prepare_features(self, df: pd.DataFrame, **params: Any) -> dict[str, pd.Series]:
         window = int(params.get("median_window", 288))
         min_periods = int(params.get("min_periods", max(24, window // 12)))
 
-        depth = pd.to_numeric(df["quote_volume"], errors="coerce").astype(float)
-
         high = pd.to_numeric(df["high"], errors="coerce").astype(float)
         low = pd.to_numeric(df["low"], errors="coerce").astype(float)
         close = pd.to_numeric(df["close"], errors="coerce").replace(0.0, np.nan).astype(float)
-
         bp_scale = float(params.get("bp_scale", 10000.0))
-        spread = ((high - low) / close).abs() * bp_scale  # bar range in bps
+        bar_range_bps = ((high - low) / close).abs() * bp_scale
+        proxy_range_median = bar_range_bps.shift(1).rolling(window=window, min_periods=min_periods).median()
 
-        imbalance = pd.Series(0.0, index=df.index)
-        canonical_spread_wide = state_at_least(
-            df,
-            "ms_spread_state",
-            1.0,
-            min_confidence=float(params.get("context_min_confidence", 0.55)),
-            max_entropy=float(params.get("context_max_entropy", 0.90)),
-        )
+        if "depth_usd" in df.columns:
+            depth = pd.to_numeric(df["depth_usd"], errors="coerce").astype(float)
+            depth_source = "depth_usd+bar_range_bps"
+        elif "quote_volume" in df.columns:
+            depth = pd.to_numeric(df["quote_volume"], errors="coerce").astype(float)
+            depth_source = "quote_volume+bar_range_bps"
+        else:
+            depth = bar_range_bps.replace(0.0, np.nan)
+            depth_source = "bar_range_bps_only"
+
+        if "spread_bps" in df.columns:
+            spread = pd.to_numeric(df["spread_bps"], errors="coerce").abs().astype(float)
+            spread_source = "spread_bps+bar_range_bps"
+        else:
+            spread = bar_range_bps
+            spread_source = "bar_range_bps"
+
+        if "ms_imbalance_24" in df.columns:
+            imbalance = pd.to_numeric(df["ms_imbalance_24"], errors="coerce").fillna(0.0).astype(float)
+        else:
+            imbalance = pd.Series(0.0, index=df.index, dtype=float)
+
+        if "quote_volume" in df.columns:
+            proxy_volume = pd.to_numeric(df["quote_volume"], errors="coerce").astype(float)
+            proxy_volume_median = proxy_volume.shift(1).rolling(window=window, min_periods=min_periods).median()
+        else:
+            proxy_volume = pd.Series(np.nan, index=df.index, dtype=float)
+            proxy_volume_median = pd.Series(np.nan, index=df.index, dtype=float)
+
+        if "ms_spread_state" in df.columns:
+            canonical_spread_wide = state_at_least(
+                df,
+                "ms_spread_state",
+                1.0,
+                default_if_absent=True,
+                min_confidence=float(params.get("context_min_confidence", 0.55)),
+                max_entropy=float(params.get("context_max_entropy", 0.90)),
+            )
+        else:
+            canonical_spread_wide = pd.Series(True, index=df.index, dtype=bool)
 
         depth_med = depth.shift(1).rolling(window=window, min_periods=min_periods).median()
         spread_med = spread.shift(1).rolling(window=window, min_periods=min_periods).median()
@@ -205,10 +247,56 @@ class ProxyLiquidityStressDetector(BaseLiquidityStressDetector):
             "spread_median": spread_med,
             "imbalance": imbalance,
             "canonical_spread_wide": canonical_spread_wide,
-            "evidence_tier": pd.Series("proxy", index=df.index),
-            "depth_source": pd.Series("volume", index=df.index),
-            "spread_source": pd.Series("bar_range_bps", index=df.index),
+            "bar_range_bps": bar_range_bps,
+            "proxy_range_median": proxy_range_median,
+            "proxy_volume": proxy_volume,
+            "proxy_volume_median": proxy_volume_median,
+            "evidence_tier": pd.Series("hybrid", index=df.index),
+            "depth_source": pd.Series(depth_source, index=df.index),
+            "spread_source": pd.Series(spread_source, index=df.index),
         }
+
+    def compute_raw_mask(
+        self, df: pd.DataFrame, *, features: dict[str, pd.Series], **params: Any
+    ) -> pd.Series:
+        base_mask = super().compute_raw_mask(df, features=features, **params)
+        proxy_range_spike_th = float(
+            params.get("proxy_range_spike_th", self.default_proxy_range_spike_threshold)
+        )
+        range_confirm = (
+            features["bar_range_bps"]
+            > features["proxy_range_median"] * proxy_range_spike_th
+        ).fillna(False)
+        if features["proxy_volume"].notna().any():
+            proxy_volume_collapse_th = float(
+                params.get(
+                    "proxy_volume_collapse_th",
+                    self.default_proxy_volume_collapse_threshold,
+                )
+            )
+            volume_confirm = (
+                features["proxy_volume"]
+                < features["proxy_volume_median"] * proxy_volume_collapse_th
+            ).fillna(False)
+        else:
+            volume_confirm = pd.Series(True, index=range_confirm.index, dtype=bool)
+        return (base_mask & range_confirm & volume_confirm).fillna(False)
+
+    def compute_intensity(
+        self, df: pd.DataFrame, *, features: dict[str, pd.Series], **params: Any
+    ) -> pd.Series:
+        base_score = super().compute_intensity(df, features=features, **params).fillna(0.0)
+        range_ratio = (
+            features["bar_range_bps"]
+            / features["proxy_range_median"].replace(0.0, np.nan)
+        ).replace([np.inf, -np.inf], np.nan).fillna(0.0)
+        if features["proxy_volume"].notna().any():
+            volume_ratio = (
+                features["proxy_volume_median"]
+                / features["proxy_volume"].replace(0.0, np.nan)
+            ).replace([np.inf, -np.inf], np.nan).fillna(0.0)
+            return (base_score + range_ratio + volume_ratio) / 3.0
+        return (base_score + range_ratio) / 2.0
 
 
 class LiquidityStressDetector(BaseLiquidityStressDetector):
@@ -254,13 +342,17 @@ class DepthCollapseDetector(ThresholdDetector):
             quantile=q_rv,
             min_periods=lookback,
         )
-        canonical_spread_wide = state_at_least(
-            df,
-            "ms_spread_state",
-            1.0,
-            min_confidence=float(params.get("context_min_confidence", 0.55)),
-            max_entropy=float(params.get("context_max_entropy", 0.90)),
-        )
+        if "ms_spread_state" in df.columns:
+            canonical_spread_wide = state_at_least(
+                df,
+                "ms_spread_state",
+                1.0,
+                default_if_absent=True,
+                min_confidence=float(params.get("context_min_confidence", 0.55)),
+                max_entropy=float(params.get("context_max_entropy", 0.90)),
+            )
+        else:
+            canonical_spread_wide = pd.Series(True, index=df.index, dtype=bool)
         return {
             "spread_z": spread_z,
             "rv_z": rv_z,
@@ -302,13 +394,17 @@ class SpreadBlowoutDetector(ThresholdDetector):
             quantile=q_spread,
             min_periods=lookback,
         )
-        canonical_spread_wide = state_at_least(
-            df,
-            "ms_spread_state",
-            1.0,
-            min_confidence=float(params.get("context_min_confidence", 0.55)),
-            max_entropy=float(params.get("context_max_entropy", 0.90)),
-        )
+        if "ms_spread_state" in df.columns:
+            canonical_spread_wide = state_at_least(
+                df,
+                "ms_spread_state",
+                1.0,
+                default_if_absent=True,
+                min_confidence=float(params.get("context_min_confidence", 0.55)),
+                max_entropy=float(params.get("context_max_entropy", 0.90)),
+            )
+        else:
+            canonical_spread_wide = pd.Series(True, index=df.index, dtype=bool)
         return {
             "spread_z": spread_z,
             "spread_q97": spread_q97,
@@ -417,13 +513,17 @@ class AbsorptionDetector(CompositeDetector):
             quantile=q_rv,
             min_periods=lookback,
         )
-        canonical_spread_wide = state_at_least(
-            df,
-            "ms_spread_state",
-            1.0,
-            min_confidence=float(params.get("context_min_confidence", 0.55)),
-            max_entropy=float(params.get("context_max_entropy", 0.90)),
-        )
+        if "ms_spread_state" in df.columns:
+            canonical_spread_wide = state_at_least(
+                df,
+                "ms_spread_state",
+                1.0,
+                default_if_absent=True,
+                min_confidence=float(params.get("context_min_confidence", 0.55)),
+                max_entropy=float(params.get("context_max_entropy", 0.90)),
+            )
+        else:
+            canonical_spread_wide = pd.Series(True, index=df.index, dtype=bool)
         return {
             "ret_abs": ret_abs,
             "spread_z": spread_z,

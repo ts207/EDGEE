@@ -65,6 +65,9 @@ minimum-green-gate:
 	PYTHONPATH=. $(PYTHON) project/scripts/spec_qa_linter.py
 	PYTHONPATH=. $(PYTHON) project/scripts/detector_coverage_audit.py --md-out docs/generated/detector_coverage.md --json-out docs/generated/detector_coverage.json --check
 	PYTHONPATH=. $(PYTHON) project/scripts/ontology_consistency_audit.py --output docs/generated/ontology_audit.json --check
+	PYTHONPATH=. $(PYTHON) project/scripts/build_event_contract_artifacts.py --check
+	PYTHONPATH=. $(PYTHON) project/scripts/event_ontology_audit.py --check
+	PYTHONPATH=. $(PYTHON) project/scripts/build_event_ontology_artifacts.py --check
 	PYTHONPATH=. $(PYTHON) project/scripts/build_system_map.py --check
 	PYTHONPATH=. $(PYTHON) project/scripts/build_architecture_metrics.py --check
 	PYTHONPATH=. $(PYTHON) -m pytest -q \
@@ -157,6 +160,9 @@ golden-certification:
 
 governance:
 	$(PYTHON) project/scripts/pipeline_governance.py --audit --sync
+	PYTHONPATH=. $(PYTHON) project/scripts/build_event_contract_artifacts.py
+	PYTHONPATH=. $(PYTHON) project/scripts/event_ontology_audit.py
+	PYTHONPATH=. $(PYTHON) project/scripts/build_event_ontology_artifacts.py
 
 pre-commit:
 	bash project/scripts/pre_commit.sh

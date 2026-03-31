@@ -66,6 +66,9 @@ def _normalize_trigger_space(values: Any) -> Dict[str, Any]:
         "subtypes",
         "phases",
         "evidence_modes",
+        "tiers",
+        "operational_roles",
+        "deployment_dispositions",
         "states",
         "sequences",
         "transitions",
@@ -79,6 +82,8 @@ def _normalize_trigger_space(values: Any) -> Dict[str, Any]:
             in {"events", "states", "sequences", "transitions", "feature_predicates", "interactions"}
             else [],
         )
+    for key in ("canonical_regimes", "subtypes", "phases", "evidence_modes", "tiers", "operational_roles", "deployment_dispositions"):
+        payload[key] = _as_str_list(payload.get(key), field_name=f"trigger_space.{key}")
     return payload
 
 

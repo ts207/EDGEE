@@ -37,15 +37,29 @@ def test_compiled_registry_exposes_canonical_ontology_fields():
     assert spec.evidence_mode == "direct"
 
 
-def test_direct_proxy_variants_share_canonical_regime_but_not_evidence_mode():
+def test_direct_and_hybrid_variants_share_canonical_regime_but_keep_distinct_evidence_modes():
     registry = get_domain_registry()
     direct = registry.get_event("LIQUIDITY_STRESS_DIRECT")
-    proxy = registry.get_event("LIQUIDITY_STRESS_PROXY")
-    assert direct is not None and proxy is not None
-    assert direct.canonical_regime == proxy.canonical_regime == "LIQUIDITY_STRESS"
+    hybrid = registry.get_event("LIQUIDITY_STRESS_PROXY")
+    assert direct is not None and hybrid is not None
+    assert direct.canonical_regime == hybrid.canonical_regime == "LIQUIDITY_STRESS"
     assert direct.evidence_mode == "direct"
-    assert proxy.evidence_mode == "proxy"
+    assert hybrid.evidence_mode == "hybrid"
 
+
+def test_compatibility_events_with_strengthened_runtime_evidence_are_promoted_to_hybrid() -> None:
+    registry = get_domain_registry()
+    for event_type in (
+        "ABSORPTION_PROXY",
+        "DEPTH_STRESS_PROXY",
+        "FLOW_EXHAUSTION_PROXY",
+        "PRICE_VOL_IMBALANCE_PROXY",
+        "LIQUIDITY_STRESS_PROXY",
+        "WICK_REVERSAL_PROXY",
+    ):
+        spec = registry.get_event(event_type)
+        assert spec is not None
+        assert spec.evidence_mode == "hybrid"
 
 def test_non_canonical_layers_are_flagged_in_registry_specs():
     seq = EVENT_REGISTRY_SPECS["SEQ_VOL_COMP_THEN_BREAKOUT"]

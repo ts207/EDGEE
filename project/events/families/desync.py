@@ -81,6 +81,10 @@ class LeadLagBreakDetector(ThresholdDetector):
 
 
 class CrossAssetDesyncDetector(ThresholdDetector):
+    DEFAULT_LOOKBACK_WINDOW = 2880
+    DEFAULT_THRESHOLD_Z = 3.0
+    DEFAULT_MIN_PAIR_OBSERVATIONS = 96
+
     """Detects price desynchronization between correlated asset pairs.
     
     Triggered when the spread between two historically correlated assets
@@ -96,37 +100,46 @@ class CrossAssetDesyncDetector(ThresholdDetector):
             df.get("pair_close", df.get("close_pair", pd.Series(np.nan, index=df.index))),
             errors="coerce"
         ).astype(float)
-        
-        # Fallback if paired close is missing — use return z-score of main asset
-        if paired_close.isna().all():
-             ret = np.log(close / close.shift(1)).fillna(0.0)
-             window = int(params.get("lookback_window", 2880))
-             z = (ret - ret.rolling(window).mean()) / ret.rolling(window).std().replace(0.0, np.nan)
-             return {"desync_z": z.abs().fillna(0.0), "threshold": pd.Series(float(params.get("threshold_z", 3.0)), index=df.index)}
-             
+        basis_valid = close.notna() & paired_close.notna()
+        min_pair_observations = int(params.get("min_pair_observations", self.DEFAULT_MIN_PAIR_OBSERVATIONS))
+        lookback_window = int(params.get("lookback_window", self.DEFAULT_LOOKBACK_WINDOW))
+        threshold_z = float(params.get("threshold_z", self.DEFAULT_THRESHOLD_Z))
+
+        if int(basis_valid.sum()) < min_pair_observations:
+            empty = pd.Series(False, index=df.index, dtype=bool)
+            return {
+                "basis": pd.Series(np.nan, index=df.index, dtype=float),
+                "basis_valid": basis_valid,
+                "desync_z": pd.Series(0.0, index=df.index, dtype=float),
+                "threshold": pd.Series(threshold_z, index=df.index, dtype=float),
+                "onset": empty,
+            }
+
         # Calculate log returns and basis (spread)
         ret = np.log(close / close.shift(1)).fillna(0.0)
         paired_ret = np.log(paired_close / paired_close.shift(1)).fillna(0.0)
         basis = ret - paired_ret
         
-        window = int(params.get("lookback_window", 2880))
-        min_periods = max(window // 10, 1)
-        
-        basis_mean = basis.rolling(window, min_periods=min_periods).mean()
-        basis_std = basis.rolling(window, min_periods=min_periods).std().replace(0.0, np.nan)
+        min_periods = max(lookback_window // 10, 1)
+
+        basis_mean = basis.rolling(lookback_window, min_periods=min_periods).mean()
+        basis_std = basis.rolling(lookback_window, min_periods=min_periods).std().replace(0.0, np.nan)
         desync_z = (basis - basis_mean) / basis_std
-        
-        threshold = float(params.get("threshold_z", 3.0))
+        active = (desync_z.abs() >= threshold_z).fillna(False) & basis_valid.fillna(False)
+        onset = (active & ~active.shift(1, fill_value=False)).fillna(False)
+
         return {
             "desync_z": desync_z.abs().fillna(0.0),
-            "threshold": pd.Series(threshold, index=df.index),
-            "basis": basis
+            "threshold": pd.Series(threshold_z, index=df.index, dtype=float),
+            "basis": basis,
+            "basis_valid": basis_valid,
+            "onset": onset,
         }
 
     def compute_raw_mask(
         self, df: pd.DataFrame, *, features: dict[str, pd.Series], **params: Any
     ) -> pd.Series:
-        return (features["desync_z"] >= features["threshold"]).fillna(False)
+        return features.get("onset", pd.Series(False, index=df.index, dtype=bool)).fillna(False)
 
     def compute_intensity(
         self, df: pd.DataFrame, *, features: dict[str, pd.Series], **params: Any

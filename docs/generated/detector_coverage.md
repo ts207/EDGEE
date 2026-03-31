@@ -3,95 +3,97 @@
 - Status: `passed`
 - Active event specs: `70`
 - Registered detectors: `70`
-- Raw registered detector entries: `78`
-- Issues: `7`
+- Raw registered detector entries: `72`
+- Issues: `0`
 
 ## Maturity Counts
 
 - `production`: 6
-- `proxy`: 9
 - `specialized`: 3
-- `standard`: 52
+- `standard`: 61
+
+## Evidence Tier Counts
+
+- `contextual`: 4
+- `direct`: 20
+- `hybrid`: 26
+- `inferred_cross_asset`: 7
+- `sequence_confirmed`: 4
+- `statistical`: 9
 
 ## Issues
 
-- [warning] Registered detector has no active event spec: CROSS_ASSET_INTERACTION (project/events/families/interaction.py)
-- [warning] Registered detector has no active event spec: INT_DEPTH_VACUUM_CONFIRM (project/events/families/interaction.py)
-- [warning] Registered detector has no active event spec: INT_FND_LIQ_CONFIRM (project/events/families/interaction.py)
-- [warning] Registered detector has no active event spec: INT_LIQ_OI_CONFIRM (project/events/families/interaction.py)
-- [warning] Registered detector has no active event spec: INT_VOL_RANGE_CONFIRM (project/events/families/interaction.py)
-- [warning] Registered detector has no active event spec: INT_ZSCORE_OVERSHOOT_CONFIRM (project/events/families/interaction.py)
-- [warning] Detector implementation has hardcoded numerical thresholds: CROSS_ASSET_DESYNC_EVENT (project/events/families/desync.py)
+- None
 
 ## Detector Inventory
 
-- `ABSORPTION_PROXY`: `proxy` via `AbsorptionProxyDetector`
-- `BAND_BREAK`: `standard` via `BandBreakDetector`
-- `BASIS_DISLOC`: `production` via `BasisDislocationDetector`
-- `BETA_SPIKE_EVENT`: `standard` via `BetaSpikeDetector`
-- `BREAKOUT_TRIGGER`: `standard` via `BreakoutTriggerDetector`
-- `CHOP_TO_TREND_SHIFT`: `standard` via `ChopToTrendDetector`
-- `CLIMAX_VOLUME_BAR`: `standard` via `ClimaxVolumeDetector`
-- `COPULA_PAIRS_TRADING`: `standard` via `CopulaPairsTradingDetector`
-- `CORRELATION_BREAKDOWN_EVENT`: `standard` via `CorrelationBreakdownDetector`
-- `CROSS_ASSET_DESYNC_EVENT`: `standard` via `CrossAssetDesyncDetector`
-- `CROSS_VENUE_DESYNC`: `standard` via `CrossVenueDesyncDetector`
-- `DELEVERAGING_WAVE`: `standard` via `DeleveragingWaveDetector`
-- `DEPTH_COLLAPSE`: `proxy` via `DepthCollapseDetector`
-- `DEPTH_STRESS_PROXY`: `proxy` via `DepthStressProxyDetector`
-- `FAILED_CONTINUATION`: `standard` via `FailedContinuationDetector`
-- `FALSE_BREAKOUT`: `standard` via `FalseBreakoutDetector`
-- `FEE_REGIME_CHANGE_EVENT`: `standard` via `FeeRegimeChangeDetector`
-- `FLOW_EXHAUSTION_PROXY`: `proxy` via `FlowExhaustionDetector`
-- `FND_DISLOC`: `production` via `FndDislocDetector`
-- `FORCED_FLOW_EXHAUSTION`: `standard` via `ForcedFlowExhaustionDetector`
-- `FUNDING_EXTREME_ONSET`: `standard` via `FundingExtremeOnsetDetector`
-- `FUNDING_FLIP`: `standard` via `FundingFlipDetector`
-- `FUNDING_NORMALIZATION_TRIGGER`: `standard` via `FundingNormalizationDetector`
-- `FUNDING_PERSISTENCE_TRIGGER`: `standard` via `FundingPersistenceDetector`
-- `FUNDING_TIMESTAMP_EVENT`: `standard` via `FundingTimestampDetector`
-- `GAP_OVERSHOOT`: `standard` via `GapOvershootDetector`
-- `INDEX_COMPONENT_DIVERGENCE`: `standard` via `IndexComponentDivergenceDetector`
-- `LEAD_LAG_BREAK`: `standard` via `LeadLagBreakDetector`
-- `LIQUIDATION_CASCADE`: `specialized` via `LiquidationCascadeDetector`
-- `LIQUIDATION_EXHAUSTION_REVERSAL`: `standard` via `LiquidationExhaustionReversalDetector`
-- `LIQUIDITY_GAP_PRINT`: `standard` via `LiquidityGapDetector`
-- `LIQUIDITY_SHOCK`: `production` via `LiquidityStressDetector`
-- `LIQUIDITY_STRESS_DIRECT`: `production` via `DirectLiquidityStressDetector`
-- `LIQUIDITY_STRESS_PROXY`: `proxy` via `ProxyLiquidityStressDetector`
-- `LIQUIDITY_VACUUM`: `specialized` via `LiquidityVacuumDetector`
-- `MOMENTUM_DIVERGENCE_TRIGGER`: `standard` via `MomentumDivergenceDetector`
-- `OI_FLUSH`: `standard` via `OIFlushDetector`
-- `OI_SPIKE_NEGATIVE`: `standard` via `OISpikeNegativeDetector`
-- `OI_SPIKE_POSITIVE`: `standard` via `OISpikePositiveDetector`
-- `ORDERFLOW_IMBALANCE_SHOCK`: `proxy` via `OrderflowImbalanceShockDetector`
-- `OVERSHOOT_AFTER_SHOCK`: `standard` via `OvershootDetector`
-- `POST_DELEVERAGING_REBOUND`: `standard` via `PostDeleveragingReboundDetector`
-- `PRICE_VOL_IMBALANCE_PROXY`: `proxy` via `PriceVolImbalanceProxyDetector`
-- `PULLBACK_PIVOT`: `standard` via `PullbackPivotDetector`
-- `RANGE_BREAKOUT`: `standard` via `RangeBreakoutDetector`
-- `RANGE_COMPRESSION_END`: `standard` via `RangeCompressionDetector`
-- `SCHEDULED_NEWS_WINDOW_EVENT`: `standard` via `ScheduledNewsDetector`
-- `SEQ_FND_EXTREME_THEN_BREAKOUT`: `standard` via `EventSequenceDetector`
-- `SEQ_LIQ_VACUUM_THEN_DEPTH_RECOVERY`: `standard` via `EventSequenceDetector`
-- `SEQ_OI_SPIKEPOS_THEN_VOL_SPIKE`: `standard` via `EventSequenceDetector`
-- `SEQ_VOL_COMP_THEN_BREAKOUT`: `standard` via `EventSequenceDetector`
-- `SESSION_CLOSE_EVENT`: `standard` via `SessionCloseDetector`
-- `SESSION_OPEN_EVENT`: `standard` via `SessionOpenDetector`
-- `SLIPPAGE_SPIKE_EVENT`: `standard` via `SlippageSpikeDetector`
-- `SPOT_PERP_BASIS_SHOCK`: `production` via `SpotPerpBasisShockDetector`
-- `SPREAD_BLOWOUT`: `standard` via `SpreadBlowoutDetector`
-- `SPREAD_REGIME_WIDENING_EVENT`: `standard` via `SpreadRegimeWideningDetector`
-- `SUPPORT_RESISTANCE_BREAK`: `standard` via `SREventDetector`
-- `SWEEP_STOPRUN`: `proxy` via `SweepStopRunDetector`
-- `TREND_ACCELERATION`: `standard` via `TrendAccelerationDetector`
-- `TREND_DECELERATION`: `standard` via `TrendDecelerationDetector`
-- `TREND_EXHAUSTION_TRIGGER`: `standard` via `TrendExhaustionDetector`
-- `TREND_TO_CHOP_SHIFT`: `standard` via `TrendToChopDetector`
-- `VOL_CLUSTER_SHIFT`: `standard` via `VolClusterShiftDetector`
-- `VOL_REGIME_SHIFT_EVENT`: `standard` via `VolRegimeShiftDetector`
-- `VOL_RELAXATION_START`: `standard` via `VolRelaxationDetector`
-- `VOL_SHOCK`: `specialized` via `VolShockRelaxationDetector`
-- `VOL_SPIKE`: `production` via `VolSpikeDetector`
-- `WICK_REVERSAL_PROXY`: `proxy` via `WickReversalProxyDetector`
-- `ZSCORE_STRETCH`: `standard` via `ZScoreStretchDetector`
+- `ABSORPTION_PROXY`: maturity=`standard`, evidence=`hybrid` via `AbsorptionProxyDetector`
+- `BAND_BREAK`: maturity=`standard`, evidence=`statistical` via `BandBreakDetector`
+- `BASIS_DISLOC`: maturity=`production`, evidence=`statistical` via `BasisDislocationDetector`
+- `BETA_SPIKE_EVENT`: maturity=`standard`, evidence=`inferred_cross_asset` via `BetaSpikeDetector`
+- `BREAKOUT_TRIGGER`: maturity=`standard`, evidence=`hybrid` via `BreakoutTriggerDetector`
+- `CHOP_TO_TREND_SHIFT`: maturity=`standard`, evidence=`hybrid` via `ChopToTrendDetector`
+- `CLIMAX_VOLUME_BAR`: maturity=`standard`, evidence=`hybrid` via `ClimaxVolumeDetector`
+- `COPULA_PAIRS_TRADING`: maturity=`standard`, evidence=`statistical` via `CopulaPairsTradingDetector`
+- `CORRELATION_BREAKDOWN_EVENT`: maturity=`standard`, evidence=`inferred_cross_asset` via `CorrelationBreakdownDetector`
+- `CROSS_ASSET_DESYNC_EVENT`: maturity=`standard`, evidence=`inferred_cross_asset` via `CrossAssetDesyncDetector`
+- `CROSS_VENUE_DESYNC`: maturity=`standard`, evidence=`inferred_cross_asset` via `CrossVenueDesyncDetector`
+- `DELEVERAGING_WAVE`: maturity=`standard`, evidence=`hybrid` via `DeleveragingWaveDetector`
+- `DEPTH_COLLAPSE`: maturity=`standard`, evidence=`direct` via `DepthCollapseDetector`
+- `DEPTH_STRESS_PROXY`: maturity=`standard`, evidence=`hybrid` via `DepthStressProxyDetector`
+- `FAILED_CONTINUATION`: maturity=`standard`, evidence=`hybrid` via `FailedContinuationDetector`
+- `FALSE_BREAKOUT`: maturity=`standard`, evidence=`hybrid` via `FalseBreakoutDetector`
+- `FEE_REGIME_CHANGE_EVENT`: maturity=`standard`, evidence=`direct` via `FeeRegimeChangeDetector`
+- `FLOW_EXHAUSTION_PROXY`: maturity=`standard`, evidence=`hybrid` via `FlowExhaustionDetector`
+- `FND_DISLOC`: maturity=`production`, evidence=`direct` via `FndDislocDetector`
+- `FORCED_FLOW_EXHAUSTION`: maturity=`standard`, evidence=`hybrid` via `ForcedFlowExhaustionDetector`
+- `FUNDING_EXTREME_ONSET`: maturity=`standard`, evidence=`direct` via `FundingExtremeOnsetDetector`
+- `FUNDING_FLIP`: maturity=`standard`, evidence=`direct` via `FundingFlipDetector`
+- `FUNDING_NORMALIZATION_TRIGGER`: maturity=`standard`, evidence=`direct` via `FundingNormalizationDetector`
+- `FUNDING_PERSISTENCE_TRIGGER`: maturity=`standard`, evidence=`direct` via `FundingPersistenceDetector`
+- `FUNDING_TIMESTAMP_EVENT`: maturity=`standard`, evidence=`contextual` via `FundingTimestampDetector`
+- `GAP_OVERSHOOT`: maturity=`standard`, evidence=`statistical` via `GapOvershootDetector`
+- `INDEX_COMPONENT_DIVERGENCE`: maturity=`standard`, evidence=`inferred_cross_asset` via `IndexComponentDivergenceDetector`
+- `LEAD_LAG_BREAK`: maturity=`standard`, evidence=`inferred_cross_asset` via `LeadLagBreakDetector`
+- `LIQUIDATION_CASCADE`: maturity=`specialized`, evidence=`direct` via `LiquidationCascadeDetector`
+- `LIQUIDATION_EXHAUSTION_REVERSAL`: maturity=`standard`, evidence=`hybrid` via `LiquidationExhaustionReversalDetector`
+- `LIQUIDITY_GAP_PRINT`: maturity=`standard`, evidence=`direct` via `LiquidityGapDetector`
+- `LIQUIDITY_SHOCK`: maturity=`production`, evidence=`hybrid` via `LiquidityStressDetector`
+- `LIQUIDITY_STRESS_DIRECT`: maturity=`production`, evidence=`direct` via `DirectLiquidityStressDetector`
+- `LIQUIDITY_STRESS_PROXY`: maturity=`standard`, evidence=`hybrid` via `ProxyLiquidityStressDetector`
+- `LIQUIDITY_VACUUM`: maturity=`specialized`, evidence=`direct` via `LiquidityVacuumDetector`
+- `MOMENTUM_DIVERGENCE_TRIGGER`: maturity=`standard`, evidence=`hybrid` via `MomentumDivergenceDetector`
+- `OI_FLUSH`: maturity=`standard`, evidence=`direct` via `OIFlushDetector`
+- `OI_SPIKE_NEGATIVE`: maturity=`standard`, evidence=`direct` via `OISpikeNegativeDetector`
+- `OI_SPIKE_POSITIVE`: maturity=`standard`, evidence=`direct` via `OISpikePositiveDetector`
+- `ORDERFLOW_IMBALANCE_SHOCK`: maturity=`standard`, evidence=`direct` via `OrderflowImbalanceShockDetector`
+- `OVERSHOOT_AFTER_SHOCK`: maturity=`standard`, evidence=`statistical` via `OvershootDetector`
+- `POST_DELEVERAGING_REBOUND`: maturity=`standard`, evidence=`hybrid` via `PostDeleveragingReboundDetector`
+- `PRICE_VOL_IMBALANCE_PROXY`: maturity=`standard`, evidence=`hybrid` via `PriceVolImbalanceProxyDetector`
+- `PULLBACK_PIVOT`: maturity=`standard`, evidence=`hybrid` via `PullbackPivotDetector`
+- `RANGE_BREAKOUT`: maturity=`standard`, evidence=`hybrid` via `RangeBreakoutDetector`
+- `RANGE_COMPRESSION_END`: maturity=`standard`, evidence=`hybrid` via `RangeCompressionDetector`
+- `SCHEDULED_NEWS_WINDOW_EVENT`: maturity=`standard`, evidence=`contextual` via `ScheduledNewsDetector`
+- `SEQ_FND_EXTREME_THEN_BREAKOUT`: maturity=`standard`, evidence=`sequence_confirmed` via `EventSequenceDetector`
+- `SEQ_LIQ_VACUUM_THEN_DEPTH_RECOVERY`: maturity=`standard`, evidence=`sequence_confirmed` via `EventSequenceDetector`
+- `SEQ_OI_SPIKEPOS_THEN_VOL_SPIKE`: maturity=`standard`, evidence=`sequence_confirmed` via `EventSequenceDetector`
+- `SEQ_VOL_COMP_THEN_BREAKOUT`: maturity=`standard`, evidence=`sequence_confirmed` via `EventSequenceDetector`
+- `SESSION_CLOSE_EVENT`: maturity=`standard`, evidence=`contextual` via `SessionCloseDetector`
+- `SESSION_OPEN_EVENT`: maturity=`standard`, evidence=`contextual` via `SessionOpenDetector`
+- `SLIPPAGE_SPIKE_EVENT`: maturity=`standard`, evidence=`direct` via `SlippageSpikeDetector`
+- `SPOT_PERP_BASIS_SHOCK`: maturity=`production`, evidence=`inferred_cross_asset` via `SpotPerpBasisShockDetector`
+- `SPREAD_BLOWOUT`: maturity=`standard`, evidence=`direct` via `SpreadBlowoutDetector`
+- `SPREAD_REGIME_WIDENING_EVENT`: maturity=`standard`, evidence=`direct` via `SpreadRegimeWideningDetector`
+- `SUPPORT_RESISTANCE_BREAK`: maturity=`standard`, evidence=`hybrid` via `SREventDetector`
+- `SWEEP_STOPRUN`: maturity=`standard`, evidence=`hybrid` via `SweepStopRunDetector`
+- `TREND_ACCELERATION`: maturity=`standard`, evidence=`hybrid` via `TrendAccelerationDetector`
+- `TREND_DECELERATION`: maturity=`standard`, evidence=`hybrid` via `TrendDecelerationDetector`
+- `TREND_EXHAUSTION_TRIGGER`: maturity=`standard`, evidence=`hybrid` via `TrendExhaustionDetector`
+- `TREND_TO_CHOP_SHIFT`: maturity=`standard`, evidence=`hybrid` via `TrendToChopDetector`
+- `VOL_CLUSTER_SHIFT`: maturity=`standard`, evidence=`statistical` via `VolClusterShiftDetector`
+- `VOL_REGIME_SHIFT_EVENT`: maturity=`standard`, evidence=`statistical` via `VolRegimeShiftDetector`
+- `VOL_RELAXATION_START`: maturity=`standard`, evidence=`direct` via `VolRelaxationDetector`
+- `VOL_SHOCK`: maturity=`specialized`, evidence=`statistical` via `VolShockRelaxationDetector`
+- `VOL_SPIKE`: maturity=`production`, evidence=`direct` via `VolSpikeDetector`
+- `WICK_REVERSAL_PROXY`: maturity=`standard`, evidence=`hybrid` via `WickReversalProxyDetector`
+- `ZSCORE_STRETCH`: maturity=`standard`, evidence=`statistical` via `ZScoreStretchDetector`

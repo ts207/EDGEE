@@ -104,13 +104,33 @@ class FundingExtremeOnsetDetector(BaseFundingDetector):
         f_pct = pd.to_numeric(df["funding_abs_pct"], errors="coerce").astype(float)
         f_abs = pd.to_numeric(df["funding_abs"], errors="coerce").astype(float)
         funding_signed = self._signed_funding(df)
+
         extreme_pct = float(params.get("extreme_pct", self.defaults["extreme_pct"]))
-        mask = ((f_pct >= extreme_pct) & (f_pct.shift(1) < extreme_pct)).fillna(False)
+        accel_pct = float(params.get("accel_pct", self.defaults["accel_pct"]))
+        accel_lookback = int(params.get("accel_lookback", 12))
+        persistence_bars = int(params.get("persistence_bars", 8))
+        threshold_window = int(params.get("threshold_window", 2880))
+
+        accel = (f_abs - f_abs.shift(accel_lookback)).clip(lower=0.0)
+        accel_rank = percentile_rank_historical(
+            accel,
+            window=threshold_window,
+            min_periods=max(1, min(threshold_window, max(24, accel_lookback))),
+        ).fillna(0.0)
+        extreme_flag = (f_pct >= extreme_pct).fillna(False)
+        accel_flag = (accel_rank >= accel_pct).fillna(False)
+        persistence_run = run_length(extreme_flag)
+        persist_flag = (persistence_run >= persistence_bars).fillna(False)
+        qualified = (extreme_flag & accel_flag & persist_flag).fillna(False)
+        onset = (qualified & ~qualified.shift(1, fill_value=False)).fillna(False)
+
         return {
             "funding_abs_pct": f_pct,
             "funding_abs": f_abs,
             "funding_signed": funding_signed,
-            "mask": mask,
+            "accel_rank": accel_rank,
+            "persistence_run": persistence_run.astype(float),
+            "mask": onset,
         }
 
     def compute_raw_mask(
@@ -119,13 +139,23 @@ class FundingExtremeOnsetDetector(BaseFundingDetector):
         mask = features["mask"]
         cooldown = int(params.get("cooldown_bars", 0))
         if cooldown > 0:
-            from project.events.sparsify import sparsify_mask
-
             indices = sparsify_mask(mask, min_spacing=cooldown)
             out = pd.Series(False, index=mask.index)
             out.iloc[indices] = True
             return out
         return mask
+
+    def compute_metadata(
+        self, idx: int, features: dict[str, pd.Series], **params: Any
+    ) -> dict[str, Any]:
+        base = super().compute_metadata(idx, features, **params)
+        base.update(
+            {
+                "funding_accel_rank": float(np.nan_to_num(features["accel_rank"].iloc[idx], nan=0.0)),
+                "funding_persistence_bars": float(np.nan_to_num(features["persistence_run"].iloc[idx], nan=0.0)),
+            }
+        )
+        return base
 
 
 class FundingPersistenceDetector(BaseFundingDetector):

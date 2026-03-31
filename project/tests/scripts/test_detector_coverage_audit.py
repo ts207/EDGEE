@@ -49,17 +49,20 @@ def test_render_markdown_contains_sections() -> None:
             "error_count": 0,
             "warning_count": 0,
             "maturity_counts": {"production": 1, "standard": 1},
+            "evidence_tier_counts": {"direct": 1, "proxy": 1},
         },
         "detectors": [
             {
                 "event_type": "A",
                 "class_name": "DetectorA",
                 "maturity_tier": "production",
+                "evidence_tier": "direct",
             },
             {
                 "event_type": "B",
                 "class_name": "DetectorB",
                 "maturity_tier": "standard",
+                "evidence_tier": "proxy",
             },
         ],
         "issues": [],
@@ -68,6 +71,7 @@ def test_render_markdown_contains_sections() -> None:
     markdown = audit.render_markdown(report)
     assert "# Detector Coverage Audit" in markdown
     assert "## Maturity Counts" in markdown
+    assert "## Evidence Tier Counts" in markdown
     assert "## Detector Inventory" in markdown
     assert "- None" in markdown
 
@@ -125,3 +129,12 @@ def test_has_hardcoded_parameters_does_not_swallow_unexpected_runtime_errors(mon
         assert "unexpected inspect failure" in str(exc)
     else:
         raise AssertionError("expected RuntimeError to propagate")
+
+
+def test_run_audit_reports_evidence_tier_counts() -> None:
+    report = audit.run_audit()
+
+    assert "evidence_tier_counts" in report["summary"]
+    assert report["summary"]["evidence_tier_counts"].get("proxy", 0) == 0
+    assert report["summary"]["evidence_tier_counts"].get("hybrid", 0) >= 1
+    assert all("evidence_tier" in row for row in report["detectors"])

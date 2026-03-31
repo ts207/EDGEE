@@ -237,6 +237,11 @@ def build_evidence_bundle(
             "tob_coverage": tob_coverage,
             "event_is_descriptive": bool(as_bool(row.get("event_is_descriptive", False))),
             "event_is_trade_trigger": bool(as_bool(row.get("event_is_trade_trigger", True))),
+            "event_contract_tier": str(row.get("event_contract_tier", "")).strip(),
+            "event_operational_role": str(row.get("event_operational_role", "")).strip(),
+            "event_deployment_disposition": str(row.get("event_deployment_disposition", "")).strip(),
+            "event_runtime_category": str(row.get("event_runtime_category", "")).strip(),
+            "event_requires_stronger_evidence": bool(as_bool(row.get("event_requires_stronger_evidence", False))),
             "is_reduced_evidence": bool(as_bool(row.get("is_reduced_evidence", False))),
             "bridge_certified": bool(as_bool(row.get("bridge_certified", False))),
             "has_realized_oos_path": bool(has_realized_oos_path),
@@ -468,6 +473,10 @@ def evaluate_promotion_bundle(bundle: Dict[str, Any], policy: PromotionPolicy) -
             if (
                 (not as_bool(meta.get("event_is_descriptive", False)))
                 and as_bool(meta.get("event_is_trade_trigger", True))
+                and not (
+                    as_bool(meta.get("event_requires_stronger_evidence", False))
+                    and as_bool(meta.get("is_reduced_evidence", False))
+                )
             )
             else "fail"
         ),

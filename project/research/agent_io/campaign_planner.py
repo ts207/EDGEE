@@ -14,6 +14,7 @@ import yaml
 
 from project.core.config import get_data_root
 from project.events.event_specs import EVENT_REGISTRY_SPECS
+from project.events.governance import event_matches_filters, get_event_governance_metadata
 from project.research.agent_io.issue_proposal import generate_run_id, issue_proposal
 from project.research.agent_io.proposal_schema import load_agent_proposal
 from project.research.knowledge.memory import ensure_memory_store, read_memory_table
@@ -212,6 +213,8 @@ class CampaignPlannerConfig:
     run_mode: str = "research"
     target_contexts: tuple[str, ...] = ("vol_regime",)
     enabled_trigger_types: tuple[str, ...] = ("EVENT",)
+    event_tiers: tuple[str, ...] = ("A", "B")
+    operational_roles: tuple[str, ...] = ("trigger", "confirm")
 
 
 @dataclass
@@ -305,9 +308,15 @@ class CampaignPlanner:
         for event_type, meta in events_registry.items():
             if not bool(meta.get("enabled", True)):
                 continue
-            if not bool(meta.get("is_trade_trigger", True)):
+            if not event_matches_filters(
+                event_type,
+                tiers=self.config.event_tiers,
+                roles=self.config.operational_roles,
+                trade_trigger_eligible=True,
+            ):
                 continue
 
+            governance = get_event_governance_metadata(event_type)
             family = event_to_family.get(event_type, "")
             event_count = int(event_counts.get(event_type, 0))
             family_count = int(family_counts.get(family, 0))
@@ -337,13 +346,17 @@ class CampaignPlanner:
 
             mechanical_penalty = 1.0 if event_type in mechanical_event_types else 0.0
             history_penalty = penalties.get(event_type, 0.0)
+            maturity_bonus = 0.4 if governance["tier"] == "A" else 0.15
+            governance_penalty = float(governance.get("rank_penalty", 0.0)) * 0.35
             score = (
                 1.8 * priority_score
                 + 1.2 * family_gap_score
                 + 0.9 * event_gap_score
                 + 0.8 * regime_score
+                + maturity_bonus
                 - 2.5 * mechanical_penalty
                 - history_penalty
+                - governance_penalty
             )
 
             templates = _allowed_templates_for_family(family, self.registry.get("templates", {}))
@@ -398,6 +411,8 @@ class CampaignPlanner:
             "trigger_space": {
                 "allowed_trigger_types": list(self.config.enabled_trigger_types),
                 "events": {"include": [event_type]},
+                "tiers": list(self.config.event_tiers),
+                "operational_roles": list(self.config.operational_roles),
             },
             "templates": list(dict.fromkeys(templates))[:4],
             "description": f"Autonomous campaign proposal for {event_type}" + (f" (family={family})" if family else ""),

@@ -11,7 +11,9 @@ from project.events.shared import EVENT_COLUMNS, emit_event, format_event_id
 from project.research.analyzers import run_analyzer_suite
 from project.events.detectors.registry import register_detector, get_detector
 from project.events.detectors.interaction import EventInteractionDetector
-from project.spec_validation import load_ontology_events
+import os
+
+from project.events.contract_registry import load_active_event_contracts, load_research_motif_specs
 
 
 class CrossAssetInteractionDetector(CompositeDetector):
@@ -45,19 +47,29 @@ class CrossAssetInteractionDetector(CompositeDetector):
         return pd.Series(0.0, index=df.index)
 
 
-_DETECTORS = {
-    "CROSS_ASSET_INTERACTION": CrossAssetInteractionDetector,
-}
+_ACTIVE_CONTRACTS = load_active_event_contracts()
 
-# Auto-load interaction events from spec/events/interaction/
-try:
-    all_specs = load_ontology_events()
-    for et, spec in all_specs.items():
-        if et.startswith("INT_"):
+_DETECTORS = {}
+if "CROSS_ASSET_INTERACTION" in _ACTIVE_CONTRACTS:
+    _DETECTORS["CROSS_ASSET_INTERACTION"] = CrossAssetInteractionDetector
+
+# Research-only interaction motifs are intentionally excluded from the default
+# executable runtime registry. They can be enabled explicitly for offline
+# research by setting EDGE_ENABLE_RESEARCH_MOTIFS=1.
+def _research_motif_registration_enabled() -> bool:
+    return str(os.getenv("EDGE_ENABLE_RESEARCH_MOTIFS", "0")).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _register_research_motif_detectors() -> None:
+    if not _research_motif_registration_enabled():
+        return
+    try:
+        all_specs = load_research_motif_specs()
+        for et, spec in all_specs.items():
+            if not et.startswith("INT_"):
+                continue
             params = spec.get("parameters", {})
-            class_name = f"InteractionDetector_{et}"
-            
-            # Create a closure-safe dynamic class
+
             def make_detector_cls(name, left, right, o, l):
                 class DynamicInteractionDetector(EventInteractionDetector):
                     def __init__(self, *args, **kwargs):
@@ -66,20 +78,22 @@ try:
                             left_id=left,
                             right_id=right,
                             op=o,
-                            lag=l
+                            lag=l,
                         )
                 return DynamicInteractionDetector
-            
+
             _DETECTORS[et] = make_detector_cls(
                 et,
                 params.get("left_event", ""),
                 params.get("right_event", ""),
                 params.get("op", "confirm"),
-                int(params.get("max_gap_bars", 6))
+                int(params.get("max_gap_bars", 6)),
             )
-except Exception as e:
-    import logging
-    logging.getLogger(__name__).warning(f"Failed to auto-load interaction events: {e}")
+    except Exception as e:
+        logging.getLogger(__name__).warning(f"Failed to auto-load interaction events: {e}")
+
+
+_register_research_motif_detectors()
 
 for et, cls in _DETECTORS.items():
     register_detector(et, cls)

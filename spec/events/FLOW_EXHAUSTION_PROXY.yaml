@@ -5,7 +5,8 @@ maturity: standard
 synthetic_coverage: covered
 active: true
 status: prototype
-description: Explicit proxy replacement for legacy forced-flow exhaustion labeling.
+description: 'Hybrid exhaustion detector: open-interest unwind and liquidation pressure
+  confirmed by reversal-style price response.'
 reports_dir: forced_flow_and_exhaustion
 events_file: forced_flow_and_exhaustion_events.parquet
 signal_column: flow_exhaustion_proxy_event
@@ -13,9 +14,9 @@ parameters:
   lookback_window: 288
   z_threshold: 3.0
   threshold_window: 2880
-  oi_drop_quantile: 0.80
+  oi_drop_quantile: 0.8
   liquidation_quantile: 0.85
-  spread_quantile: 0.70
+  spread_quantile: 0.7
   return_quantile: 0.75
   rebound_window: 6
   reversal_window: 3
@@ -30,8 +31,9 @@ parameters:
   cooldown_bars: 12
   merge_gap_bars: 0
 canonical_family: FORCED_FLOW_AND_EXHAUSTION
-trigger: Detector triggers on flow exhaustion proxy pattern
-confirmation: Post-detection price action confirms signal validity
+trigger: Detector triggers when liquidation and OI unwind confirm forced-flow exhaustion.
+confirmation: Price reversal and volatility-cooldown behavior confirm the exhaustion
+  signal.
 expected_behavior:
   holding_horizon_bars: 2-12
   invalidation_conditions:

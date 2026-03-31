@@ -68,7 +68,6 @@ def test_build_cleaned_respects_requested_start_end_window(monkeypatch, tmp_path
         return Path(path), "parquet"
 
     monkeypatch.setattr(build_cleaned_bars, "get_data_root", lambda: tmp_path / "data")
-    monkeypatch.setattr(build_cleaned_bars, "choose_partition_dir", lambda _candidates: Path("dummy_dir"))
     monkeypatch.setattr(build_cleaned_bars, "list_parquet_files", fake_list_parquet_files)
     monkeypatch.setattr(build_cleaned_bars, "read_parquet", fake_read_parquet)
     monkeypatch.setattr(build_cleaned_bars, "start_manifest", fake_start_manifest)
@@ -140,7 +139,6 @@ def test_build_cleaned_warns_when_funding_window_does_not_overlap(monkeypatch, t
         return Path(path), "parquet"
 
     monkeypatch.setattr(build_cleaned_bars, "get_data_root", lambda: tmp_path / "data")
-    monkeypatch.setattr(build_cleaned_bars, "choose_partition_dir", lambda _candidates: Path("dummy_dir"))
     monkeypatch.setattr(build_cleaned_bars, "list_parquet_files", fake_list_parquet_files)
     monkeypatch.setattr(build_cleaned_bars, "read_parquet", fake_read_parquet)
     monkeypatch.setattr(build_cleaned_bars, "start_manifest", fake_start_manifest)
@@ -205,7 +203,6 @@ def test_build_cleaned_writes_data_quality_report(monkeypatch, tmp_path):
         return Path(path), "parquet"
 
     monkeypatch.setattr(build_cleaned_bars, "get_data_root", lambda: tmp_path / "data")
-    monkeypatch.setattr(build_cleaned_bars, "choose_partition_dir", lambda _candidates: Path("dummy_dir"))
     monkeypatch.setattr(build_cleaned_bars, "list_parquet_files", fake_list_parquet_files)
     monkeypatch.setattr(build_cleaned_bars, "read_parquet", fake_read_parquet)
     monkeypatch.setattr(build_cleaned_bars, "start_manifest", fake_start_manifest)

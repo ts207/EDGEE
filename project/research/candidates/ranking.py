@@ -5,6 +5,7 @@ from typing import Dict, List, Tuple, Any
 import numpy as np
 import pandas as pd
 from project.core.coercion import safe_float
+from project.events.governance import get_event_governance_metadata
 
 SOURCE_PRIORITY = {
     "promoted_blueprint": 0,
@@ -39,7 +40,7 @@ def _sort_metric_desc(value: object) -> float:
     return float("inf") if not pd.notna(v) else -float(v)
 
 
-def candidate_rank_key(row: Dict[str, object]) -> Tuple[float, float, float, int, str]:
+def candidate_rank_key(row: Dict[str, object]) -> Tuple[float, float, float, float, int, str]:
     quality_score = safe_float(
         row.get("selection_score_executed"),
         safe_float(row.get("quality_score"), safe_float(row.get("selection_score"), np.nan)),
@@ -49,11 +50,15 @@ def candidate_rank_key(row: Dict[str, object]) -> Tuple[float, float, float, int
         safe_float(row.get("expectancy_per_trade"), np.nan),
     )
     robustness = safe_float(row.get("robustness_score"), np.nan)
+    event_token = str(row.get("event_type", row.get("event", ""))).strip().upper()
+    governance = get_event_governance_metadata(event_token) if event_token and event_token != "ALPHA_BUNDLE" else {"rank_penalty": -1.0}
+    rank_penalty = float(governance.get("rank_penalty", 0.0))
     source_priority = SOURCE_PRIORITY.get(str(row.get("source_type", row.get("source", ""))), 99)
     return (
         _sort_metric_desc(quality_score),
         _sort_metric_desc(expectancy),
         _sort_metric_desc(robustness),
+        rank_penalty,
         source_priority,
         str(row.get("strategy_candidate_id", "")),
     )
