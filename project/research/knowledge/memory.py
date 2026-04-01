@@ -19,6 +19,7 @@ from project.research.knowledge.schemas import (
     PROPOSAL_AUDIT_COLUMNS,
     REFLECTION_COLUMNS,
     TESTED_REGION_COLUMNS,
+    EVIDENCE_LEDGER_COLUMNS,
     canonical_json,
     region_key,
     stable_hash,
@@ -147,6 +148,7 @@ _TABLES = {
     "failures": FAILURE_COLUMNS,
     "proposals": PROPOSAL_AUDIT_COLUMNS,
     "reflections": REFLECTION_COLUMNS,
+    "evidence_ledger": EVIDENCE_LEDGER_COLUMNS,
 }
 
 
@@ -161,6 +163,7 @@ class MemoryPaths:
     failures: Path
     proposals: Path
     reflections: Path
+    evidence_ledger: Path
     belief_state: Path
     next_actions: Path
     proposals_dir: Path
@@ -179,6 +182,7 @@ def memory_paths(program_id: str, *, data_root: Path | None = None) -> MemoryPat
         failures=root / "failures.parquet",
         proposals=root / "proposals.parquet",
         reflections=root / "reflections.parquet",
+        evidence_ledger=root / "evidence_ledger.parquet",
         belief_state=root / "belief_state.json",
         next_actions=root / "next_actions.json",
         proposals_dir=root / "proposals",

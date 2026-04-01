@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, Mapping
 
+from project.episodes import infer_live_episode_matches
 from project.live.contracts.live_trade_context import LiveTradeContext
 from project.live.event_detector import DetectedEvent
 
@@ -33,6 +34,44 @@ def build_live_trade_context(
         regime_snapshot["microstructure_regime"] = "healthy"
     else:
         regime_snapshot["microstructure_regime"] = "degraded"
+
+    active_events: list[str] = []
+    for raw in list(market_features.get("active_event_families", [])) + [detected_event.event_family]:
+        token = str(raw or "").strip().upper()
+        if token and token not in active_events:
+            active_events.append(token)
+
+    contradiction_events: list[str] = []
+    for raw in market_features.get("contradiction_event_families", []):
+        token = str(raw or "").strip().upper()
+        if token and token not in contradiction_events:
+            contradiction_events.append(token)
+
+    episode_matches = infer_live_episode_matches(
+        active_events,
+        regime_snapshot=regime_snapshot,
+        live_features=dict(market_features) | dict(detected_event.features),
+    )
+    provided_episode_ids = [str(item or "").strip().upper() for item in market_features.get("active_episode_ids", []) if str(item or "").strip()]
+    active_episode_ids: list[str] = []
+    for token in provided_episode_ids + [match.episode_id for match in episode_matches]:
+        if token and token not in active_episode_ids:
+            active_episode_ids.append(token)
+
+    episode_snapshot = {
+        "episode_ids": active_episode_ids,
+        "matches": [
+            {
+                "episode_id": match.episode_id,
+                "observed_events": list(match.observed_events),
+                "matched_required_events": int(match.matched_required_events),
+                "runtime_hint": match.runtime_hint,
+            }
+            for match in episode_matches
+        ],
+        "activation_mode": "heuristic_live_runtime",
+    }
+
     return LiveTradeContext(
         timestamp=str(timestamp),
         symbol=str(symbol).upper(),
@@ -43,4 +82,8 @@ def build_live_trade_context(
         regime_snapshot=regime_snapshot,
         execution_env=dict(execution_env),
         portfolio_state=dict(portfolio_state),
+        active_event_families=active_events,
+        active_episode_ids=active_episode_ids,
+        contradiction_event_families=contradiction_events,
+        episode_snapshot=episode_snapshot,
     )

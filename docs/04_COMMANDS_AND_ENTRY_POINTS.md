@@ -2,12 +2,13 @@
 
 This file lists the main maintained ways to interact with the repository.
 
-## Console Scripts
+## Console scripts
 
 Defined in [pyproject.toml](../pyproject.toml):
 
+- `edge`: canonical operator CLI
+- `edge-backtest` (alias `backtest`): compatibility alias for the same CLI
 - `edge-run-all`: full orchestrator
-- `edge-backtest` (alias `backtest`): backtest execution engine
 - `edge-live-engine`: live runtime entry point
 - `edge-phase2-discovery`: phase-2 discovery entry point via [project/research/cli/candidate_discovery_cli.py](../project/research/cli/candidate_discovery_cli.py)
 - `edge-promote`: promotion entry point via [project/research/cli/promotion_cli.py](../project/research/cli/promotion_cli.py)
@@ -16,7 +17,7 @@ Defined in [pyproject.toml](../pyproject.toml):
 - `build-strategy-candidates`: candidate packager via [project/research/build_strategy_candidates.py](../project/research/build_strategy_candidates.py)
 - `ontology-consistency-audit`
 
-## Main Python Entry Points
+## Main Python entry points
 
 - [project/pipelines/run_all.py](../project/pipelines/run_all.py)
 - [project/research/cli/candidate_discovery_cli.py](../project/research/cli/candidate_discovery_cli.py)
@@ -28,7 +29,20 @@ Defined in [pyproject.toml](../pyproject.toml):
 - [project/research/agent_io/proposal_to_experiment.py](../project/research/agent_io/proposal_to_experiment.py)
 - [project/research/knowledge/query.py](../project/research/knowledge/query.py)
 
-## `make` Targets
+## Bootstrap / thesis-packaging scripts
+
+These scripts are maintained entry points for the thesis lifecycle after bounded runs have produced plausible candidates:
+
+- `python -m project.scripts.build_seed_bootstrap_artifacts`
+- `python -m project.scripts.build_seed_testing_artifacts`
+- `python -m project.scripts.build_seed_empirical_artifacts`
+- `python -m project.scripts.build_founding_thesis_evidence`
+- `python -m project.scripts.build_seed_packaging_artifacts`
+- `python -m project.scripts.build_structural_confirmation_artifacts`
+- `python -m project.scripts.build_thesis_overlap_artifacts`
+- `./project/scripts/regenerate_artifacts.sh`
+
+## `make` targets
 
 Maintained targets from `make help`:
 
@@ -58,7 +72,17 @@ Maintained targets from `make help`:
 - `benchmark-maintenance`
 - `minimum-green-gate`
 
-## Best Usage By Intent
+## Canonical operator commands
+
+Use these first for normal bounded research:
+
+```bash
+edge operator preflight --proposal /abs/path/to/proposal.yaml
+edge operator plan --proposal /abs/path/to/proposal.yaml
+edge operator run --proposal /abs/path/to/proposal.yaml
+```
+
+## Best usage by intent
 
 ### I want to inspect prior work
 
@@ -75,58 +99,66 @@ Use:
 Use:
 
 ```bash
-.venv/bin/python -m project.research.agent_io.proposal_to_experiment \
-  --proposal /abs/path/to/proposal.yaml \
-  --registry_root project/configs/registries \
-  --config_path /tmp/experiment.yaml \
-  --overrides_path /tmp/run_all_overrides.json
+.venv/bin/python -m project.research.agent_io.proposal_to_experiment   --proposal /abs/path/to/proposal.yaml   --registry_root project/configs/registries   --config_path /tmp/experiment.yaml   --overrides_path /tmp/run_all_overrides.json
 ```
 
 ### I want to inspect a full plan first
 
-Use:
+Preferred command:
 
 ```bash
-.venv/bin/python -m project.research.agent_io.execute_proposal \
-  --proposal /abs/path/to/proposal.yaml \
-  --run_id my_run \
-  --registry_root project/configs/registries \
-  --out_dir data/artifacts/experiments/my_program/proposals/my_run \
-  --plan_only 1
+edge operator plan --proposal /abs/path/to/proposal.yaml
+```
+
+Equivalent internal command:
+
+```bash
+.venv/bin/python -m project.research.agent_io.execute_proposal   --proposal /abs/path/to/proposal.yaml   --run_id my_run   --registry_root project/configs/registries   --out_dir data/artifacts/experiments/my_program/proposals/my_run   --plan_only 1
 ```
 
 ### I want memory bookkeeping with proposal issuance
 
-Use:
+Preferred command:
 
 ```bash
-.venv/bin/python -m project.research.agent_io.issue_proposal \
-  --proposal /abs/path/to/proposal.yaml \
-  --registry_root project/configs/registries \
-  --plan_only 1
+edge operator run --proposal /abs/path/to/proposal.yaml
 ```
+
+Equivalent internal command:
+
+```bash
+.venv/bin/python -m project.research.agent_io.issue_proposal   --proposal /abs/path/to/proposal.yaml   --registry_root project/configs/registries   --plan_only 1
+```
+
+### I want to bootstrap or refresh the thesis store
+
+Use the bootstrap scripts rather than ad hoc notebooks:
+
+```bash
+python -m project.scripts.build_seed_bootstrap_artifacts
+python -m project.scripts.build_seed_testing_artifacts
+python -m project.scripts.build_seed_empirical_artifacts
+python -m project.scripts.build_seed_packaging_artifacts
+python -m project.scripts.build_thesis_overlap_artifacts
+```
+
+Use the evidence and structural confirmation builders only when you are adding or refreshing empirical support for specific theses.
 
 ### I want a narrow direct run
 
 Use `run_all` directly when you already know the slice:
 
 ```bash
-.venv/bin/python -m project.pipelines.run_all \
-  --run_id btc_vol_shock_slice \
-  --symbols BTCUSDT \
-  --start 2022-11-01 \
-  --end 2022-12-31 \
-  --mode research \
-  --phase2_event_type VOL_SHOCK \
-  --phase2_gate_profile discovery
+.venv/bin/python -m project.pipelines.run_all   --run_id btc_vol_shock_slice   --symbols BTCUSDT   --start 2022-11-01   --end 2022-12-31   --mode research   --phase2_event_type VOL_SHOCK   --phase2_gate_profile discovery
 ```
 
-## Command Selection Rule
+## Command selection rule
 
 Prefer:
 
 - `knowledge.query` for reading prior state
 - proposal tools for disciplined research issuance
+- bootstrap scripts for thesis inventory, evidence, packaging, and overlap artifacts
 - `run_all` for direct bounded execution
 - `make` targets for maintained common workflows
 

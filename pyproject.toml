@@ -36,6 +36,7 @@ where = ["."]
 include = ["project*"]
 
 [project.scripts]
+edge = "project.cli:main"
 backtest = "project.cli:main"
 edge-backtest = "project.cli:main"
 edge-run-all = "project.pipelines.run_all:main"

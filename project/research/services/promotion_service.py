@@ -6,7 +6,7 @@ import logging
 from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Mapping, Optional
 
 import pandas as pd
 
@@ -107,6 +107,26 @@ class ResolvedPromotionPolicy:
     enforce_baseline_beats_complexity: bool
     enforce_placebo_controls: bool
     enforce_timeframe_consensus: bool
+
+
+PROMOTION_CLASSES: tuple[str, ...] = ("seed_promoted", "paper_promoted", "production_promoted")
+DEFAULT_DEPLOYMENT_STATE_BY_PROMOTION_CLASS: dict[str, str] = {
+    "seed_promoted": "monitor_only",
+    "paper_promoted": "paper_only",
+    "production_promoted": "live_enabled",
+}
+
+
+def normalize_promotion_class(value: str | None, *, default: str = "paper_promoted") -> str:
+    token = str(value or "").strip().lower()
+    if token in PROMOTION_CLASSES:
+        return token
+    return default
+
+
+def default_deployment_state_for_promotion_class(value: str | None, *, default: str = "paper_only") -> str:
+    token = normalize_promotion_class(value, default="paper_promoted")
+    return DEFAULT_DEPLOYMENT_STATE_BY_PROMOTION_CLASS.get(token, default)
 
 
 @dataclass
@@ -687,6 +707,66 @@ def _resolve_promotion_policy(
     )
 
 
+
+
+def _write_promotion_lineage_audit(
+    *,
+    out_dir: Path,
+    run_id: str,
+    evidence_bundles: list[dict[str, Any]],
+    promoted_df: pd.DataFrame,
+    live_export_diagnostics: Mapping[str, Any] | None = None,
+) -> dict[str, str]:
+    rows: list[dict[str, Any]] = []
+    promoted_ids = {
+        str(row.get("candidate_id", "")).strip()
+        for row in promoted_df.to_dict(orient="records")
+        if str(row.get("candidate_id", "")).strip()
+    }
+    for bundle in evidence_bundles:
+        candidate_id = str(bundle.get("candidate_id", "")).strip()
+        decision = bundle.get("promotion_decision", {}) if isinstance(bundle.get("promotion_decision", {}), dict) else {}
+        metadata = bundle.get("metadata", {}) if isinstance(bundle.get("metadata", {}), dict) else {}
+        rows.append({
+            "run_id": run_id,
+            "candidate_id": candidate_id,
+            "event_type": str(bundle.get("event_type", "")).strip(),
+            "promotion_status": str(decision.get("promotion_status", "")).strip(),
+            "promotion_track": str(decision.get("promotion_track", "")).strip(),
+            "bundle_version": str(bundle.get("bundle_version", "")).strip(),
+            "policy_version": str(bundle.get("policy_version", "")).strip(),
+            "hypothesis_id": str(metadata.get("hypothesis_id", "")).strip(),
+            "plan_row_id": str(metadata.get("plan_row_id", "")).strip(),
+            "program_id": str(metadata.get("program_id", "")).strip(),
+            "campaign_id": str(metadata.get("campaign_id", "")).strip(),
+            "live_exported": candidate_id in promoted_ids,
+        })
+    json_path = out_dir / "promotion_lineage_audit.json"
+    md_path = out_dir / "promotion_lineage_audit.md"
+    payload = {
+        "schema_version": "promotion_lineage_audit_v1",
+        "run_id": run_id,
+        "rows": rows,
+        "live_export": dict(live_export_diagnostics or {}),
+    }
+    json_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    md_lines = [
+        "# Promotion lineage audit",
+        "",
+        f"- run_id: `{run_id}`",
+        f"- evidence_bundle_count: `{len(evidence_bundles)}`",
+        f"- live_exported_count: `{sum(1 for row in rows if row['live_exported'])}`",
+        "",
+        "| candidate_id | event_type | promotion_status | promotion_track | program_id | campaign_id | live_exported |",
+        "| --- | --- | --- | --- | --- | --- | --- |",
+    ]
+    for row in rows:
+        md_lines.append(
+            "| {candidate_id} | {event_type} | {promotion_status} | {promotion_track} | {program_id} | {campaign_id} | {live_exported} |".format(**row)
+        )
+    md_path.write_text("\n".join(md_lines) + "\n", encoding="utf-8")
+    return {"json_path": str(json_path), "md_path": str(md_path)}
+
 def execute_promotion(config: PromotionConfig) -> PromotionServiceResult:
     data_root = get_data_root()
     out_dir = config.resolved_out_dir()
@@ -972,6 +1052,13 @@ def execute_promotion(config: PromotionConfig) -> PromotionServiceResult:
             "active_count": int(thesis_export.active_count),
             "pending_count": int(thesis_export.pending_count),
         }
+        diagnostics["promotion_lineage_audit"] = _write_promotion_lineage_audit(
+            out_dir=out_dir,
+            run_id=config.run_id,
+            evidence_bundles=evidence_bundles,
+            promoted_df=promoted_df,
+            live_export_diagnostics=diagnostics.get("live_thesis_export"),
+        )
         finalize_manifest(manifest, "success", stats=diagnostics)
         return PromotionServiceResult(0, out_dir, audit_df, promoted_df, diagnostics)
     except Exception as exc:

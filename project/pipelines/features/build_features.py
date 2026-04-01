@@ -32,6 +32,7 @@ from project.io.utils import (
     read_parquet,
     write_parquet,
     choose_partition_dir,
+    resolve_raw_dataset_dir,
     list_parquet_files,
     run_scoped_lake_path,
 )
@@ -448,30 +449,16 @@ def _merge_optional_oi_liquidation(
     oi_dataset = "open_interest"
     liq_dataset = "liquidations"
 
-    oi_paths = [
-        run_scoped_lake_path(data_root, run_id, "raw", "binance", market, symbol, oi_dataset),
-        data_root / "lake" / "raw" / "binance" / market / symbol / oi_dataset,
-    ]
-    liq_paths = [
-        run_scoped_lake_path(data_root, run_id, "raw", "binance", market, symbol, liq_dataset),
-        data_root / "lake" / "raw" / "binance" / market / symbol / liq_dataset,
-        run_scoped_lake_path(
-            data_root, run_id, "raw", "binance", market, symbol, "liquidation_snapshot"
-        ),
-        data_root / "lake" / "raw" / "binance" / market / symbol / "liquidation_snapshot",
-    ]
-
     # Open interest
     oi_period = "5m"
-    oi_paths = [
-        run_scoped_lake_path(
-            data_root, run_id, "raw", "binance", market, symbol, oi_dataset, oi_period
-        ),
-        data_root / "lake" / "raw" / "binance" / market / symbol / oi_dataset / oi_period,
-        run_scoped_lake_path(data_root, run_id, "raw", "binance", market, symbol, oi_dataset),
-        data_root / "lake" / "raw" / "binance" / market / symbol / oi_dataset,
-    ]
-    oi_dir = choose_partition_dir(oi_paths)
+    oi_dir = resolve_raw_dataset_dir(
+        data_root,
+        market=market,
+        symbol=symbol,
+        dataset=oi_dataset,
+        run_id=run_id,
+        aliases=(oi_period,),
+    )
     oi = read_parquet(list_parquet_files(oi_dir)) if oi_dir else pd.DataFrame()
 
     out["oi_notional"] = np.nan
@@ -515,7 +502,14 @@ def _merge_optional_oi_liquidation(
             out.loc[stale, "oi_notional"] = np.nan
 
     # Liquidations
-    liq_dir = choose_partition_dir(liq_paths)
+    liq_dir = resolve_raw_dataset_dir(
+        data_root,
+        market=market,
+        symbol=symbol,
+        dataset=liq_dataset,
+        run_id=run_id,
+        aliases=("liquidation_snapshot",),
+    )
     liq = read_parquet(list_parquet_files(liq_dir)) if liq_dir else pd.DataFrame()
 
     out["liquidation_notional"] = 0.0
@@ -885,29 +879,14 @@ def main() -> int:
             # Load funding (only for perp)
             funding = pd.DataFrame()
             if market == "perp":
-                funding_paths = [
-                    run_scoped_lake_path(
-                        data_root,
-                        run_id,
-                        "raw",
-                        "binance",
-                        "perp",
-                        symbol,
-                        funding_dataset_name(tf),
-                    ),
-                    data_root
-                    / "lake"
-                    / "raw"
-                    / "binance"
-                    / "perp"
-                    / symbol
-                    / funding_dataset_name(tf),
-                    run_scoped_lake_path(
-                        data_root, run_id, "raw", "binance", "perp", symbol, "funding"
-                    ),
-                    data_root / "lake" / "raw" / "binance" / "perp" / symbol / "funding",
-                ]
-                funding_dir = choose_partition_dir(funding_paths)
+                funding_dir = resolve_raw_dataset_dir(
+                    data_root,
+                    market="perp",
+                    symbol=symbol,
+                    dataset=funding_dataset_name(tf),
+                    run_id=run_id,
+                    aliases=("funding",),
+                )
                 if funding_dir:
                     funding = read_parquet(list_parquet_files(funding_dir))
                     funding = _filter_time_window(funding, start=args.start, end=args.end)

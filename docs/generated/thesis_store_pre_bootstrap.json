@@ -1,0 +1,11 @@
+{
+  "active_thesis_count": 0,
+  "data_root": "/mnt/data/d1_work/Edge-irene/data",
+  "has_live_index": false,
+  "latest_run_id": "",
+  "live_index_path": "/mnt/data/d1_work/Edge-irene/data/live/theses/index.json",
+  "schema_version": "thesis_store_pre_bootstrap_v1",
+  "source_path": "",
+  "status": "missing",
+  "thesis_count": 0
+}

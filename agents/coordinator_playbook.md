@@ -12,7 +12,14 @@ You (Claude Code) are the coordinator. You do not delegate coordination.
 You invoke specialist agents in sequence, enforce stage discipline, and run
 repo commands directly.
 
-## Pipeline Stages
+Important current-state rule: the repo now has two connected loops.
+
+1. **bounded research loop** — run -> diagnose -> formulate -> compile -> execute
+2. **thesis bootstrap loop** — seed queue -> testing -> empirical evidence -> package -> overlap graph
+
+Use the bounded research loop to discover or validate claims. Use the bootstrap loop only when those claims need to become canonical thesis objects.
+
+## Pipeline stages
 
 ```
 OBSERVATION/RESEARCH ──> VALIDATION ──> FINAL HOLDOUT
@@ -23,7 +30,7 @@ OBSERVATION/RESEARCH ──> VALIDATION ──> FINAL HOLDOUT
    analyst_report       mech_hypotheses     proposal_yaml
 ```
 
-## When to Invoke Each Agent
+## When to invoke each agent
 
 ### Analyst
 **Trigger:** A run has completed (or failed) and you need to understand what happened.
@@ -98,14 +105,34 @@ invalid template, nonexistent event), route the rejection back to
 mechanism_hypothesis for revision. Maximum 2 revision cycles before escalating
 to the user.
 
-## Stage Discipline
+## Thesis bootstrap loop
 
-### Observation / Research Stage
+When the thesis store is empty or sparse, or when recent runs produced bounded claims that deserve packaging, use this sequence after the bounded research loop:
+
+1. `python -m project.scripts.build_seed_bootstrap_artifacts`
+2. `python -m project.scripts.build_seed_testing_artifacts`
+3. `python -m project.scripts.build_seed_empirical_artifacts`
+4. `python -m project.scripts.build_founding_thesis_evidence` for selected high-priority theses
+5. `python -m project.scripts.build_seed_packaging_artifacts`
+6. `python -m project.scripts.build_structural_confirmation_artifacts` only when conservative bridge packaging is intended
+7. `python -m project.scripts.build_thesis_overlap_artifacts`
+
+Use this loop to answer:
+
+- which theses are still only candidates
+- which are tested but under-evidenced
+- which can be `seed_promoted`
+- which can be `paper_promoted`
+- whether the packaged thesis set is structurally disconnected or overlap-aware
+
+## Stage discipline
+
+### Observation / Research stage
 - Run the experiment via `issue_proposal`
 - Invoke analyst on the completed run
 - This is read-only diagnosis — no hypothesis formulation here
 
-### Validation Stage
+### Validation stage
 - Invoke mechanism_hypothesis on the analyst report
 - Review the hypotheses yourself for scope drift:
   - Are the events in the canonical registry?
@@ -114,14 +141,19 @@ to the user.
   - Are horizons supported?
 - If anything drifts, reject back to mechanism_hypothesis
 
-### Final Holdout Stage
+### Final holdout stage
 - Invoke compiler on each validated hypothesis
 - Review the compiled proposal against the plan review checklist
 - Run the translation command yourself to validate
 - Run the plan-only command to verify the plan
 - Only after plan review: execute
 
-## Scope Drift Prevention
+### Packaging stage
+- Do not package a thesis until testing and empirical evidence are both reviewed
+- Do not allow `seed_promoted` or bridge-derived confirmation theses to be described as production-ready
+- Regenerate overlap artifacts after any packaging change
+
+## Scope drift prevention
 
 You MUST check for and prevent:
 
@@ -137,265 +169,3 @@ You MUST check for and prevent:
 
 If any drift is detected, REJECT the output back to the originating agent with
 the specific drift identified.
-
-## Explicit State Transitions
-
-The coordinator is always in exactly one of these states:
-
-| State | Entry Condition | Exit Condition | Next State |
-|-------|----------------|----------------|------------|
-| `GATHER` | Run completed or failed | All artifacts collected | `ANALYZE` |
-| `ANALYZE` | Artifacts gathered | Analyst report received | `TRIAGE` |
-| `TRIAGE` | Analyst report reviewed | Classification decided | `FORMULATE` or `STOP` or `PATCH_REPO` |
-| `PATCH_REPO` | Pipeline failure or data issue | Fix applied and verified | `GATHER` (re-run) |
-| `FORMULATE` | Triage says keep/modify | Hypotheses received | `VALIDATE_DRIFT` |
-| `VALIDATE_DRIFT` | Hypotheses received | All drift checks pass | `COMPILE` |
-| `COMPILE` | Drift-free hypotheses | Compiled proposal received | `TRANSLATE` |
-| `TRANSLATE` | Compiled proposal | Translation command succeeds | `PLAN` |
-| `PLAN` | Translation succeeded | Plan-only command succeeds | `AUTO_GATE` |
-| `AUTO_GATE` | Plan succeeded | All 5 preconditions pass | `EXECUTE` |
-| `EXECUTE` | Auto-gate passed | Run completes | `GATHER` (new cycle) |
-| `STOP` | Kill decision, gate failure, or max cycles reached | Ledger updated | terminal |
-
-Transitions that loop back:
-- `VALIDATE_DRIFT` → `FORMULATE`: drift detected (max 2 cycles)
-- `COMPILE` → `FORMULATE`: compiler rejects hypothesis (max 2 cycles)
-- `TRANSLATE` → `COMPILE`: translation fails with fixable error
-- `PATCH_REPO` → `GATHER`: after repo fix, re-run same proposal
-
-Transitions that stop:
-- `TRIAGE` → `STOP`: analyst recommends kill with high confidence
-- `TRIAGE` → `STOP`: pipeline failure that requires human intervention
-- `VALIDATE_DRIFT` → `STOP`: 2 revision cycles exhausted, escalate to user
-- `AUTO_GATE` → `STOP`: any precondition fails (see Auto-Execution Gate below)
-
-## Full Workflow Sequence
-
-```
-1. USER provides run_id (or requests new experiment)
-     │
-2. COORDINATOR gathers run artifacts              [state: GATHER]
-     │
-3. COORDINATOR ──> ANALYST (via handoff template) [state: ANALYZE]
-     │
-4. ANALYST returns analyst_report
-     │
-5. COORDINATOR reviews analyst_report             [state: TRIAGE]
-   - If pipeline failure: go to PATCH_REPO or STOP
-   - If kill recommendation: go to STOP, update ledger
-   - If modify/keep: go to FORMULATE
-     │
-6. COORDINATOR ──> MECHANISM_HYPOTHESIS           [state: FORMULATE]
-     │
-7. MECHANISM_HYPOTHESIS returns 1-3 hypotheses
-     │
-8. COORDINATOR validates for scope drift          [state: VALIDATE_DRIFT]
-   - If drift detected: REJECT back to step 6 (max 2 cycles)
-     │
-9. For each hypothesis:
-   COORDINATOR ──> COMPILER                       [state: COMPILE]
-     │
-10. COMPILER returns proposal + commands + checklist
-      │
-11. COORDINATOR runs translation command          [state: TRANSLATE]
-      │
-12. COORDINATOR runs plan-only command            [state: PLAN]
-      │
-13. COORDINATOR evaluates auto-execution gate     [state: AUTO_GATE]
-    - All 5 preconditions must pass (see below)
-    - If ANY fails: STOP, log which precondition failed
-      │
-14. AUTO: COORDINATOR runs execution              [state: EXECUTE]
-      │
-15. COORDINATOR updates campaign ledger
-      │
-16. Return to step 2 with new run_id             [state: GATHER]
-```
-
-## Auto-Execution Gate
-
-The coordinator auto-executes ONLY when ALL five preconditions are true.
-If any precondition fails, the coordinator MUST stop and report which failed.
-No partial passes. No overrides. No "close enough".
-
-### Precondition 1: Drift checks pass
-
-Every drift check in the Scope Drift Prevention table returned clean.
-
-Evaluate:
-```
-drift_clean = (
-    no new symbols beyond original proposal
-    AND no date window expansion
-    AND all templates valid for event family
-    AND all events from intended trigger family
-    AND all horizons in supported set
-    AND regime unchanged (or new hypothesis version created)
-    AND no new context dimensions without justification
-)
-```
-
-Fail action: STOP. Report the specific drift type and value. Do not execute.
-
-### Precondition 2: Compiler validation passes
-
-The compiler agent returned a compiled proposal without rejection.
-All compiler validation rules passed:
-- Events exist in `spec/events/canonical_event_registry.yaml`
-- Templates valid for event family per `spec/templates/event_template_registry.yaml`
-- Horizons parseable by `project/core/constants.py:parse_horizon_bars`
-- Regime exists in `spec/events/regime_routing.yaml`
-- Entry lags >= 1
-- Search control within `project/configs/registries/search_limits.yaml` limits
-- No forbidden knobs set
-- YAML parses cleanly
-
-Evaluate:
-```
-compiler_clean = (
-    compiler returned proposal without REJECT
-    AND plan review checklist has no unchecked items
-)
-```
-
-Fail action: STOP. Report the specific validation failure. Route back to
-mechanism_hypothesis if the failure is in the hypothesis (max 2 cycles).
-Escalate to user if the failure is in repo configuration.
-
-### Precondition 3: Plan-only succeeds
-
-The plan-only command (`execute_proposal --plan_only 1`) exited with return
-code 0 and produced a valid `validated_plan.json`.
-
-Evaluate:
-```
-plan_clean = (
-    plan_only command exit code == 0
-    AND validated_plan.json exists at expected path
-    AND validated_plan.json contains program_id matching proposal
-    AND estimated_hypothesis_count > 0
-)
-```
-
-Fail action: STOP. Read stderr/stdout. If the error is a proposal schema
-mismatch, route back to compiler. If the error is a repo/data issue, route
-to PATCH_REPO. If unclear, escalate to user.
-
-### Precondition 4: No repo/data defect is active
-
-The repo is in a clean, testable state with no known blocking defects.
-
-Evaluate:
-```
-repo_clean = (
-    `make test-fast` passes (exit code 0)
-    AND no uncommitted changes to forbidden files
-    AND no active PATCH_REPO state from a prior cycle
-    AND campaign ledger does not show an unresolved defect from prior cycle
-)
-```
-
-Fail action: STOP. If `make test-fast` fails, diagnose and fix before
-executing. If forbidden files have uncommitted changes, escalate to user.
-If a prior-cycle defect is unresolved, resolve it first or escalate.
-
-Run `make test-fast` BEFORE every auto-execution, not just on first cycle.
-This catches regressions introduced by local fixes during PATCH_REPO.
-
-### Precondition 5: Revision-cycle limit not exceeded
-
-The current hypothesis has not already been through 2 revision cycles
-(VALIDATE_DRIFT → FORMULATE or COMPILE → FORMULATE loops).
-
-Evaluate:
-```
-revision_ok = (
-    revision_count_for_current_hypothesis < 2
-)
-```
-
-Fail action: STOP. The hypothesis has been revised twice and still has
-issues. Escalate to user with the full revision history — both the
-original and each revision, with the specific rejection reason for each.
-
-### Gate Decision
-
-```
-auto_execute = (
-    drift_clean
-    AND compiler_clean
-    AND plan_clean
-    AND repo_clean
-    AND revision_ok
-)
-
-if auto_execute:
-    proceed to EXECUTE
-else:
-    proceed to STOP
-    log: which precondition(s) failed
-    log: recommended recovery action
-    update campaign ledger with gate failure
-```
-
-### Gate Failure Logging
-
-When the auto-gate fails, record in the campaign ledger:
-
-| Field | Value |
-|-------|-------|
-| cycle | current cycle number |
-| gate_result | FAIL |
-| failed_precondition | 1-5 (which one) |
-| failure_detail | specific error |
-| recovery_action | what the coordinator recommends |
-| requires_human | yes / no |
-
-## Campaign Ledger
-
-Every program MUST have a campaign ledger at
-`data/artifacts/experiments/<program_id>/campaign_ledger.md`
-
-Use the template from `agents/templates/campaign_ledger.md`.
-
-Update the ledger at these points:
-- After TRIAGE: record classification of the analyzed run
-- After COMPILE: record the new hypothesis_id and proposal_path
-- After EXECUTE: record the new run_id
-- At STOP: record the terminal classification and reasoning
-
-The ledger is the coordinator's persistent memory across cycles. Without it,
-long-running research loops lose context.
-
-## Version Discipline
-
-- If a mechanism hypothesis changes regime, forced actor, or event family:
-  it is a NEW hypothesis, not a version bump
-- If a mechanism hypothesis changes only horizon, context, date window, or
-  search_control: it is a version bump
-- The coordinator tracks hypothesis lineage and enforces this rule
-
-## Memory / State
-
-After each complete cycle, the coordinator should:
-1. Record the decision (keep/modify/kill) in the experiment review
-2. Update the edge registry
-3. Store the analyst report, mechanism hypotheses, and compiled proposal
-   under `data/artifacts/experiments/<program_id>/`
-4. Note the next action
-
-## Error Recovery
-
-| Error | Action |
-|-------|--------|
-| Run failed before phase2 | Stop. Report pipeline error. Do not analyze. |
-| Empty candidates, no evaluated_hypotheses | Stop. Report data issue. |
-| Compiler rejects hypothesis | Route back to mechanism_hypothesis (max 2x) |
-| Translation command fails | Read error, fix proposal if obvious, else escalate |
-| Plan-only command fails | Read error, check proposal against schema, escalate if unclear |
-| Execution fails mid-pipeline | Invoke analyst on partial results |
-| Auto-gate precondition 1 fails (drift) | Stop. Report drift. Do not execute. |
-| Auto-gate precondition 2 fails (compiler) | Route to mechanism_hypothesis or escalate |
-| Auto-gate precondition 3 fails (plan) | Diagnose: proposal error → compiler; repo error → PATCH_REPO |
-| Auto-gate precondition 4 fails (repo/data) | Run `make test-fast`, fix or escalate |
-| Auto-gate precondition 5 fails (revisions) | Stop. Escalate with full revision history. |

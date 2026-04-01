@@ -12,6 +12,7 @@ import pandas as pd
 from project.core.config import get_data_root
 from project.research.agent_io.execute_proposal import execute_proposal
 from project.research.agent_io.proposal_schema import load_agent_proposal
+from project.operator.bounded import validate_bounded_proposal
 from project.research.knowledge.memory import (
     ensure_memory_store,
     read_memory_table,
@@ -66,6 +67,7 @@ def issue_proposal(
 ) -> Dict[str, Any]:
     resolved_data_root = Path(data_root) if data_root is not None else get_data_root()
     proposal = load_agent_proposal(proposal_path)
+    bounded_validation = validate_bounded_proposal(proposal, data_root=resolved_data_root)
     proposal_payload = proposal.to_dict()
     resolved_run_id = (
         str(run_id).strip() if run_id else generate_run_id(proposal.program_id, proposal_payload)
@@ -89,6 +91,10 @@ def issue_proposal(
     )
 
     issued_at = datetime.now(timezone.utc).isoformat()
+    campaign_meta = proposal_payload.get("campaign", {}) or {}
+    if not isinstance(campaign_meta, dict):
+        campaign_meta = {}
+
     proposal_row = {
         "proposal_id": f"proposal::{resolved_run_id}",
         "program_id": proposal.program_id,
@@ -110,6 +116,17 @@ def issue_proposal(
         "symbols": ",".join(proposal.symbols),
         "command_json": canonical_json(execution["command"]),
         "validated_plan_json": canonical_json(execution["validated_plan"]),
+        "bounded_json": canonical_json(bounded_validation.to_dict()) if bounded_validation is not None else "",
+        "baseline_run_id": bounded_validation.baseline_run_id if bounded_validation is not None else "",
+        "experiment_type": proposal.bounded.experiment_type if proposal.bounded is not None else "discovery",
+        "allowed_change_field": proposal.bounded.allowed_change_field if proposal.bounded is not None else "",
+        "campaign_id": str(campaign_meta.get("campaign_id", "") or ""),
+        "cycle_number": int(campaign_meta.get("cycle_number", 0) or 0),
+        "branch_id": str(campaign_meta.get("branch_id", "") or ""),
+        "parent_run_id": str(campaign_meta.get("parent_run_id", "") or ""),
+        "mutation_type": str(campaign_meta.get("mutation_type", "") or ""),
+        "branch_depth": int(campaign_meta.get("branch_depth", 0) or 0),
+        "decision": str(campaign_meta.get("decision", "") or ""),
     }
     existing = read_memory_table(proposal.program_id, "proposals", data_root=resolved_data_root)
     proposals = _merge_proposal_rows(existing, pd.DataFrame([proposal_row]))
@@ -122,6 +139,7 @@ def issue_proposal(
         "proposal_memory_dir": str(proposal_copy_path.parent),
         "proposal_record_path": str(paths.proposals),
         "execution": execution,
+        "bounded_validation": bounded_validation.to_dict() if bounded_validation is not None else None,
     }
 
 

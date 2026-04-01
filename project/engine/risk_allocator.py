@@ -72,6 +72,10 @@ class AllocationPolicy:
     strategy_risk_budgets: Dict[str, float] = field(default_factory=dict)
     family_risk_budgets: Dict[str, float] = field(default_factory=dict)
     strategy_family_map: Dict[str, str] = field(default_factory=dict)
+    strategy_thesis_map: Dict[str, str] = field(default_factory=dict)
+    thesis_overlap_group_map: Dict[str, str] = field(default_factory=dict)
+    overlap_group_risk_budgets: Dict[str, float] = field(default_factory=dict)
+    thesis_evidence_multipliers: Dict[str, float] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if self.mode not in {"heuristic", "deterministic_optimizer"}:
@@ -109,6 +113,22 @@ class AllocationContract:
                 "strategy_family_map": {
                     str(key): str(value)
                     for key, value in sorted(self.policy.strategy_family_map.items())
+                },
+                "strategy_thesis_map": {
+                    str(key): str(value)
+                    for key, value in sorted(self.policy.strategy_thesis_map.items())
+                },
+                "thesis_overlap_group_map": {
+                    str(key): str(value)
+                    for key, value in sorted(self.policy.thesis_overlap_group_map.items())
+                },
+                "overlap_group_risk_budgets": {
+                    str(key): float(value)
+                    for key, value in sorted(self.policy.overlap_group_risk_budgets.items())
+                },
+                "thesis_evidence_multipliers": {
+                    str(key): float(value)
+                    for key, value in sorted(self.policy.thesis_evidence_multipliers.items())
                 },
             },
             "limits": {
@@ -221,6 +241,10 @@ def build_allocation_contract(params: Mapping[str, object]) -> AllocationContrac
         strategy_risk_budgets=_coerce_budget_mapping(params.get("strategy_risk_budgets")),
         family_risk_budgets=_coerce_budget_mapping(params.get("family_risk_budgets")),
         strategy_family_map=_coerce_string_mapping(params.get("strategy_family_map")),
+        strategy_thesis_map=_coerce_string_mapping(params.get("strategy_thesis_map")),
+        thesis_overlap_group_map=_coerce_string_mapping(params.get("thesis_overlap_group_map")),
+        overlap_group_risk_budgets=_coerce_budget_mapping(params.get("overlap_group_risk_budgets")),
+        thesis_evidence_multipliers=_coerce_budget_mapping(params.get("thesis_evidence_multipliers")),
     )
     return AllocationContract(limits=limits, policy=policy)
 
@@ -263,6 +287,22 @@ def _resolve_policy_weights(
     return {str(key): float(weights.loc[key]) for key in ordered}
 
 
+def _apply_thesis_evidence_scaling(
+    requested: Dict[str, pd.Series],
+    *,
+    ordered: list[str],
+    contract: AllocationContract,
+) -> None:
+    for key in ordered:
+        thesis_id = str(contract.policy.strategy_thesis_map.get(key, "")).strip()
+        if not thesis_id:
+            continue
+        multiplier = float(contract.policy.thesis_evidence_multipliers.get(thesis_id, 1.0))
+        if abs(multiplier - 1.0) <= 1e-12:
+            continue
+        requested[key] = requested[key] * max(0.0, multiplier)
+
+
 def _apply_family_budget_caps(
     allocated: Dict[str, pd.Series],
     *,
@@ -303,6 +343,44 @@ def _apply_family_budget_caps(
             for member in members:
                 allocated[member] = allocated[member] * family_ratio
     return family_budget_hits
+
+
+def _apply_thesis_overlap_budget_caps(
+    allocated: Dict[str, pd.Series],
+    *,
+    ordered: list[str],
+    aligned_index: pd.Index,
+    contract: AllocationContract,
+    flag: callable,
+) -> Dict[str, int]:
+    overlap_hits: Dict[str, int] = {}
+    members_by_group: Dict[str, list[str]] = {}
+    for key in ordered:
+        thesis_id = str(contract.policy.strategy_thesis_map.get(key, "")).strip()
+        if not thesis_id:
+            continue
+        group = str(contract.policy.thesis_overlap_group_map.get(thesis_id, "")).strip()
+        if not group:
+            continue
+        members_by_group.setdefault(group, []).append(key)
+
+    for group, members in members_by_group.items():
+        budget = contract.policy.overlap_group_risk_budgets.get(group)
+        if budget is None:
+            continue
+        group_frame = pd.DataFrame({member: allocated[member] for member in members}, index=aligned_index)
+        group_gross = group_frame.abs().sum(axis=1)
+        safe_group_gross = group_gross.replace(0.0, np.nan)
+        group_ratio = (float(max(0.0, budget)) / safe_group_gross).where(group_gross > float(budget), 1.0)
+        group_ratio = group_ratio.replace([np.inf, -np.inf], np.nan).fillna(1.0).clip(lower=0.0, upper=1.0)
+        group_mask = group_ratio < 0.999999
+        if bool(group_mask.any()):
+            overlap_hits[group] = int(group_mask.sum())
+            flag(f"thesis_overlap_budget:{group}", group_mask)
+            flag("thesis_overlap_budget", group_mask)
+            for member in members:
+                allocated[member] = allocated[member] * group_ratio
+    return overlap_hits
 
 
 def allocate_position_scales(
@@ -388,6 +466,7 @@ def allocate_position_details(
     if resolved_contract.policy.mode == "deterministic_optimizer" and policy_weights:
         for key in ordered:
             requested[key] = requested[key] * float(policy_weights.get(key, 0.0))
+    _apply_thesis_evidence_scaling(requested, ordered=ordered, contract=resolved_contract)
 
     scale_by_strategy: Dict[str, pd.Series] = {}
     requested_gross = (
@@ -471,6 +550,13 @@ def allocate_position_details(
         allocated[key] = allocated[key] * symbol_ratio_series
 
     family_budget_hits = _apply_family_budget_caps(
+        allocated,
+        ordered=ordered,
+        aligned_index=aligned_index,
+        contract=resolved_contract,
+        flag=_flag,
+    )
+    overlap_group_budget_hits = _apply_thesis_overlap_budget_caps(
         allocated,
         ordered=ordered,
         aligned_index=aligned_index,
@@ -798,6 +884,7 @@ def allocate_position_details(
             "allocator_mode": resolved_contract.policy.mode,
             "policy_weights": policy_weights,
             "family_budget_hits": family_budget_hits,
+            "overlap_group_budget_hits": overlap_group_budget_hits,
         },
         contract=resolved_contract,
         policy_weights=policy_weights,

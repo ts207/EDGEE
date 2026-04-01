@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -17,6 +17,10 @@ class LiveTradeContext(BaseModel):
     regime_snapshot: Dict[str, Any] = Field(default_factory=dict)
     execution_env: Dict[str, Any] = Field(default_factory=dict)
     portfolio_state: Dict[str, Any] = Field(default_factory=dict)
+    active_event_families: List[str] = Field(default_factory=list)
+    active_episode_ids: List[str] = Field(default_factory=list)
+    contradiction_event_families: List[str] = Field(default_factory=list)
+    episode_snapshot: Dict[str, Any] = Field(default_factory=dict)
 
     @field_validator("timestamp", "symbol", "timeframe", "event_family", "event_side")
     @classmethod

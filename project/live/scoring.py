@@ -71,9 +71,15 @@ def build_decision_score(match: ThesisMatch, context: LiveTradeContext) -> Decis
         reasons_for.append("net_expectancy_positive")
     else:
         reasons_against.append("net_expectancy_non_positive")
+    if any(item.startswith("episode_match:") for item in reasons_for):
+        thesis_strength_score += 0.10
+    if any(item.startswith("confirmation_match:") for item in reasons_for):
+        thesis_strength_score += 0.05
 
     regime_alignment_score = 0.10 if any(item.startswith("regime_match:") for item in reasons_for) else 0.0
     contradiction_penalty = max(0.0, min(1.0, match.contradiction_penalty))
+    if any(item.startswith("confirmation_missing:") for item in reasons_against):
+        contradiction_penalty = min(1.0, contradiction_penalty + 0.05)
 
     reasons_for.extend(exec_for)
     reasons_against.extend(exec_against)

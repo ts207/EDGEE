@@ -8,7 +8,7 @@ from typing import Dict, List, Optional
 
 from project.domain.hypotheses import HypothesisSpec, TriggerSpec
 from project.domain.compiled_registry import get_domain_registry
-from project.events.governance import event_matches_filters
+from project.events.governance import event_matches_filters, get_event_governance_metadata
 from project.events.event_aliases import resolve_executable_event_alias
 from project.research.context_labels import canonicalize_context_label
 from project.research.experiment_engine_schema import (
@@ -483,6 +483,18 @@ def _resolve_requested_event_ids(
             raise ValueError(
                 f"Explicit event '{event_id}' does not satisfy requested governance filters "
                 f"tiers={sorted(tiers)} roles={sorted(operational_roles)} dispositions={sorted(deployment_dispositions)}."
+            )
+        governance = get_event_governance_metadata(event_id)
+        deployment_like_mode = str(getattr(request, "run_mode", "") or "").strip().lower() in {
+            "production",
+            "promotion",
+            "deploy",
+            "certification",
+        } or bool(getattr(getattr(request, "promotion", None), "enabled", False))
+        if deployment_like_mode and not bool(governance.get("trade_trigger_eligible", False)):
+            raise ValueError(
+                f"Explicit event '{event_id}' is not deployment eligible under current governance: "
+                f"{governance.get('promotion_block_reason', 'blocked')}"
             )
 
     ordered: list[str] = []

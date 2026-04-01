@@ -48,12 +48,14 @@ class _DummyOrderManager:
 def test_live_runner_exposes_persistent_session_metadata(tmp_path) -> None:
     snapshot_path = tmp_path / "live_session_state.json"
     report_path = tmp_path / "execution_quality.json"
+    metrics_path = tmp_path / "runtime_metrics.json"
 
     runner = LiveEngineRunner(
         ["btcusdt", "ethusdt"],
         snapshot_path=snapshot_path,
         microstructure_recovery_streak=5,
         execution_quality_report_path=report_path,
+        runtime_metrics_snapshot_path=metrics_path,
         data_manager=_DummyDataManager(),
     )
 
@@ -69,6 +71,7 @@ def test_live_runner_exposes_persistent_session_metadata(tmp_path) -> None:
     assert runner.session_metadata["execution_degradation_block_edge_bps"] == -5.0
     assert runner.session_metadata["execution_degradation_throttle_scale"] == 0.5
     assert runner.session_metadata["execution_quality_report_path"] == str(report_path)
+    assert runner.session_metadata["runtime_metrics_snapshot_path"] == str(metrics_path)
     assert runner.session_metadata["runtime_mode"] == "monitor_only"
     assert runner.session_metadata["strategy_runtime_implemented"] is False
 
@@ -1067,3 +1070,191 @@ def test_live_runner_monitor_only_processes_thesis_runtime_events(tmp_path) -> N
     assert len(outcomes) == 1
     assert outcomes[0].trade_intent.action in {"probe", "trade_small", "trade_normal"}
     assert (tmp_path / "memory" / "episodic_trades.jsonl").exists()
+
+
+def test_live_runner_refreshes_runtime_market_features_and_computes_open_interest_delta() -> None:
+    responses = iter([
+        {"funding_rate": 0.0010, "open_interest": 1000.0, "mark_price": 101.0},
+        {"funding_rate": 0.0015, "open_interest": 900.0, "mark_price": 102.0},
+    ])
+
+    async def _fetch_market_features(symbol: str):
+        assert symbol == "BTCUSDT"
+        return next(responses)
+
+    runner = LiveEngineRunner(
+        ["btcusdt"],
+        data_manager=_DummyDataManager(),
+        strategy_runtime={
+            "implemented": True,
+            "supported_event_families": ["LIQUIDATION_CASCADE"],
+        },
+        market_feature_fetcher=_fetch_market_features,
+    )
+    runner._thesis_store = object()
+
+    async def _exercise() -> None:
+        await runner._refresh_runtime_market_features_once()
+        first = runner._latest_runtime_market_features_by_symbol["BTCUSDT"]
+        assert first["funding_rate"] == pytest.approx(0.0010)
+        assert first["open_interest"] == pytest.approx(1000.0)
+        assert first["open_interest_delta_fraction"] == pytest.approx(0.0)
+
+        await runner._refresh_runtime_market_features_once()
+        second = runner._latest_runtime_market_features_by_symbol["BTCUSDT"]
+        assert second["funding_rate"] == pytest.approx(0.0015)
+        assert second["open_interest"] == pytest.approx(900.0)
+        assert second["open_interest_delta_fraction"] == pytest.approx(-0.1)
+
+        snapshot = runner._current_market_snapshot(
+            symbol="BTCUSDT",
+            timeframe="5m",
+            close=103.0,
+            timestamp="2026-04-01T00:00:00+00:00",
+            move_bps=450.0,
+        )
+        assert snapshot["funding_rate"] == pytest.approx(0.0015)
+        assert snapshot["open_interest_delta_fraction"] == pytest.approx(-0.1)
+        assert snapshot["mark_price"] == pytest.approx(102.0)
+        assert snapshot["mid_price"] == pytest.approx(102.0)
+
+    asyncio.run(_exercise())
+
+
+def test_live_runner_persists_runtime_metrics_snapshot_with_market_state_and_decisions(tmp_path) -> None:
+    thesis_dir = tmp_path / "live" / "theses" / "run_metrics"
+    thesis_dir.mkdir(parents=True, exist_ok=True)
+    (thesis_dir / "promoted_theses.json").write_text(
+        json.dumps(
+            {
+                "schema_version": "promoted_theses_v1",
+                "run_id": "run_metrics",
+                "generated_at_utc": "2026-03-30T00:00:00Z",
+                "thesis_count": 1,
+                "active_thesis_count": 1,
+                "pending_thesis_count": 0,
+                "theses": [
+                    {
+                        "thesis_id": "thesis::run_metrics::cand_1",
+                        "status": "active",
+                        "symbol_scope": {
+                            "mode": "single_symbol",
+                            "symbols": ["BTCUSDT"],
+                            "candidate_symbol": "BTCUSDT",
+                        },
+                        "timeframe": "5m",
+                        "event_family": "VOL_SHOCK",
+                        "event_side": "long",
+                        "required_context": {"symbol": "BTCUSDT", "event_type": "VOL_SHOCK"},
+                        "supportive_context": {
+                            "canonical_regime": "VOLATILITY",
+                            "has_realized_oos_path": True,
+                        },
+                        "expected_response": {"direction": "long"},
+                        "invalidation": {"metric": "adverse_proxy", "operator": ">", "value": 0.02},
+                        "risk_notes": [],
+                        "evidence": {
+                            "sample_size": 120,
+                            "validation_samples": 60,
+                            "test_samples": 60,
+                            "estimate_bps": 10.0,
+                            "net_expectancy_bps": 7.0,
+                            "q_value": 0.01,
+                            "stability_score": 0.8,
+                            "cost_survival_ratio": 1.0,
+                            "tob_coverage": 0.95,
+                            "rank_score": 1.0,
+                            "promotion_track": "deploy",
+                            "policy_version": "v1",
+                            "bundle_version": "b1",
+                        },
+                        "lineage": {
+                            "run_id": "run_metrics",
+                            "candidate_id": "cand_1",
+                            "blueprint_id": "bp_1",
+                            "hypothesis_id": "",
+                            "plan_row_id": "",
+                            "proposal_id": "",
+                        },
+                    }
+                ],
+            },
+            indent=2,
+            sort_keys=True,
+        ),
+        encoding="utf-8",
+    )
+    responses = iter([
+        {"funding_rate": 0.0010, "open_interest": 1000.0, "mark_price": 101.0},
+        {"funding_rate": 0.0015, "open_interest": 900.0, "mark_price": 102.0},
+    ])
+
+    async def _fetch_market_features(symbol: str):
+        assert symbol == "BTCUSDT"
+        return next(responses)
+
+    metrics_path = tmp_path / "runtime_metrics.json"
+    runner = LiveEngineRunner(
+        ["btcusdt"],
+        data_manager=_DummyDataManager(),
+        runtime_metrics_snapshot_path=metrics_path,
+        strategy_runtime={
+            "implemented": True,
+            "thesis_path": str(thesis_dir / "promoted_theses.json"),
+            "include_pending_theses": False,
+            "auto_submit": False,
+            "supported_event_families": ["VOL_SHOCK", "LIQUIDATION_CASCADE"],
+            "memory_root": str(tmp_path / "memory"),
+        },
+        market_feature_fetcher=_fetch_market_features,
+    )
+    runner._latest_book_ticker_by_symbol["BTCUSDT"] = {
+        "best_bid_price": 99.99,
+        "best_ask_price": 100.01,
+        "timestamp": "2026-03-30T00:04:59Z",
+    }
+
+    first = KlineEvent(
+        symbol="BTCUSDT",
+        timeframe="5m",
+        timestamp=pd.Timestamp("2026-03-30T00:00:00Z"),
+        open=100.0,
+        high=100.2,
+        low=99.8,
+        close=100.0,
+        volume=10.0,
+        quote_volume=1000.0,
+        taker_base_volume=5.0,
+        is_final=True,
+    )
+    second = KlineEvent(
+        symbol="BTCUSDT",
+        timeframe="5m",
+        timestamp=pd.Timestamp("2026-03-30T00:05:00Z"),
+        open=100.0,
+        high=101.0,
+        low=99.9,
+        close=100.6,
+        volume=20.0,
+        quote_volume=2000.0,
+        taker_base_volume=10.0,
+        is_final=True,
+    )
+
+    async def _exercise() -> None:
+        await runner._refresh_runtime_market_features_once()
+        await runner._refresh_runtime_market_features_once()
+        await runner._process_kline_for_thesis_runtime(first)
+        await runner._process_kline_for_thesis_runtime(second)
+
+    asyncio.run(_exercise())
+
+    payload = json.loads(metrics_path.read_text(encoding="utf-8"))
+    symbol_state = payload["latest_market_state_by_symbol"]["BTCUSDT"]
+    assert symbol_state["funding_rate"] == pytest.approx(0.0015)
+    assert symbol_state["open_interest"] == pytest.approx(900.0)
+    assert symbol_state["open_interest_delta_fraction"] == pytest.approx(-0.1)
+    assert payload["decision_counts"]["recent_window"] == 1
+    assert payload["decision_counts"]["by_action"]
+    assert payload["recent_decisions"][0]["symbol"] == "BTCUSDT"
+    assert payload["recent_decisions"][0]["event_family"] == "VOL_SHOCK"

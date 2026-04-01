@@ -47,6 +47,9 @@ def test_promoted_thesis_contract_model_dump() -> None:
 
     payload = thesis.model_dump()
 
+    assert payload["promotion_class"] == "paper_promoted"
+    assert payload["deployment_state"] == "paper_only"
+    assert payload["evidence_gaps"] == []
     assert payload["status"] == "active"
     assert payload["timeframe"] == "5m"
     assert payload["evidence"]["net_expectancy_bps"] == 9.0

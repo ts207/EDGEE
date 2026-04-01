@@ -17,4 +17,15 @@ __all__ = [
     "calculate_portfolio_risk_multiplier",
     "calculate_target_notional",
     "get_asset_correlation_adjustment",
+    "THESIS_OVERLAP_SCHEMA_VERSION",
+    "build_thesis_overlap_graph",
+    "overlap_group_id_for_thesis",
+    "write_thesis_overlap_artifacts",
 ]
+
+from project.portfolio.thesis_overlap import (
+    THESIS_OVERLAP_SCHEMA_VERSION,
+    build_thesis_overlap_graph,
+    overlap_group_id_for_thesis,
+    write_thesis_overlap_artifacts,
+)

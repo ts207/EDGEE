@@ -2,7 +2,7 @@
 
 Artifacts are the source of truth. Logs and summaries only matter when they reconcile with artifacts.
 
-## Read Order
+## Read order
 
 For every meaningful run, read in this order:
 
@@ -14,7 +14,9 @@ For every meaningful run, read in this order:
 
 If these disagree, the disagreement is a first-class finding.
 
-## Core Artifact Paths
+## Core artifact paths
+
+### Run and search artifacts
 
 - run manifest: `data/runs/<run_id>/run_manifest.json`
 - stage logs: `data/runs/<run_id>/*.log`
@@ -22,9 +24,22 @@ If these disagree, the disagreement is a first-class finding.
 - edge candidates: `data/reports/edge_candidates/<run_id>/`
 - event outputs: `data/reports/<detector_reports_dir>/<run_id>/`
 
-## High-Value Files
+### Thesis bootstrap and promotion artifacts
 
-Inspect these first:
+- founding queue: `docs/generated/promotion_seed_inventory.csv`
+- thesis testing scorecards: `docs/generated/thesis_testing_scorecards.csv`
+- thesis empirical scorecards: `docs/generated/thesis_empirical_scorecards.csv`
+- founding evidence bundles: `data/reports/promotions/<thesis_id>/evidence_bundles.jsonl`
+- packaging summary: `docs/generated/seed_thesis_packaging_summary.json`
+- seed thesis cards: `docs/generated/seed_thesis_cards/<THESIS_ID>.md`
+- thesis catalog: `docs/generated/seed_thesis_catalog.md`
+- thesis store index: `data/live/theses/index.json`
+- packaged thesis batch: `data/live/theses/<batch>/promoted_theses.json`
+- overlap graph: `docs/generated/thesis_overlap_graph.json`
+
+## High-value files
+
+Inspect these first for bounded experiment work:
 
 - `run_manifest.json`
 - `phase2_candidates.parquet`
@@ -33,9 +48,19 @@ Inspect these first:
 - `funnel_summary.json`
 - detector event parquet outputs
 
-## The Three Required Conclusions
+Inspect these first for thesis bootstrap work:
 
-### Mechanical Integrity
+- `promotion_seed_inventory.md`
+- `thesis_testing_summary.md`
+- `thesis_empirical_summary.md`
+- `founding_thesis_evidence_summary.md`
+- `seed_thesis_packaging_summary.md`
+- `seed_thesis_catalog.md`
+- `thesis_overlap_graph.md`
+
+## The four required conclusions
+
+### Mechanical integrity
 
 Questions:
 
@@ -46,7 +71,7 @@ Questions:
 
 Mechanical success means the system executed correctly. It does not prove edge.
 
-### Statistical Quality
+### Statistical quality
 
 Questions:
 
@@ -56,20 +81,30 @@ Questions:
 - How many died on sample size, invalid metrics, or `t_stat`?
 - What are `q_value`, after-cost expectancy, and stressed expectancy?
 
-Statistical success means there is evidence. It does not prove deployability.
+Statistical success means there is evidence. It does not prove packagability.
 
-### Deployment Relevance
+### Promotion or thesis-class relevance
 
 Questions:
 
 - Did bridge tradability pass?
 - Did robustness clear threshold?
 - Did stress survival clear threshold?
-- Is the candidate stable enough for promotion-oriented follow-up?
+- Does the evidence support only `candidate`/`tested`, or does it clear `seed_promoted` or `paper_promoted`?
 
-Deployment success means the candidate survived a stricter filter than discovery.
+Promotion success means the candidate survived a stricter filter than discovery.
 
-## Typical Failure Shapes
+### Packaging relevance
+
+Questions:
+
+- Does a canonical thesis object exist under `data/live/theses/`?
+- Does the thesis card explain trigger, invalidation, regimes, and gaps?
+- Does the overlap graph now include the thesis in a meaningful node or edge?
+
+Packaging success means downstream live and allocator surfaces can consume the result.
+
+## Typical failure shapes
 
 ### Mechanical failure
 
@@ -89,21 +124,31 @@ Examples:
 - failed FDR control
 - positive in one bucket but unsupported broadly
 
-### Deployment failure
+### Promotion failure
 
 Examples:
 
 - poor robustness across regimes
 - poor stress survival
-- microstructure risk controls failed
+- missing holdout or confounder checks
 - candidate never became bridge-tradable
 
-## Example Interpretation Pattern
+### Packaging failure
 
-Use a structure like this after every run:
+Examples:
+
+- evidence exists but no canonical thesis object was created
+- thesis class is overstated relative to evidence
+- overlap graph stays disconnected because the thesis lacks structurally related packaged peers
+- live retrieval cannot load the thesis due to missing contract fields
+
+## Example interpretation pattern
+
+Use a structure like this after every run or thesis bootstrap cycle:
 
 - mechanical: "Run completed, artifacts reconciled, postflight passed."
 - statistical: "Detector produced 128 events; 80 hypotheses were evaluated; 10 candidates survived phase 2."
-- deployment: "No candidates passed bridge because robustness and stress survival were below threshold."
+- promotion: "One thesis cleared the seed gate but not the paper gate because direct paired-event evidence is still missing."
+- packaging: "The thesis store was refreshed and the overlap graph gained two edges."
 
-That format forces you to separate pipeline health from research quality.
+That format forces you to separate pipeline health from research quality from packaging truth.

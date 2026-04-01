@@ -1,23 +1,29 @@
 # Edge
 
-Edge is a research platform for event-driven alpha discovery in crypto markets.
+Edge is a governed event-driven crypto research platform.
 
-It is built to test explicit claims under artifact, cost, and promotion discipline. The operating unit is a bounded hypothesis carried through a reproducible pipeline.
+The repository now supports the full path from:
 
-## Core Model
+`event contract -> bounded experiment -> evidence bundle -> promoted thesis -> thesis store -> overlap-aware live/runtime input`
 
-Edge turns:
+The operating unit is still a bounded hypothesis, but the downstream output is no longer just a candidate row. The repo now carries:
 
-`proposal -> validated experiment config -> planned run -> artifacted execution -> gated promotion decision -> strategy candidate / live runtime input`
+- an authoritative event contract and maturity layer
+- a canonical campaign contract
+- episode contracts and episode registry support
+- staged thesis promotion classes (`candidate`, `tested`, `seed_promoted`, `paper_promoted`, `production_promoted`)
+- a canonical thesis store under `data/live/theses/`
+- overlap-aware portfolio artifacts generated from packaged theses
 
-The platform is centered on:
+## Current Repo Model
 
-- event definitions and ontology mapping
-- canonical regimes and template legality
-- proposal-driven discovery
-- manifest-tracked pipeline execution
-- promotion gates before deployment-oriented outputs
-- replay, determinism, and artifact reconciliation checks
+Use this mental model first:
+
+1. **Event contracts** define what happened and whether it is trigger-, confirm-, context-, or research-only material.
+2. **Bounded proposals** test a single regime/mechanism slice.
+3. **Evidence bundles** decide whether a thesis is still only exploratory, seed-promotable, paper-promotable, or not promotable.
+4. **Promoted theses** are the canonical live-consumable objects.
+5. **Overlap graphs** and live retrieval consume packaged theses, not raw event rows.
 
 ## Pipeline
 
@@ -50,27 +56,27 @@ The source of truth for stage families and artifact contracts is `project/contra
 
 There are three different configuration layers:
 
-- `spec/` — YAML domain specs: events, ontology, grammar, objectives, search, runtime, templates, benchmarks, proposals
+- `spec/` — YAML domain specs: events, episodes, campaigns, promotion policies, ontology, grammar, proposals
 - `project/configs/` — runnable workflow configs, live configs, synthetic suites, registry defaults, retail profiles
 - `project/` — Python implementation
 
 High-value code surfaces:
 
-- `project/pipelines/` — pipeline entry points and orchestration
-- `project/research/` — proposal I/O, discovery, promotion, diagnostics, knowledge memory
 - `project/events/` — detectors, families, registries, ontology helpers
-- `project/strategy/` — DSL, template compatibility, executable strategy models
-- `project/live/` and `project/scripts/run_live_engine.py` — live runtime support
-- `project/reliability/` — smoke workflows, regression assertions, artifact validation
-- `project/contracts/` — stage families, artifact token contracts, schemas
+- `project/episodes/` — episode registry and episode contract loaders
+- `project/research/` — proposal I/O, discovery, promotion, diagnostics, knowledge memory, thesis bootstrap, packaging
+- `project/live/` — thesis retrieval, context building, decisioning, attribution, OMS integration
+- `project/portfolio/` and `project/engine/` — overlap-aware risk allocation and budget controls
+- `project/scripts/` — maintained artifact builders and bootstrap utilities
 - `project/tests/` — architecture, smoke, contracts, regressions, replay, runtime, docs, domain, strategy, synthetic truth
 
 ## Command Surface
 
 Installed console scripts from `pyproject.toml`:
 
-- `edge-run-all`
+- `edge`
 - `edge-backtest` (alias `backtest`)
+- `edge-run-all`
 - `edge-live-engine`
 - `edge-phase2-discovery`
 - `edge-promote`
@@ -96,9 +102,26 @@ Maintained `make` targets:
 - `make lint`
 - `make format-check`
 
+## Thesis Bootstrap Surface
+
+When the thesis store is empty or sparse, use the thesis bootstrap scripts instead of trying to jump directly to live deployment:
+
+```bash
+python -m project.scripts.build_seed_bootstrap_artifacts
+python -m project.scripts.build_seed_testing_artifacts
+python -m project.scripts.build_seed_empirical_artifacts
+python -m project.scripts.build_founding_thesis_evidence
+python -m project.scripts.build_seed_packaging_artifacts
+python -m project.scripts.build_structural_confirmation_artifacts
+python -m project.scripts.build_thesis_overlap_artifacts
+./project/scripts/regenerate_artifacts.sh
+```
+
+These surfaces produce the founding thesis queue, testing scorecards, empirical summaries, canonical thesis store, seed thesis cards, and overlap graph.
+
 ## Quality Model
 
-A run is only trustworthy when:
+A run or thesis is only trustworthy when:
 
 - manifests reconcile
 - artifacts exist and validate
@@ -106,6 +129,8 @@ A run is only trustworthy when:
 - promotion evidence is explicit
 - drift checks stay within tolerance
 - replay / determinism expectations remain intact
+- thesis packaging lineage is visible
+- promotion class and deployment state are not conflated
 
 Exit status alone is not sufficient.
 
@@ -113,21 +138,38 @@ Exit status alone is not sufficient.
 
 Do not treat hand-authored docs as live inventory.
 
-Use `docs/generated/` for current generated surfaces:
+Use `docs/generated/` for current generated surfaces, especially:
 
-- `detector_coverage.{md,json}`
-- `ontology_audit.json`
-- `event_ontology_audit.{md,json}`
-- `regime_routing_audit.{md,json}`
-- `architecture_metrics.json`
+- `event_contract_completeness.{md,json}`
+- `event_tiers.md`
+- `promotion_seed_inventory.{md,csv}`
+- `thesis_testing_scorecards.{csv,json}`
+- `thesis_empirical_scorecards.{csv,json}`
+- `seed_thesis_catalog.md`
+- `seed_thesis_packaging_summary.{md,json}`
+- `thesis_overlap_graph.{md,json}`
+- `founding_thesis_evidence_summary.{md,json}`
+- `structural_confirmation_summary.{md,json}`
+
+## Canonical operator flow
+
+- `edge operator preflight --proposal <proposal.yaml>`
+- `edge operator plan --proposal <proposal.yaml>`
+- `edge operator run --proposal <proposal.yaml>`
+- `edge operator diagnose --run_id <run_id>`
+- `edge operator regime-report --run_id <run_id>`
+- `edge operator compare --run_ids <baseline_run,followup_run>`
+
+Use the bootstrap scripts only when you are moving from tested claims into canonical thesis objects.
 
 ## Documentation
 
 - [docs/README.md](docs/README.md) — full doc index
-- [docs/03_OPERATOR_WORKFLOW.md](docs/03_OPERATOR_WORKFLOW.md) — canonical research loop
+- [docs/03_OPERATOR_WORKFLOW.md](docs/03_OPERATOR_WORKFLOW.md) — canonical research loop + thesis bootstrap lane
 - [docs/04_COMMANDS_AND_ENTRY_POINTS.md](docs/04_COMMANDS_AND_ENTRY_POINTS.md) — command reference
-- [docs/06_QUALITY_GATES_AND_PROMOTION.md](docs/06_QUALITY_GATES_AND_PROMOTION.md) — gate policy
-- [docs/08_TESTING_AND_MAINTENANCE.md](docs/08_TESTING_AND_MAINTENANCE.md) — test and maintenance commands
+- [docs/06_QUALITY_GATES_AND_PROMOTION.md](docs/06_QUALITY_GATES_AND_PROMOTION.md) — gate policy + promotion classes
+- [docs/09_THESIS_BOOTSTRAP_AND_PROMOTION.md](docs/09_THESIS_BOOTSTRAP_AND_PROMOTION.md) — founding thesis workflow
+- [docs/11_LIVE_THESIS_STORE_AND_OVERLAP.md](docs/11_LIVE_THESIS_STORE_AND_OVERLAP.md) — packaged thesis store + overlap graph
 - [docs/AGENT_CONTRACT.md](docs/AGENT_CONTRACT.md) — agent operating contract
 
 ## Fast synthetic demo

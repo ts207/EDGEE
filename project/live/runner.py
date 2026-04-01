@@ -42,7 +42,9 @@ class LiveEngineRunner:
         account_sync_interval_seconds: float = 30.0,
         account_sync_failure_threshold: int = 3,
         account_snapshot_fetcher: Callable[[], Awaitable[Dict[str, Any]]] | None = None,
+        market_feature_fetcher: Callable[[str], Awaitable[Dict[str, Any]]] | None = None,
         execution_quality_report_path: str | Path | None = None,
+        runtime_metrics_snapshot_path: str | Path | None = None,
         execution_degradation_min_samples: int = 3,
         execution_degradation_warn_edge_bps: float = 0.0,
         execution_degradation_block_edge_bps: float = -5.0,
@@ -78,11 +80,17 @@ class LiveEngineRunner:
             )
         self.data_manager = data_manager
         self.order_manager = order_manager or OrderManager(exchange_client=self.rest_client)
+        self.runtime_mode = str(runtime_mode or "monitor_only").strip().lower()
+        self.strategy_runtime = dict(strategy_runtime or {})
         self.execution_quality_report_path = (
             Path(execution_quality_report_path)
             if execution_quality_report_path is not None
             else None
         )
+        metrics_path = runtime_metrics_snapshot_path or self.strategy_runtime.get(
+            "runtime_metrics_snapshot_path"
+        )
+        self.runtime_metrics_snapshot_path = Path(metrics_path) if metrics_path else None
         self.account_sync_interval_seconds = max(1.0, float(account_sync_interval_seconds))
         self.account_sync_failure_threshold = max(1, int(account_sync_failure_threshold))
         self.execution_degradation_min_samples = max(1, int(execution_degradation_min_samples))
@@ -98,8 +106,8 @@ class LiveEngineRunner:
         self.reconcile_at_startup = bool(reconcile_at_startup)
         self.account_snapshot_fetcher = account_snapshot_fetcher
         self.account_sync_failure_count = 0
-        self.runtime_mode = str(runtime_mode or "monitor_only").strip().lower()
-        self.strategy_runtime = dict(strategy_runtime or {})
+        self.market_feature_fetcher = market_feature_fetcher or self._fetch_runtime_market_features_from_rest
+        self.market_feature_poll_interval_seconds = max(5.0, float(self.strategy_runtime.get("market_feature_poll_interval_seconds", 30.0) or 30.0))
         if order_manager is None and self.runtime_mode != "trading":
             self.order_manager = OrderManager()
 
@@ -107,6 +115,7 @@ class LiveEngineRunner:
         self.incubation_ledger = IncubationLedger(PROJECT_ROOT / "live" / "incubation_ledger.json")
 
         self._latest_book_ticker_by_symbol: Dict[str, Dict[str, Any]] = {}
+        self._latest_runtime_market_features_by_symbol: Dict[str, Dict[str, Any]] = {}
         self._latest_final_kline_by_key: Dict[tuple[str, str], Dict[str, Any]] = {}
         self._decision_outcomes: List[DecisionOutcome] = []
         self._auto_order_sequence = 0
@@ -130,6 +139,7 @@ class LiveEngineRunner:
             "kill_switch_recovery_streak": int(self.kill_switch.microstructure_recovery_streak),
             "account_sync_interval_seconds": float(self.account_sync_interval_seconds),
             "account_sync_failure_threshold": int(self.account_sync_failure_threshold),
+            "market_feature_poll_interval_seconds": float(self.market_feature_poll_interval_seconds),
             "execution_degradation_min_samples": int(self.execution_degradation_min_samples),
             "execution_degradation_warn_edge_bps": float(self.execution_degradation_warn_edge_bps),
             "execution_degradation_block_edge_bps": float(
@@ -141,6 +151,11 @@ class LiveEngineRunner:
             "execution_quality_report_path": (
                 str(self.execution_quality_report_path)
                 if self.execution_quality_report_path is not None
+                else ""
+            ),
+            "runtime_metrics_snapshot_path": (
+                str(self.runtime_metrics_snapshot_path)
+                if self.runtime_metrics_snapshot_path is not None
                 else ""
             ),
             "runtime_mode": self.runtime_mode,
@@ -156,6 +171,97 @@ class LiveEngineRunner:
         if not memory_root:
             return None
         return Path(memory_root)
+
+    def _serialize_recent_decision(self, outcome: DecisionOutcome) -> Dict[str, Any]:
+        top_match = outcome.ranked_matches[0] if outcome.ranked_matches else None
+        thesis = top_match.thesis if top_match is not None else None
+        return {
+            "timestamp": str(outcome.context.timestamp),
+            "symbol": str(outcome.context.symbol),
+            "event_family": str(outcome.context.event_family),
+            "event_side": str(outcome.context.event_side),
+            "action": str(outcome.trade_intent.action),
+            "thesis_id": str(outcome.trade_intent.thesis_id),
+            "support_score": float(outcome.trade_intent.support_score),
+            "contradiction_penalty": float(outcome.trade_intent.contradiction_penalty),
+            "confidence_band": str(outcome.trade_intent.confidence_band),
+            "match_count": int(len(outcome.ranked_matches)),
+            "top_thesis_net_expectancy_bps": float(
+                thesis.evidence.net_expectancy_bps if thesis is not None else 0.0
+            ),
+        }
+
+    def _latest_market_state_by_symbol(self) -> Dict[str, Dict[str, Any]]:
+        payload: Dict[str, Dict[str, Any]] = {}
+        for symbol in sorted({str(s).upper() for s in self.symbols}):
+            ticker = dict(self._latest_book_ticker_by_symbol.get(symbol, {}))
+            runtime = dict(self._latest_runtime_market_features_by_symbol.get(symbol, {}))
+            payload[symbol] = {
+                "best_bid_price": float(ticker.get("best_bid_price", 0.0) or 0.0),
+                "best_ask_price": float(ticker.get("best_ask_price", 0.0) or 0.0),
+                "ticker_timestamp": str(ticker.get("timestamp", "") or ""),
+                "funding_rate": float(runtime.get("funding_rate", 0.0) or 0.0),
+                "funding_timestamp": str(runtime.get("funding_timestamp", "") or ""),
+                "open_interest": float(runtime.get("open_interest", 0.0) or 0.0),
+                "open_interest_delta_fraction": float(
+                    runtime.get("open_interest_delta_fraction", 0.0) or 0.0
+                ),
+                "open_interest_timestamp": str(
+                    runtime.get("open_interest_timestamp", "") or ""
+                ),
+                "mark_price": float(runtime.get("mark_price", 0.0) or 0.0),
+            }
+        return payload
+
+    def runtime_metrics_snapshot(self) -> Dict[str, Any]:
+        recent_outcomes = list(self._decision_outcomes[-20:])
+        action_counts: Dict[str, int] = {}
+        symbol_counts: Dict[str, int] = {}
+        for outcome in recent_outcomes:
+            action = str(outcome.trade_intent.action)
+            symbol = str(outcome.context.symbol)
+            action_counts[action] = int(action_counts.get(action, 0)) + 1
+            symbol_counts[symbol] = int(symbol_counts.get(symbol, 0)) + 1
+        account = self.state_store.account
+        health = self.health_monitor.check_health()
+        return {
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "runtime_mode": self.runtime_mode,
+            "strategy_runtime_enabled": bool(self._strategy_runtime_enabled()),
+            "thesis_runtime_loaded": bool(self._thesis_store is not None),
+            "thesis_count_loaded": len(self._thesis_store.all()) if self._thesis_store is not None else 0,
+            "symbols": list(self.symbols),
+            "kill_switch": self.state_store.get_kill_switch_snapshot(),
+            "account": {
+                "wallet_balance": float(account.wallet_balance),
+                "margin_balance": float(account.margin_balance),
+                "available_balance": float(account.available_balance),
+                "total_unrealized_pnl": float(account.total_unrealized_pnl),
+                "exchange_status": str(account.exchange_status),
+                "position_count": int(len(account.positions)),
+                "update_time": account.update_time.isoformat(),
+            },
+            "health": health,
+            "execution_quality_summary": self.execution_quality_summary(),
+            "latest_market_state_by_symbol": self._latest_market_state_by_symbol(),
+            "decision_counts": {
+                "recent_window": int(len(recent_outcomes)),
+                "by_action": action_counts,
+                "by_symbol": symbol_counts,
+            },
+            "recent_decisions": [self._serialize_recent_decision(outcome) for outcome in recent_outcomes],
+        }
+
+    def persist_runtime_metrics_snapshot(self) -> Path | None:
+        if self.runtime_metrics_snapshot_path is None:
+            return None
+        target = self.runtime_metrics_snapshot_path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(
+            json.dumps(self.runtime_metrics_snapshot(), indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        return target
 
     def _load_thesis_store(self) -> ThesisStore | None:
         thesis_path = str(self.strategy_runtime.get("thesis_path", "")).strip()
@@ -421,6 +527,125 @@ class LiveEngineRunner:
             "exchange_status": str(self.state_store.account.exchange_status),
         }
 
+    def _supported_event_families(self) -> List[str]:
+        configured = self.strategy_runtime.get("supported_event_families", ["VOL_SHOCK"])
+        if not isinstance(configured, list):
+            return ["VOL_SHOCK"]
+        values = [str(item).strip().upper() for item in configured if str(item).strip()]
+        return values or ["VOL_SHOCK"]
+
+    def _requires_runtime_market_features(self) -> bool:
+        return self._strategy_runtime_enabled() and "LIQUIDATION_CASCADE" in set(self._supported_event_families())
+
+    async def _fetch_runtime_market_features_from_rest(self, symbol: str) -> Dict[str, Any]:
+        if self.rest_client is None:
+            return {}
+        premium_payload: Dict[str, Any] | None = None
+        open_interest_payload: Dict[str, Any] | None = None
+        premium_task = asyncio.create_task(self.rest_client.get_premium_index(symbol))
+        open_interest_task = asyncio.create_task(self.rest_client.get_open_interest(symbol))
+        premium_result, open_interest_result = await asyncio.gather(
+            premium_task, open_interest_task, return_exceptions=True
+        )
+        if isinstance(premium_result, Exception):
+            _LOG.debug("Runtime premium-index fetch failed for %s: %s", symbol, premium_result)
+        elif isinstance(premium_result, dict):
+            premium_payload = premium_result
+        elif isinstance(premium_result, list) and premium_result:
+            first = premium_result[0]
+            if isinstance(first, dict):
+                premium_payload = first
+        if isinstance(open_interest_result, Exception):
+            _LOG.debug("Runtime open-interest fetch failed for %s: %s", symbol, open_interest_result)
+        elif isinstance(open_interest_result, dict):
+            open_interest_payload = open_interest_result
+
+        snapshot: Dict[str, Any] = {}
+        if premium_payload is not None:
+            snapshot["funding_rate"] = float(premium_payload.get("lastFundingRate", 0.0) or 0.0)
+            snapshot["mark_price"] = float(premium_payload.get("markPrice", 0.0) or 0.0)
+            premium_ts = premium_payload.get("time") or premium_payload.get("nextFundingTime")
+            if premium_ts is not None:
+                try:
+                    snapshot["funding_timestamp"] = datetime.fromtimestamp(
+                        float(premium_ts) / 1000.0, tz=timezone.utc
+                    ).isoformat()
+                except Exception:
+                    snapshot["funding_timestamp"] = str(premium_ts)
+        if open_interest_payload is not None:
+            snapshot["open_interest"] = float(open_interest_payload.get("openInterest", 0.0) or 0.0)
+            oi_ts = open_interest_payload.get("time")
+            if oi_ts is not None:
+                try:
+                    snapshot["open_interest_timestamp"] = datetime.fromtimestamp(
+                        float(oi_ts) / 1000.0, tz=timezone.utc
+                    ).isoformat()
+                except Exception:
+                    snapshot["open_interest_timestamp"] = str(oi_ts)
+        return snapshot
+
+    async def _refresh_runtime_market_features_once(self) -> None:
+        if self.market_feature_fetcher is None or not self._requires_runtime_market_features():
+            return
+        for symbol in self.symbols:
+            normalized = str(symbol).upper()
+            try:
+                raw = await self.market_feature_fetcher(normalized)
+            except Exception as exc:
+                _LOG.debug("Runtime market-feature refresh failed for %s: %s", normalized, exc)
+                continue
+            if not isinstance(raw, Mapping):
+                continue
+            previous = dict(self._latest_runtime_market_features_by_symbol.get(normalized, {}))
+            merged = dict(previous)
+            merged.update(dict(raw))
+            open_interest = raw.get("open_interest")
+            if open_interest is not None:
+                try:
+                    current_oi = float(open_interest)
+                except Exception:
+                    current_oi = None
+                previous_oi = previous.get("open_interest")
+                delta_fraction = raw.get("open_interest_delta_fraction")
+                if delta_fraction is None and current_oi is not None:
+                    try:
+                        previous_oi_f = float(previous_oi) if previous_oi is not None else None
+                    except Exception:
+                        previous_oi_f = None
+                    if previous_oi_f is not None and abs(previous_oi_f) > 0.0:
+                        delta_fraction = (current_oi - previous_oi_f) / abs(previous_oi_f)
+                    else:
+                        delta_fraction = 0.0
+                if delta_fraction is not None:
+                    try:
+                        merged["open_interest_delta_fraction"] = float(delta_fraction)
+                    except Exception:
+                        pass
+                if current_oi is not None:
+                    merged["open_interest"] = float(current_oi)
+            if "funding_rate" in merged:
+                try:
+                    merged["funding_rate"] = float(merged.get("funding_rate", 0.0) or 0.0)
+                except Exception:
+                    merged["funding_rate"] = 0.0
+            if "mark_price" in merged:
+                try:
+                    merged["mark_price"] = float(merged.get("mark_price", 0.0) or 0.0)
+                except Exception:
+                    merged["mark_price"] = 0.0
+            self._latest_runtime_market_features_by_symbol[normalized] = merged
+        self.persist_runtime_metrics_snapshot()
+
+    async def _poll_runtime_market_features(self) -> None:
+        while self._running:
+            try:
+                await self._refresh_runtime_market_features_once()
+            except asyncio.CancelledError:
+                break
+            except Exception as exc:
+                _LOG.error("Error polling runtime market features: %s", exc)
+            await asyncio.sleep(self.market_feature_poll_interval_seconds)
+
     def _current_market_snapshot(
         self,
         *,
@@ -430,25 +655,36 @@ class LiveEngineRunner:
         timestamp: str,
         move_bps: float,
     ) -> Dict[str, Any]:
-        ticker = self._latest_book_ticker_by_symbol.get(str(symbol).upper(), {})
+        normalized_symbol = str(symbol).upper()
+        ticker = self._latest_book_ticker_by_symbol.get(normalized_symbol, {})
+        runtime_features = dict(self._latest_runtime_market_features_by_symbol.get(normalized_symbol, {}))
         bid = float(ticker.get("best_bid_price", 0.0) or 0.0)
         ask = float(ticker.get("best_ask_price", 0.0) or 0.0)
         spread_bps = 0.0
         mid_price = float(close)
+        mark_price = float(runtime_features.get("mark_price", 0.0) or 0.0)
         if bid > 0.0 and ask > 0.0:
             mid_price = (bid + ask) / 2.0
             spread_bps = ((ask - bid) / mid_price) * 10_000.0 if mid_price > 0.0 else 0.0
+        elif mark_price > 0.0:
+            mid_price = mark_price
         return {
             "timestamp": str(timestamp),
             "close": float(close),
             "last_price": float(close),
             "mid_price": float(mid_price),
+            "mark_price": float(mark_price or close),
             "spread_bps": float(spread_bps),
             "depth_usd": float(self.strategy_runtime.get("default_depth_usd", 50_000.0) or 50_000.0),
             "tob_coverage": float(self.strategy_runtime.get("default_tob_coverage", 0.95) or 0.95),
             "canonical_regime": "VOLATILITY" if abs(move_bps) >= 80.0 else "TRANSITION",
             "microstructure_regime": "healthy" if spread_bps <= 5.0 else "degraded",
             "expected_cost_bps": float(self.strategy_runtime.get("default_expected_cost_bps", 3.0) or 3.0),
+            "funding_rate": float(runtime_features.get("funding_rate", 0.0) or 0.0),
+            "funding_timestamp": str(runtime_features.get("funding_timestamp", "") or ""),
+            "open_interest": float(runtime_features.get("open_interest", 0.0) or 0.0),
+            "open_interest_delta_fraction": float(runtime_features.get("open_interest_delta_fraction", 0.0) or 0.0),
+            "open_interest_timestamp": str(runtime_features.get("open_interest_timestamp", "") or ""),
         }
 
     def _record_live_decision_episode(self, outcome: DecisionOutcome) -> None:
@@ -459,6 +695,8 @@ class LiveEngineRunner:
             "symbol": outcome.context.symbol,
             "event_family": outcome.context.event_family,
             "event_side": outcome.context.event_side,
+            "active_event_families": list(outcome.context.active_event_families),
+            "active_episode_ids": list(outcome.context.active_episode_ids),
             "action": outcome.trade_intent.action,
             "thesis_id": outcome.trade_intent.thesis_id,
             "support_score": float(outcome.trade_intent.support_score),
@@ -543,14 +781,25 @@ class LiveEngineRunner:
 
         prior = self._latest_final_kline_by_key.get((symbol, timeframe))
         previous_close = float(prior.get("close", 0.0) or 0.0) if prior else None
-        supported = self.strategy_runtime.get("supported_event_families", ["VOL_SHOCK"])
+        supported = self._supported_event_families()
+        provisional_move_bps = 0.0
+        if previous_close is not None and previous_close > 0.0:
+            provisional_move_bps = ((float(close) / float(previous_close)) - 1.0) * 10_000.0
+        market_state = self._current_market_snapshot(
+            symbol=symbol,
+            timeframe=timeframe,
+            close=close,
+            timestamp=str(timestamp),
+            move_bps=float(provisional_move_bps),
+        )
         detector = detect_live_event(
             symbol=symbol,
             timeframe=timeframe,
             current_close=close,
             previous_close=previous_close,
             volume=volume,
-            supported_event_families=supported if isinstance(supported, list) else ["VOL_SHOCK"],
+            market_features=market_state,
+            supported_event_families=supported,
             detector_config=self.strategy_runtime.get("event_detector", {}),
         )
         self._latest_final_kline_by_key[(symbol, timeframe)] = {
@@ -560,13 +809,7 @@ class LiveEngineRunner:
         if detector is None:
             return
 
-        market_state = self._current_market_snapshot(
-            symbol=symbol,
-            timeframe=timeframe,
-            close=close,
-            timestamp=str(timestamp),
-            move_bps=float(detector.features.get("move_bps", 0.0) or 0.0),
-        )
+        market_state = market_state | dict(detector.features)
         context = build_live_trade_context(
             timestamp=str(timestamp),
             symbol=symbol,
@@ -586,6 +829,7 @@ class LiveEngineRunner:
         self._decision_outcomes = self._decision_outcomes[-100:]
         self._record_live_decision_episode(outcome)
         await self._submit_trade_intent_if_enabled(outcome=outcome, market_state=market_state)
+        self.persist_runtime_metrics_snapshot()
 
     def on_order_fill(self, client_order_id: str, fill_qty: float, fill_price: float) -> None:
         self.order_manager.on_fill(client_order_id, fill_qty=fill_qty, fill_price=fill_price)
@@ -607,6 +851,7 @@ class LiveEngineRunner:
                 )
                 break
         self.persist_execution_quality_report()
+        self.persist_runtime_metrics_snapshot()
 
     def execution_quality_summary(self) -> Dict[str, float]:
         return self.order_manager.summarize_execution_quality()
@@ -623,6 +868,18 @@ class LiveEngineRunner:
             ),
             "by_strategy": summarize_execution_attribution_by(
                 self.order_manager.execution_attribution, "strategy"
+            ),
+            "by_thesis_id": summarize_execution_attribution_by(
+                self.order_manager.execution_attribution, "thesis_id"
+            ),
+            "by_overlap_group_id": summarize_execution_attribution_by(
+                self.order_manager.execution_attribution, "overlap_group_id"
+            ),
+            "by_governance_tier": summarize_execution_attribution_by(
+                self.order_manager.execution_attribution, "governance_tier"
+            ),
+            "by_operational_role": summarize_execution_attribution_by(
+                self.order_manager.execution_attribution, "operational_role"
             ),
             "by_volatility_regime": summarize_execution_attribution_by(
                 self.order_manager.execution_attribution, "volatility_regime"
@@ -675,10 +932,17 @@ class LiveEngineRunner:
         # Start the data ingestion manager
         await self.data_manager.start()
 
+        # Prime runtime market features before the first decision cycle when required.
+        if self._requires_runtime_market_features():
+            await self._refresh_runtime_market_features_once()
+        self.persist_runtime_metrics_snapshot()
+
         # Start consumers
         self._tasks.append(asyncio.create_task(self._consume_klines()))
         self._tasks.append(asyncio.create_task(self._consume_tickers()))
         self._tasks.append(asyncio.create_task(self._monitor_data_health()))
+        if self._requires_runtime_market_features():
+            self._tasks.append(asyncio.create_task(self._poll_runtime_market_features()))
         if self.account_snapshot_fetcher is not None:
             self._tasks.append(asyncio.create_task(self._sync_account_state()))
 
@@ -712,6 +976,7 @@ class LiveEngineRunner:
                 await self.order_manager.close()
             except Exception as exc:
                 _LOG.error("Failed to close order manager during shutdown: %s", exc)
+        self.persist_runtime_metrics_snapshot()
 
     def _on_kill_switch_triggered(self, reason: KillSwitchReason, message: str) -> None:
         self._running = False
@@ -739,6 +1004,7 @@ class LiveEngineRunner:
                 await self.order_manager.flatten_all_positions(self.state_store)
         except Exception as exc:
             _LOG.error("Kill-switch actuation failed: %s", exc)
+        self.persist_runtime_metrics_snapshot()
 
     async def _consume_klines(self):
         while self._running:
@@ -787,6 +1053,7 @@ class LiveEngineRunner:
                 if isinstance(snapshot, dict):
                     self.state_store.update_from_exchange_snapshot(snapshot)
                     self.account_sync_failure_count = 0
+                    self.persist_runtime_metrics_snapshot()
             except asyncio.CancelledError:
                 break
             except Exception as e:

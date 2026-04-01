@@ -14,6 +14,7 @@ import pandas as pd
 from project.core.config import load_configs
 from project.io.utils import (
     choose_partition_dir,
+    resolve_raw_dataset_dir,
     ensure_dir,
     list_parquet_files,
     read_parquet,
@@ -255,27 +256,26 @@ def main() -> int:
 
     try:
         for symbol in symbols:
-            raw_dir_candidates = [
-                run_scoped_lake_path(
-                    data_root, run_id, "raw", "binance", market, symbol, ohlcv_dataset
-                ),
-                data_root / "lake" / "raw" / "binance" / market / symbol / ohlcv_dataset,
-            ]
-            raw_dir = choose_partition_dir(raw_dir_candidates)
-            raw_files = list_parquet_files(raw_dir)
+            raw_dir = resolve_raw_dataset_dir(
+                data_root,
+                market=market,
+                symbol=symbol,
+                dataset=ohlcv_dataset,
+                run_id=run_id,
+            )
+            raw_files = list_parquet_files(raw_dir) if raw_dir else []
 
             # Accept both "funding" (new ingest) and "fundingRate" (legacy ingest path)
             funding_files: list = []
             funding_dir = None
             if market == "perp":
                 for _subdir in ("funding", "fundingRate"):
-                    _candidate = choose_partition_dir(
-                        [
-                            run_scoped_lake_path(
-                                data_root, run_id, "raw", "binance", market, symbol, _subdir
-                            ),
-                            data_root / "lake" / "raw" / "binance" / market / symbol / _subdir,
-                        ]
+                    _candidate = resolve_raw_dataset_dir(
+                        data_root,
+                        market=market,
+                        symbol=symbol,
+                        dataset=_subdir,
+                        run_id=run_id,
                     )
                     _files = list_parquet_files(_candidate)
                     if _files:

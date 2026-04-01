@@ -1,8 +1,8 @@
 # Agent Operating Contract
 
-## Allowed Actions
+## Allowed actions
 
-- Read and query only the repository-defined research surfaces before proposing work:
+- Read and query only the repository-defined research and packaging surfaces before proposing work:
   - `project.domain.compiled_registry`
   - `project.research.regime_routing`
   - `project.research.agent_io.*`
@@ -11,14 +11,18 @@
   - `project.research.services.*`
   - `project.research.knowledge.query`
   - `project.research.search_intelligence`
-- Create or update bounded proposal files, review files, scorecards, and run notes.
+  - `project.research.seed_*`
+  - `project.research.thesis_evidence_runner`
+  - `project.research.live_export`
+  - `project.portfolio.thesis_overlap`
+- Create or update bounded proposal files, review files, scorecards, run notes, bootstrap artifacts, and thesis evidence artifacts.
 - Run `project.research.agent_io.proposal_to_experiment`, `project.research.agent_io.issue_proposal`, and `project.research.agent_io.execute_proposal`.
 - Run one regime-scoped experiment at a time.
 - Compare a new run only against a directly relevant prior run using `project/scripts/compare_research_runs.py`.
 - Make local fixes only when they are narrow, contract-preserving, and directly necessary to recover the bounded loop.
 - Add or tighten tests covering the exact surface touched by a local fix.
 
-## Forbidden Actions
+## Forbidden actions
 
 - Editing canonical ontology, routing, or contract surfaces without explicit human approval:
   - `spec/events/event_registry_unified.yaml`
@@ -33,9 +37,11 @@
 - Relaxing promotion thresholds, cost assumptions, sample-quality floors, or multiplicity controls to rescue a weak hypothesis.
 - Running broad searches across multiple unrelated regimes in one experiment.
 - Conflating research evidence with executable-strategy truth or with live-readiness.
+- Promoting `seed_promoted` or `paper_promoted` theses as if they were automatically production-ready.
+- Treating derived bridge evidence as if it were equivalent to direct paired-event evidence.
 - Performing uncontrolled refactors, compatibility-layer rewrites, or large pipeline changes during routine research.
 
-## Bounded Hypothesis Definition
+## Bounded hypothesis definition
 
 A bounded hypothesis must state exactly:
 
@@ -59,7 +65,7 @@ Invalid bounded hypothesis examples:
 - "Search all dislocations and all templates."
 - "Use the model to predict returns regardless of regime."
 
-## Valid Regime-Scoped Experiment Definition
+## Valid regime-scoped experiment definition
 
 A valid autonomous experiment is one that:
 
@@ -71,7 +77,7 @@ A valid autonomous experiment is one that:
 - writes canonical artifacts under the run-scoped paths used by `project.research.services.pathing`,
 - ends with an explicit keep/modify/kill decision.
 
-## Artifact Obligations For Every Run
+## Artifact obligations for every run
 
 Every autonomous run must produce and review:
 
@@ -85,7 +91,19 @@ Every autonomous run must produce and review:
 
 If promotion is intentionally disabled, the run is not valid for the default autonomous loop and must be marked exploratory-only.
 
-## When Local Fixes Are Allowed
+## Additional artifact obligations for thesis bootstrap work
+
+When the task is thesis bootstrapping rather than raw run execution, the agent must review and update the relevant generated artifacts:
+
+- `docs/generated/promotion_seed_inventory.*`
+- `docs/generated/thesis_testing_scorecards.*`
+- `docs/generated/thesis_empirical_scorecards.*`
+- `data/reports/promotions/<thesis_id>/evidence_bundles.jsonl` for any thesis receiving direct evidence updates
+- `docs/generated/seed_thesis_packaging_summary.*`
+- `data/live/theses/index.json` and packaged thesis batches when packaging changes
+- `docs/generated/thesis_overlap_graph.*` after packaged-thesis changes
+
+## When local fixes are allowed
 
 The agent may propose and implement a local fix only when all of the following are true:
 
@@ -99,10 +117,10 @@ Examples of allowed local fixes:
 
 - repair missing lineage columns in a report writer,
 - add a targeted regression test for proposal parsing or artifact metadata,
-- fix a smoke fixture that drifted from canonical contracts,
+- fix a bootstrap artifact builder that drifted from canonical contracts,
 - add review templates or verification automation.
 
-## Escalate To Human Immediately When
+## Escalate to human immediately when
 
 - the required fix touches any forbidden contract surface listed above,
 - the hypothesis requires a new ontology element, detector, or template,
@@ -112,11 +130,17 @@ Examples of allowed local fixes:
 - the claim would require engine or execution-model reinterpretation,
 - the agent cannot explain the mechanism in regime terms.
 
-## Verification Obligations
+## Verification obligations
 
 After any code or config change, run the contract block defined in `researcher_verification.md`.
 
 After any bounded experiment, run the experiment block defined in `researcher_verification.md`.
+
+If the task touched thesis bootstrap or packaging surfaces, also run targeted tests for:
+
+- bootstrap inventory generation
+- empirical mapping or evidence generation if touched
+- packaging or overlap graph generation if touched
 
 If verification fails:
 
@@ -125,11 +149,17 @@ If verification fails:
 - classify the issue as `repair` or `kill`,
 - do not continue with additional experiments until the failure is resolved or escalated.
 
-## Valid Edge Claim Standard
+## Valid edge claim standard
 
 A valid edge claim must be phrased as:
 
-"Within canonical regime `<regime>`, trigger family `<event/state>`, template `<template>`, symbol scope `<symbols>`, timeframe `<timeframe>`, and horizon `<horizon>`, the mechanism `<mechanism>` shows evidence of after-cost and stressed survivability under the repository’s research gates, with no contract or artifact contradictions."
+"Within canonical regime `<regime>`, trigger family `<event/state/episode>`, template `<template>` or thesis clause set, symbol scope `<symbols>`, timeframe `<timeframe>`, and horizon `<horizon>`, the mechanism `<mechanism>` shows evidence of after-cost and stressed survivability under the repository’s research gates, with no contract or artifact contradictions."
+
+A valid packaged-thesis claim must additionally state:
+
+- promotion class
+- deployment state
+- major evidence gap if the thesis is only `seed_promoted`
 
 A valid edge claim must never be phrased as:
 
@@ -138,7 +168,7 @@ A valid edge claim must never be phrased as:
 - deployment readiness based only on discovery or backtest output,
 - live-readiness without separate execution and canary evidence.
 
-## Keep / Modify / Kill Standards
+## Keep / modify / kill standards
 
 - `keep`
   - mechanism survives cost-aware review,

@@ -17,6 +17,11 @@ class ExecutionAttributionRecord:
     client_order_id: str
     symbol: str
     strategy: str
+    thesis_id: str
+    overlap_group_id: str
+    governance_tier: str
+    operational_role: str
+    active_episode_ids: List[str]
     volatility_regime: str
     microstructure_regime: str
     side: str
@@ -41,6 +46,11 @@ def build_execution_attribution_record(
     client_order_id: str,
     symbol: str,
     strategy: str,
+    thesis_id: str = "",
+    overlap_group_id: str = "",
+    governance_tier: str = "",
+    operational_role: str = "",
+    active_episode_ids: List[str] | None = None,
     volatility_regime: str,
     microstructure_regime: str,
     side: str,
@@ -70,6 +80,11 @@ def build_execution_attribution_record(
         client_order_id=str(client_order_id),
         symbol=str(symbol).upper(),
         strategy=str(strategy),
+        thesis_id=str(thesis_id),
+        overlap_group_id=str(overlap_group_id),
+        governance_tier=str(governance_tier),
+        operational_role=str(operational_role),
+        active_episode_ids=[str(item).strip().upper() for item in (active_episode_ids or []) if str(item).strip()],
         volatility_regime=str(volatility_regime),
         microstructure_regime=str(microstructure_regime),
         side=side_norm,
@@ -100,6 +115,8 @@ def summarize_execution_attribution(records: List[ExecutionAttributionRecord]) -
             "avg_realized_fee_bps": 0.0,
             "avg_realized_slippage_bps": 0.0,
             "win_rate_vs_expected_edge": 0.0,
+            "overlap_group_count": 0.0,
+            "episode_count": 0.0,
         }
 
     count = float(len(records))
@@ -109,6 +126,8 @@ def summarize_execution_attribution(records: List[ExecutionAttributionRecord]) -
     fees = [float(item.realized_fee_bps) for item in records]
     slippage = [float(item.realized_slippage_bps) for item in records]
     wins = sum(1 for item in records if item.realized_net_edge_bps >= 0.0)
+    overlap_group_count = len({str(item.overlap_group_id).strip() for item in records if str(item.overlap_group_id).strip()})
+    episode_count = len({episode for item in records for episode in item.active_episode_ids})
     return {
         "fills": count,
         "avg_expected_net_edge_bps": sum(expected_net) / count,
@@ -117,6 +136,8 @@ def summarize_execution_attribution(records: List[ExecutionAttributionRecord]) -
         "avg_realized_fee_bps": sum(fees) / count,
         "avg_realized_slippage_bps": sum(slippage) / count,
         "win_rate_vs_expected_edge": wins / count,
+        "overlap_group_count": float(overlap_group_count),
+        "episode_count": float(episode_count),
     }
 
 
@@ -148,7 +169,7 @@ def write_attribution_summary(
         return
 
     by_key = {}
-    for key in ["symbol", "volatility_regime", "microstructure_regime"]:
+    for key in ["symbol", "thesis_id", "overlap_group_id", "governance_tier", "operational_role", "volatility_regime", "microstructure_regime"]:
         by_key[key] = summarize_execution_attribution_by(records, key)
 
     summaries = []

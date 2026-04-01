@@ -374,6 +374,7 @@ class CampaignPlanner:
                 family_gap_score=family_gap_score,
                 event_gap_score=event_gap_score,
                 history_penalty=history_penalty,
+                governance=governance,
                 excluded_region_keys=mechanical_region_keys,
             )
             if proposal is not None:
@@ -398,6 +399,7 @@ class CampaignPlanner:
         family_gap_score: float,
         event_gap_score: float,
         history_penalty: float,
+        governance: Dict[str, Any],
         excluded_region_keys: set[str] | None = None,
     ) -> Dict[str, Any] | None:
         if score <= -10.0:
@@ -413,6 +415,7 @@ class CampaignPlanner:
                 "events": {"include": [event_type]},
                 "tiers": list(self.config.event_tiers),
                 "operational_roles": list(self.config.operational_roles),
+                "deployment_dispositions": [str(governance.get("deployment_disposition", "")).strip()] if str(governance.get("deployment_disposition", "")).strip() else [],
             },
             "templates": list(dict.fromkeys(templates))[:4],
             "description": f"Autonomous campaign proposal for {event_type}" + (f" (family={family})" if family else ""),
@@ -447,6 +450,13 @@ class CampaignPlanner:
             "history_penalty": history_penalty,
             "event_count": event_count,
             "family_count": family_count,
+            "governance": {
+                "tier": governance.get("tier", ""),
+                "operational_role": governance.get("operational_role", ""),
+                "deployment_disposition": governance.get("deployment_disposition", ""),
+                "evidence_mode": governance.get("evidence_mode", ""),
+                "trade_trigger_eligible": bool(governance.get("trade_trigger_eligible", False)),
+            },
         }
         proposal_key = region_key(
             {

@@ -34,11 +34,52 @@ class ThesisLineage(BaseModel):
     proposal_id: str = ""
 
 
+class ThesisGovernance(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    tier: str = ""
+    operational_role: str = ""
+    deployment_disposition: str = ""
+    evidence_mode: str = ""
+    overlap_group_id: str = ""
+    trade_trigger_eligible: bool = False
+    requires_stronger_evidence: bool = False
+
+
+class ThesisRequirements(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    trigger_events: List[str] = Field(default_factory=list)
+    confirmation_events: List[str] = Field(default_factory=list)
+    required_episodes: List[str] = Field(default_factory=list)
+    disallowed_regimes: List[str] = Field(default_factory=list)
+    deployment_gate: str = ""
+    sequence_mode: str = ""
+    minimum_episode_confidence: float = 0.0
+
+
+class ThesisSource(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    source_program_id: str = ""
+    source_campaign_id: str = ""
+    source_run_mode: str = ""
+    objective_name: str = ""
+    event_contract_ids: List[str] = Field(default_factory=list)
+    episode_contract_ids: List[str] = Field(default_factory=list)
+
+
 class PromotedThesis(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     thesis_id: str = Field(min_length=1)
+    promotion_class: Literal["seed_promoted", "paper_promoted", "production_promoted"] = "paper_promoted"
+    deployment_state: Literal["monitor_only", "paper_only", "live_enabled", "retired"] = "paper_only"
+    evidence_gaps: List[str] = Field(default_factory=list)
     status: Literal["pending_blueprint", "active", "paused", "retired"] = "pending_blueprint"
+    evidence_freshness_date: str = ""
+    review_due_date: str = ""
+    staleness_class: Literal["fresh", "watch", "stale", "unknown"] = "unknown"
     symbol_scope: Dict[str, Any] = Field(default_factory=dict)
     timeframe: str = Field(min_length=1)
     event_family: str = Field(min_length=1)
@@ -50,6 +91,9 @@ class PromotedThesis(BaseModel):
     risk_notes: List[str] = Field(default_factory=list)
     evidence: ThesisEvidence
     lineage: ThesisLineage
+    governance: ThesisGovernance = Field(default_factory=ThesisGovernance)
+    requirements: ThesisRequirements = Field(default_factory=ThesisRequirements)
+    source: ThesisSource = Field(default_factory=ThesisSource)
 
     @field_validator("thesis_id", "timeframe", "event_family")
     @classmethod

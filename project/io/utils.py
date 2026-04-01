@@ -102,6 +102,73 @@ def choose_partition_dir(candidates: Sequence[Path]) -> Path | None:
     return None
 
 
+
+
+def raw_dataset_dir_candidates(
+    data_root: Path,
+    *,
+    market: str,
+    symbol: str,
+    dataset: str,
+    run_id: str | None = None,
+    venue: str = "binance",
+    aliases: Sequence[str] = (),
+) -> List[Path]:
+    """
+    Build ordered raw-data candidate directories.
+
+    Order is deliberate:
+    1) run-scoped vendor-qualified
+    2) global vendor-qualified
+    3) run-scoped vendorless
+    4) global vendorless
+
+    This keeps the canonical vendor-qualified layout primary while explicitly
+    supporting local vendorless archives such as ``data/lake/raw/perp/...``.
+    """
+    datasets = [str(dataset).strip(), *[str(alias).strip() for alias in aliases if str(alias).strip()]]
+    candidates: list[Path] = []
+    seen: set[str] = set()
+    for dataset_name in datasets:
+        ordered = []
+        if run_id:
+            ordered.append(run_scoped_lake_path(data_root, run_id, "raw", venue, market, symbol, dataset_name))
+        ordered.append(Path(data_root) / "lake" / "raw" / venue / market / symbol / dataset_name)
+        if run_id:
+            ordered.append(run_scoped_lake_path(data_root, run_id, "raw", market, symbol, dataset_name))
+        ordered.append(Path(data_root) / "lake" / "raw" / market / symbol / dataset_name)
+        for candidate in ordered:
+            key = str(candidate)
+            if key in seen:
+                continue
+            seen.add(key)
+            candidates.append(candidate)
+    return candidates
+
+
+def resolve_raw_dataset_dir(
+    data_root: Path,
+    *,
+    market: str,
+    symbol: str,
+    dataset: str,
+    run_id: str | None = None,
+    venue: str = "binance",
+    aliases: Sequence[str] = (),
+) -> Path | None:
+    return choose_partition_dir(
+        raw_dataset_dir_candidates(
+            data_root,
+            market=market,
+            symbol=symbol,
+            dataset=dataset,
+            run_id=run_id,
+            venue=venue,
+            aliases=aliases,
+        )
+    )
+
+
 def list_parquet_files(path: Path) -> List[Path]:
     """
     Recursively list all parquet files under a directory.

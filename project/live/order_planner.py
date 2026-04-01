@@ -93,6 +93,10 @@ def build_order_plan(
         "realized_fee_bps": 0.0,
         "thesis_id": str(intent.thesis_id),
         "trade_intent_action": intent.action,
+        "overlap_group_id": str(intent.metadata.get("overlap_group_id", "")),
+        "governance_tier": str(intent.metadata.get("governance_tier", "")),
+        "operational_role": str(intent.metadata.get("operational_role", "")),
+        "active_episode_ids": list(intent.metadata.get("active_episode_ids", [])),
     }
     order = LiveOrder(
         client_order_id=client_order_id,

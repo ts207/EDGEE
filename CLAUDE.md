@@ -1,6 +1,10 @@
 # Edge
 
-Governed event-driven crypto research engine. Proposal → plan → run → artifacts → diagnosis → hypothesis → next proposal.
+Governed event-driven crypto research engine.
+
+Current end-to-end path:
+
+`proposal -> plan -> run -> artifacts -> diagnosis -> bounded claim -> evidence bundle -> promoted thesis -> thesis store -> overlap-aware live/runtime input`
 
 ## Commands
 
@@ -19,20 +23,24 @@ make format                         # ruff format in-place
 make style                          # lint + format-check
 
 # Research proposal lifecycle
-.venv/bin/python -m project.research.agent_io.proposal_to_experiment \
-  --proposal <path>.yaml --registry_root project/configs/registries \
-  --config_path /tmp/experiment.yaml --overrides_path /tmp/overrides.json
-.venv/bin/python -m project.research.agent_io.execute_proposal \
-  --proposal <path>.yaml --run_id <id> --registry_root project/configs/registries \
-  --out_dir <out> --plan_only 1                          # plan only
-.venv/bin/python -m project.research.agent_io.issue_proposal \
-  --proposal <path>.yaml --registry_root project/configs/registries \
-  --run_id <id> --plan_only 0                            # execute
+.venv/bin/python -m project.research.agent_io.proposal_to_experiment   --proposal <path>.yaml --registry_root project/configs/registries   --config_path /tmp/experiment.yaml --overrides_path /tmp/overrides.json
+.venv/bin/python -m project.research.agent_io.execute_proposal   --proposal <path>.yaml --run_id <id> --registry_root project/configs/registries   --out_dir <out> --plan_only 1                          # plan only
+.venv/bin/python -m project.research.agent_io.issue_proposal   --proposal <path>.yaml --registry_root project/configs/registries   --run_id <id> --plan_only 0                            # execute
 
 # Discovery
 make discover-target SYMBOLS=BTCUSDT EVENT=VOL_SHOCK     # single-event targeted
 make discover-edges                                       # full phase2 all events
 make discover-blueprints                                  # full pipeline + strategy
+
+# Thesis bootstrap and packaging
+python -m project.scripts.build_seed_bootstrap_artifacts
+python -m project.scripts.build_seed_testing_artifacts
+python -m project.scripts.build_seed_empirical_artifacts
+python -m project.scripts.build_founding_thesis_evidence
+python -m project.scripts.build_seed_packaging_artifacts
+python -m project.scripts.build_structural_confirmation_artifacts
+python -m project.scripts.build_thesis_overlap_artifacts
+./project/scripts/regenerate_artifacts.sh
 
 # Artifact inspection
 .venv/bin/python -c "import pandas as pd; df = pd.read_parquet('data/reports/phase2/<run_id>/phase2_candidates.parquet'); print(len(df)); print(df[['event_type','template_verb','horizon','direction','effect_raw','p_value','q_value','selection_score','fail_gate_primary']].head(10))"
@@ -44,28 +52,47 @@ cat data/reports/phase2/<run_id>/phase2_diagnostics.json | python -m json.tool
 
 ```
 project/           Python implementation (the package)
-  research/         Phase2 search engine, gating, promotion, agent_io
+  research/         Phase2 search engine, gating, promotion, bootstrap, packaging
+  episodes/         Episode registry / contract loading
   pipelines/        run_all orchestrator, stage execution
   contracts/        Pipeline registry, schemas (FORBIDDEN to edit without approval)
-  domain/           Hypotheses, compiled_registry
   engine/           Execution engine schema (FORBIDDEN)
+  live/             Thesis retrieval, decisioning, OMS, attribution
+  portfolio/        Overlap graph and thesis-aware budget helpers
   core/             Constants, timeframes, horizon parsing
   strategy/         DSL, models, blueprints (schema files FORBIDDEN)
 spec/              YAML domain specs (source of truth)
-  events/           ~70 event definitions, _families.yaml, regime_routing.yaml
-  templates/        event_template_registry.yaml (template-to-family mapping)
+  events/           authoritative event definitions and registry
+  episodes/         episode contract and registry
+  campaigns/        canonical campaign contract
+  promotion/        seed and founding-thesis policies
   proposals/        Proposal YAML files
-  gates.yaml        Gate policy for phase2, bridge, promotion
 data/              Runtime artifacts (gitignored)
   runs/<run_id>/    Run manifests, stage manifests
   reports/phase2/   phase2_candidates.parquet, phase2_diagnostics.json
   reports/promotions/
+  live/theses/      canonical packaged thesis store
   artifacts/experiments/  Program memory, proposal copies
 agents/            Specialist agent specs (analyst, mechanism_hypothesis, compiler)
 docs/              Extensive documentation (00-15 numbered guides)
 ```
 
-## Forbidden Files
+## Current thesis lifecycle
+
+Treat these as distinct states:
+
+- `candidate`
+- `tested`
+- `seed_promoted`
+- `paper_promoted`
+- `production_promoted`
+
+Important:
+- `seed_promoted` is enough for monitor-only retrieval and overlap generation.
+- `paper_promoted` is still not equivalent to production-ready.
+- `deployment_state` narrows what even a packaged thesis may be used for.
+
+## Forbidden files
 
 Do NOT edit without explicit human approval:
 - `spec/events/event_registry_unified.yaml`
@@ -79,8 +106,9 @@ Do NOT edit without explicit human approval:
 
 Do NOT add new events, regimes, templates, detectors, or states during routine research.
 Do NOT relax promotion thresholds or cost assumptions.
+Do NOT treat derived confirmation support as equivalent to direct paired-event evidence.
 
-## Research Workflow
+## Research workflow
 
 One regime-scoped experiment at a time. Workflow:
 1. Write proposal YAML (`spec/proposals/`)
@@ -89,19 +117,17 @@ One regime-scoped experiment at a time. Workflow:
 4. Execute: `issue_proposal --plan_only 0`
 5. Inspect: `run_manifest.json`, `phase2_diagnostics.json`, `phase2_candidates.parquet`
 6. Decide: keep / modify / kill
-
-Bounded hypothesis must state exactly one: regime, mechanism, trigger family, template family,
-symbol set, timeframe, date window, horizon set, direction set, entry-lag set, success test, kill condition.
+7. If the result is thesis-queue-worthy, move through the bootstrap lane before treating it as canonical live input
 
 See `docs/AGENT_CONTRACT.md` for the full operating contract.
 
-## Scope Discipline
+## Scope discipline
 
 Never silently widen symbols, dates, templates, trigger families, horizons, or conditioning axes.
 If candidates are empty, inspect upstream `evaluated_hypotheses` and `gate_failures` before proposing changes.
 Any major hypothesis rewrite after validation must become a new version, not an in-place edit.
 
-## Specialist Agents
+## Specialist agents
 
 See `agents/coordinator_playbook.md` for the full pipeline.
 - `agents/analyst.md` — diagnose completed runs
@@ -118,6 +144,7 @@ See `agents/coordinator_playbook.md` for the full pipeline.
   `project/research/search/validation.py:VALID_HORIZONS` (generator whitelist, only 8 labels). Proposals bypass the whitelist.
 - **Search limits**: `project/configs/registries/search_limits.yaml` — max 1000 hypotheses, 12 events, 6 templates, 5 horizons per run
 - **promotion_profile=disabled** means the run is exploratory-only, not valid for the default autonomous loop
+- **bootstrap artifacts are authoritative for packaged thesis state**: prefer `seed_thesis_catalog`, `seed_thesis_packaging_summary`, and `thesis_overlap_graph` over hand-edited notes
 - **Ruff lint/format runs on changed files only** (vs `origin/main`), not the whole repo
 - **`data/` is gitignored** — all runtime artifacts are local
 - **pytest markers**: `slow` (deselect with `-m "not slow"`), `contract`, `audit`

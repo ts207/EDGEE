@@ -317,6 +317,7 @@ def _run_all_impl(raw_argv: List[str] | None = None) -> int:
         finalize_run_manifest(
             run_manifest=run_manifest,
             status="failed",
+            terminal_status="failed_mechanical",
             stage_timings=stage_timings,
             stage_instance_timings=stage_instance_timings,
             checklist_decision=stage_execution.get("checklist_decision"),

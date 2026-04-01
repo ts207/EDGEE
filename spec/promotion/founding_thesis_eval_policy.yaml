@@ -1,0 +1,148 @@
+version: 1
+kind: founding_thesis_eval_policy
+schema_version: founding_thesis_eval_policy_v1
+notes:
+- Generate canonical evidence bundles directly from raw perp market data.
+- This archive does not include spot-perp basis inputs, so BASIS_DISLOC and FND_DISLOC
+  are not part of the first supported empirical run.
+- The first supported raw-data pass targets volatility, liquidity, and forced-flow
+  theses.
+- The next supported structural thesis is VOL_SHOCK + LIQUIDITY_VACUUM confirmation,
+  which shares raw-data inputs with the first volatility/liquidity passes.
+- A second supported structural thesis uses LIQUIDITY_VACUUM + LIQUIDATION_CASCADE
+  co-occurrence to deepen the overlap graph around liquidity stress and forced-flow
+  conditions.
+founding_theses:
+- candidate_id: THESIS_VOL_SHOCK
+  event_type: VOL_SHOCK
+  detector_kind: vol_shock
+  symbols:
+  - BTCUSDT
+  - ETHUSDT
+  horizons:
+  - 8
+  - 16
+  - 24
+  payoff_mode: absolute_return
+  fees_bps: 6.0
+  notes: Raw-data evidence uses absolute post-shock move, which matches the contract's
+    volatility-expansion semantics better than directional continuation.
+  params:
+    rv_window: 12
+    baseline_window: 288
+    shock_quantile: 0.95
+- candidate_id: THESIS_LIQUIDITY_VACUUM
+  event_type: LIQUIDITY_VACUUM
+  detector_kind: liquidity_vacuum
+  symbols:
+  - BTCUSDT
+  - ETHUSDT
+  horizons:
+  - 8
+  - 16
+  - 24
+  payoff_mode: absolute_return
+  fees_bps: 6.0
+  notes: Raw-data evidence uses post-event absolute move after low-volume, wide-range
+    continuation bars following the initiating shock.
+  params:
+    shock_quantile: 0.95
+    shock_window: 288
+    volume_window: 36
+    vol_ratio_floor: 0.9
+    range_multiplier: 1.1
+    lookahead_bars: 3
+    min_vacuum_bars: 1
+- candidate_id: THESIS_LIQUIDATION_CASCADE
+  event_type: LIQUIDATION_CASCADE
+  detector_kind: liquidation_cascade
+  symbols:
+  - BTCUSDT
+  - ETHUSDT
+  horizons:
+  - 8
+  - 16
+  - 24
+  payoff_mode: absolute_return
+  fees_bps: 6.0
+  notes: Raw-data evidence uses a forced-flow proxy requiring an extreme return shock,
+    large open-interest drop, and concurrent funding stretch.
+  params:
+    shock_quantile: 0.975
+    shock_window: 288
+    oi_window: 12
+    oi_drop_quantile: 0.05
+    funding_window: 720
+    funding_z: 1.5
+- candidate_id: THESIS_VOL_SHOCK_LIQUIDITY_CONFIRM
+  event_type: VOL_SHOCK_LIQUIDITY_CONFIRM
+  event_contract_ids:
+  - VOL_SHOCK
+  - LIQUIDITY_VACUUM
+  detector_kind: vol_shock_liquidity_confirm
+  symbols:
+  - BTCUSDT
+  - ETHUSDT
+  horizons:
+  - 8
+  - 16
+  - 24
+  payoff_mode: absolute_return
+  fees_bps: 6.0
+  notes: Raw-data evidence requires a VOL_SHOCK trigger with a nearby LIQUIDITY_VACUUM
+    confirmation, producing a stronger post-shock move thesis than either event alone.
+  params:
+    confirmation_window_bars: 3
+    require_confirmation_after_trigger: true
+    trigger_kind: vol_shock
+    confirm_kind: liquidity_vacuum
+    trigger_params:
+      rv_window: 12
+      baseline_window: 288
+      shock_quantile: 0.95
+    confirm_params:
+      shock_quantile: 0.95
+      shock_window: 288
+      volume_window: 36
+      vol_ratio_floor: 0.9
+      range_multiplier: 1.1
+      lookahead_bars: 3
+      min_vacuum_bars: 1
+- candidate_id: THESIS_LIQUIDITY_VACUUM_CASCADE_CONFIRM
+  event_type: LIQUIDITY_VACUUM_CASCADE_CONFIRM
+  event_contract_ids:
+  - LIQUIDITY_VACUUM
+  - LIQUIDATION_CASCADE
+  detector_kind: paired_confirmation
+  symbols:
+  - BTCUSDT
+  - ETHUSDT
+  horizons:
+  - 24
+  - 32
+  - 48
+  payoff_mode: absolute_return
+  fees_bps: 6.0
+  notes: Raw-data evidence requires LIQUIDITY_VACUUM to appear in the same local stress
+    window as LIQUIDATION_CASCADE, producing a stronger forced-flow/liquidity-stress
+    setup than either event alone.
+  params:
+    confirmation_window_bars: 24
+    require_confirmation_after_trigger: false
+    trigger_kind: liquidity_vacuum
+    confirm_kind: liquidation_cascade
+    trigger_params:
+      shock_quantile: 0.95
+      shock_window: 288
+      volume_window: 36
+      vol_ratio_floor: 0.9
+      range_multiplier: 1.1
+      lookahead_bars: 3
+      min_vacuum_bars: 1
+    confirm_params:
+      shock_quantile: 0.975
+      shock_window: 288
+      oi_window: 12
+      oi_drop_quantile: 0.05
+      funding_window: 720
+      funding_z: 1.5

@@ -1,0 +1,1328 @@
+{
+  "aggregate_horizon_summaries": {
+    "24": {
+      "joint_trigger": {
+        "estimate_bps": 131.40439081633986,
+        "has_realized_oos_path": true,
+        "n_events": 55,
+        "negative_control_pass_rate": null,
+        "q_value": 5.179759110375781e-08,
+        "realized_vol_regime": {
+          "available": true,
+          "gap_bps": 15.21644574892548,
+          "high_vol_mean_bps": 138.87428236581238,
+          "low_vol_mean_bps": 123.6578366168869,
+          "passed": true
+        },
+        "regime_slices": {
+          "available": true,
+          "high_vol": {
+            "mean_bps": 138.87428236581238,
+            "n_events": 28
+          },
+          "low_vol": {
+            "mean_bps": 123.6578366168869,
+            "n_events": 27
+          },
+          "median_realized_vol": 0.0027070894120497127
+        },
+        "session_transition": {
+          "asia_mean_bps": 176.42965393266306,
+          "available": true,
+          "gap_bps": 52.689137689314364,
+          "non_asia_mean_bps": 123.7405162433487,
+          "passed": true
+        },
+        "stability_score": 0.9151514605022155,
+        "test_mean_bps": 111.51390568081257,
+        "test_samples": 31,
+        "validation_mean_bps": 157.0962674497293,
+        "validation_samples": 24
+      },
+      "liquidation_cascade_only": {
+        "estimate_bps": 131.42941507612878,
+        "has_realized_oos_path": true,
+        "n_events": 260,
+        "negative_control_pass_rate": null,
+        "q_value": 1.3911738097767045e-26,
+        "realized_vol_regime": {
+          "available": true,
+          "gap_bps": 116.14616295475427,
+          "high_vol_mean_bps": 189.5024965535059,
+          "low_vol_mean_bps": 73.35633359875162,
+          "passed": true
+        },
+        "regime_slices": {
+          "available": true,
+          "high_vol": {
+            "mean_bps": 189.5024965535059,
+            "n_events": 130
+          },
+          "low_vol": {
+            "mean_bps": 73.35633359875162,
+            "n_events": 130
+          },
+          "median_realized_vol": 0.004797020556474496
+        },
+        "session_transition": {
+          "asia_mean_bps": 113.99725542631231,
+          "available": true,
+          "gap_bps": 24.767002781159988,
+          "non_asia_mean_bps": 138.7642582074723,
+          "passed": true
+        },
+        "stability_score": 0.9701838108525467,
+        "test_mean_bps": 126.5525677093954,
+        "test_samples": 181,
+        "validation_mean_bps": 142.6029514480115,
+        "validation_samples": 79
+      },
+      "liquidity_vacuum_only": {
+        "estimate_bps": 99.6557783254397,
+        "has_realized_oos_path": true,
+        "n_events": 1028,
+        "negative_control_pass_rate": null,
+        "q_value": 4.752129221640673e-41,
+        "realized_vol_regime": {
+          "available": true,
+          "gap_bps": 76.65120635745613,
+          "high_vol_mean_bps": 137.98138150416776,
+          "low_vol_mean_bps": 61.330175146711625,
+          "passed": true
+        },
+        "regime_slices": {
+          "available": true,
+          "high_vol": {
+            "mean_bps": 137.98138150416776,
+            "n_events": 514
+          },
+          "low_vol": {
+            "mean_bps": 61.330175146711625,
+            "n_events": 514
+          },
+          "median_realized_vol": 0.0025662747544312582
+        },
+        "session_transition": {
+          "asia_mean_bps": 92.01583384348456,
+          "available": true,
+          "gap_bps": 9.48534169981869,
+          "non_asia_mean_bps": 101.50117554330325,
+          "passed": true
+        },
+        "stability_score": 0.9186141148163687,
+        "test_mean_bps": 81.80261746977014,
+        "test_samples": 451,
+        "validation_mean_bps": 113.61032866496652,
+        "validation_samples": 577
+      },
+      "pair_advantage": {
+        "beats_confirmation_only": false,
+        "beats_trigger_only": true,
+        "confirm_label": "liquidation_cascade_only",
+        "joint_minus_confirmation_only_bps": -0.0250242597889212,
+        "joint_minus_trigger_only_bps": 31.748612490900157,
+        "joint_test_advantage_vs_confirmation_only_bps": -15.038662028582834,
+        "joint_test_advantage_vs_trigger_only_bps": 29.71128821104243,
+        "joint_validation_advantage_vs_confirmation_only_bps": 14.493316001717801,
+        "joint_validation_advantage_vs_trigger_only_bps": 43.485938784762794,
+        "trigger_label": "liquidity_vacuum_only"
+      }
+    },
+    "32": {
+      "joint_trigger": {
+        "estimate_bps": 138.640689950293,
+        "has_realized_oos_path": true,
+        "n_events": 55,
+        "negative_control_pass_rate": null,
+        "q_value": 1.1401616369831199e-07,
+        "realized_vol_regime": {
+          "available": true,
+          "gap_bps": 24.92137453373236,
+          "high_vol_mean_bps": 150.87481926685248,
+          "low_vol_mean_bps": 125.95344473312012,
+          "passed": true
+        },
+        "regime_slices": {
+          "available": true,
+          "high_vol": {
+            "mean_bps": 150.87481926685248,
+            "n_events": 28
+          },
+          "low_vol": {
+            "mean_bps": 125.95344473312012,
+            "n_events": 27
+          },
+          "median_realized_vol": 0.0027070894120497127
+        },
+        "session_transition": {
+          "asia_mean_bps": 176.40711450487527,
+          "available": true,
+          "gap_bps": 44.19475213834099,
+          "non_asia_mean_bps": 132.21236236653428,
+          "passed": true
+        },
+        "stability_score": 0.9465008143103224,
+        "test_mean_bps": 125.51563058016598,
+        "test_samples": 31,
+        "validation_mean_bps": 155.59389163670704,
+        "validation_samples": 24
+      },
+      "liquidation_cascade_only": {
+        "estimate_bps": 139.5385843046614,
+        "has_realized_oos_path": true,
+        "n_events": 260,
+        "negative_control_pass_rate": null,
+        "q_value": 6.79183670548069e-29,
+        "realized_vol_regime": {
+          "available": true,
+          "gap_bps": 114.35063580750281,
+          "high_vol_mean_bps": 196.7139022084128,
+          "low_vol_mean_bps": 82.36326640090999,
+          "passed": true
+        },
+        "regime_slices": {
+          "available": true,
+          "high_vol": {
+            "mean_bps": 196.7139022084128,
+            "n_events": 130
+          },
+          "low_vol": {
+            "mean_bps": 82.36326640090999,
+            "n_events": 130
+          },
+          "median_realized_vol": 0.004797020556474496
+        },
+        "session_transition": {
+          "asia_mean_bps": 126.72442402340982,
+          "available": true,
+          "gap_bps": 18.205910782106088,
+          "non_asia_mean_bps": 144.9303348055159,
+          "passed": true
+        },
+        "stability_score": 0.9540395875522263,
+        "test_mean_bps": 131.4524207014784,
+        "test_samples": 181,
+        "validation_mean_bps": 158.06511104106798,
+        "validation_samples": 79
+      },
+      "liquidity_vacuum_only": {
+        "estimate_bps": 114.8694803834928,
+        "has_realized_oos_path": true,
+        "n_events": 1028,
+        "negative_control_pass_rate": null,
+        "q_value": 9.617612036461572e-52,
+        "realized_vol_regime": {
+          "available": true,
+          "gap_bps": 82.30940297633045,
+          "high_vol_mean_bps": 156.02418187165802,
+          "low_vol_mean_bps": 73.71477889532757,
+          "passed": true
+        },
+        "regime_slices": {
+          "available": true,
+          "high_vol": {
+            "mean_bps": 156.02418187165802,
+            "n_events": 514
+          },
+          "low_vol": {
+            "mean_bps": 73.71477889532757,
+            "n_events": 514
+          },
+          "median_realized_vol": 0.0025662747544312582
+        },
+        "session_transition": {
+          "asia_mean_bps": 106.04159083360402,
+          "available": true,
+          "gap_bps": 10.96023002087641,
+          "non_asia_mean_bps": 117.00182085448043,
+          "passed": true
+        },
+        "stability_score": 0.9089915568155968,
+        "test_mean_bps": 91.91081433856934,
+        "test_samples": 451,
+        "validation_mean_bps": 132.81464223143124,
+        "validation_samples": 577
+      },
+      "pair_advantage": {
+        "beats_confirmation_only": false,
+        "beats_trigger_only": true,
+        "confirm_label": "liquidation_cascade_only",
+        "joint_minus_confirmation_only_bps": -0.8978943543684181,
+        "joint_minus_trigger_only_bps": 23.771209566800195,
+        "joint_test_advantage_vs_confirmation_only_bps": -5.936790121312413,
+        "joint_test_advantage_vs_trigger_only_bps": 33.60481624159664,
+        "joint_validation_advantage_vs_confirmation_only_bps": -2.4712194043609372,
+        "joint_validation_advantage_vs_trigger_only_bps": 22.779249405275806,
+        "trigger_label": "liquidity_vacuum_only"
+      }
+    },
+    "48": {
+      "joint_trigger": {
+        "estimate_bps": 161.13039024509905,
+        "has_realized_oos_path": true,
+        "n_events": 55,
+        "negative_control_pass_rate": null,
+        "q_value": 5.39449178183571e-06,
+        "realized_vol_regime": {
+          "available": true,
+          "gap_bps": 29.348528723033326,
+          "high_vol_mean_bps": 175.5378498000427,
+          "low_vol_mean_bps": 146.18932107700937,
+          "passed": true
+        },
+        "regime_slices": {
+          "available": true,
+          "high_vol": {
+            "mean_bps": 175.5378498000427,
+            "n_events": 28
+          },
+          "low_vol": {
+            "mean_bps": 146.18932107700937,
+            "n_events": 27
+          },
+          "median_realized_vol": 0.0027070894120497127
+        },
+        "session_transition": {
+          "asia_mean_bps": 277.7533716673428,
+          "available": true,
+          "gap_bps": 136.47370166432776,
+          "non_asia_mean_bps": 141.279670003015,
+          "passed": true
+        },
+        "stability_score": 0.915259260133303,
+        "test_mean_bps": 136.77199585267388,
+        "test_samples": 31,
+        "validation_mean_bps": 192.59331633531494,
+        "validation_samples": 24
+      },
+      "liquidation_cascade_only": {
+        "estimate_bps": 154.6173850815889,
+        "has_realized_oos_path": true,
+        "n_events": 260,
+        "negative_control_pass_rate": null,
+        "q_value": 1.9407058079603352e-31,
+        "realized_vol_regime": {
+          "available": true,
+          "gap_bps": 103.63495015673185,
+          "high_vol_mean_bps": 206.4348601599548,
+          "low_vol_mean_bps": 102.79991000322296,
+          "passed": true
+        },
+        "regime_slices": {
+          "available": true,
+          "high_vol": {
+            "mean_bps": 206.4348601599548,
+            "n_events": 130
+          },
+          "low_vol": {
+            "mean_bps": 102.79991000322296,
+            "n_events": 130
+          },
+          "median_realized_vol": 0.004797020556474496
+        },
+        "session_transition": {
+          "asia_mean_bps": 129.5869140689039,
+          "available": true,
+          "gap_bps": 35.56241783223004,
+          "non_asia_mean_bps": 165.14933190113393,
+          "passed": true
+        },
+        "stability_score": 0.954233859025953,
+        "test_mean_bps": 145.69669929861516,
+        "test_samples": 181,
+        "validation_mean_bps": 175.0559183311869,
+        "validation_samples": 79
+      },
+      "liquidity_vacuum_only": {
+        "estimate_bps": 138.93328586744803,
+        "has_realized_oos_path": true,
+        "n_events": 1028,
+        "negative_control_pass_rate": null,
+        "q_value": 2.021938514373722e-55,
+        "realized_vol_regime": {
+          "available": true,
+          "gap_bps": 88.26636049864776,
+          "high_vol_mean_bps": 183.06646611677192,
+          "low_vol_mean_bps": 94.80010561812416,
+          "passed": true
+        },
+        "regime_slices": {
+          "available": true,
+          "high_vol": {
+            "mean_bps": 183.06646611677192,
+            "n_events": 514
+          },
+          "low_vol": {
+            "mean_bps": 94.80010561812416,
+            "n_events": 514
+          },
+          "median_realized_vol": 0.0025662747544312582
+        },
+        "session_transition": {
+          "asia_mean_bps": 123.35601044353177,
+          "available": true,
+          "gap_bps": 19.3399023379057,
+          "non_asia_mean_bps": 142.69591278143747,
+          "passed": true
+        },
+        "stability_score": 0.9291971702513351,
+        "test_mean_bps": 117.22495069955494,
+        "test_samples": 451,
+        "validation_mean_bps": 155.90115269711836,
+        "validation_samples": 577
+      },
+      "pair_advantage": {
+        "beats_confirmation_only": true,
+        "beats_trigger_only": true,
+        "confirm_label": "liquidation_cascade_only",
+        "joint_minus_confirmation_only_bps": 6.513005163510144,
+        "joint_minus_trigger_only_bps": 22.197104377651016,
+        "joint_test_advantage_vs_confirmation_only_bps": -8.924703445941276,
+        "joint_test_advantage_vs_trigger_only_bps": 19.547045153118944,
+        "joint_validation_advantage_vs_confirmation_only_bps": 17.53739800412805,
+        "joint_validation_advantage_vs_trigger_only_bps": 36.692163638196575,
+        "trigger_label": "liquidity_vacuum_only"
+      }
+    }
+  },
+  "comparison_design": {
+    "joint_trigger": "LIQUIDITY VACUUM trigger with nearby LIQUIDATION CASCADE confirmation, anchored at the trigger timestamp.",
+    "liquidation_cascade_only": "LIQUIDATION CASCADE event without the paired LIQUIDITY VACUUM trigger inside the declared confirmation window.",
+    "liquidity_vacuum_only": "LIQUIDITY VACUUM trigger without the paired LIQUIDATION CASCADE confirmation inside the declared confirmation window."
+  },
+  "decision_support": {
+    "direct_pair_event_study_required_gap_closed": true,
+    "direct_pair_evidence_present": true,
+    "pair_beats_confirmation_only": true,
+    "pair_beats_trigger_only": true,
+    "promotion_commentary": "Direct paired-event evidence now exists for THESIS_LIQUIDITY_VACUUM_CASCADE_CONFIRM. Use the pair-vs-component comparison for LIQUIDITY VACUUM and LIQUIDATION CASCADE to decide whether the thesis should remain confirmation-scoped or be treated as a stronger paper-grade object."
+  },
+  "event_contract_ids": [
+    "LIQUIDITY_VACUUM",
+    "LIQUIDATION_CASCADE"
+  ],
+  "generated_at_utc": "2026-04-01T03:41:13Z",
+  "horizons_tested": [
+    24,
+    32,
+    48
+  ],
+  "selected_horizon_bars": 48,
+  "selected_horizon_summary": {
+    "joint_trigger": {
+      "estimate_bps": 161.13039024509905,
+      "has_realized_oos_path": true,
+      "n_events": 55,
+      "negative_control_pass_rate": null,
+      "q_value": 5.39449178183571e-06,
+      "realized_vol_regime": {
+        "available": true,
+        "gap_bps": 29.348528723033326,
+        "high_vol_mean_bps": 175.5378498000427,
+        "low_vol_mean_bps": 146.18932107700937,
+        "passed": true
+      },
+      "regime_slices": {
+        "available": true,
+        "high_vol": {
+          "mean_bps": 175.5378498000427,
+          "n_events": 28
+        },
+        "low_vol": {
+          "mean_bps": 146.18932107700937,
+          "n_events": 27
+        },
+        "median_realized_vol": 0.0027070894120497127
+      },
+      "session_transition": {
+        "asia_mean_bps": 277.7533716673428,
+        "available": true,
+        "gap_bps": 136.47370166432776,
+        "non_asia_mean_bps": 141.279670003015,
+        "passed": true
+      },
+      "stability_score": 0.915259260133303,
+      "test_mean_bps": 136.77199585267388,
+      "test_samples": 31,
+      "validation_mean_bps": 192.59331633531494,
+      "validation_samples": 24
+    },
+    "liquidation_cascade_only": {
+      "estimate_bps": 154.6173850815889,
+      "has_realized_oos_path": true,
+      "n_events": 260,
+      "negative_control_pass_rate": null,
+      "q_value": 1.9407058079603352e-31,
+      "realized_vol_regime": {
+        "available": true,
+        "gap_bps": 103.63495015673185,
+        "high_vol_mean_bps": 206.4348601599548,
+        "low_vol_mean_bps": 102.79991000322296,
+        "passed": true
+      },
+      "regime_slices": {
+        "available": true,
+        "high_vol": {
+          "mean_bps": 206.4348601599548,
+          "n_events": 130
+        },
+        "low_vol": {
+          "mean_bps": 102.79991000322296,
+          "n_events": 130
+        },
+        "median_realized_vol": 0.004797020556474496
+      },
+      "session_transition": {
+        "asia_mean_bps": 129.5869140689039,
+        "available": true,
+        "gap_bps": 35.56241783223004,
+        "non_asia_mean_bps": 165.14933190113393,
+        "passed": true
+      },
+      "stability_score": 0.954233859025953,
+      "test_mean_bps": 145.69669929861516,
+      "test_samples": 181,
+      "validation_mean_bps": 175.0559183311869,
+      "validation_samples": 79
+    },
+    "liquidity_vacuum_only": {
+      "estimate_bps": 138.93328586744803,
+      "has_realized_oos_path": true,
+      "n_events": 1028,
+      "negative_control_pass_rate": null,
+      "q_value": 2.021938514373722e-55,
+      "realized_vol_regime": {
+        "available": true,
+        "gap_bps": 88.26636049864776,
+        "high_vol_mean_bps": 183.06646611677192,
+        "low_vol_mean_bps": 94.80010561812416,
+        "passed": true
+      },
+      "regime_slices": {
+        "available": true,
+        "high_vol": {
+          "mean_bps": 183.06646611677192,
+          "n_events": 514
+        },
+        "low_vol": {
+          "mean_bps": 94.80010561812416,
+          "n_events": 514
+        },
+        "median_realized_vol": 0.0025662747544312582
+      },
+      "session_transition": {
+        "asia_mean_bps": 123.35601044353177,
+        "available": true,
+        "gap_bps": 19.3399023379057,
+        "non_asia_mean_bps": 142.69591278143747,
+        "passed": true
+      },
+      "stability_score": 0.9291971702513351,
+      "test_mean_bps": 117.22495069955494,
+      "test_samples": 451,
+      "validation_mean_bps": 155.90115269711836,
+      "validation_samples": 577
+    },
+    "pair_advantage": {
+      "beats_confirmation_only": true,
+      "beats_trigger_only": true,
+      "confirm_label": "liquidation_cascade_only",
+      "joint_minus_confirmation_only_bps": 6.513005163510144,
+      "joint_minus_trigger_only_bps": 22.197104377651016,
+      "joint_test_advantage_vs_confirmation_only_bps": -8.924703445941276,
+      "joint_test_advantage_vs_trigger_only_bps": 19.547045153118944,
+      "joint_validation_advantage_vs_confirmation_only_bps": 17.53739800412805,
+      "joint_validation_advantage_vs_trigger_only_bps": 36.692163638196575,
+      "trigger_label": "liquidity_vacuum_only"
+    }
+  },
+  "split_definition": {
+    "split_scheme_id": "calendar_year_holdout_2022",
+    "test_window": "2022",
+    "validation_window": "2021"
+  },
+  "study_id": "THESIS_LIQUIDITY_VACUUM_CASCADE_CONFIRM_direct_pair_event_study",
+  "symbol_horizon_summaries": {
+    "BTCUSDT": {
+      "24": {
+        "joint_trigger": {
+          "estimate_bps": 139.14956409704484,
+          "has_realized_oos_path": false,
+          "n_events": 39,
+          "negative_control_pass_rate": null,
+          "q_value": 1.3462976056521898e-05,
+          "realized_vol_regime": {
+            "available": true,
+            "gap_bps": 68.2817729374283,
+            "high_vol_mean_bps": 172.41504322040734,
+            "low_vol_mean_bps": 104.13327028297904,
+            "passed": true
+          },
+          "regime_slices": {
+            "available": true,
+            "high_vol": {
+              "mean_bps": 172.41504322040734,
+              "n_events": 20
+            },
+            "low_vol": {
+              "mean_bps": 104.13327028297904,
+              "n_events": 19
+            },
+            "median_realized_vol": 0.0027070894120497127
+          },
+          "session_transition": {
+            "asia_mean_bps": 139.11805035209446,
+            "available": true,
+            "gap_bps": 0.0372435167595313,
+            "non_asia_mean_bps": 139.155293868854,
+            "passed": true
+          },
+          "stability_score": 0.8970858842725042,
+          "test_mean_bps": 108.78624915948178,
+          "test_samples": 18,
+          "validation_mean_bps": 165.175262614956,
+          "validation_samples": 21
+        },
+        "liquidation_cascade_only": {
+          "estimate_bps": 124.78925924505849,
+          "has_realized_oos_path": true,
+          "n_events": 173,
+          "negative_control_pass_rate": null,
+          "q_value": 6.374182139198363e-13,
+          "realized_vol_regime": {
+            "available": true,
+            "gap_bps": 106.78385273925004,
+            "high_vol_mean_bps": 177.87256176283594,
+            "low_vol_mean_bps": 71.0887090235859,
+            "passed": true
+          },
+          "regime_slices": {
+            "available": true,
+            "high_vol": {
+              "mean_bps": 177.87256176283594,
+              "n_events": 87
+            },
+            "low_vol": {
+              "mean_bps": 71.0887090235859,
+              "n_events": 86
+            },
+            "median_realized_vol": 0.004954405129959025
+          },
+          "session_transition": {
+            "asia_mean_bps": 111.77116213837336,
+            "available": true,
+            "gap_bps": 19.08585423268245,
+            "non_asia_mean_bps": 130.8570163710558,
+            "passed": true
+          },
+          "stability_score": 0.9350593706547294,
+          "test_mean_bps": 109.81817750002345,
+          "test_samples": 94,
+          "validation_mean_bps": 142.6029514480115,
+          "validation_samples": 79
+        },
+        "liquidity_vacuum_only": {
+          "estimate_bps": 87.3142797049913,
+          "has_realized_oos_path": true,
+          "n_events": 511,
+          "negative_control_pass_rate": null,
+          "q_value": 1.0876028442374454e-17,
+          "realized_vol_regime": {
+            "available": true,
+            "gap_bps": 69.41330125270296,
+            "high_vol_mean_bps": 121.95301124988222,
+            "low_vol_mean_bps": 52.53970999717926,
+            "passed": true
+          },
+          "regime_slices": {
+            "available": true,
+            "high_vol": {
+              "mean_bps": 121.95301124988222,
+              "n_events": 256
+            },
+            "low_vol": {
+              "mean_bps": 52.53970999717926,
+              "n_events": 255
+            },
+            "median_realized_vol": 0.0022808895678146464
+          },
+          "session_transition": {
+            "asia_mean_bps": 69.4468136102038,
+            "available": true,
+            "gap_bps": 22.214781446317318,
+            "non_asia_mean_bps": 91.66159505652112,
+            "passed": true
+          },
+          "stability_score": 0.9374063796323167,
+          "test_mean_bps": 76.02974940334876,
+          "test_samples": 246,
+          "validation_mean_bps": 97.7897304755727,
+          "validation_samples": 265
+        },
+        "pair_advantage": {
+          "beats_confirmation_only": true,
+          "beats_trigger_only": true,
+          "confirm_label": "liquidation_cascade_only",
+          "joint_minus_confirmation_only_bps": 14.360304851986356,
+          "joint_minus_trigger_only_bps": 51.83528439205354,
+          "joint_test_advantage_vs_confirmation_only_bps": -1.0319283405416684,
+          "joint_test_advantage_vs_trigger_only_bps": 32.756499756133024,
+          "joint_validation_advantage_vs_confirmation_only_bps": 22.572311166944502,
+          "joint_validation_advantage_vs_trigger_only_bps": 67.38553213938332,
+          "trigger_label": "liquidity_vacuum_only"
+        }
+      },
+      "32": {
+        "joint_trigger": {
+          "estimate_bps": 134.75280488046434,
+          "has_realized_oos_path": false,
+          "n_events": 39,
+          "negative_control_pass_rate": null,
+          "q_value": 5.502667657665388e-05,
+          "realized_vol_regime": {
+            "available": true,
+            "gap_bps": 53.32907545819471,
+            "high_vol_mean_bps": 160.73363651394385,
+            "low_vol_mean_bps": 107.40456105574914,
+            "passed": true
+          },
+          "regime_slices": {
+            "available": true,
+            "high_vol": {
+              "mean_bps": 160.73363651394385,
+              "n_events": 20
+            },
+            "low_vol": {
+              "mean_bps": 107.40456105574914,
+              "n_events": 19
+            },
+            "median_realized_vol": 0.0027070894120497127
+          },
+          "session_transition": {
+            "asia_mean_bps": 114.85318115913746,
+            "available": true,
+            "gap_bps": 23.517737125204533,
+            "non_asia_mean_bps": 138.370918284342,
+            "passed": true
+          },
+          "stability_score": 0.9198697333845933,
+          "test_mean_bps": 111.77926356336312,
+          "test_samples": 18,
+          "validation_mean_bps": 154.44441172369403,
+          "validation_samples": 21
+        },
+        "liquidation_cascade_only": {
+          "estimate_bps": 136.46597747336983,
+          "has_realized_oos_path": true,
+          "n_events": 173,
+          "negative_control_pass_rate": null,
+          "q_value": 1.0285975469778617e-14,
+          "realized_vol_regime": {
+            "available": true,
+            "gap_bps": 94.66188528788226,
+            "high_vol_mean_bps": 183.52333085347314,
+            "low_vol_mean_bps": 88.86144556559088,
+            "passed": true
+          },
+          "regime_slices": {
+            "available": true,
+            "high_vol": {
+              "mean_bps": 183.52333085347314,
+              "n_events": 87
+            },
+            "low_vol": {
+              "mean_bps": 88.86144556559088,
+              "n_events": 86
+            },
+            "median_realized_vol": 0.004954405129959025
+          },
+          "session_transition": {
+            "asia_mean_bps": 117.37331491202924,
+            "available": true,
+            "gap_bps": 27.99178494162645,
+            "non_asia_mean_bps": 145.3650998536557,
+            "passed": true
+          },
+          "stability_score": 0.9280848928589048,
+          "test_mean_bps": 118.31351415583626,
+          "test_samples": 94,
+          "validation_mean_bps": 158.06511104106798,
+          "validation_samples": 79
+        },
+        "liquidity_vacuum_only": {
+          "estimate_bps": 96.97412259057361,
+          "has_realized_oos_path": true,
+          "n_events": 511,
+          "negative_control_pass_rate": null,
+          "q_value": 1.606417138733147e-23,
+          "realized_vol_regime": {
+            "available": true,
+            "gap_bps": 70.32526001722368,
+            "high_vol_mean_bps": 132.06794119016664,
+            "low_vol_mean_bps": 61.74268117294295,
+            "passed": true
+          },
+          "regime_slices": {
+            "available": true,
+            "high_vol": {
+              "mean_bps": 132.06794119016664,
+              "n_events": 256
+            },
+            "low_vol": {
+              "mean_bps": 61.74268117294295,
+              "n_events": 255
+            },
+            "median_realized_vol": 0.0022808895678146464
+          },
+          "session_transition": {
+            "asia_mean_bps": 82.29774770495331,
+            "available": true,
+            "gap_bps": 18.247269018374624,
+            "non_asia_mean_bps": 100.54501672332793,
+            "passed": true
+          },
+          "stability_score": 0.9352274452541414,
+          "test_mean_bps": 84.00695909809716,
+          "test_samples": 246,
+          "validation_mean_bps": 109.0115649269857,
+          "validation_samples": 265
+        },
+        "pair_advantage": {
+          "beats_confirmation_only": false,
+          "beats_trigger_only": true,
+          "confirm_label": "liquidation_cascade_only",
+          "joint_minus_confirmation_only_bps": -1.7131725929054937,
+          "joint_minus_trigger_only_bps": 37.778682289890725,
+          "joint_test_advantage_vs_confirmation_only_bps": -6.534250592473143,
+          "joint_test_advantage_vs_trigger_only_bps": 27.77230446526596,
+          "joint_validation_advantage_vs_confirmation_only_bps": -3.6206993173739477,
+          "joint_validation_advantage_vs_trigger_only_bps": 45.43284679670833,
+          "trigger_label": "liquidity_vacuum_only"
+        }
+      },
+      "48": {
+        "joint_trigger": {
+          "estimate_bps": 151.95055478655877,
+          "has_realized_oos_path": false,
+          "n_events": 39,
+          "negative_control_pass_rate": null,
+          "q_value": 8.306791521776324e-05,
+          "realized_vol_regime": {
+            "available": true,
+            "gap_bps": 88.58976549932812,
+            "high_vol_mean_bps": 195.10967131187246,
+            "low_vol_mean_bps": 106.51990581254434,
+            "passed": true
+          },
+          "regime_slices": {
+            "available": true,
+            "high_vol": {
+              "mean_bps": 195.10967131187246,
+              "n_events": 20
+            },
+            "low_vol": {
+              "mean_bps": 106.51990581254434,
+              "n_events": 19
+            },
+            "median_realized_vol": 0.0027070894120497127
+          },
+          "session_transition": {
+            "asia_mean_bps": 209.2081307403034,
+            "available": true,
+            "gap_bps": 67.66804430897093,
+            "non_asia_mean_bps": 141.54008643133247,
+            "passed": true
+          },
+          "stability_score": 0.8774194781469623,
+          "test_mean_bps": 112.57519417558296,
+          "test_samples": 18,
+          "validation_mean_bps": 185.70086388168087,
+          "validation_samples": 21
+        },
+        "liquidation_cascade_only": {
+          "estimate_bps": 151.5898312928085,
+          "has_realized_oos_path": true,
+          "n_events": 173,
+          "negative_control_pass_rate": null,
+          "q_value": 4.150499493679395e-17,
+          "realized_vol_regime": {
+            "available": true,
+            "gap_bps": 83.2380404020456,
+            "high_vol_mean_bps": 192.96827912272713,
+            "low_vol_mean_bps": 109.73023872068153,
+            "passed": true
+          },
+          "regime_slices": {
+            "available": true,
+            "high_vol": {
+              "mean_bps": 192.96827912272713,
+              "n_events": 87
+            },
+            "low_vol": {
+              "mean_bps": 109.73023872068153,
+              "n_events": 86
+            },
+            "median_realized_vol": 0.004954405129959025
+          },
+          "session_transition": {
+            "asia_mean_bps": 120.88203871272499,
+            "available": true,
+            "gap_bps": 45.02074674876654,
+            "non_asia_mean_bps": 165.90278546149153,
+            "passed": true
+          },
+          "stability_score": 0.9296445530342339,
+          "test_mean_bps": 131.86833261161814,
+          "test_samples": 94,
+          "validation_mean_bps": 175.0559183311869,
+          "validation_samples": 79
+        },
+        "liquidity_vacuum_only": {
+          "estimate_bps": 121.62872624597463,
+          "has_realized_oos_path": true,
+          "n_events": 511,
+          "negative_control_pass_rate": null,
+          "q_value": 1.7055757804963363e-26,
+          "realized_vol_regime": {
+            "available": true,
+            "gap_bps": 87.73460054304235,
+            "high_vol_mean_bps": 165.41018052870615,
+            "low_vol_mean_bps": 77.6755799856638,
+            "passed": true
+          },
+          "regime_slices": {
+            "available": true,
+            "high_vol": {
+              "mean_bps": 165.41018052870615,
+              "n_events": 256
+            },
+            "low_vol": {
+              "mean_bps": 77.6755799856638,
+              "n_events": 255
+            },
+            "median_realized_vol": 0.0022808895678146464
+          },
+          "session_transition": {
+            "asia_mean_bps": 101.00561347051209,
+            "available": true,
+            "gap_bps": 25.640901771925428,
+            "non_asia_mean_bps": 126.64651524243752,
+            "passed": true
+          },
+          "stability_score": 0.9515460920572496,
+          "test_mean_bps": 109.44758763968156,
+          "test_samples": 246,
+          "validation_mean_bps": 132.93650019747687,
+          "validation_samples": 265
+        },
+        "pair_advantage": {
+          "beats_confirmation_only": true,
+          "beats_trigger_only": true,
+          "confirm_label": "liquidation_cascade_only",
+          "joint_minus_confirmation_only_bps": 0.360723493750271,
+          "joint_minus_trigger_only_bps": 30.321828540584136,
+          "joint_test_advantage_vs_confirmation_only_bps": -19.29313843603518,
+          "joint_test_advantage_vs_trigger_only_bps": 3.127606535901407,
+          "joint_validation_advantage_vs_confirmation_only_bps": 10.644945550493986,
+          "joint_validation_advantage_vs_trigger_only_bps": 52.764363684204,
+          "trigger_label": "liquidity_vacuum_only"
+        }
+      }
+    },
+    "ETHUSDT": {
+      "24": {
+        "joint_trigger": {
+          "estimate_bps": 112.52553094462152,
+          "has_realized_oos_path": false,
+          "n_events": 16,
+          "negative_control_pass_rate": null,
+          "q_value": 0.000830566753975455,
+          "realized_vol_regime": {
+            "available": true,
+            "gap_bps": 115.00630143059311,
+            "high_vol_mean_bps": 55.02238022932496,
+            "low_vol_mean_bps": 170.02868165991808,
+            "passed": true
+          },
+          "regime_slices": {
+            "available": true,
+            "high_vol": {
+              "mean_bps": 55.02238022932496,
+              "n_events": 8
+            },
+            "low_vol": {
+              "mean_bps": 170.02868165991808,
+              "n_events": 8
+            },
+            "median_realized_vol": 0.0030004292517426296
+          },
+          "session_transition": {
+            "asia_mean_bps": 288.36446467436883,
+            "available": true,
+            "gap_bps": 200.9587814054255,
+            "non_asia_mean_bps": 87.40568326894335,
+            "passed": false
+          },
+          "stability_score": 0.9658363321889243,
+          "test_mean_bps": 115.29066086419365,
+          "test_samples": 13,
+          "validation_mean_bps": 100.54330129314228,
+          "validation_samples": 3
+        },
+        "liquidation_cascade_only": {
+          "estimate_bps": 144.63340310802718,
+          "has_realized_oos_path": true,
+          "n_events": 87,
+          "negative_control_pass_rate": null,
+          "q_value": 1.6245760293251e-15,
+          "realized_vol_regime": {
+            "available": true,
+            "gap_bps": 131.71443883150692,
+            "high_vol_mean_bps": 209.73364299026625,
+            "low_vol_mean_bps": 78.01920415875931,
+            "passed": true
+          },
+          "regime_slices": {
+            "available": true,
+            "high_vol": {
+              "mean_bps": 209.73364299026625,
+              "n_events": 44
+            },
+            "low_vol": {
+              "mean_bps": 78.01920415875931,
+              "n_events": 43
+            },
+            "median_realized_vol": 0.004577931802129662
+          },
+          "session_transition": {
+            "asia_mean_bps": 119.56248864615974,
+            "available": true,
+            "gap_bps": 33.55645474126872,
+            "non_asia_mean_bps": 153.11894338742846,
+            "passed": true
+          },
+          "stability_score": 0.0,
+          "test_mean_bps": 144.63340310802718,
+          "test_samples": 87,
+          "validation_mean_bps": null,
+          "validation_samples": 0
+        },
+        "liquidity_vacuum_only": {
+          "estimate_bps": 111.85404872205308,
+          "has_realized_oos_path": true,
+          "n_events": 517,
+          "negative_control_pass_rate": null,
+          "q_value": 3.3346407683243143e-28,
+          "realized_vol_regime": {
+            "available": true,
+            "gap_bps": 71.52542054728373,
+            "high_vol_mean_bps": 147.5475854748562,
+            "low_vol_mean_bps": 76.02216492757246,
+            "passed": true
+          },
+          "regime_slices": {
+            "available": true,
+            "high_vol": {
+              "mean_bps": 147.5475854748562,
+              "n_events": 259
+            },
+            "low_vol": {
+              "mean_bps": 76.02216492757246,
+              "n_events": 258
+            },
+            "median_realized_vol": 0.002998451214557796
+          },
+          "session_transition": {
+            "asia_mean_bps": 114.58485407676534,
+            "available": true,
+            "gap_bps": 3.385674744331496,
+            "non_asia_mean_bps": 111.19917933243384,
+            "passed": true
+          },
+          "stability_score": 0.9112104104731766,
+          "test_mean_bps": 88.73005914947575,
+          "test_samples": 205,
+          "validation_mean_bps": 127.04769571685546,
+          "validation_samples": 312
+        },
+        "pair_advantage": {
+          "beats_confirmation_only": false,
+          "beats_trigger_only": true,
+          "confirm_label": "liquidation_cascade_only",
+          "joint_minus_confirmation_only_bps": -32.10787216340566,
+          "joint_minus_trigger_only_bps": 0.6714822225684429,
+          "joint_test_advantage_vs_confirmation_only_bps": -29.342742243833527,
+          "joint_test_advantage_vs_trigger_only_bps": 26.560601714717905,
+          "joint_validation_advantage_vs_confirmation_only_bps": null,
+          "joint_validation_advantage_vs_trigger_only_bps": -26.50439442371318,
+          "trigger_label": "liquidity_vacuum_only"
+        }
+      },
+      "32": {
+        "joint_trigger": {
+          "estimate_bps": 148.11740980800022,
+          "has_realized_oos_path": false,
+          "n_events": 16,
+          "negative_control_pass_rate": null,
+          "q_value": 0.000447408512002754,
+          "realized_vol_regime": {
+            "available": true,
+            "gap_bps": 43.77926731775213,
+            "high_vol_mean_bps": 126.22777614912414,
+            "low_vol_mean_bps": 170.00704346687627,
+            "passed": true
+          },
+          "regime_slices": {
+            "available": true,
+            "high_vol": {
+              "mean_bps": 126.22777614912414,
+              "n_events": 8
+            },
+            "low_vol": {
+              "mean_bps": 170.00704346687627,
+              "n_events": 8
+            },
+            "median_realized_vol": 0.0030004292517426296
+          },
+          "session_transition": {
+            "asia_mean_bps": 361.0689145420887,
+            "available": true,
+            "gap_bps": 243.37314826752967,
+            "non_asia_mean_bps": 117.69576627455902,
+            "passed": false
+          },
+          "stability_score": 0.969002991134472,
+          "test_mean_bps": 144.53521568035453,
+          "test_samples": 13,
+          "validation_mean_bps": 163.64025102779826,
+          "validation_samples": 3
+        },
+        "liquidation_cascade_only": {
+          "estimate_bps": 145.64848064734466,
+          "has_realized_oos_path": true,
+          "n_events": 87,
+          "negative_control_pass_rate": null,
+          "q_value": 5.576866726266334e-16,
+          "realized_vol_regime": {
+            "available": true,
+            "gap_bps": 143.09425238265237,
+            "high_vol_mean_bps": 216.373226077851,
+            "low_vol_mean_bps": 73.27897369519863,
+            "passed": true
+          },
+          "regime_slices": {
+            "available": true,
+            "high_vol": {
+              "mean_bps": 216.373226077851,
+              "n_events": 44
+            },
+            "low_vol": {
+              "mean_bps": 73.27897369519863,
+              "n_events": 43
+            },
+            "median_realized_vol": 0.004577931802129662
+          },
+          "session_transition": {
+            "asia_mean_bps": 150.1021968018612,
+            "available": true,
+            "gap_bps": 5.961127776045231,
+            "non_asia_mean_bps": 144.14106902581597,
+            "passed": true
+          },
+          "stability_score": 0.0,
+          "test_mean_bps": 145.64848064734466,
+          "test_samples": 87,
+          "validation_mean_bps": null,
+          "validation_samples": 0
+        },
+        "liquidity_vacuum_only": {
+          "estimate_bps": 132.55715510724852,
+          "has_realized_oos_path": true,
+          "n_events": 517,
+          "negative_control_pass_rate": null,
+          "q_value": 1.8767784640488807e-31,
+          "realized_vol_regime": {
+            "available": true,
+            "gap_bps": 77.5437291740252,
+            "high_vol_mean_bps": 171.25402575888972,
+            "low_vol_mean_bps": 93.71029658486452,
+            "passed": true
+          },
+          "regime_slices": {
+            "available": true,
+            "high_vol": {
+              "mean_bps": 171.25402575888972,
+              "n_events": 259
+            },
+            "low_vol": {
+              "mean_bps": 93.71029658486452,
+              "n_events": 258
+            },
+            "median_realized_vol": 0.002998451214557796
+          },
+          "session_transition": {
+            "asia_mean_bps": 129.78543396225473,
+            "available": true,
+            "gap_bps": 3.43640247472851,
+            "non_asia_mean_bps": 133.22183643698324,
+            "passed": true
+          },
+          "stability_score": 0.8985239978585892,
+          "test_mean_bps": 101.39544062713597,
+          "test_samples": 205,
+          "validation_mean_bps": 153.03199955732248,
+          "validation_samples": 312
+        },
+        "pair_advantage": {
+          "beats_confirmation_only": true,
+          "beats_trigger_only": true,
+          "confirm_label": "liquidation_cascade_only",
+          "joint_minus_confirmation_only_bps": 2.468929160655563,
+          "joint_minus_trigger_only_bps": 15.560254700751699,
+          "joint_test_advantage_vs_confirmation_only_bps": -1.1132649669901298,
+          "joint_test_advantage_vs_trigger_only_bps": 43.13977505321856,
+          "joint_validation_advantage_vs_confirmation_only_bps": null,
+          "joint_validation_advantage_vs_trigger_only_bps": 10.608251470475778,
+          "trigger_label": "liquidity_vacuum_only"
+        }
+      },
+      "48": {
+        "joint_trigger": {
+          "estimate_bps": 183.50623917529106,
+          "has_realized_oos_path": false,
+          "n_events": 16,
+          "negative_control_pass_rate": null,
+          "q_value": 0.003583833948456844,
+          "realized_vol_regime": {
+            "available": true,
+            "gap_bps": 113.79588630964555,
+            "high_vol_mean_bps": 126.60829602046827,
+            "low_vol_mean_bps": 240.40418233011383,
+            "passed": true
+          },
+          "regime_slices": {
+            "available": true,
+            "high_vol": {
+              "mean_bps": 126.60829602046827,
+              "n_events": 8
+            },
+            "low_vol": {
+              "mean_bps": 240.40418233011383,
+              "n_events": 8
+            },
+            "median_realized_vol": 0.0030004292517426296
+          },
+          "session_transition": {
+            "asia_mean_bps": 483.3890944484609,
+            "available": true,
+            "gap_bps": 342.723263169337,
+            "non_asia_mean_bps": 140.66583127912392,
+            "passed": false
+          },
+          "stability_score": 0.9141783974946563,
+          "test_mean_bps": 170.27525971326125,
+          "test_samples": 13,
+          "validation_mean_bps": 240.84048351075356,
+          "validation_samples": 3
+        },
+        "liquidation_cascade_only": {
+          "estimate_bps": 160.6376931903131,
+          "has_realized_oos_path": true,
+          "n_events": 87,
+          "negative_control_pass_rate": null,
+          "q_value": 2.427645319784671e-16,
+          "realized_vol_regime": {
+            "available": true,
+            "gap_bps": 135.83814735272148,
+            "high_vol_mean_bps": 227.77608785889961,
+            "low_vol_mean_bps": 91.93794050617814,
+            "passed": true
+          },
+          "regime_slices": {
+            "available": true,
+            "high_vol": {
+              "mean_bps": 227.77608785889961,
+              "n_events": 44
+            },
+            "low_vol": {
+              "mean_bps": 91.93794050617814,
+              "n_events": 43
+            },
+            "median_realized_vol": 0.004577931802129662
+          },
+          "session_transition": {
+            "asia_mean_bps": 151.34910245935103,
+            "available": true,
+            "gap_bps": 12.432421439903123,
+            "non_asia_mean_bps": 163.78152389925415,
+            "passed": true
+          },
+          "stability_score": 0.0,
+          "test_mean_bps": 160.6376931903131,
+          "test_samples": 87,
+          "validation_mean_bps": null,
+          "validation_samples": 0
+        },
+        "liquidity_vacuum_only": {
+          "estimate_bps": 156.03701887822734,
+          "has_realized_oos_path": true,
+          "n_events": 517,
+          "negative_control_pass_rate": null,
+          "q_value": 1.3398950083818228e-31,
+          "realized_vol_regime": {
+            "available": true,
+            "gap_bps": 72.4967682196437,
+            "high_vol_mean_bps": 192.21529005940351,
+            "low_vol_mean_bps": 119.71852183975982,
+            "passed": true
+          },
+          "regime_slices": {
+            "available": true,
+            "high_vol": {
+              "mean_bps": 192.21529005940351,
+              "n_events": 259
+            },
+            "low_vol": {
+              "mean_bps": 119.71852183975982,
+              "n_events": 258
+            },
+            "median_realized_vol": 0.002998451214557796
+          },
+          "session_transition": {
+            "asia_mean_bps": 145.70640741655146,
+            "available": true,
+            "gap_bps": 12.807976320590996,
+            "non_asia_mean_bps": 158.51438373714245,
+            "passed": true
+          },
+          "stability_score": 0.9191152387842383,
+          "test_mean_bps": 126.557786371403,
+          "test_samples": 205,
+          "validation_mean_bps": 175.4063863907241,
+          "validation_samples": 312
+        },
+        "pair_advantage": {
+          "beats_confirmation_only": true,
+          "beats_trigger_only": true,
+          "confirm_label": "liquidation_cascade_only",
+          "joint_minus_confirmation_only_bps": 22.86854598497797,
+          "joint_minus_trigger_only_bps": 27.469220297063714,
+          "joint_test_advantage_vs_confirmation_only_bps": 9.637566522948163,
+          "joint_test_advantage_vs_trigger_only_bps": 43.71747334185825,
+          "joint_validation_advantage_vs_confirmation_only_bps": null,
+          "joint_validation_advantage_vs_trigger_only_bps": 65.43409712002946,
+          "trigger_label": "liquidity_vacuum_only"
+        }
+      }
+    }
+  },
+  "symbols": [
+    "BTCUSDT",
+    "ETHUSDT"
+  ],
+  "thesis_contract_id": "THESIS_LIQUIDITY_VACUUM_CASCADE_CONFIRM",
+  "thesis_contract_ids": [
+    "THESIS_LIQUIDITY_VACUUM_CASCADE_CONFIRM"
+  ],
+  "thesis_id": "THESIS_LIQUIDITY_VACUUM_CASCADE_CONFIRM"
+}

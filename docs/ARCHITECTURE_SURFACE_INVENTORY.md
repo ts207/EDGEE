@@ -5,6 +5,8 @@ surfaces so refactors can be audited without guessing which imports remain valid
 
 ## Canonical Surfaces
 
+- `project.cli`
+- `project.operator.preflight`
 - `project.pipelines.run_all`
 - `project.contracts.pipeline_registry`
 - `project.research.services`
@@ -14,6 +16,10 @@ surfaces so refactors can be audited without guessing which imports remain valid
 
 ## Transitional Surfaces
 
+- `project.research.agent_io.execute_proposal`
+  Transitional internal operator step. Prefer `edge operator plan` from `project.cli`.
+- `project.research.agent_io.issue_proposal`
+  Transitional internal issuance step. Prefer `edge operator run` from `project.cli`.
 - `project.strategy_dsl`
   Transitional alias surface retained only for compatibility accounting and
   architectural metrics.

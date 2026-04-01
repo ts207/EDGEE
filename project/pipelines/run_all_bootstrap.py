@@ -191,6 +191,10 @@ def build_run_bootstrap_state(
         phase2_parallel_workers=int(getattr(args, "phase2_parallel_workers", 1) or 1),
         strict_run_scoped_reads=str(args.mode).strip().lower() == "certification",
         require_stage_manifests=str(args.mode).strip().lower() == "certification",
+        experiment_type=str(getattr(args, "experiment_type", "discovery") or "discovery"),
+        baseline_run_id=str(getattr(args, "research_compare_baseline_run_id", "") or "").strip(),
+        allowed_change_field=str(getattr(args, "allowed_change_field", "") or "").strip(),
+        resume_recommended=False,
     )
 
     return RunBootstrapState(

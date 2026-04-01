@@ -14,6 +14,7 @@ from project.core.feature_quality import summarize_feature_quality
 from project.core.feature_schema import feature_dataset_dir_name
 from project.io.utils import (
     choose_partition_dir,
+    resolve_raw_dataset_dir,
     list_parquet_files,
     read_parquet,
     run_scoped_lake_path,
@@ -100,29 +101,47 @@ def _ignored_feature_columns(
     spot_candidates = [
         run_scoped_lake_path(data_root, run_id, "cleaned", "spot", symbol, f"bars_{timeframe}"),
         data_root / "lake" / "cleaned" / "spot" / symbol / f"bars_{timeframe}",
-        run_scoped_lake_path(data_root, run_id, "raw", "binance", "spot", symbol, f"ohlcv_{timeframe}"),
-        data_root / "lake" / "raw" / "binance" / "spot" / symbol / f"ohlcv_{timeframe}",
     ]
+    raw_spot_dir = resolve_raw_dataset_dir(
+        data_root,
+        market="spot",
+        symbol=symbol,
+        dataset=f"ohlcv_{timeframe}",
+        run_id=run_id,
+    )
+    if raw_spot_dir is not None:
+        spot_candidates.append(raw_spot_dir)
     if not _has_source_artifacts(spot_candidates):
         ignored_nan_columns.update(_SPOT_DEPENDENT_COLUMNS)
         ignored_constant_columns.update(_SPOT_DEPENDENT_COLUMNS)
 
-    liquidation_candidates = [
-        run_scoped_lake_path(data_root, run_id, "raw", "binance", "perp", symbol, "liquidations"),
-        data_root / "lake" / "raw" / "binance" / "perp" / symbol / "liquidations",
-        run_scoped_lake_path(data_root, run_id, "raw", "binance", "perp", symbol, "liquidation_snapshot"),
-        data_root / "lake" / "raw" / "binance" / "perp" / symbol / "liquidation_snapshot",
-    ]
+    liquidation_candidates = []
+    for dataset_name in ("liquidations", "liquidation_snapshot"):
+        resolved = resolve_raw_dataset_dir(
+            data_root,
+            market="perp",
+            symbol=symbol,
+            dataset=dataset_name,
+            run_id=run_id,
+        )
+        if resolved is not None:
+            liquidation_candidates.append(resolved)
     if not _has_source_artifacts(liquidation_candidates):
         ignored_nan_columns.update(_LIQUIDATION_DEPENDENT_COLUMNS)
         ignored_constant_columns.update(_LIQUIDATION_DEPENDENT_COLUMNS)
 
-    oi_candidates = [
-        run_scoped_lake_path(data_root, run_id, "raw", "binance", "perp", symbol, "open_interest", timeframe),
-        data_root / "lake" / "raw" / "binance" / "perp" / symbol / "open_interest" / timeframe,
-        run_scoped_lake_path(data_root, run_id, "raw", "binance", "perp", symbol, "open_interest"),
-        data_root / "lake" / "raw" / "binance" / "perp" / symbol / "open_interest",
-    ]
+    oi_candidates = []
+    for dataset_name in ("open_interest",):
+        resolved = resolve_raw_dataset_dir(
+            data_root,
+            market="perp",
+            symbol=symbol,
+            dataset=dataset_name,
+            run_id=run_id,
+            aliases=(timeframe,),
+        )
+        if resolved is not None:
+            oi_candidates.append(resolved)
     if not _has_source_artifacts(oi_candidates):
         ignored_nan_columns.update(_OI_DEPENDENT_COLUMNS)
         ignored_constant_columns.update(_OI_DEPENDENT_COLUMNS)

@@ -110,6 +110,7 @@ def proposal_to_experiment_config(
             "multiplicity_scope": "program_id",
         },
         "artifacts": dict(proposal.artifacts),
+        "bounded": proposal.bounded.to_dict() if proposal.bounded is not None else None,
     }
 
 
@@ -126,6 +127,8 @@ def build_run_all_overrides(proposal: AgentProposal) -> Dict[str, Any]:
     }
     if proposal.config_overlays:
         overrides["config"] = list(proposal.config_overlays)
+    if proposal.bounded is not None and proposal.bounded.compare_to_baseline:
+        overrides["research_compare_baseline_run_id"] = proposal.bounded.baseline_run_id
     if proposal.promotion_profile == "disabled":
         overrides["run_candidate_promotion"] = 0
     for key, value in sorted(proposal.knobs.items()):

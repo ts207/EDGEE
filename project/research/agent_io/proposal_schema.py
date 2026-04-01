@@ -115,6 +115,45 @@ def _normalize_phase2_gate_profile(raw: Any) -> str:
 def _normalize_config_overlays(values: Any) -> List[str]:
     return _as_str_list(values, field_name="config_overlays")
 
+
+@dataclass(frozen=True)
+class BoundedProposalSpec:
+    baseline_run_id: str
+    experiment_type: str = "confirmation"
+    allowed_change_field: str = ""
+    change_reason: str = ""
+    compare_to_baseline: bool = True
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "baseline_run_id": self.baseline_run_id,
+            "experiment_type": self.experiment_type,
+            "allowed_change_field": self.allowed_change_field,
+            "change_reason": self.change_reason,
+            "compare_to_baseline": bool(self.compare_to_baseline),
+        }
+
+
+def _normalize_bounded_spec(raw: Any) -> BoundedProposalSpec | None:
+    if raw in (None, False, "", {}):
+        return None
+    if not isinstance(raw, dict):
+        raise ValueError("bounded must be an object when provided")
+    baseline_run_id = str(raw.get("baseline_run_id", "") or "").strip()
+    experiment_type = str(raw.get("experiment_type", "confirmation") or "confirmation").strip().lower()
+    allowed_change_field = str(raw.get("allowed_change_field", "") or "").strip()
+    change_reason = str(raw.get("change_reason", "") or "").strip()
+    compare_to_baseline = bool(raw.get("compare_to_baseline", True))
+    if experiment_type not in {"confirmation", "horizon_test", "regime_test", "template_fit_test", "negative_control"}:
+        raise ValueError(f"Unsupported bounded.experiment_type: {experiment_type}")
+    return BoundedProposalSpec(
+        baseline_run_id=baseline_run_id,
+        experiment_type=experiment_type,
+        allowed_change_field=allowed_change_field,
+        change_reason=change_reason,
+        compare_to_baseline=compare_to_baseline,
+    )
+
 def _proposal_settable_knobs() -> set[str]:
     return {
         str(row.get("name", "")).strip()
@@ -148,6 +187,7 @@ class AgentProposal:
     phase2_gate_profile: str = "auto"
     search_spec: str = "spec/search_space.yaml"
     config_overlays: List[str] = field(default_factory=list)
+    bounded: BoundedProposalSpec | None = None
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -174,6 +214,7 @@ class AgentProposal:
             "phase2_gate_profile": self.phase2_gate_profile,
             "search_spec": self.search_spec,
             "config_overlays": list(self.config_overlays),
+            "bounded": self.bounded.to_dict() if self.bounded is not None else None,
         }
 
 
@@ -232,6 +273,7 @@ def load_agent_proposal(path_or_payload: str | Path | Dict[str, Any]) -> AgentPr
         phase2_gate_profile=_normalize_phase2_gate_profile(raw.get("phase2_gate_profile", "auto")),
         search_spec=str(raw.get("search_spec", "spec/search_space.yaml") or "spec/search_space.yaml").strip(),
         config_overlays=_normalize_config_overlays(raw.get("config_overlays", [])),
+        bounded=_normalize_bounded_spec(raw.get("bounded")),
     )
     _validate_proposal(proposal)
     return proposal
@@ -254,6 +296,11 @@ def _validate_proposal(proposal: AgentProposal) -> None:
         raise ValueError("entry_lags must contain at least one lag")
     if not proposal.search_spec:
         raise ValueError("search_spec must be provided")
+    if proposal.bounded is not None:
+        if not proposal.bounded.baseline_run_id:
+            raise ValueError("bounded.baseline_run_id is required")
+        if not proposal.bounded.allowed_change_field:
+            raise ValueError("bounded.allowed_change_field is required")
     invalid_entry_lags = [int(lag) for lag in proposal.entry_lags if int(lag) < 1]
     if invalid_entry_lags:
         raise ValueError("entry_lags must be >= 1 to prevent same-bar entry leakage")

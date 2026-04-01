@@ -78,6 +78,9 @@ def finalize_run_manifest(
     if status == "success":
         run_manifest["failed_stage"] = None
         run_manifest["failed_stage_instance"] = None
+        run_manifest.setdefault("terminal_status", "completed")
+    elif status == "failed":
+        run_manifest.setdefault("terminal_status", "failed_mechanical")
 
     # Capture additional metadata if provided
     if "failed_stage" in kwargs:

@@ -82,6 +82,10 @@ class AllocationSpec(BaseModel):
         strategy_family_map = dict(constraints.get("strategy_family_map", {}))
         family_risk_budgets = dict(constraints.get("family_risk_budgets", {}))
         strategy_risk_budgets = dict(constraints.get("strategy_risk_budgets", {}))
+        strategy_thesis_map = dict(constraints.get("strategy_thesis_map", {}))
+        thesis_overlap_group_map = dict(constraints.get("thesis_overlap_group_map", {}))
+        overlap_group_risk_budgets = dict(constraints.get("overlap_group_risk_budgets", {}))
+        thesis_evidence_multipliers = dict(constraints.get("thesis_evidence_multipliers", {}))
         return {
             "allocator_mode": str(constraints.get("allocator_mode", "heuristic")).strip().lower(),
             "allocator_deterministic": bool(constraints.get("allocator_deterministic", True)),
@@ -89,6 +93,10 @@ class AllocationSpec(BaseModel):
             "strategy_risk_budgets": strategy_risk_budgets,
             "family_risk_budgets": family_risk_budgets,
             "strategy_family_map": strategy_family_map,
+            "strategy_thesis_map": strategy_thesis_map,
+            "thesis_overlap_group_map": thesis_overlap_group_map,
+            "overlap_group_risk_budgets": overlap_group_risk_budgets,
+            "thesis_evidence_multipliers": thesis_evidence_multipliers,
             "portfolio_max_exposure": float(self.risk_controls.per_position_notional_cap_usd),
             "max_portfolio_gross": float(self.sizing_policy.portfolio_risk_budget),
             "max_strategy_gross": float(self.sizing_policy.max_gross_leverage),

@@ -14,7 +14,17 @@ from project.core.coercion import safe_float, safe_int
 from project.core.config import get_data_root
 from project.core.exceptions import DataIntegrityError
 from project.io.utils import ensure_dir
-from project.live.contracts import PromotedThesis, ThesisEvidence, ThesisLineage
+from project.events.governance import get_event_governance_metadata
+from project.live.contracts import (
+    PromotedThesis,
+    ThesisEvidence,
+    ThesisGovernance,
+    ThesisLineage,
+    ThesisRequirements,
+    ThesisSource,
+)
+from project.episodes import load_episode_registry
+from project.portfolio.thesis_overlap import overlap_group_id_for_thesis
 
 
 @dataclass(frozen=True)
@@ -252,6 +262,75 @@ def _build_expected_response(
     return response
 
 
+def _build_governance(bundle: Mapping[str, Any], promoted_row: Mapping[str, Any], *, overlap_group_id: str = "") -> ThesisGovernance:
+    event_id = str(bundle.get("event_type", "") or promoted_row.get("event_type", "")).strip()
+    meta = get_event_governance_metadata(event_id) if event_id else {}
+    return ThesisGovernance(
+        tier=str(meta.get("tier", "")).strip(),
+        operational_role=str(meta.get("operational_role", "")).strip(),
+        deployment_disposition=str(meta.get("deployment_disposition", "")).strip(),
+        evidence_mode=str(meta.get("evidence_mode", "")).strip(),
+        overlap_group_id=str(overlap_group_id or "").strip(),
+        trade_trigger_eligible=bool(meta.get("trade_trigger_eligible", False)),
+        requires_stronger_evidence=bool(meta.get("requires_stronger_evidence", False)),
+    )
+
+
+def _episode_ids_from_metadata(bundle: Mapping[str, Any], promoted_row: Mapping[str, Any], metadata: Mapping[str, Any]) -> list[str]:
+    payloads = [metadata, bundle, promoted_row]
+    out: list[str] = []
+    seen: set[str] = set()
+    known = set(load_episode_registry().keys())
+    for payload in payloads:
+        if not isinstance(payload, Mapping):
+            continue
+        values = payload.get("episode_ids") or payload.get("episodes") or []
+        if isinstance(values, str):
+            values = [values]
+        if not isinstance(values, (list, tuple, set)):
+            continue
+        for item in values:
+            token = str(item or "").strip().upper()
+            if token and token not in seen and (not known or token in known):
+                out.append(token)
+                seen.add(token)
+    return out
+
+
+def _build_requirements(bundle: Mapping[str, Any], promoted_row: Mapping[str, Any]) -> ThesisRequirements:
+    event_id = str(bundle.get("event_type", "") or promoted_row.get("event_type", "")).strip()
+    meta = get_event_governance_metadata(event_id) if event_id else {}
+    metadata = bundle.get("metadata", {}) if isinstance(bundle.get("metadata", {}), Mapping) else {}
+    disallowed = bundle.get("disabled_regimes") or promoted_row.get("disabled_regimes") or []
+    if isinstance(disallowed, str):
+        disallowed = [disallowed]
+    return ThesisRequirements(
+        trigger_events=[event_id] if event_id else [],
+        confirmation_events=[],
+        required_episodes=_episode_ids_from_metadata(bundle, promoted_row, metadata),
+        disallowed_regimes=[str(value).strip() for value in disallowed if str(value).strip()],
+        deployment_gate=str(meta.get("promotion_block_reason", "")).strip(),
+        sequence_mode=str(metadata.get("sequence_mode", "")).strip(),
+        minimum_episode_confidence=float(metadata.get("minimum_episode_confidence", 0.0) or 0.0),
+    )
+
+
+def _build_source(bundle: Mapping[str, Any], promoted_row: Mapping[str, Any], metadata: Mapping[str, Any]) -> ThesisSource:
+    event_id = str(bundle.get("event_type", "") or promoted_row.get("event_type", "")).strip()
+    campaign_id = str(metadata.get("campaign_id", "") or promoted_row.get("campaign_id", "")).strip()
+    program_id = str(metadata.get("program_id", "") or promoted_row.get("program_id", "")).strip()
+    source_run_mode = str(metadata.get("source_run_mode", "") or promoted_row.get("source_run_mode", "")).strip()
+    objective_name = str(metadata.get("objective_name", "") or promoted_row.get("objective_name", "")).strip()
+    return ThesisSource(
+        source_program_id=program_id,
+        source_campaign_id=campaign_id,
+        source_run_mode=source_run_mode,
+        objective_name=objective_name,
+        event_contract_ids=[event_id] if event_id else [],
+        episode_contract_ids=_episode_ids_from_metadata(bundle, promoted_row, metadata),
+    )
+
+
 def _build_risk_notes(
     *,
     bundle: Mapping[str, Any],
@@ -329,8 +408,11 @@ def _build_thesis(
             proposal_id = str(lineage.get("proposal_id", "")).strip()
 
     track = _promotion_track(bundle, promoted_row)
-    return PromotedThesis(
+    thesis = PromotedThesis(
         thesis_id=f"thesis::{run_id}::{candidate_id}",
+        promotion_class="paper_promoted",
+        deployment_state="paper_only",
+        evidence_gaps=[],
         status=status,
         symbol_scope=_coerce_symbol_scope(symbol, blueprint),
         timeframe=timeframe,
@@ -368,7 +450,15 @@ def _build_thesis(
             blueprint_id=blueprint_id,
             proposal_id=proposal_id,
         ),
+        governance=ThesisGovernance(),
+        requirements=_build_requirements(bundle, promoted_row),
+        source=_build_source(bundle, promoted_row, metadata if isinstance(metadata, Mapping) else {}),
     )
+    overlap_group_id = overlap_group_id_for_thesis(thesis)
+    thesis = thesis.model_copy(
+        update={"governance": _build_governance(bundle, promoted_row, overlap_group_id=overlap_group_id)}
+    )
+    return thesis
 
 
 def build_promoted_theses(

@@ -18,6 +18,7 @@ from project.core.config import get_data_root
 from project.domain.compiled_registry import get_domain_registry
 from project.research import campaign_controller_scan_support as _scan_support
 from project.research.experiment_engine import build_experiment_plan, RegistryBundle
+from project.research.campaign_contract import controller_contract_view
 from project.research.search_intelligence import update_search_intelligence
 from project.research.knowledge.memory import memory_paths, read_memory_table
 from project.spec_registry.search_space import (
@@ -175,7 +176,9 @@ class CampaignController:
         self.ledger_path = self.campaign_dir / "tested_ledger.parquet"
         self.summary_path = self.campaign_dir / "campaign_summary.json"
         self.frontier_path = self.campaign_dir / "search_frontier.json"
+        self.contract_path = self.campaign_dir / "campaign_contract.json"
         self.registries = RegistryBundle(registry_root)
+        self._write_campaign_contract_artifact()
 
         # Phase 2.2: quality weights now loaded via the centralised
         # spec_registry.search_space loader, which also captures raw IG values
@@ -190,6 +193,16 @@ class CampaignController:
         self._quality_weights: Dict[str, float] = load_event_priority_weights(
             self._search_space_path
         )
+
+    def _write_campaign_contract_artifact(self) -> None:
+        payload = controller_contract_view(
+            program_id=self.config.program_id,
+            registry_root=str(self.registry_root),
+            max_runs=self.config.max_runs,
+            max_consecutive_no_signal=self.config.max_consecutive_no_signal,
+            research_mode=self.config.research_mode,
+        ).to_dict()
+        self.contract_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
     # ------------------------------------------------------------------
     # Main loop

@@ -6,6 +6,9 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from project.operator.run_semantics import classify_terminal_status
+from project.research.reports import write_operator_outputs_for_run
+
 
 def handle_runtime_postflight(
     *,
@@ -129,6 +132,7 @@ def finalize_successful_run(
             finalize_run_manifest(
                 run_manifest=run_manifest,
                 status="failed",
+                terminal_status="failed_mechanical",
                 stage_timings=stage_timings,
                 stage_instance_timings=stage_instance_timings,
                 checklist_decision=stage_execution.get("checklist_decision"),
@@ -138,6 +142,10 @@ def finalize_successful_run(
                 failed_stage="run_reconciliation",
                 failed_stage_instance="run_reconciliation",
             )
+            semantics = classify_terminal_status(run_id=run_id, manifest=run_manifest, data_root=data_root)
+            run_manifest.update({k: v for k, v in semantics.items() if k != "reflection"})
+            semantics = classify_terminal_status(run_id=run_id, manifest=run_manifest, data_root=data_root)
+            run_manifest.update({k: v for k, v in semantics.items() if k != "reflection"})
             write_run_manifest(run_id, run_manifest)
             write_run_kpi_scorecard(run_id, run_manifest)
             print(
@@ -153,6 +161,7 @@ def finalize_successful_run(
             finalize_run_manifest(
                 run_manifest=run_manifest,
                 status="failed",
+                terminal_status="failed_mechanical",
                 stage_timings=stage_timings,
                 stage_instance_timings=stage_instance_timings,
                 checklist_decision=stage_execution.get("checklist_decision"),
@@ -237,6 +246,8 @@ def finalize_successful_run(
                     failed_stage="research_comparison",
                     failed_stage_instance="research_comparison",
                 )
+                semantics = classify_terminal_status(run_id=run_id, manifest=run_manifest, data_root=data_root)
+                run_manifest.update({k: v for k, v in semantics.items() if k != "reflection"})
                 maybe_emit_run_hash(run_manifest)
                 write_run_manifest(run_id, run_manifest)
                 write_run_kpi_scorecard(run_id, run_manifest)
@@ -251,9 +262,22 @@ def finalize_successful_run(
             run_manifest["research_comparison_error"] = str(exc)
     else:
         run_manifest["research_comparison_status"] = "skipped"
+    semantics = classify_terminal_status(run_id=run_id, manifest=run_manifest, data_root=data_root)
+    run_manifest.update({k: v for k, v in semantics.items() if k != "reflection"})
     maybe_emit_run_hash(run_manifest)
     write_run_manifest(run_id, run_manifest)
     write_run_kpi_scorecard(run_id, run_manifest)
+    if data_root is not None:
+        try:
+            write_operator_outputs_for_run(
+                run_id=run_id,
+                program_id=str(run_manifest.get("program_id", "") or "") or None,
+                data_root=data_root,
+            )
+        except Exception as exc:
+            run_manifest["operator_summary_status"] = "failed"
+            run_manifest["operator_summary_error"] = str(exc)
+            write_run_manifest(run_id, run_manifest)
 
     print(f"Pipeline run completed: {run_id}")
     print_artifact_summary(run_id)
