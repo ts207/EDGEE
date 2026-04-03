@@ -1,4 +1,9 @@
 version: 1
+kind: runtime_state_registry
+metadata:
+  status: generated
+  authored_source: spec/states/*.yaml
+  generated_from: spec/states/state_registry.yaml
 states:
   AFTERSHOCK_STATE:
     enabled: true

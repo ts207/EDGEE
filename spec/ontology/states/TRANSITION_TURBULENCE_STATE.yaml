@@ -1,3 +1,9 @@
+version: 1
+kind: state_ontology_spec
+metadata:
+  status: generated
+  authored_source: spec/states/TRANSITION_TURBULENCE_STATE.yaml
+  generated_from: spec/states/state_registry.yaml
 state_id: TRANSITION_TURBULENCE_STATE
 family: REGIME_TRANSITION
 source_event_type: VOL_REGIME_SHIFT_EVENT

@@ -50,7 +50,15 @@ def build_runtime_template_registry_payload() -> Dict[str, Any]:
                 if str(item).strip()
             ],
         }
-    return {"templates": templates}
+    return {
+        "version": 1,
+        "kind": "runtime_template_registry",
+        "metadata": {
+            "status": "generated",
+            "authored_source": "spec/templates/registry.yaml",
+        },
+        "templates": templates,
+    }
 
 
 def build_ontology_template_registry_payload() -> Dict[str, Any]:
@@ -83,6 +91,10 @@ def build_ontology_template_registry_payload() -> Dict[str, Any]:
     return {
         "version": 1,
         "kind": "template_registry",
+        "metadata": {
+            "status": "generated",
+            "authored_source": "spec/templates/registry.yaml",
+        },
         "defaults": {
             "templates": [
                 str(item).strip()

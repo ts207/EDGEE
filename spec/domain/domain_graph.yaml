@@ -511,9 +511,6 @@ unified_payload:
       suppressed_by: &id025 []
       parameters:
         synthetic_coverage: covered
-        canonical_family: STATISTICAL_DISLOCATION
-        trigger: Detector triggers on basis disloc pattern
-        confirmation: Post-detection price action confirms signal validity
         expected_behavior: &id018
           holding_horizon_bars: 6-36
           invalidation_conditions:
@@ -521,7 +518,6 @@ unified_payload:
           - Z-score returns to mean
           disabled_regimes:
           - 'Low basis volatility: z-score undefined'
-        cluster_id: basis_dislocation
         z_threshold: 5.0
         lookback_window: 288
         cooldown_bars: 12
@@ -1827,9 +1823,6 @@ unified_payload:
         notes: &id153
         - '`threshold_bps` is expressed in basis points and is converted against decimal
           `funding_rate_scaled` values at runtime.'
-        canonical_family: STATISTICAL_DISLOCATION
-        trigger: Detector triggers on fnd disloc pattern
-        confirmation: Post-detection price action confirms signal validity
         expected_behavior: &id154
           holding_horizon_bars: 6-36
           invalidation_conditions:
@@ -1837,7 +1830,6 @@ unified_payload:
           - Z-score returns to mean
           disabled_regimes:
           - 'Low basis volatility: z-score undefined'
-        cluster_id: basis_dislocation
         threshold_bps: 2.0
         funding_quantile: 0.95
         alignment_window: 3
@@ -2735,9 +2727,6 @@ unified_payload:
       suppressed_by: &id246 []
       parameters:
         synthetic_coverage: covered
-        canonical_family: POSITIONING_EXTREMES
-        trigger: Detector triggers on liquidation cascade pattern
-        confirmation: Post-detection price action confirms signal validity
         expected_behavior: &id239
           holding_horizon_bars: 4-24
           invalidation_conditions:
@@ -2745,7 +2734,6 @@ unified_payload:
           - Funding reverses sign
           disabled_regimes:
           - 'Low liquidity regime: OI/vol signals unreliable'
-        cluster_id: forced_liquidation
         liq_multiplier: 3.0
         median_window: 288
         liq_vol_th: 100000.0
@@ -5687,7 +5675,6 @@ unified_payload:
       suppressed_by: &id568 []
       parameters:
         synthetic_coverage: covered
-        canonical_family: VOLATILITY_TRANSITION
         detector_contract: true
         detector: &id559
           signal_definition: 'Detects realized-volatility shock onset using a point-in-time-safe
@@ -5770,10 +5757,6 @@ unified_payload:
           - SPREAD_BLOWOUT: low; different mechanisms
           - TREND_ACCELERATION: low but possible; trending vol differs from shock
               vol
-        trigger: Detector triggers on the first dynamic-threshold shock crossing
-        confirmation: No separate detector-side confirmation gate; downstream research
-          uses relaxation telemetry and post-event evaluation
-        cluster_id: vol_regime
         m_controls: 5
         bootstrap_iters: 1000
         phase_tolerance_bars: 16
@@ -6300,11 +6283,7 @@ event_definitions:
       anchor_rule: max_intensity
       min_occurrences: 0
       synthetic_coverage: covered
-      canonical_family: STATISTICAL_DISLOCATION
-      trigger: Detector triggers on basis disloc pattern
-      confirmation: Post-detection price action confirms signal validity
       expected_behavior: *id018
-      cluster_id: basis_dislocation
       z_threshold: 5.0
       lookback_window: 288
       min_basis_bps: 10.0
@@ -6315,11 +6294,7 @@ event_definitions:
         anchor_rule: max_intensity
         min_occurrences: 0
         synthetic_coverage: covered
-        canonical_family: STATISTICAL_DISLOCATION
-        trigger: Detector triggers on basis disloc pattern
-        confirmation: Post-detection price action confirms signal validity
         expected_behavior: *id018
-        cluster_id: basis_dislocation
         z_threshold: 5.0
         lookback_window: 288
         min_basis_bps: 10.0
@@ -8321,11 +8296,7 @@ event_definitions:
       min_occurrences: 0
       synthetic_coverage: covered
       notes: *id153
-      canonical_family: STATISTICAL_DISLOCATION
-      trigger: Detector triggers on fnd disloc pattern
-      confirmation: Post-detection price action confirms signal validity
       expected_behavior: *id154
-      cluster_id: basis_dislocation
       threshold_bps: 2.0
       funding_quantile: 0.95
       alignment_window: 3
@@ -8338,11 +8309,7 @@ event_definitions:
         min_occurrences: 0
         synthetic_coverage: covered
         notes: *id153
-        canonical_family: STATISTICAL_DISLOCATION
-        trigger: Detector triggers on fnd disloc pattern
-        confirmation: Post-detection price action confirms signal validity
         expected_behavior: *id154
-        cluster_id: basis_dislocation
         threshold_bps: 2.0
         funding_quantile: 0.95
         alignment_window: 3
@@ -9741,11 +9708,7 @@ event_definitions:
       anchor_rule: max_intensity
       min_occurrences: 0
       synthetic_coverage: covered
-      canonical_family: POSITIONING_EXTREMES
-      trigger: Detector triggers on liquidation cascade pattern
-      confirmation: Post-detection price action confirms signal validity
       expected_behavior: *id239
-      cluster_id: forced_liquidation
       liq_multiplier: 3.0
       median_window: 288
       liq_vol_th: 100000.0
@@ -9757,11 +9720,7 @@ event_definitions:
         anchor_rule: max_intensity
         min_occurrences: 0
         synthetic_coverage: covered
-        canonical_family: POSITIONING_EXTREMES
-        trigger: Detector triggers on liquidation cascade pattern
-        confirmation: Post-detection price action confirms signal validity
         expected_behavior: *id239
-        cluster_id: forced_liquidation
         liq_multiplier: 3.0
         median_window: 288
         liq_vol_th: 100000.0
@@ -14532,15 +14491,10 @@ event_definitions:
       anchor_rule: max_intensity
       min_occurrences: 0
       synthetic_coverage: covered
-      canonical_family: VOLATILITY_TRANSITION
       detector_contract: true
       detector: *id559
       calibration: *id560
       expected_behavior: *id561
-      trigger: Detector triggers on the first dynamic-threshold shock crossing
-      confirmation: No separate detector-side confirmation gate; downstream research
-        uses relaxation telemetry and post-event evaluation
-      cluster_id: vol_regime
       m_controls: 5
       bootstrap_iters: 1000
       phase_tolerance_bars: 16
@@ -14552,15 +14506,10 @@ event_definitions:
         anchor_rule: max_intensity
         min_occurrences: 0
         synthetic_coverage: covered
-        canonical_family: VOLATILITY_TRANSITION
         detector_contract: true
         detector: *id559
         calibration: *id560
         expected_behavior: *id561
-        trigger: Detector triggers on the first dynamic-threshold shock crossing
-        confirmation: No separate detector-side confirmation gate; downstream research
-          uses relaxation telemetry and post-event evaluation
-        cluster_id: vol_regime
         m_controls: 5
         bootstrap_iters: 1000
         phase_tolerance_bars: 16
@@ -18081,10 +18030,10 @@ template_operator_definitions:
     raw:
       enabled: true
       supports_contexts: true
-      supports_directions: &id609
+      supports_directions: &id616
       - long
       - short
-      supports_trigger_types: &id610
+      supports_trigger_types: &id617
       - EVENT
       operator_id: op.basis_repair
       operator_version: v1
@@ -18092,10 +18041,10 @@ template_operator_definitions:
       side_policy: contrarian
       label_target: basis_repair_h
       test_spec: mean_gt_0
-      compatible_families: &id611
+      compatible_families: &id618
       - INFORMATION_DESYNC
-      default_conditioning: &id612 {}
-      risk_metrics_required: &id613 []
+      default_conditioning: &id619 {}
+      risk_metrics_required: &id620 []
       template_kind: filter_template
       feature: basis_zscore
       operator: '>'
@@ -18117,10 +18066,10 @@ template_operator_definitions:
     raw:
       enabled: true
       supports_contexts: true
-      supports_directions: &id614
+      supports_directions: &id621
       - long
       - short
-      supports_trigger_types: &id615
+      supports_trigger_types: &id622
       - EVENT
       - SEQUENCE
       operator_id: op.breakout_followthrough
@@ -18129,7 +18078,7 @@ template_operator_definitions:
       side_policy: directional
       label_target: fwd_return_h
       test_spec: mean_gt_0
-      compatible_families: &id616
+      compatible_families: &id623
       - TREND_STRUCTURE
       - VOLATILITY_TRANSITION
       - LIQUIDITY_DISLOCATION
@@ -18141,8 +18090,8 @@ template_operator_definitions:
       - PRICE_VOL_IMBALANCE_PROXY
       - WICK_REVERSAL_PROXY
       - LIQUIDATION_EXHAUSTION_REVERSAL
-      default_conditioning: &id617 {}
-      risk_metrics_required: &id618 []
+      default_conditioning: &id624 {}
+      risk_metrics_required: &id625 []
       template_kind: execution_template
   continuation:
     template_id: continuation
@@ -18164,10 +18113,10 @@ template_operator_definitions:
     raw:
       enabled: true
       supports_contexts: true
-      supports_directions: &id619
+      supports_directions: &id626
       - long
       - short
-      supports_trigger_types: &id620
+      supports_trigger_types: &id627
       - EVENT
       - STATE
       - SEQUENCE
@@ -18178,7 +18127,7 @@ template_operator_definitions:
       side_policy: directional
       label_target: fwd_return_h
       test_spec: mean_gt_0
-      compatible_families: &id621
+      compatible_families: &id628
       - LIQUIDITY_DISLOCATION
       - POSITIONING_EXTREMES
       - REGIME_TRANSITION
@@ -18193,8 +18142,8 @@ template_operator_definitions:
       - PRICE_VOL_IMBALANCE_PROXY
       - WICK_REVERSAL_PROXY
       - LIQUIDATION_EXHAUSTION_REVERSAL
-      default_conditioning: &id622 {}
-      risk_metrics_required: &id623 []
+      default_conditioning: &id629 {}
+      risk_metrics_required: &id630 []
       template_kind: execution_template
   convergence:
     template_id: convergence
@@ -18203,10 +18152,10 @@ template_operator_definitions:
     raw:
       enabled: true
       supports_contexts: true
-      supports_directions: &id624
+      supports_directions: &id631
       - long
       - short
-      supports_trigger_types: &id625
+      supports_trigger_types: &id632
       - EVENT
       operator_id: op.convergence
       operator_version: v1
@@ -18214,10 +18163,10 @@ template_operator_definitions:
       side_policy: contrarian
       label_target: basis_repair_h
       test_spec: mean_gt_0
-      compatible_families: &id626
+      compatible_families: &id633
       - INFORMATION_DESYNC
-      default_conditioning: &id627 {}
-      risk_metrics_required: &id628 []
+      default_conditioning: &id634 {}
+      risk_metrics_required: &id635 []
       template_kind: execution_template
   convexity_capture:
     template_id: convexity_capture
@@ -18226,10 +18175,10 @@ template_operator_definitions:
     raw:
       enabled: true
       supports_contexts: true
-      supports_directions: &id629
+      supports_directions: &id636
       - long
       - short
-      supports_trigger_types: &id630
+      supports_trigger_types: &id637
       - EVENT
       operator_id: op.convexity_capture
       operator_version: v1
@@ -18237,10 +18186,10 @@ template_operator_definitions:
       side_policy: both
       label_target: mfe_h
       test_spec: upper_quantile_gt_0
-      compatible_families: &id631
+      compatible_families: &id638
       - POSITIONING_EXTREMES
-      default_conditioning: &id632 {}
-      risk_metrics_required: &id633
+      default_conditioning: &id639 {}
+      risk_metrics_required: &id640
       - tail_risk_avoid
       template_kind: filter_template
       feature: oi_delta_1h
@@ -18253,10 +18202,10 @@ template_operator_definitions:
     raw:
       enabled: true
       supports_contexts: true
-      supports_directions: &id634
+      supports_directions: &id641
       - long
       - short
-      supports_trigger_types: &id635
+      supports_trigger_types: &id642
       - EVENT
       operator_id: op.desync_repair
       operator_version: v1
@@ -18264,10 +18213,10 @@ template_operator_definitions:
       side_policy: contrarian
       label_target: basis_repair_h
       test_spec: mean_gt_0
-      compatible_families: &id636
+      compatible_families: &id643
       - INFORMATION_DESYNC
-      default_conditioning: &id637 {}
-      risk_metrics_required: &id638 []
+      default_conditioning: &id644 {}
+      risk_metrics_required: &id645 []
       template_kind: filter_template
       feature: cross_exchange_spread_z
       operator: '>'
@@ -18280,10 +18229,10 @@ template_operator_definitions:
     raw:
       enabled: true
       supports_contexts: true
-      supports_directions: &id639
+      supports_directions: &id646
       - long
       - short
-      supports_trigger_types: &id640
+      supports_trigger_types: &id647
       - EVENT
       operator_id: op.divergence_continuation
       operator_version: v1
@@ -18291,11 +18240,11 @@ template_operator_definitions:
       side_policy: directional
       label_target: basis_repair_h
       test_spec: hit_rate_gt_threshold
-      compatible_families: &id641
+      compatible_families: &id648
       - INFORMATION_DESYNC
       - REGIME_TRANSITION
-      default_conditioning: &id642 {}
-      risk_metrics_required: &id643
+      default_conditioning: &id649 {}
+      risk_metrics_required: &id650
       - tail_risk_avoid
       template_kind: filter_template
       feature: cross_exchange_spread_z
@@ -18309,10 +18258,10 @@ template_operator_definitions:
     raw:
       enabled: true
       supports_contexts: true
-      supports_directions: &id644
+      supports_directions: &id651
       - long
       - short
-      supports_trigger_types: &id645
+      supports_trigger_types: &id652
       - EVENT
       - STATE
       operator_id: op.drawdown_filter
@@ -18321,11 +18270,11 @@ template_operator_definitions:
       side_policy: both
       label_target: path_class_h
       test_spec: drawdown_lt_threshold
-      compatible_families: &id646
+      compatible_families: &id653
       - FORCED_FLOW_AND_EXHAUSTION
       - REGIME_TRANSITION
-      default_conditioning: &id647 {}
-      risk_metrics_required: &id648 []
+      default_conditioning: &id654 {}
+      risk_metrics_required: &id655 []
       template_kind: filter_template
       feature: logret_1
       operator: <
@@ -18338,10 +18287,10 @@ template_operator_definitions:
     raw:
       enabled: true
       supports_contexts: true
-      supports_directions: &id649
+      supports_directions: &id656
       - long
       - short
-      supports_trigger_types: &id650
+      supports_trigger_types: &id657
       - EVENT
       - SEQUENCE
       operator_id: op.exhaustion_reversal
@@ -18350,11 +18299,11 @@ template_operator_definitions:
       side_policy: contrarian
       label_target: fwd_return_h
       test_spec: mean_gt_0
-      compatible_families: &id651
+      compatible_families: &id658
       - FORCED_FLOW_AND_EXHAUSTION
       - POSITIONING_EXTREMES
-      default_conditioning: &id652 {}
-      risk_metrics_required: &id653
+      default_conditioning: &id659 {}
+      risk_metrics_required: &id660
       - drawdown_filter
       template_kind: filter_template
       feature: rv_pct_17280
@@ -18375,10 +18324,10 @@ template_operator_definitions:
     raw:
       enabled: true
       supports_contexts: true
-      supports_directions: &id654
+      supports_directions: &id661
       - long
       - short
-      supports_trigger_types: &id655
+      supports_trigger_types: &id662
       - EVENT
       operator_id: op.false_breakout_reversal
       operator_version: v1
@@ -18386,7 +18335,7 @@ template_operator_definitions:
       side_policy: contrarian
       label_target: fwd_return_h
       test_spec: mean_gt_0
-      compatible_families: &id656
+      compatible_families: &id663
       - TREND_STRUCTURE
       - ABSORPTION_PROXY
       - DEPTH_STRESS_PROXY
@@ -18396,8 +18345,8 @@ template_operator_definitions:
       - PRICE_VOL_IMBALANCE_PROXY
       - WICK_REVERSAL_PROXY
       - LIQUIDATION_EXHAUSTION_REVERSAL
-      default_conditioning: &id657 {}
-      risk_metrics_required: &id658 []
+      default_conditioning: &id664 {}
+      risk_metrics_required: &id665 []
       template_kind: execution_template
   lead_lag_follow:
     template_id: lead_lag_follow
@@ -18406,10 +18355,10 @@ template_operator_definitions:
     raw:
       enabled: true
       supports_contexts: true
-      supports_directions: &id659
+      supports_directions: &id666
       - long
       - short
-      supports_trigger_types: &id660
+      supports_trigger_types: &id667
       - EVENT
       - SEQUENCE
       operator_id: op.lead_lag_follow
@@ -18418,10 +18367,10 @@ template_operator_definitions:
       side_policy: directional
       label_target: fwd_return_h
       test_spec: mean_gt_0
-      compatible_families: &id661
+      compatible_families: &id668
       - INFORMATION_DESYNC
-      default_conditioning: &id662 {}
-      risk_metrics_required: &id663 []
+      default_conditioning: &id669 {}
+      risk_metrics_required: &id670 []
       template_kind: execution_template
   mean_reversion:
     template_id: mean_reversion
@@ -18444,10 +18393,10 @@ template_operator_definitions:
     raw:
       enabled: true
       supports_contexts: true
-      supports_directions: &id664
+      supports_directions: &id671
       - long
       - short
-      supports_trigger_types: &id665
+      supports_trigger_types: &id672
       - EVENT
       - STATE
       - SEQUENCE
@@ -18458,7 +18407,7 @@ template_operator_definitions:
       side_policy: contrarian
       label_target: fwd_return_h
       test_spec: mean_gt_0
-      compatible_families: &id666
+      compatible_families: &id673
       - FORCED_FLOW_AND_EXHAUSTION
       - LIQUIDITY_DISLOCATION
       - POSITIONING_EXTREMES
@@ -18474,8 +18423,8 @@ template_operator_definitions:
       - PRICE_VOL_IMBALANCE_PROXY
       - WICK_REVERSAL_PROXY
       - LIQUIDATION_EXHAUSTION_REVERSAL
-      default_conditioning: &id667 {}
-      risk_metrics_required: &id668
+      default_conditioning: &id674 {}
+      risk_metrics_required: &id675
       - tail_risk_avoid
       template_kind: execution_template
   momentum_fade:
@@ -18486,10 +18435,10 @@ template_operator_definitions:
     raw:
       enabled: true
       supports_contexts: true
-      supports_directions: &id669
+      supports_directions: &id676
       - long
       - short
-      supports_trigger_types: &id670
+      supports_trigger_types: &id677
       - EVENT
       operator_id: op.momentum_fade
       operator_version: v1
@@ -18497,11 +18446,11 @@ template_operator_definitions:
       side_policy: contrarian
       label_target: fwd_return_h
       test_spec: mean_gt_0
-      compatible_families: &id671
+      compatible_families: &id678
       - FORCED_FLOW_AND_EXHAUSTION
       - TREND_STRUCTURE
-      default_conditioning: &id672 {}
-      risk_metrics_required: &id673 []
+      default_conditioning: &id679 {}
+      risk_metrics_required: &id680 []
       template_kind: filter_template
       feature: logret_1
       operator: <
@@ -18513,10 +18462,10 @@ template_operator_definitions:
     raw:
       enabled: true
       supports_contexts: true
-      supports_directions: &id674
+      supports_directions: &id681
       - long
       - short
-      supports_trigger_types: &id675
+      supports_trigger_types: &id682
       - EVENT
       - STATE
       operator_id: op.only_if_funding
@@ -18525,10 +18474,10 @@ template_operator_definitions:
       side_policy: both
       label_target: gate
       test_spec: binary_gate
-      compatible_families: &id676
+      compatible_families: &id683
       - POSITIONING_EXTREMES
-      default_conditioning: &id677 {}
-      risk_metrics_required: &id678 []
+      default_conditioning: &id684 {}
+      risk_metrics_required: &id685 []
       template_kind: filter_template
       feature: funding_rate
       operator: '>'
@@ -18540,10 +18489,10 @@ template_operator_definitions:
     raw:
       enabled: true
       supports_contexts: true
-      supports_directions: &id679
+      supports_directions: &id686
       - long
       - short
-      supports_trigger_types: &id680
+      supports_trigger_types: &id687
       - EVENT
       - STATE
       operator_id: op.only_if_liquidity
@@ -18552,10 +18501,10 @@ template_operator_definitions:
       side_policy: both
       label_target: gate
       test_spec: binary_gate
-      compatible_families: &id681
+      compatible_families: &id688
       - LIQUIDITY_DISLOCATION
-      default_conditioning: &id682 {}
-      risk_metrics_required: &id683 []
+      default_conditioning: &id689 {}
+      risk_metrics_required: &id690 []
       template_kind: filter_template
       feature: liquidation_count
       operator: '>'
@@ -18567,10 +18516,10 @@ template_operator_definitions:
     raw:
       enabled: true
       supports_contexts: true
-      supports_directions: &id684
+      supports_directions: &id691
       - long
       - short
-      supports_trigger_types: &id685
+      supports_trigger_types: &id692
       - EVENT
       - STATE
       operator_id: op.only_if_no_news_window
@@ -18579,10 +18528,10 @@ template_operator_definitions:
       side_policy: both
       label_target: gate
       test_spec: binary_gate
-      compatible_families: &id686
+      compatible_families: &id693
       - TEMPORAL_STRUCTURE
-      default_conditioning: &id687 {}
-      risk_metrics_required: &id688 []
+      default_conditioning: &id694 {}
+      risk_metrics_required: &id695 []
       template_kind: filter_template
       feature: calendar_event
       operator: ==
@@ -18594,10 +18543,10 @@ template_operator_definitions:
     raw:
       enabled: true
       supports_contexts: true
-      supports_directions: &id689
+      supports_directions: &id696
       - long
       - short
-      supports_trigger_types: &id690
+      supports_trigger_types: &id697
       - EVENT
       - STATE
       operator_id: op.only_if_oi
@@ -18606,10 +18555,10 @@ template_operator_definitions:
       side_policy: both
       label_target: gate
       test_spec: binary_gate
-      compatible_families: &id691
+      compatible_families: &id698
       - POSITIONING_EXTREMES
-      default_conditioning: &id692 {}
-      risk_metrics_required: &id693 []
+      default_conditioning: &id699 {}
+      risk_metrics_required: &id700 []
       template_kind: filter_template
       feature: oi_delta_1h
       operator: '>'
@@ -18622,10 +18571,10 @@ template_operator_definitions:
     raw:
       enabled: true
       supports_contexts: true
-      supports_directions: &id694
+      supports_directions: &id701
       - long
       - short
-      supports_trigger_types: &id695
+      supports_trigger_types: &id702
       - EVENT
       - STATE
       operator_id: op.only_if_regime
@@ -18634,11 +18583,11 @@ template_operator_definitions:
       side_policy: both
       label_target: gate
       test_spec: binary_gate
-      compatible_families: &id696
+      compatible_families: &id703
       - REGIME_TRANSITION
       - VOLATILITY_TRANSITION
-      default_conditioning: &id697 {}
-      risk_metrics_required: &id698 []
+      default_conditioning: &id704 {}
+      risk_metrics_required: &id705 []
       template_kind: filter_template
       feature: rv_pct_17280
       operator: '>'
@@ -18651,10 +18600,10 @@ template_operator_definitions:
     raw:
       enabled: true
       supports_contexts: true
-      supports_directions: &id699
+      supports_directions: &id706
       - long
       - short
-      supports_trigger_types: &id700
+      supports_trigger_types: &id707
       - EVENT
       - STATE
       operator_id: op.only_if_trend
@@ -18663,11 +18612,11 @@ template_operator_definitions:
       side_policy: both
       label_target: gate
       test_spec: binary_gate
-      compatible_families: &id701
+      compatible_families: &id708
       - FORCED_FLOW_AND_EXHAUSTION
       - TREND_STRUCTURE
-      default_conditioning: &id702 {}
-      risk_metrics_required: &id703 []
+      default_conditioning: &id709 {}
+      risk_metrics_required: &id710 []
       template_kind: filter_template
       feature: logret_1
       operator: '>'
@@ -18688,10 +18637,10 @@ template_operator_definitions:
     raw:
       enabled: true
       supports_contexts: true
-      supports_directions: &id704
+      supports_directions: &id711
       - long
       - short
-      supports_trigger_types: &id705
+      supports_trigger_types: &id712
       - EVENT
       operator_id: op.overshoot_repair
       operator_version: v1
@@ -18699,7 +18648,7 @@ template_operator_definitions:
       side_policy: contrarian
       label_target: fwd_return_h
       test_spec: mean_gt_0
-      compatible_families: &id706
+      compatible_families: &id713
       - LIQUIDITY_DISLOCATION
       - STATISTICAL_DISLOCATION
       - ABSORPTION_PROXY
@@ -18710,8 +18659,8 @@ template_operator_definitions:
       - PRICE_VOL_IMBALANCE_PROXY
       - WICK_REVERSAL_PROXY
       - LIQUIDATION_EXHAUSTION_REVERSAL
-      default_conditioning: &id707 {}
-      risk_metrics_required: &id708
+      default_conditioning: &id714 {}
+      risk_metrics_required: &id715
       - tail_risk_avoid
       template_kind: filter_template
       feature: basis_zscore
@@ -18734,10 +18683,10 @@ template_operator_definitions:
     raw:
       enabled: true
       supports_contexts: true
-      supports_directions: &id709
+      supports_directions: &id716
       - long
       - short
-      supports_trigger_types: &id710
+      supports_trigger_types: &id717
       - EVENT
       - STATE
       operator_id: op.pullback_entry
@@ -18746,7 +18695,7 @@ template_operator_definitions:
       side_policy: directional
       label_target: fwd_return_h
       test_spec: mean_gt_0
-      compatible_families: &id711
+      compatible_families: &id718
       - TREND_STRUCTURE
       - VOLATILITY_TRANSITION
       - LIQUIDITY_DISLOCATION
@@ -18758,8 +18707,8 @@ template_operator_definitions:
       - PRICE_VOL_IMBALANCE_PROXY
       - WICK_REVERSAL_PROXY
       - LIQUIDATION_EXHAUSTION_REVERSAL
-      default_conditioning: &id712 {}
-      risk_metrics_required: &id713
+      default_conditioning: &id719 {}
+      risk_metrics_required: &id720
       - drawdown_filter
       template_kind: execution_template
   range_reversion:
@@ -18770,10 +18719,10 @@ template_operator_definitions:
     raw:
       enabled: true
       supports_contexts: true
-      supports_directions: &id714
+      supports_directions: &id721
       - long
       - short
-      supports_trigger_types: &id715
+      supports_trigger_types: &id722
       - EVENT
       - STATE
       operator_id: op.range_reversion
@@ -18782,11 +18731,11 @@ template_operator_definitions:
       side_policy: contrarian
       label_target: fwd_return_h
       test_spec: mean_gt_0
-      compatible_families: &id716
+      compatible_families: &id723
       - FORCED_FLOW_AND_EXHAUSTION
       - STATISTICAL_DISLOCATION
-      default_conditioning: &id717 {}
-      risk_metrics_required: &id718 []
+      default_conditioning: &id724 {}
+      risk_metrics_required: &id725 []
       template_kind: filter_template
       feature: basis_zscore
       operator: '>'
@@ -18798,10 +18747,10 @@ template_operator_definitions:
     raw:
       enabled: true
       supports_contexts: true
-      supports_directions: &id719
+      supports_directions: &id726
       - long
       - short
-      supports_trigger_types: &id720
+      supports_trigger_types: &id727
       - EVENT
       - SEQUENCE
       operator_id: op.reversal_or_squeeze
@@ -18810,10 +18759,10 @@ template_operator_definitions:
       side_policy: both
       label_target: fwd_return_h
       test_spec: mean_gt_0_or_tail_positive
-      compatible_families: &id721
+      compatible_families: &id728
       - POSITIONING_EXTREMES
-      default_conditioning: &id722 {}
-      risk_metrics_required: &id723
+      default_conditioning: &id729 {}
+      risk_metrics_required: &id730
       - tail_risk_avoid
       template_kind: filter_template
       feature: funding_rate_scaled
@@ -18827,10 +18776,10 @@ template_operator_definitions:
     raw:
       enabled: true
       supports_contexts: true
-      supports_directions: &id724
+      supports_directions: &id731
       - long
       - short
-      supports_trigger_types: &id725
+      supports_trigger_types: &id732
       - EVENT
       operator_id: op.slippage_aware_filter
       operator_version: v1
@@ -18838,11 +18787,11 @@ template_operator_definitions:
       side_policy: both
       label_target: path_class_h
       test_spec: cost_ratio_lt_threshold
-      compatible_families: &id726
+      compatible_families: &id733
       - LIQUIDITY_DISLOCATION
       - EXECUTION_FRICTION
-      default_conditioning: &id727 {}
-      risk_metrics_required: &id728 []
+      default_conditioning: &id734 {}
+      risk_metrics_required: &id735 []
       template_kind: filter_template
       feature: spread_zscore
       operator: '>'
@@ -18854,10 +18803,10 @@ template_operator_definitions:
     raw:
       enabled: true
       supports_contexts: true
-      supports_directions: &id729
+      supports_directions: &id736
       - long
       - short
-      supports_trigger_types: &id730
+      supports_trigger_types: &id737
       - EVENT
       operator_id: op.stop_run_repair
       operator_version: v1
@@ -18865,10 +18814,10 @@ template_operator_definitions:
       side_policy: contrarian
       label_target: fwd_return_h
       test_spec: mean_gt_0
-      compatible_families: &id731
+      compatible_families: &id738
       - LIQUIDITY_DISLOCATION
-      default_conditioning: &id732 {}
-      risk_metrics_required: &id733
+      default_conditioning: &id739 {}
+      risk_metrics_required: &id740
       - slippage_aware_filter
       template_kind: filter_template
       feature: liquidation_count
@@ -18884,10 +18833,10 @@ template_operator_definitions:
     raw:
       enabled: true
       supports_contexts: true
-      supports_directions: &id734
+      supports_directions: &id741
       - long
       - short
-      supports_trigger_types: &id735
+      supports_trigger_types: &id742
       - EVENT
       - STATE
       operator_id: op.tail_risk_avoid
@@ -18896,13 +18845,13 @@ template_operator_definitions:
       side_policy: both
       label_target: path_class_h
       test_spec: tail_loss_lt_threshold
-      compatible_families: &id736
+      compatible_families: &id743
       - EXECUTION_FRICTION
       - POSITIONING_EXTREMES
       - REGIME_TRANSITION
       - STATISTICAL_DISLOCATION
-      default_conditioning: &id737 {}
-      risk_metrics_required: &id738
+      default_conditioning: &id744 {}
+      risk_metrics_required: &id745
       - drawdown_filter
       template_kind: filter_template
       feature: rv_pct_17280
@@ -18925,10 +18874,10 @@ template_operator_definitions:
     raw:
       enabled: true
       supports_contexts: true
-      supports_directions: &id739
+      supports_directions: &id746
       - long
       - short
-      supports_trigger_types: &id740
+      supports_trigger_types: &id747
       - EVENT
       - STATE
       - SEQUENCE
@@ -18938,7 +18887,7 @@ template_operator_definitions:
       side_policy: directional
       label_target: fwd_return_h
       test_spec: mean_gt_0
-      compatible_families: &id741
+      compatible_families: &id748
       - TREND_STRUCTURE
       - VOLATILITY_TRANSITION
       - LIQUIDITY_DISLOCATION
@@ -18950,8 +18899,8 @@ template_operator_definitions:
       - PRICE_VOL_IMBALANCE_PROXY
       - WICK_REVERSAL_PROXY
       - LIQUIDATION_EXHAUSTION_REVERSAL
-      default_conditioning: &id742 {}
-      risk_metrics_required: &id743
+      default_conditioning: &id749 {}
+      risk_metrics_required: &id750
       - drawdown_filter
       template_kind: execution_template
   volatility_expansion_follow:
@@ -18961,10 +18910,10 @@ template_operator_definitions:
     raw:
       enabled: true
       supports_contexts: true
-      supports_directions: &id744
+      supports_directions: &id751
       - long
       - short
-      supports_trigger_types: &id745
+      supports_trigger_types: &id752
       - EVENT
       operator_id: op.volatility_expansion_follow
       operator_version: v1
@@ -18972,10 +18921,10 @@ template_operator_definitions:
       side_policy: directional
       label_target: path_class_h
       test_spec: hit_rate_gt_threshold
-      compatible_families: &id746
+      compatible_families: &id753
       - VOLATILITY_TRANSITION
-      default_conditioning: &id747 {}
-      risk_metrics_required: &id748
+      default_conditioning: &id754 {}
+      risk_metrics_required: &id755
       - drawdown_filter
       template_kind: filter_template
       feature: rv_96
@@ -19442,10 +19391,194 @@ regime_definitions:
     spec_path: /home/irene/Edge/spec/regimes/registry.yaml
     source_kind: regime_registry
 thesis_definitions:
+  THESIS_BASIS_DISLOC:
+    thesis_id: THESIS_BASIS_DISLOC
+    thesis_kind: standalone_event
+    event_family: BASIS_DISLOC
+    primary_event_id: BASIS_DISLOC
+    canonical_regime: BASIS_FUNDING_DISLOCATION
+    timeframe: 5m
+    event_side: both
+    promotion_class: ''
+    deployment_state: ''
+    trigger_events:
+    - BASIS_DISLOC
+    confirmation_events: []
+    required_episodes: []
+    disallowed_regimes: []
+    source_event_contract_ids:
+    - BASIS_DISLOC
+    source_episode_contract_ids: []
+    required_context: {}
+    supportive_context:
+      has_realized_oos_path: false
+      canonical_regime: BASIS_FUNDING_DISLOCATION
+    expected_response:
+      response_class: basis_dislocation_continuation_or_repair
+    invalidation: {}
+    freshness_policy:
+      allowed_staleness_classes: &id597
+      - fresh
+      - watch
+      require_review_due_date: false
+    governance:
+      trade_trigger_eligible: true
+      requires_stronger_evidence: false
+      operational_role: trigger
+      evidence_mode: direct
+    symbol_scope:
+      mode: symbol_set
+    detection:
+      detector_kind: basis_disloc
+      symbols: &id594
+      - BTCUSDT
+      horizons: &id595
+      - 8
+      - 16
+      - 24
+      payoff_mode: absolute_return
+      fees_bps: 6.0
+      params: &id596
+        z_threshold: 5.0
+        lookback_window: 288
+        cooldown_bars: 12
+        min_basis_bps: 10.0
+    notes: Founding basis dislocation thesis uses canonical feature-schema basis fields
+      when spot-perp paired raw bars are not available as a dedicated bootstrap input.
+    raw:
+      identity:
+        thesis_id: THESIS_BASIS_DISLOC
+        thesis_kind: standalone_event
+        event_family: BASIS_DISLOC
+        timeframe: 5m
+        event_side: both
+      source:
+        event_contract_ids:
+        - BASIS_DISLOC
+        episode_contract_ids: []
+      clauses:
+        trigger_events:
+        - BASIS_DISLOC
+        confirmation_events: []
+        required_episodes: []
+        disallowed_regimes: []
+      governance:
+        operational_role: trigger
+        evidence_mode: direct
+      supportive_context:
+        canonical_regime: BASIS_FUNDING_DISLOCATION
+      expected_response:
+        response_class: basis_dislocation_continuation_or_repair
+      detection:
+        detector_kind: basis_disloc
+        symbols: *id594
+        horizons: *id595
+        payoff_mode: absolute_return
+        fees_bps: 6.0
+        params: *id596
+      notes: Founding basis dislocation thesis uses canonical feature-schema basis
+        fields when spot-perp paired raw bars are not available as a dedicated bootstrap
+        input.
+    spec_path: /home/irene/Edge/spec/theses/thesis_registry.yaml
+    source_kind: thesis_registry
+  THESIS_FND_DISLOC:
+    thesis_id: THESIS_FND_DISLOC
+    thesis_kind: standalone_event
+    event_family: FND_DISLOC
+    primary_event_id: FND_DISLOC
+    canonical_regime: BASIS_FUNDING_DISLOCATION
+    timeframe: 5m
+    event_side: both
+    promotion_class: ''
+    deployment_state: ''
+    trigger_events:
+    - FND_DISLOC
+    confirmation_events: []
+    required_episodes: []
+    disallowed_regimes: []
+    source_event_contract_ids:
+    - FND_DISLOC
+    source_episode_contract_ids: []
+    required_context: {}
+    supportive_context:
+      has_realized_oos_path: false
+      canonical_regime: BASIS_FUNDING_DISLOCATION
+    expected_response:
+      response_class: funding_dislocation_continuation_or_repair
+    invalidation: {}
+    freshness_policy:
+      allowed_staleness_classes: *id597
+      require_review_due_date: false
+    governance:
+      trade_trigger_eligible: true
+      requires_stronger_evidence: false
+      operational_role: trigger
+      evidence_mode: direct
+    symbol_scope:
+      mode: symbol_set
+    detection:
+      detector_kind: fnd_disloc
+      symbols: &id598
+      - BTCUSDT
+      horizons: &id599
+      - 8
+      - 16
+      - 24
+      payoff_mode: absolute_return
+      fees_bps: 6.0
+      params: &id600
+        z_threshold: 5.0
+        lookback_window: 288
+        threshold_bps: 2.0
+        funding_quantile: 0.95
+        alignment_window: 3
+        cooldown_bars: 12
+        min_basis_bps: 5.0
+    notes: Founding funding dislocation thesis uses canonical basis and funding features
+      from the feature schema when bootstrap raw inputs are not sufficient on their
+      own.
+    raw:
+      identity:
+        thesis_id: THESIS_FND_DISLOC
+        thesis_kind: standalone_event
+        event_family: FND_DISLOC
+        timeframe: 5m
+        event_side: both
+      source:
+        event_contract_ids:
+        - FND_DISLOC
+        episode_contract_ids: []
+      clauses:
+        trigger_events:
+        - FND_DISLOC
+        confirmation_events: []
+        required_episodes: []
+        disallowed_regimes: []
+      governance:
+        operational_role: trigger
+        evidence_mode: direct
+      supportive_context:
+        canonical_regime: BASIS_FUNDING_DISLOCATION
+      expected_response:
+        response_class: funding_dislocation_continuation_or_repair
+      detection:
+        detector_kind: fnd_disloc
+        symbols: *id598
+        horizons: *id599
+        payoff_mode: absolute_return
+        fees_bps: 6.0
+        params: *id600
+      notes: Founding funding dislocation thesis uses canonical basis and funding
+        features from the feature schema when bootstrap raw inputs are not sufficient
+        on their own.
+    spec_path: /home/irene/Edge/spec/theses/thesis_registry.yaml
+    source_kind: thesis_registry
   THESIS_LIQUIDATION_CASCADE:
     thesis_id: THESIS_LIQUIDATION_CASCADE
     thesis_kind: standalone_event
     event_family: LIQUIDATION_CASCADE
+    primary_event_id: LIQUIDATION_CASCADE
+    canonical_regime: FORCED_FLOW
     timeframe: 5m
     event_side: both
     promotion_class: ''
@@ -19465,6 +19598,9 @@ thesis_definitions:
     expected_response:
       response_class: forced_flow_aftershock
     invalidation: {}
+    freshness_policy:
+      allowed_staleness_classes: *id597
+      require_review_due_date: false
     governance:
       trade_trigger_eligible: true
       requires_stronger_evidence: false
@@ -19474,16 +19610,16 @@ thesis_definitions:
       mode: symbol_set
     detection:
       detector_kind: liquidation_cascade
-      symbols: &id594
+      symbols: &id601
       - BTCUSDT
       - ETHUSDT
-      horizons: &id595
+      horizons: &id602
       - 8
       - 16
       - 24
       payoff_mode: absolute_return
       fees_bps: 6.0
-      params: &id596
+      params: &id603
         shock_quantile: 0.975
         shock_window: 288
         oi_window: 12
@@ -19518,11 +19654,11 @@ thesis_definitions:
         response_class: forced_flow_aftershock
       detection:
         detector_kind: liquidation_cascade
-        symbols: *id594
-        horizons: *id595
+        symbols: *id601
+        horizons: *id602
         payoff_mode: absolute_return
         fees_bps: 6.0
-        params: *id596
+        params: *id603
       notes: Raw-data evidence uses a forced-flow proxy requiring an extreme return
         shock, large open-interest drop, and concurrent funding stretch.
     spec_path: /home/irene/Edge/spec/theses/thesis_registry.yaml
@@ -19531,6 +19667,8 @@ thesis_definitions:
     thesis_id: THESIS_LIQUIDITY_VACUUM
     thesis_kind: standalone_event
     event_family: LIQUIDITY_VACUUM
+    primary_event_id: LIQUIDITY_VACUUM
+    canonical_regime: LIQUIDITY_STRESS
     timeframe: 5m
     event_side: both
     promotion_class: ''
@@ -19550,6 +19688,9 @@ thesis_definitions:
     expected_response:
       response_class: liquidity_stress_continuation
     invalidation: {}
+    freshness_policy:
+      allowed_staleness_classes: *id597
+      require_review_due_date: false
     governance:
       trade_trigger_eligible: true
       requires_stronger_evidence: false
@@ -19559,16 +19700,16 @@ thesis_definitions:
       mode: symbol_set
     detection:
       detector_kind: liquidity_vacuum
-      symbols: &id597
+      symbols: &id604
       - BTCUSDT
       - ETHUSDT
-      horizons: &id598
+      horizons: &id605
       - 8
       - 16
       - 24
       payoff_mode: absolute_return
       fees_bps: 6.0
-      params: &id599
+      params: &id606
         shock_quantile: 0.95
         shock_window: 288
         volume_window: 36
@@ -19604,11 +19745,11 @@ thesis_definitions:
         response_class: liquidity_stress_continuation
       detection:
         detector_kind: liquidity_vacuum
-        symbols: *id597
-        horizons: *id598
+        symbols: *id604
+        horizons: *id605
         payoff_mode: absolute_return
         fees_bps: 6.0
-        params: *id599
+        params: *id606
       notes: Raw-data evidence uses post-event absolute move after low-volume, wide-range
         continuation bars following the initiating shock.
     spec_path: /home/irene/Edge/spec/theses/thesis_registry.yaml
@@ -19617,6 +19758,8 @@ thesis_definitions:
     thesis_id: THESIS_LIQUIDITY_VACUUM_CASCADE_CONFIRM
     thesis_kind: event_plus_confirm
     event_family: LIQUIDITY_VACUUM
+    primary_event_id: LIQUIDITY_VACUUM
+    canonical_regime: LIQUIDITY_STRESS
     timeframe: 5m
     event_side: both
     promotion_class: ''
@@ -19638,6 +19781,9 @@ thesis_definitions:
     expected_response:
       response_class: liquidity_stress_forced_flow_confirmation
     invalidation: {}
+    freshness_policy:
+      allowed_staleness_classes: *id597
+      require_review_due_date: false
     governance:
       trade_trigger_eligible: true
       requires_stronger_evidence: true
@@ -19647,16 +19793,16 @@ thesis_definitions:
       mode: symbol_set
     detection:
       detector_kind: paired_confirmation
-      symbols: &id600
+      symbols: &id607
       - BTCUSDT
       - ETHUSDT
-      horizons: &id601
+      horizons: &id608
       - 24
       - 32
       - 48
       payoff_mode: absolute_return
       fees_bps: 6.0
-      params: &id602
+      params: &id609
         confirmation_window_bars: 24
         require_confirmation_after_trigger: false
         trigger_kind: liquidity_vacuum
@@ -19708,11 +19854,11 @@ thesis_definitions:
         response_class: liquidity_stress_forced_flow_confirmation
       detection:
         detector_kind: paired_confirmation
-        symbols: *id600
-        horizons: *id601
+        symbols: *id607
+        horizons: *id608
         payoff_mode: absolute_return
         fees_bps: 6.0
-        params: *id602
+        params: *id609
       notes: Raw-data evidence requires LIQUIDITY_VACUUM to appear in the same local
         stress window as LIQUIDATION_CASCADE, producing a stronger forced-flow/liquidity-stress
         setup than either event alone.
@@ -19722,6 +19868,8 @@ thesis_definitions:
     thesis_id: THESIS_VOL_SHOCK
     thesis_kind: standalone_event
     event_family: VOL_SHOCK
+    primary_event_id: VOL_SHOCK
+    canonical_regime: VOLATILITY_TRANSITION
     timeframe: 5m
     event_side: both
     promotion_class: ''
@@ -19741,6 +19889,9 @@ thesis_definitions:
     expected_response:
       response_class: volatility_expansion
     invalidation: {}
+    freshness_policy:
+      allowed_staleness_classes: *id597
+      require_review_due_date: false
     governance:
       trade_trigger_eligible: true
       requires_stronger_evidence: false
@@ -19750,16 +19901,16 @@ thesis_definitions:
       mode: symbol_set
     detection:
       detector_kind: vol_shock
-      symbols: &id603
+      symbols: &id610
       - BTCUSDT
       - ETHUSDT
-      horizons: &id604
+      horizons: &id611
       - 8
       - 16
       - 24
       payoff_mode: absolute_return
       fees_bps: 6.0
-      params: &id605
+      params: &id612
         rv_window: 12
         baseline_window: 288
         shock_quantile: 0.95
@@ -19791,11 +19942,11 @@ thesis_definitions:
         response_class: volatility_expansion
       detection:
         detector_kind: vol_shock
-        symbols: *id603
-        horizons: *id604
+        symbols: *id610
+        horizons: *id611
         payoff_mode: absolute_return
         fees_bps: 6.0
-        params: *id605
+        params: *id612
       notes: Raw-data evidence uses absolute post-shock move, which matches the contract's
         volatility-expansion semantics better than directional continuation.
     spec_path: /home/irene/Edge/spec/theses/thesis_registry.yaml
@@ -19804,6 +19955,8 @@ thesis_definitions:
     thesis_id: THESIS_VOL_SHOCK_LIQUIDITY_CONFIRM
     thesis_kind: event_plus_confirm
     event_family: VOL_SHOCK
+    primary_event_id: VOL_SHOCK
+    canonical_regime: VOLATILITY_TRANSITION
     timeframe: 5m
     event_side: both
     promotion_class: ''
@@ -19825,6 +19978,9 @@ thesis_definitions:
     expected_response:
       response_class: confirmation_strengthens_volatility_thesis
     invalidation: {}
+    freshness_policy:
+      allowed_staleness_classes: *id597
+      require_review_due_date: false
     governance:
       trade_trigger_eligible: true
       requires_stronger_evidence: true
@@ -19834,16 +19990,16 @@ thesis_definitions:
       mode: symbol_set
     detection:
       detector_kind: vol_shock_liquidity_confirm
-      symbols: &id606
+      symbols: &id613
       - BTCUSDT
       - ETHUSDT
-      horizons: &id607
+      horizons: &id614
       - 8
       - 16
       - 24
       payoff_mode: absolute_return
       fees_bps: 6.0
-      params: &id608
+      params: &id615
         confirmation_window_bars: 3
         require_confirmation_after_trigger: true
         trigger_kind: vol_shock
@@ -19892,11 +20048,11 @@ thesis_definitions:
         response_class: confirmation_strengthens_volatility_thesis
       detection:
         detector_kind: vol_shock_liquidity_confirm
-        symbols: *id606
-        horizons: *id607
+        symbols: *id613
+        horizons: *id614
         payoff_mode: absolute_return
         fees_bps: 6.0
-        params: *id608
+        params: *id615
       notes: Raw-data evidence requires a VOL_SHOCK trigger with a nearby LIQUIDITY_VACUUM
         confirmation, producing a stronger post-shock move thesis than either event
         alone.
@@ -21160,17 +21316,17 @@ template_registry_payload:
     basis_repair:
       enabled: true
       supports_contexts: true
-      supports_directions: *id609
-      supports_trigger_types: *id610
+      supports_directions: *id616
+      supports_trigger_types: *id617
       operator_id: op.basis_repair
       operator_version: v1
       requires_direction: false
       side_policy: contrarian
       label_target: basis_repair_h
       test_spec: mean_gt_0
-      compatible_families: *id611
-      default_conditioning: *id612
-      risk_metrics_required: *id613
+      compatible_families: *id618
+      default_conditioning: *id619
+      risk_metrics_required: *id620
       template_kind: filter_template
       feature: basis_zscore
       operator: '>'
@@ -21178,62 +21334,62 @@ template_registry_payload:
     breakout_followthrough:
       enabled: true
       supports_contexts: true
-      supports_directions: *id614
-      supports_trigger_types: *id615
+      supports_directions: *id621
+      supports_trigger_types: *id622
       operator_id: op.breakout_followthrough
       operator_version: v1
       requires_direction: true
       side_policy: directional
       label_target: fwd_return_h
       test_spec: mean_gt_0
-      compatible_families: *id616
-      default_conditioning: *id617
-      risk_metrics_required: *id618
+      compatible_families: *id623
+      default_conditioning: *id624
+      risk_metrics_required: *id625
       template_kind: execution_template
     continuation:
       enabled: true
       supports_contexts: true
-      supports_directions: *id619
-      supports_trigger_types: *id620
+      supports_directions: *id626
+      supports_trigger_types: *id627
       operator_id: op.continuation
       operator_version: v1
       requires_direction: true
       side_policy: directional
       label_target: fwd_return_h
       test_spec: mean_gt_0
-      compatible_families: *id621
-      default_conditioning: *id622
-      risk_metrics_required: *id623
+      compatible_families: *id628
+      default_conditioning: *id629
+      risk_metrics_required: *id630
       template_kind: execution_template
     convergence:
       enabled: true
       supports_contexts: true
-      supports_directions: *id624
-      supports_trigger_types: *id625
+      supports_directions: *id631
+      supports_trigger_types: *id632
       operator_id: op.convergence
       operator_version: v1
       requires_direction: false
       side_policy: contrarian
       label_target: basis_repair_h
       test_spec: mean_gt_0
-      compatible_families: *id626
-      default_conditioning: *id627
-      risk_metrics_required: *id628
+      compatible_families: *id633
+      default_conditioning: *id634
+      risk_metrics_required: *id635
       template_kind: execution_template
     convexity_capture:
       enabled: true
       supports_contexts: true
-      supports_directions: *id629
-      supports_trigger_types: *id630
+      supports_directions: *id636
+      supports_trigger_types: *id637
       operator_id: op.convexity_capture
       operator_version: v1
       requires_direction: true
       side_policy: both
       label_target: mfe_h
       test_spec: upper_quantile_gt_0
-      compatible_families: *id631
-      default_conditioning: *id632
-      risk_metrics_required: *id633
+      compatible_families: *id638
+      default_conditioning: *id639
+      risk_metrics_required: *id640
       template_kind: filter_template
       feature: oi_delta_1h
       operator: <
@@ -21241,17 +21397,17 @@ template_registry_payload:
     desync_repair:
       enabled: true
       supports_contexts: true
-      supports_directions: *id634
-      supports_trigger_types: *id635
+      supports_directions: *id641
+      supports_trigger_types: *id642
       operator_id: op.desync_repair
       operator_version: v1
       requires_direction: false
       side_policy: contrarian
       label_target: basis_repair_h
       test_spec: mean_gt_0
-      compatible_families: *id636
-      default_conditioning: *id637
-      risk_metrics_required: *id638
+      compatible_families: *id643
+      default_conditioning: *id644
+      risk_metrics_required: *id645
       template_kind: filter_template
       feature: cross_exchange_spread_z
       operator: '>'
@@ -21259,17 +21415,17 @@ template_registry_payload:
     divergence_continuation:
       enabled: true
       supports_contexts: true
-      supports_directions: *id639
-      supports_trigger_types: *id640
+      supports_directions: *id646
+      supports_trigger_types: *id647
       operator_id: op.divergence_continuation
       operator_version: v1
       requires_direction: true
       side_policy: directional
       label_target: basis_repair_h
       test_spec: hit_rate_gt_threshold
-      compatible_families: *id641
-      default_conditioning: *id642
-      risk_metrics_required: *id643
+      compatible_families: *id648
+      default_conditioning: *id649
+      risk_metrics_required: *id650
       template_kind: filter_template
       feature: cross_exchange_spread_z
       operator: '>'
@@ -21277,17 +21433,17 @@ template_registry_payload:
     drawdown_filter:
       enabled: true
       supports_contexts: true
-      supports_directions: *id644
-      supports_trigger_types: *id645
+      supports_directions: *id651
+      supports_trigger_types: *id652
       operator_id: op.drawdown_filter
       operator_version: v1
       requires_direction: false
       side_policy: both
       label_target: path_class_h
       test_spec: drawdown_lt_threshold
-      compatible_families: *id646
-      default_conditioning: *id647
-      risk_metrics_required: *id648
+      compatible_families: *id653
+      default_conditioning: *id654
+      risk_metrics_required: *id655
       template_kind: filter_template
       feature: logret_1
       operator: <
@@ -21295,17 +21451,17 @@ template_registry_payload:
     exhaustion_reversal:
       enabled: true
       supports_contexts: true
-      supports_directions: *id649
-      supports_trigger_types: *id650
+      supports_directions: *id656
+      supports_trigger_types: *id657
       operator_id: op.exhaustion_reversal
       operator_version: v1
       requires_direction: true
       side_policy: contrarian
       label_target: fwd_return_h
       test_spec: mean_gt_0
-      compatible_families: *id651
-      default_conditioning: *id652
-      risk_metrics_required: *id653
+      compatible_families: *id658
+      default_conditioning: *id659
+      risk_metrics_required: *id660
       template_kind: filter_template
       feature: rv_pct_17280
       operator: '>'
@@ -21313,62 +21469,62 @@ template_registry_payload:
     false_breakout_reversal:
       enabled: true
       supports_contexts: true
-      supports_directions: *id654
-      supports_trigger_types: *id655
+      supports_directions: *id661
+      supports_trigger_types: *id662
       operator_id: op.false_breakout_reversal
       operator_version: v1
       requires_direction: true
       side_policy: contrarian
       label_target: fwd_return_h
       test_spec: mean_gt_0
-      compatible_families: *id656
-      default_conditioning: *id657
-      risk_metrics_required: *id658
+      compatible_families: *id663
+      default_conditioning: *id664
+      risk_metrics_required: *id665
       template_kind: execution_template
     lead_lag_follow:
       enabled: true
       supports_contexts: true
-      supports_directions: *id659
-      supports_trigger_types: *id660
+      supports_directions: *id666
+      supports_trigger_types: *id667
       operator_id: op.lead_lag_follow
       operator_version: v1
       requires_direction: true
       side_policy: directional
       label_target: fwd_return_h
       test_spec: mean_gt_0
-      compatible_families: *id661
-      default_conditioning: *id662
-      risk_metrics_required: *id663
+      compatible_families: *id668
+      default_conditioning: *id669
+      risk_metrics_required: *id670
       template_kind: execution_template
     mean_reversion:
       enabled: true
       supports_contexts: true
-      supports_directions: *id664
-      supports_trigger_types: *id665
+      supports_directions: *id671
+      supports_trigger_types: *id672
       operator_id: op.mean_reversion
       operator_version: v1
       requires_direction: false
       side_policy: contrarian
       label_target: fwd_return_h
       test_spec: mean_gt_0
-      compatible_families: *id666
-      default_conditioning: *id667
-      risk_metrics_required: *id668
+      compatible_families: *id673
+      default_conditioning: *id674
+      risk_metrics_required: *id675
       template_kind: execution_template
     momentum_fade:
       enabled: true
       supports_contexts: true
-      supports_directions: *id669
-      supports_trigger_types: *id670
+      supports_directions: *id676
+      supports_trigger_types: *id677
       operator_id: op.momentum_fade
       operator_version: v1
       requires_direction: true
       side_policy: contrarian
       label_target: fwd_return_h
       test_spec: mean_gt_0
-      compatible_families: *id671
-      default_conditioning: *id672
-      risk_metrics_required: *id673
+      compatible_families: *id678
+      default_conditioning: *id679
+      risk_metrics_required: *id680
       template_kind: filter_template
       feature: logret_1
       operator: <
@@ -21376,17 +21532,17 @@ template_registry_payload:
     only_if_funding:
       enabled: true
       supports_contexts: true
-      supports_directions: *id674
-      supports_trigger_types: *id675
+      supports_directions: *id681
+      supports_trigger_types: *id682
       operator_id: op.only_if_funding
       operator_version: v1
       requires_direction: false
       side_policy: both
       label_target: gate
       test_spec: binary_gate
-      compatible_families: *id676
-      default_conditioning: *id677
-      risk_metrics_required: *id678
+      compatible_families: *id683
+      default_conditioning: *id684
+      risk_metrics_required: *id685
       template_kind: filter_template
       feature: funding_rate
       operator: '>'
@@ -21394,17 +21550,17 @@ template_registry_payload:
     only_if_liquidity:
       enabled: true
       supports_contexts: true
-      supports_directions: *id679
-      supports_trigger_types: *id680
+      supports_directions: *id686
+      supports_trigger_types: *id687
       operator_id: op.only_if_liquidity
       operator_version: v1
       requires_direction: false
       side_policy: both
       label_target: gate
       test_spec: binary_gate
-      compatible_families: *id681
-      default_conditioning: *id682
-      risk_metrics_required: *id683
+      compatible_families: *id688
+      default_conditioning: *id689
+      risk_metrics_required: *id690
       template_kind: filter_template
       feature: liquidation_count
       operator: '>'
@@ -21412,17 +21568,17 @@ template_registry_payload:
     only_if_no_news_window:
       enabled: true
       supports_contexts: true
-      supports_directions: *id684
-      supports_trigger_types: *id685
+      supports_directions: *id691
+      supports_trigger_types: *id692
       operator_id: op.only_if_no_news_window
       operator_version: v1
       requires_direction: false
       side_policy: both
       label_target: gate
       test_spec: binary_gate
-      compatible_families: *id686
-      default_conditioning: *id687
-      risk_metrics_required: *id688
+      compatible_families: *id693
+      default_conditioning: *id694
+      risk_metrics_required: *id695
       template_kind: filter_template
       feature: calendar_event
       operator: ==
@@ -21430,17 +21586,17 @@ template_registry_payload:
     only_if_oi:
       enabled: true
       supports_contexts: true
-      supports_directions: *id689
-      supports_trigger_types: *id690
+      supports_directions: *id696
+      supports_trigger_types: *id697
       operator_id: op.only_if_oi
       operator_version: v1
       requires_direction: false
       side_policy: both
       label_target: gate
       test_spec: binary_gate
-      compatible_families: *id691
-      default_conditioning: *id692
-      risk_metrics_required: *id693
+      compatible_families: *id698
+      default_conditioning: *id699
+      risk_metrics_required: *id700
       template_kind: filter_template
       feature: oi_delta_1h
       operator: '>'
@@ -21448,17 +21604,17 @@ template_registry_payload:
     only_if_regime:
       enabled: true
       supports_contexts: true
-      supports_directions: *id694
-      supports_trigger_types: *id695
+      supports_directions: *id701
+      supports_trigger_types: *id702
       operator_id: op.only_if_regime
       operator_version: v1
       requires_direction: false
       side_policy: both
       label_target: gate
       test_spec: binary_gate
-      compatible_families: *id696
-      default_conditioning: *id697
-      risk_metrics_required: *id698
+      compatible_families: *id703
+      default_conditioning: *id704
+      risk_metrics_required: *id705
       template_kind: filter_template
       feature: rv_pct_17280
       operator: '>'
@@ -21466,17 +21622,17 @@ template_registry_payload:
     only_if_trend:
       enabled: true
       supports_contexts: true
-      supports_directions: *id699
-      supports_trigger_types: *id700
+      supports_directions: *id706
+      supports_trigger_types: *id707
       operator_id: op.only_if_trend
       operator_version: v1
       requires_direction: false
       side_policy: both
       label_target: gate
       test_spec: binary_gate
-      compatible_families: *id701
-      default_conditioning: *id702
-      risk_metrics_required: *id703
+      compatible_families: *id708
+      default_conditioning: *id709
+      risk_metrics_required: *id710
       template_kind: filter_template
       feature: logret_1
       operator: '>'
@@ -21484,17 +21640,17 @@ template_registry_payload:
     overshoot_repair:
       enabled: true
       supports_contexts: true
-      supports_directions: *id704
-      supports_trigger_types: *id705
+      supports_directions: *id711
+      supports_trigger_types: *id712
       operator_id: op.overshoot_repair
       operator_version: v1
       requires_direction: false
       side_policy: contrarian
       label_target: fwd_return_h
       test_spec: mean_gt_0
-      compatible_families: *id706
-      default_conditioning: *id707
-      risk_metrics_required: *id708
+      compatible_families: *id713
+      default_conditioning: *id714
+      risk_metrics_required: *id715
       template_kind: filter_template
       feature: basis_zscore
       operator: '>'
@@ -21502,32 +21658,32 @@ template_registry_payload:
     pullback_entry:
       enabled: true
       supports_contexts: true
-      supports_directions: *id709
-      supports_trigger_types: *id710
+      supports_directions: *id716
+      supports_trigger_types: *id717
       operator_id: op.pullback_entry
       operator_version: v1
       requires_direction: true
       side_policy: directional
       label_target: fwd_return_h
       test_spec: mean_gt_0
-      compatible_families: *id711
-      default_conditioning: *id712
-      risk_metrics_required: *id713
+      compatible_families: *id718
+      default_conditioning: *id719
+      risk_metrics_required: *id720
       template_kind: execution_template
     range_reversion:
       enabled: true
       supports_contexts: true
-      supports_directions: *id714
-      supports_trigger_types: *id715
+      supports_directions: *id721
+      supports_trigger_types: *id722
       operator_id: op.range_reversion
       operator_version: v1
       requires_direction: false
       side_policy: contrarian
       label_target: fwd_return_h
       test_spec: mean_gt_0
-      compatible_families: *id716
-      default_conditioning: *id717
-      risk_metrics_required: *id718
+      compatible_families: *id723
+      default_conditioning: *id724
+      risk_metrics_required: *id725
       template_kind: filter_template
       feature: basis_zscore
       operator: '>'
@@ -21535,17 +21691,17 @@ template_registry_payload:
     reversal_or_squeeze:
       enabled: true
       supports_contexts: true
-      supports_directions: *id719
-      supports_trigger_types: *id720
+      supports_directions: *id726
+      supports_trigger_types: *id727
       operator_id: op.reversal_or_squeeze
       operator_version: v1
       requires_direction: true
       side_policy: both
       label_target: fwd_return_h
       test_spec: mean_gt_0_or_tail_positive
-      compatible_families: *id721
-      default_conditioning: *id722
-      risk_metrics_required: *id723
+      compatible_families: *id728
+      default_conditioning: *id729
+      risk_metrics_required: *id730
       template_kind: filter_template
       feature: funding_rate_scaled
       operator: '>'
@@ -21553,17 +21709,17 @@ template_registry_payload:
     slippage_aware_filter:
       enabled: true
       supports_contexts: true
-      supports_directions: *id724
-      supports_trigger_types: *id725
+      supports_directions: *id731
+      supports_trigger_types: *id732
       operator_id: op.slippage_aware_filter
       operator_version: v1
       requires_direction: false
       side_policy: both
       label_target: path_class_h
       test_spec: cost_ratio_lt_threshold
-      compatible_families: *id726
-      default_conditioning: *id727
-      risk_metrics_required: *id728
+      compatible_families: *id733
+      default_conditioning: *id734
+      risk_metrics_required: *id735
       template_kind: filter_template
       feature: spread_zscore
       operator: '>'
@@ -21571,17 +21727,17 @@ template_registry_payload:
     stop_run_repair:
       enabled: true
       supports_contexts: true
-      supports_directions: *id729
-      supports_trigger_types: *id730
+      supports_directions: *id736
+      supports_trigger_types: *id737
       operator_id: op.stop_run_repair
       operator_version: v1
       requires_direction: false
       side_policy: contrarian
       label_target: fwd_return_h
       test_spec: mean_gt_0
-      compatible_families: *id731
-      default_conditioning: *id732
-      risk_metrics_required: *id733
+      compatible_families: *id738
+      default_conditioning: *id739
+      risk_metrics_required: *id740
       template_kind: filter_template
       feature: liquidation_count
       operator: '>'
@@ -21589,17 +21745,17 @@ template_registry_payload:
     tail_risk_avoid:
       enabled: true
       supports_contexts: true
-      supports_directions: *id734
-      supports_trigger_types: *id735
+      supports_directions: *id741
+      supports_trigger_types: *id742
       operator_id: op.tail_risk_avoid
       operator_version: v1
       requires_direction: false
       side_policy: both
       label_target: path_class_h
       test_spec: tail_loss_lt_threshold
-      compatible_families: *id736
-      default_conditioning: *id737
-      risk_metrics_required: *id738
+      compatible_families: *id743
+      default_conditioning: *id744
+      risk_metrics_required: *id745
       template_kind: filter_template
       feature: rv_pct_17280
       operator: <
@@ -21607,32 +21763,32 @@ template_registry_payload:
     trend_continuation:
       enabled: true
       supports_contexts: true
-      supports_directions: *id739
-      supports_trigger_types: *id740
+      supports_directions: *id746
+      supports_trigger_types: *id747
       operator_id: op.trend_continuation
       operator_version: v1
       requires_direction: true
       side_policy: directional
       label_target: fwd_return_h
       test_spec: mean_gt_0
-      compatible_families: *id741
-      default_conditioning: *id742
-      risk_metrics_required: *id743
+      compatible_families: *id748
+      default_conditioning: *id749
+      risk_metrics_required: *id750
       template_kind: execution_template
     volatility_expansion_follow:
       enabled: true
       supports_contexts: true
-      supports_directions: *id744
-      supports_trigger_types: *id745
+      supports_directions: *id751
+      supports_trigger_types: *id752
       operator_id: op.volatility_expansion_follow
       operator_version: v1
       requires_direction: true
       side_policy: directional
       label_target: path_class_h
       test_spec: hit_rate_gt_threshold
-      compatible_families: *id746
-      default_conditioning: *id747
-      risk_metrics_required: *id748
+      compatible_families: *id753
+      default_conditioning: *id754
+      risk_metrics_required: *id755
       template_kind: filter_template
       feature: rv_96
       operator: '>'

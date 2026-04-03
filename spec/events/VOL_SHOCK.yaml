@@ -3,7 +3,6 @@ synthetic_coverage: covered
 reports_dir: vol_shock_relaxation
 events_file: vol_shock_relaxation_events.parquet
 signal_column: vol_shock_relaxation_event
-canonical_family: VOLATILITY_TRANSITION
 detector_contract: true
 parameters:
   m_controls: 5
@@ -89,10 +88,6 @@ expected_behavior:
   - LIQUIDITY_VACUUM: moderate; both activate post-impulse
   - SPREAD_BLOWOUT: low; different mechanisms
   - TREND_ACCELERATION: low but possible; trending vol differs from shock vol
-trigger: Detector triggers on the first dynamic-threshold shock crossing
-confirmation: No separate detector-side confirmation gate; downstream research uses
-  relaxation telemetry and post-event evaluation
-cluster_id: vol_regime
 identity:
   canonical_regime: VOLATILITY_TRANSITION
   legacy_family: VOLATILITY_TRANSITION
@@ -130,6 +125,7 @@ runtime:
   - vol_regime
   - high_urgency
 semantics:
+  summary: Canonical volatility shock onset with downstream relaxation telemetry.
   cluster_id: vol_regime
   notes: Canonical volatility shock; current detector implementation also models relaxation
     boundary.

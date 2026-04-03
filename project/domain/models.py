@@ -112,6 +112,8 @@ class ThesisDefinition:
     thesis_kind: str
     event_family: str
     timeframe: str
+    primary_event_id: str = ""
+    canonical_regime: str = ""
     event_side: str = "unknown"
     promotion_class: str = ""
     deployment_state: str = ""
@@ -125,6 +127,7 @@ class ThesisDefinition:
     supportive_context: Dict[str, Any] = field(default_factory=dict)
     expected_response: Dict[str, Any] = field(default_factory=dict)
     invalidation: Dict[str, Any] = field(default_factory=dict)
+    freshness_policy: Dict[str, Any] = field(default_factory=dict)
     governance: Dict[str, Any] = field(default_factory=dict)
     symbol_scope: Dict[str, Any] = field(default_factory=dict)
     detection: Dict[str, Any] = field(default_factory=dict)

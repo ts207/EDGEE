@@ -446,6 +446,7 @@ def _load_theses() -> Dict[str, ThesisDefinition]:
     default_supportive_context = defaults.get("supportive_context", {})
     default_expected_response = defaults.get("expected_response", {})
     default_invalidation = defaults.get("invalidation", {})
+    default_freshness_policy = defaults.get("freshness_policy", {})
     default_governance = defaults.get("governance", {})
     default_symbol_scope = defaults.get("symbol_scope", {})
     default_detection = defaults.get("detection", {})
@@ -469,28 +470,46 @@ def _load_theses() -> Dict[str, ThesisDefinition]:
         supportive_context = _merge_mapping(default_supportive_context, raw.get("supportive_context", {}))
         expected_response = _merge_mapping(default_expected_response, raw.get("expected_response", {}))
         invalidation = _merge_mapping(default_invalidation, raw.get("invalidation", {}))
+        freshness_policy = _merge_mapping(default_freshness_policy, raw.get("freshness_policy", {}))
 
         normalized_id = str(identity.get("thesis_id", thesis_id)).strip().upper()
         if not normalized_id:
             continue
+        source_event_contract_ids = _normalize_tokens(source.get("event_contract_ids", []))
+        trigger_events = _normalize_tokens(clauses.get("trigger_events", []))
+        primary_event_id = (
+            source_event_contract_ids[0]
+            if source_event_contract_ids
+            else (trigger_events[0] if trigger_events else str(identity.get("event_family", raw.get("event_family", ""))).strip().upper())
+        )
+        canonical_regime = str(
+            raw.get(
+                "canonical_regime",
+                supportive_context.get("canonical_regime", ""),
+            )
+        ).strip().upper()
+
         out[normalized_id] = ThesisDefinition(
             thesis_id=normalized_id,
             thesis_kind=str(identity.get("thesis_kind", raw.get("thesis_kind", "standalone_event"))).strip().lower() or "standalone_event",
             event_family=str(identity.get("event_family", raw.get("event_family", ""))).strip().upper(),
+            primary_event_id=str(primary_event_id).strip().upper(),
+            canonical_regime=canonical_regime,
             timeframe=str(identity.get("timeframe", defaults.get("timeframe", ""))).strip(),
             event_side=str(identity.get("event_side", defaults.get("event_side", "unknown"))).strip().lower() or "unknown",
             promotion_class=str(raw.get("promotion_class", defaults.get("promotion_class", ""))).strip(),
             deployment_state=str(raw.get("deployment_state", defaults.get("deployment_state", ""))).strip(),
-            trigger_events=_normalize_tokens(clauses.get("trigger_events", [])),
+            trigger_events=trigger_events,
             confirmation_events=_normalize_tokens(clauses.get("confirmation_events", [])),
             required_episodes=_normalize_tokens(clauses.get("required_episodes", [])),
             disallowed_regimes=_normalize_tokens(clauses.get("disallowed_regimes", [])),
-            source_event_contract_ids=_normalize_tokens(source.get("event_contract_ids", [])),
+            source_event_contract_ids=source_event_contract_ids,
             source_episode_contract_ids=_normalize_tokens(source.get("episode_contract_ids", [])),
             required_context=required_context,
             supportive_context=supportive_context,
             expected_response=expected_response,
             invalidation=invalidation,
+            freshness_policy=freshness_policy,
             governance=governance,
             symbol_scope=symbol_scope,
             detection=detection,
@@ -667,6 +686,8 @@ def _thesis_definition_payload(spec: ThesisDefinition) -> Dict[str, Any]:
         "thesis_id": spec.thesis_id,
         "thesis_kind": spec.thesis_kind,
         "event_family": spec.event_family,
+        "primary_event_id": spec.primary_event_id,
+        "canonical_regime": spec.canonical_regime,
         "timeframe": spec.timeframe,
         "event_side": spec.event_side,
         "promotion_class": spec.promotion_class,
@@ -681,6 +702,7 @@ def _thesis_definition_payload(spec: ThesisDefinition) -> Dict[str, Any]:
         "supportive_context": dict(spec.supportive_context),
         "expected_response": dict(spec.expected_response),
         "invalidation": dict(spec.invalidation),
+        "freshness_policy": dict(spec.freshness_policy),
         "governance": dict(spec.governance),
         "symbol_scope": dict(spec.symbol_scope),
         "detection": dict(spec.detection),
@@ -845,6 +867,15 @@ def _thesis_definition_from_payload(row: Dict[str, Any]) -> ThesisDefinition:
         thesis_id=str(row.get("thesis_id", "")).strip().upper(),
         thesis_kind=str(row.get("thesis_kind", "standalone_event")).strip().lower() or "standalone_event",
         event_family=str(row.get("event_family", "")).strip().upper(),
+        primary_event_id=str(row.get("primary_event_id", row.get("event_family", ""))).strip().upper(),
+        canonical_regime=str(
+            row.get(
+                "canonical_regime",
+                row.get("supportive_context", {}).get("canonical_regime", "")
+                if isinstance(row.get("supportive_context"), dict)
+                else "",
+            )
+        ).strip().upper(),
         timeframe=str(row.get("timeframe", "")).strip(),
         event_side=str(row.get("event_side", "unknown")).strip().lower() or "unknown",
         promotion_class=str(row.get("promotion_class", "")).strip(),
@@ -859,6 +890,7 @@ def _thesis_definition_from_payload(row: Dict[str, Any]) -> ThesisDefinition:
         supportive_context=dict(row.get("supportive_context", {})) if isinstance(row.get("supportive_context"), dict) else {},
         expected_response=dict(row.get("expected_response", {})) if isinstance(row.get("expected_response"), dict) else {},
         invalidation=dict(row.get("invalidation", {})) if isinstance(row.get("invalidation"), dict) else {},
+        freshness_policy=dict(row.get("freshness_policy", {})) if isinstance(row.get("freshness_policy"), dict) else {},
         governance=dict(row.get("governance", {})) if isinstance(row.get("governance"), dict) else {},
         symbol_scope=dict(row.get("symbol_scope", {})) if isinstance(row.get("symbol_scope"), dict) else {},
         detection=dict(row.get("detection", {})) if isinstance(row.get("detection"), dict) else {},
@@ -985,14 +1017,23 @@ def _load_domain_registry_from_graph() -> DomainRegistry | None:
     )
 
 
-def compile_domain_registry(*, allow_source_fallback: bool = False) -> DomainRegistry:
+def load_domain_registry_from_graph(*, required: bool = True) -> DomainRegistry | None:
     graph = _load_domain_registry_from_graph()
     if graph is not None:
         return graph
-    if allow_source_fallback:
-        return _build_domain_registry_from_sources()
+    if not required:
+        return None
     path = domain_graph_path()
     raise FileNotFoundError(
         "Compiled domain graph is missing or invalid at "
         f"{path}. Rebuild it with `python3 project/scripts/build_domain_graph.py`."
     )
+
+
+def compile_domain_registry(*, allow_source_fallback: bool = False) -> DomainRegistry:
+    graph = load_domain_registry_from_graph(required=not allow_source_fallback)
+    if graph is not None:
+        return graph
+    if allow_source_fallback:
+        return _build_domain_registry_from_sources()
+    raise AssertionError("unreachable: required graph load must raise before this point")

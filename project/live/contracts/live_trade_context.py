@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator, model_validator
 
 
 class LiveTradeContext(BaseModel):
@@ -55,3 +55,16 @@ class LiveTradeContext(BaseModel):
     @classmethod
     def _normalize_optional_tokens(cls, value: str) -> str:
         return str(value).strip().upper()
+
+    @computed_field(return_type=dict)
+    @property
+    def context_clause(self) -> Dict[str, Any]:
+        return {
+            "symbol": self.symbol,
+            "timeframe": self.timeframe,
+            "primary_event_id": self.primary_event_id,
+            "canonical_regime": self.canonical_regime,
+            "event_side": self.event_side,
+            "active_event_ids": list(self.active_event_ids),
+            "active_episode_ids": list(self.active_episode_ids),
+        }

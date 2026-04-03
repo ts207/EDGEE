@@ -37,6 +37,29 @@ def _matches_symbol(thesis: PromotedThesis, symbol: str) -> bool:
     return token in symbols
 
 
+def _event_tokens_for_matching(thesis: PromotedThesis) -> set[str]:
+    tokens = {
+        str(thesis.primary_event_id or "").strip().upper(),
+        str(thesis.event_family or "").strip().upper(),
+    }
+    tokens.update(
+        str(item).strip().upper()
+        for item in thesis.requirements.trigger_events
+        if str(item).strip()
+    )
+    tokens.update(
+        str(item).strip().upper()
+        for item in thesis.requirements.confirmation_events
+        if str(item).strip()
+    )
+    tokens.update(
+        str(item).strip().upper()
+        for item in thesis.source.event_contract_ids
+        if str(item).strip()
+    )
+    return {token for token in tokens if token}
+
+
 class ThesisStore:
     def __init__(
         self,
@@ -93,6 +116,8 @@ class ThesisStore:
         event_id: str | None = None,
         event_family: str | None = None,
         canonical_regime: str | None = None,
+        deployment_state: str | None = None,
+        overlap_group_id: str | None = None,
     ) -> List[PromotedThesis]:
         filtered = self._theses
         if status is not None:
@@ -110,7 +135,7 @@ class ThesisStore:
             filtered = [
                 thesis
                 for thesis in filtered
-                if thesis.event_family.strip().upper() == event_token
+                if event_token in _event_tokens_for_matching(thesis)
             ]
         if canonical_regime is not None:
             regime_token = str(canonical_regime).strip().upper()
@@ -118,6 +143,20 @@ class ThesisStore:
                 thesis
                 for thesis in filtered
                 if thesis.canonical_regime.strip().upper() == regime_token
+            ]
+        if deployment_state is not None:
+            deployment_token = str(deployment_state).strip().lower()
+            filtered = [
+                thesis
+                for thesis in filtered
+                if thesis.deployment_state.strip().lower() == deployment_token
+            ]
+        if overlap_group_id is not None:
+            overlap_token = str(overlap_group_id).strip()
+            filtered = [
+                thesis
+                for thesis in filtered
+                if str(thesis.governance.overlap_group_id or "").strip() == overlap_token
             ]
         return list(filtered)
 
@@ -129,6 +168,8 @@ class ThesisStore:
         event_id: str | None = None,
         event_family: str | None = None,
         canonical_regime: str | None = None,
+        deployment_state: str | None = None,
+        overlap_group_id: str | None = None,
     ) -> List[PromotedThesis]:
         return self.filter(
             status="active",
@@ -137,4 +178,6 @@ class ThesisStore:
             event_id=event_id,
             event_family=event_family,
             canonical_regime=canonical_regime,
+            deployment_state=deployment_state,
+            overlap_group_id=overlap_group_id,
         )

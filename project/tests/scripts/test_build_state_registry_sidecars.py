@@ -23,6 +23,8 @@ def test_state_registry_is_aggregated_from_state_specs() -> None:
 def test_runtime_state_registry_payload_uses_canonical_state_metadata() -> None:
     payload = build_runtime_state_registry_payload()
 
+    assert payload["metadata"]["status"] == "generated"
+    assert payload["metadata"]["authored_source"] == "spec/states/*.yaml"
     high_vol = payload["states"]["HIGH_VOL_REGIME"]
     assert high_vol["state_engine"] == "VolatilityRegimeEngine"
     assert high_vol["instrument_classes"] == ["crypto", "equities", "futures"]
@@ -36,6 +38,7 @@ def test_runtime_state_registry_payload_uses_canonical_state_metadata() -> None:
 def test_state_grammar_payload_uses_canonical_context_dimensions() -> None:
     payload = build_state_grammar_payload()
 
+    assert payload["metadata"]["status"] == "generated"
     assert payload["regimes"]["vol_regime"] == ["low", "high"]
     assert payload["context_state_map"]["vol_regime"]["high"] == "high_vol_regime"
     assert payload["context_state_map"]["funding_regime"]["crowded"] == "crowding_state"
@@ -45,5 +48,6 @@ def test_state_ontology_specs_cover_materialized_state_rows() -> None:
     payload = build_state_ontology_specs()
 
     assert "LOW_LIQUIDITY_STATE" in payload
+    assert payload["LOW_LIQUIDITY_STATE"]["metadata"]["status"] == "generated"
     assert payload["LOW_LIQUIDITY_STATE"]["family"] == "LIQUIDITY_DISLOCATION"
     assert "mean_reversion" in payload["LOW_LIQUIDITY_STATE"]["allowed_templates"]

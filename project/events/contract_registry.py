@@ -419,6 +419,7 @@ def build_event_contract(event_type: str) -> dict[str, Any]:
     detector = row.get("detector", {}) if isinstance(row.get("detector"), Mapping) else {}
     calibration = row.get("calibration", {}) if isinstance(row.get("calibration"), Mapping) else {}
     expected_behavior = row.get("expected_behavior", {}) if isinstance(row.get("expected_behavior"), Mapping) else {}
+    semantics = row.get("semantics", {}) if isinstance(row.get("semantics"), Mapping) else {}
 
     runtime_category = str(row.get("runtime_category", "")).strip()
     if not runtime_category:
@@ -443,6 +444,7 @@ def build_event_contract(event_type: str) -> dict[str, Any]:
         "runtime_category": runtime_category,
         "description": _coalesce_text(
             row.get("description"),
+            semantics.get("summary"),
             detector.get("signal_definition"),
             row.get("trigger"),
             row.get("notes"),

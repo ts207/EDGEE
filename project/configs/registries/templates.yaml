@@ -1,3 +1,8 @@
+version: 1
+kind: runtime_template_registry
+metadata:
+  status: generated
+  authored_source: spec/templates/registry.yaml
 templates:
   basis_repair:
     enabled: true

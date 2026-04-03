@@ -8,9 +8,6 @@ parameters:
   lookback_window: 288
   cooldown_bars: 12
   min_basis_bps: 10.0
-canonical_family: STATISTICAL_DISLOCATION
-trigger: Detector triggers on basis disloc pattern
-confirmation: Post-detection price action confirms signal validity
 expected_behavior:
   holding_horizon_bars: 6-36
   invalidation_conditions:
@@ -18,7 +15,6 @@ expected_behavior:
   - Z-score returns to mean
   disabled_regimes:
   - 'Low basis volatility: z-score undefined'
-cluster_id: basis_dislocation
 identity:
   canonical_regime: BASIS_FUNDING_DISLOCATION
   legacy_family: STATISTICAL_DISLOCATION
@@ -55,6 +51,7 @@ runtime:
   runtime_tags:
   - basis_dislocation
 semantics:
+  summary: Basis dislocation captures a statistical basis/funding stress episode.
   cluster_id: basis_dislocation
   notes: Canonical basis dislocation surface.
   precedence_rank: 0

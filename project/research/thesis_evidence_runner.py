@@ -34,6 +34,13 @@ class FoundingThesisSpec:
     event_contract_ids: tuple[str, ...] = ()
 
 
+@dataclass(frozen=True)
+class EventSplit:
+    validation_values: pd.Series
+    test_values: pd.Series
+    split_definition: dict[str, str]
+
+
 def _ensure_dir(path: Path) -> Path:
     path.mkdir(parents=True, exist_ok=True)
     return path
@@ -80,6 +87,47 @@ def _load_raw_dataset(symbol: str, dataset: str, *, data_root: Path) -> pd.DataF
     if dataset_dir is None:
         return pd.DataFrame()
     files = list_parquet_files(dataset_dir)
+    if not files:
+        return pd.DataFrame()
+    frames = [pd.read_parquet(file_path) for file_path in files]
+    frame = pd.concat(frames, ignore_index=True)
+    if "timestamp" in frame.columns:
+        frame["timestamp"] = pd.to_datetime(frame["timestamp"], utc=True, errors="coerce")
+        frame = frame.sort_values("timestamp").drop_duplicates("timestamp").reset_index(drop=True)
+    return frame
+
+
+def _latest_feature_schema_dir(
+    data_root: Path,
+    *,
+    symbol: str,
+    timeframe: str = "5m",
+    schema_version: str = "feature_schema_v2",
+) -> Path | None:
+    runs_root = data_root / "lake" / "runs"
+    if not runs_root.exists():
+        return None
+    candidates: list[tuple[float, Path]] = []
+    pattern = f"features/perp/{symbol}/{timeframe}/features_{schema_version}"
+    for run_dir in runs_root.iterdir():
+        candidate = run_dir / pattern
+        if candidate.exists() and candidate.is_dir():
+            try:
+                score = candidate.stat().st_mtime
+            except OSError:
+                score = 0.0
+            candidates.append((score, candidate))
+    if not candidates:
+        return None
+    candidates.sort(key=lambda item: item[0], reverse=True)
+    return candidates[0][1]
+
+
+def _load_feature_dataset(symbol: str, *, data_root: Path, timeframe: str = "5m") -> pd.DataFrame:
+    feature_dir = _latest_feature_schema_dir(data_root, symbol=symbol, timeframe=timeframe)
+    if feature_dir is None:
+        return pd.DataFrame()
+    files = list_parquet_files(feature_dir)
     if not files:
         return pd.DataFrame()
     frames = [pd.read_parquet(file_path) for file_path in files]
@@ -161,6 +209,52 @@ def _liquidation_cascade_events(bars: pd.DataFrame, funding: pd.DataFrame, open_
     return ((abs_return >= shock_threshold) & (oi_change <= oi_floor) & (funding_score.abs() >= funding_z)).fillna(False).astype(bool)
 
 
+def _liquidation_cascade_feature_proxy_events(features: pd.DataFrame, params: Mapping[str, Any]) -> pd.Series:
+    close = pd.to_numeric(features.get("close"), errors="coerce")
+    funding_rate = pd.to_numeric(features.get("funding_rate_scaled"), errors="coerce")
+    depth_depletion = pd.to_numeric(features.get("micro_depth_depletion"), errors="coerce")
+    spread_z = pd.to_numeric(features.get("spread_zscore"), errors="coerce").abs()
+    if close is None or funding_rate is None or depth_depletion is None or spread_z is None:
+        return pd.Series(False, index=features.index, dtype=bool)
+
+    shock_quantile = float(params.get("shock_quantile", 0.97) or 0.97)
+    shock_window = int(params.get("shock_window", 288) or 288)
+    funding_quantile = float(params.get("funding_quantile", 0.80) or 0.80)
+    depth_quantile = float(params.get("depth_quantile", 0.80) or 0.80)
+    spread_quantile = float(params.get("spread_quantile", 0.80) or 0.80)
+    cooldown_bars = int(params.get("cooldown_bars", 12) or 12)
+    min_funding_abs = float(params.get("min_funding_abs", 0.0005) or 0.0005)
+    min_depth_depletion = float(params.get("min_depth_depletion", 0.60) or 0.60)
+    min_spread_z = float(params.get("min_spread_z", 3.0) or 3.0)
+
+    abs_return = (close / close.shift(1) - 1.0).abs()
+    min_periods = max(24, min(shock_window, shock_window // 2))
+    shock_floor = abs_return.shift(1).rolling(shock_window, min_periods=min_periods).quantile(shock_quantile)
+    funding_abs = funding_rate.abs()
+    funding_floor = funding_abs.shift(1).rolling(shock_window, min_periods=min_periods).quantile(funding_quantile)
+    funding_floor = funding_floor.fillna(min_funding_abs).clip(lower=min_funding_abs)
+    depth_floor = depth_depletion.shift(1).rolling(shock_window, min_periods=min_periods).quantile(depth_quantile)
+    depth_floor = depth_floor.fillna(min_depth_depletion).clip(lower=min_depth_depletion)
+    spread_floor = spread_z.shift(1).rolling(shock_window, min_periods=min_periods).quantile(spread_quantile)
+    spread_floor = spread_floor.fillna(min_spread_z).clip(lower=min_spread_z)
+
+    raw = (
+        (abs_return >= shock_floor)
+        & (funding_abs >= funding_floor)
+        & (depth_depletion >= depth_floor)
+        & (spread_z >= spread_floor)
+    ).fillna(False)
+    onset = (raw & ~raw.shift(1, fill_value=False)).astype(bool)
+    mask = pd.Series(False, index=features.index, dtype=bool)
+    last_idx = -cooldown_bars - 1
+    for idx in np.flatnonzero(onset.to_numpy(dtype=bool)):
+        if idx - last_idx < cooldown_bars:
+            continue
+        mask.iloc[idx] = True
+        last_idx = int(idx)
+    return mask
+
+
 def _event_mask_for_kind(
     kind: str,
     bars: pd.DataFrame,
@@ -179,6 +273,46 @@ def _event_mask_for_kind(
             return pd.Series(False, index=bars.index, dtype=bool)
         return _liquidation_cascade_events(bars, funding, open_interest, params)
     raise ValueError(f"Unsupported event kind for paired confirmation: {kind}")
+
+
+def _basis_disloc_events(features: pd.DataFrame, params: Mapping[str, Any]) -> pd.Series:
+    basis_zscore = pd.to_numeric(features.get("basis_zscore"), errors="coerce")
+    basis_bps = pd.to_numeric(features.get("basis_bps"), errors="coerce")
+    if basis_zscore is None or basis_bps is None:
+        return pd.Series(False, index=features.index, dtype=bool)
+    z_threshold = float(params.get("z_threshold", 5.0) or 5.0)
+    min_basis_bps = float(params.get("min_basis_bps", 10.0) or 10.0)
+    cooldown_bars = int(params.get("cooldown_bars", 12) or 12)
+    raw = (basis_zscore.abs() >= z_threshold) & (basis_bps.abs() >= min_basis_bps)
+    onset = (raw.fillna(False) & ~raw.fillna(False).shift(1, fill_value=False)).astype(bool)
+    mask = pd.Series(False, index=features.index, dtype=bool)
+    last_idx = -cooldown_bars - 1
+    for idx in np.flatnonzero(onset.to_numpy(dtype=bool)):
+        if idx - last_idx < cooldown_bars:
+            continue
+        mask.iloc[idx] = True
+        last_idx = int(idx)
+    return mask
+
+
+def _fnd_disloc_events(features: pd.DataFrame, params: Mapping[str, Any]) -> pd.Series:
+    basis_mask = _basis_disloc_events(features, params)
+    funding_rate = pd.to_numeric(features.get("funding_rate_scaled"), errors="coerce")
+    basis_bps = pd.to_numeric(features.get("basis_bps"), errors="coerce")
+    if funding_rate is None or basis_bps is None:
+        return pd.Series(False, index=features.index, dtype=bool)
+    funding_abs = funding_rate.abs()
+    lookback_window = int(params.get("lookback_window", 288) or 288)
+    min_periods = max(24, min(lookback_window, lookback_window // 2))
+    funding_quantile = float(params.get("funding_quantile", 0.95) or 0.95)
+    threshold_bps = float(params.get("threshold_bps", 2.0) or 2.0) / 10_000.0
+    funding_floor = funding_abs.shift(1).rolling(lookback_window, min_periods=min_periods).quantile(funding_quantile)
+    funding_floor = funding_floor.fillna(threshold_bps).clip(lower=threshold_bps)
+    funding_extreme = (funding_abs >= funding_floor).fillna(False)
+    sign_align = (np.sign(basis_bps.fillna(0.0)) == np.sign(funding_rate.fillna(0.0))).astype(bool)
+    alignment_window = int(params.get("alignment_window", 3) or 3)
+    basis_active = basis_mask.rolling(window=alignment_window, min_periods=1).max().astype(bool)
+    return (basis_active & funding_extreme & sign_align).fillna(False).astype(bool)
 
 
 def _paired_confirmation_events(
@@ -226,13 +360,19 @@ def _paired_confirmation_events(
 
 
 def _detect_events(spec: FoundingThesisSpec, bars: pd.DataFrame, funding: pd.DataFrame | None = None, open_interest: pd.DataFrame | None = None) -> pd.Series:
+    if spec.detector_kind == "basis_disloc":
+        return _basis_disloc_events(bars, spec.params)
+    if spec.detector_kind == "fnd_disloc":
+        return _fnd_disloc_events(bars, spec.params)
     if spec.detector_kind == "vol_shock":
         return _vol_shock_events(bars, spec.params)
     if spec.detector_kind == "liquidity_vacuum":
         return _liquidity_vacuum_events(bars, spec.params)
     if spec.detector_kind == "liquidation_cascade":
         if funding is None or open_interest is None or funding.empty or open_interest.empty:
-            return pd.Series(False, index=bars.index)
+            if {"micro_depth_depletion", "spread_zscore", "funding_rate_scaled", "close"} <= set(bars.columns):
+                return _liquidation_cascade_feature_proxy_events(bars, spec.params)
+            return pd.Series(False, index=bars.index, dtype=bool)
         return _liquidation_cascade_events(bars, funding, open_interest, spec.params)
     if spec.detector_kind in {"vol_shock_liquidity_confirm", "paired_confirmation"}:
         return _paired_confirmation_events(bars, spec.params, funding=funding, open_interest=open_interest)
@@ -331,17 +471,71 @@ def _vol_regime_confounder(vol_series: pd.Series, payoff_values: pd.Series) -> d
     }
 
 
-def _assemble_bundle(spec: FoundingThesisSpec, symbol: str, bars: pd.DataFrame, event_mask: pd.Series, horizon: int) -> dict[str, Any] | None:
+def _split_event_sample(event_times: pd.Series, event_values: pd.Series, *, min_split_samples: int = 10) -> EventSplit | None:
+    aligned_times = pd.to_datetime(event_times, utc=True, errors="coerce")
+    aligned_values = pd.to_numeric(event_values, errors="coerce")
+    valid_mask = aligned_times.notna() & aligned_values.notna()
+    if not bool(valid_mask.any()):
+        return None
+    aligned_times = aligned_times.loc[valid_mask]
+    aligned_values = aligned_values.loc[valid_mask].astype(float)
+
+    years = aligned_times.dt.year
+    validation_values = aligned_values[years <= 2021]
+    test_values = aligned_values[years >= 2022]
+    if len(validation_values) >= min_split_samples and len(test_values) >= min_split_samples:
+        return EventSplit(
+            validation_values=validation_values,
+            test_values=test_values,
+            split_definition={
+                "split_scheme_id": "calendar_year_holdout_2022",
+                "validation_window": "2021",
+                "test_window": "2022",
+            },
+        )
+
+    ordered_index = aligned_times.sort_values(kind="mergesort").index
+    ordered_times = aligned_times.loc[ordered_index]
+    ordered_values = aligned_values.loc[ordered_index]
+    total = len(ordered_values)
+    if total < max(20, min_split_samples * 2):
+        return None
+    split_at = max(min_split_samples, int(math.floor(total * 0.70)))
+    split_at = min(split_at, total - min_split_samples)
+    if split_at < min_split_samples or (total - split_at) < min_split_samples:
+        return None
+    validation_values = ordered_values.iloc[:split_at]
+    test_values = ordered_values.iloc[split_at:]
+    return EventSplit(
+        validation_values=validation_values,
+        test_values=test_values,
+        split_definition={
+            "split_scheme_id": "chronological_holdout_70_30",
+            "validation_window": f"{ordered_times.iloc[0].isoformat()}..{ordered_times.iloc[split_at - 1].isoformat()}",
+            "test_window": f"{ordered_times.iloc[split_at].isoformat()}..{ordered_times.iloc[-1].isoformat()}",
+        },
+    )
+
+
+def _assemble_bundle(
+    spec: FoundingThesisSpec,
+    symbol: str,
+    bars: pd.DataFrame,
+    event_mask: pd.Series,
+    horizon: int,
+    *,
+    input_mode: str = "raw_market_data",
+) -> dict[str, Any] | None:
     payoff = _payoff_series(bars, horizon=horizon, payoff_mode=spec.payoff_mode)
     event_values = payoff[event_mask].dropna().astype(float)
     if len(event_values) < 20:
         return None
     event_times = bars.loc[event_mask, "timestamp"].loc[event_values.index]
-    years = event_times.dt.year
-    validation_values = event_values[years <= 2021]
-    test_values = event_values[years >= 2022]
-    if len(validation_values) == 0 or len(test_values) == 0:
+    split = _split_event_sample(event_times, event_values)
+    if split is None:
         return None
+    validation_values = split.validation_values
+    test_values = split.test_values
 
     gross_mean = float(event_values.mean())
     net_expectancy = gross_mean - spec.fees_bps
@@ -374,11 +568,7 @@ def _assemble_bundle(spec: FoundingThesisSpec, symbol: str, bars: pd.DataFrame, 
             "start": str(event_times.min()),
             "end": str(event_times.max()),
         },
-        "split_definition": {
-            "split_scheme_id": "calendar_year_holdout_2022",
-            "validation_window": "2021",
-            "test_window": "2022",
-        },
+        "split_definition": split.split_definition,
         "effect_estimates": {
             "estimate_bps": gross_mean,
             "validation_mean_bps": float(validation_values.mean()),
@@ -416,24 +606,27 @@ def _assemble_bundle(spec: FoundingThesisSpec, symbol: str, bars: pd.DataFrame, 
             "thesis_contract_id": spec.candidate_id,
             "thesis_contract_ids": [spec.candidate_id],
             "input_symbols": list(spec.symbols),
+            "input_mode": input_mode,
             "notes": spec.notes,
         },
     }
 
 
-def _select_best_horizon(spec: FoundingThesisSpec, symbol_frames: Sequence[tuple[str, pd.DataFrame, pd.Series]]) -> int:
+def _select_best_horizon(spec: FoundingThesisSpec, symbol_frames: Sequence[tuple[str, pd.DataFrame, pd.Series, str]]) -> int:
     best_horizon = spec.horizons[0]
     best_score = float("-inf")
     for horizon in spec.horizons:
         validation_values: list[float] = []
-        for _symbol, bars, event_mask in symbol_frames:
+        for _symbol, bars, event_mask, _input_mode in symbol_frames:
             payoff = _payoff_series(bars, horizon=horizon, payoff_mode=spec.payoff_mode)
             event_values = payoff[event_mask].dropna().astype(float)
             if event_values.empty:
                 continue
             event_times = bars.loc[event_mask, "timestamp"].loc[event_values.index]
-            validation = event_values[event_times.dt.year <= 2021]
-            validation_values.extend(float(value) for value in validation.tolist())
+            split = _split_event_sample(event_times, event_values)
+            if split is None:
+                continue
+            validation_values.extend(float(value) for value in split.validation_values.tolist())
         if not validation_values:
             continue
         score = float(np.mean(validation_values))
@@ -452,10 +645,25 @@ def build_founding_thesis_evidence(*, policy_path: str | Path | None = None, dat
     unsupported: list[dict[str, str]] = []
 
     for spec in specs:
-        symbol_frames: list[tuple[str, pd.DataFrame, pd.Series]] = []
+        symbol_frames: list[tuple[str, pd.DataFrame, pd.Series, str]] = []
         missing_inputs = False
         for symbol in spec.symbols:
-            bars = _load_raw_dataset(symbol, "ohlcv_5m", data_root=resolved_data_root)
+            if spec.detector_kind in {"basis_disloc", "fnd_disloc"}:
+                bars = _load_feature_dataset(symbol, data_root=resolved_data_root)
+                input_mode = "feature_schema"
+            elif spec.detector_kind == "liquidation_cascade":
+                bars = _load_raw_dataset(symbol, "ohlcv_5m", data_root=resolved_data_root)
+                input_mode = "raw_market_data"
+                if bars.empty:
+                    feature_bars = _load_feature_dataset(symbol, data_root=resolved_data_root)
+                    if feature_bars.empty:
+                        missing_inputs = True
+                        continue
+                    bars = feature_bars
+                    input_mode = "feature_schema_proxy"
+            else:
+                bars = _load_raw_dataset(symbol, "ohlcv_5m", data_root=resolved_data_root)
+                input_mode = "raw_market_data"
             if bars.empty:
                 missing_inputs = True
                 continue
@@ -463,10 +671,16 @@ def build_founding_thesis_evidence(*, policy_path: str | Path | None = None, dat
             funding = _load_raw_dataset(symbol, "funding", data_root=resolved_data_root) if needs_flow_inputs else None
             open_interest = _load_raw_dataset(symbol, "open_interest", data_root=resolved_data_root) if needs_flow_inputs else None
             if spec.detector_kind == "liquidation_cascade" and ((funding is None or funding.empty) or (open_interest is None or open_interest.empty)):
-                missing_inputs = True
-                continue
+                feature_bars = _load_feature_dataset(symbol, data_root=resolved_data_root)
+                if feature_bars.empty:
+                    missing_inputs = True
+                    continue
+                bars = feature_bars
+                funding = None
+                open_interest = None
+                input_mode = "feature_schema_proxy"
             event_mask = _detect_events(spec, bars, funding=funding, open_interest=open_interest)
-            symbol_frames.append((symbol, bars, event_mask))
+            symbol_frames.append((symbol, bars, event_mask, input_mode))
         if missing_inputs and not symbol_frames:
             unsupported.append({
                 "candidate_id": spec.candidate_id,
@@ -480,8 +694,8 @@ def build_founding_thesis_evidence(*, policy_path: str | Path | None = None, dat
         promotion_dir = _ensure_dir(resolved_data_root / "reports" / "promotions" / spec.candidate_id)
         bundles: list[dict[str, Any]] = []
         total_events = 0
-        for symbol, bars, event_mask in symbol_frames:
-            bundle = _assemble_bundle(spec, symbol, bars, event_mask, chosen_horizon)
+        for symbol, bars, event_mask, input_mode in symbol_frames:
+            bundle = _assemble_bundle(spec, symbol, bars, event_mask, chosen_horizon, input_mode=input_mode)
             if bundle is None:
                 continue
             bundles.append(bundle)

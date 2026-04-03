@@ -1,3 +1,9 @@
+version: 1
+kind: state_ontology_spec
+metadata:
+  status: generated
+  authored_source: spec/states/FEE_REGIME_STATE.yaml
+  generated_from: spec/states/state_registry.yaml
 state_id: FEE_REGIME_STATE
 family: EXECUTION_FRICTION
 source_event_type: FEE_REGIME_CHANGE_EVENT

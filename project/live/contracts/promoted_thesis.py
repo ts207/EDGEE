@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator, model_validator
 
 
 class ThesisEvidence(BaseModel):
@@ -90,6 +90,7 @@ class PromotedThesis(BaseModel):
     supportive_context: Dict[str, Any] = Field(default_factory=dict)
     expected_response: Dict[str, Any] = Field(default_factory=dict)
     invalidation: Dict[str, Any] = Field(default_factory=dict)
+    freshness_policy: Dict[str, Any] = Field(default_factory=dict)
     risk_notes: List[str] = Field(default_factory=list)
     evidence: ThesisEvidence
     lineage: ThesisLineage
@@ -102,6 +103,38 @@ class PromotedThesis(BaseModel):
     def _populate_compat_event_fields(cls, data: Any) -> Any:
         if not isinstance(data, dict):
             return data
+        requirements = dict(data.get("requirements", {})) if isinstance(data.get("requirements"), dict) else {}
+        trigger_clause = data.get("trigger_clause")
+        if not requirements.get("trigger_events"):
+            if isinstance(trigger_clause, dict):
+                requirements["trigger_events"] = list(trigger_clause.get("events", []))
+            elif isinstance(trigger_clause, list):
+                requirements["trigger_events"] = list(trigger_clause)
+        confirmation_clause = data.get("confirmation_clause")
+        if not requirements.get("confirmation_events"):
+            if isinstance(confirmation_clause, dict):
+                requirements["confirmation_events"] = list(confirmation_clause.get("events", []))
+            elif isinstance(confirmation_clause, list):
+                requirements["confirmation_events"] = list(confirmation_clause)
+        if requirements:
+            data["requirements"] = requirements
+
+        if "context_clause" in data and not isinstance(data.get("required_context"), dict):
+            context_clause = data.get("context_clause")
+            if isinstance(context_clause, dict):
+                data["required_context"] = dict(context_clause)
+        if "invalidation_clause" in data and not isinstance(data.get("invalidation"), dict):
+            invalidation_clause = data.get("invalidation_clause")
+            if isinstance(invalidation_clause, dict):
+                data["invalidation"] = dict(invalidation_clause)
+
+        governance = dict(data.get("governance", {})) if isinstance(data.get("governance"), dict) else {}
+        overlap_group_id = str(data.get("overlap_group_id", "")).strip()
+        if overlap_group_id and not str(governance.get("overlap_group_id", "")).strip():
+            governance["overlap_group_id"] = overlap_group_id
+        if governance:
+            data["governance"] = governance
+
         primary_event_id = str(
             data.get("primary_event_id", "") or data.get("event_family", "")
         ).strip()
@@ -125,3 +158,28 @@ class PromotedThesis(BaseModel):
     @classmethod
     def _normalize_optional_tokens(cls, value: str) -> str:
         return str(value).strip().upper()
+
+    @computed_field(return_type=dict)
+    @property
+    def trigger_clause(self) -> Dict[str, Any]:
+        return {"events": list(self.requirements.trigger_events)}
+
+    @computed_field(return_type=dict)
+    @property
+    def confirmation_clause(self) -> Dict[str, Any]:
+        return {"events": list(self.requirements.confirmation_events)}
+
+    @computed_field(return_type=dict)
+    @property
+    def invalidation_clause(self) -> Dict[str, Any]:
+        return dict(self.invalidation)
+
+    @computed_field(return_type=dict)
+    @property
+    def context_clause(self) -> Dict[str, Any]:
+        return dict(self.required_context)
+
+    @computed_field(return_type=str)
+    @property
+    def overlap_group_id(self) -> str:
+        return str(self.governance.overlap_group_id or "")

@@ -8,9 +8,6 @@ parameters:
   median_window: 288
   liq_vol_th: 100000.0
   oi_drop_th: -500000.0
-canonical_family: POSITIONING_EXTREMES
-trigger: Detector triggers on liquidation cascade pattern
-confirmation: Post-detection price action confirms signal validity
 expected_behavior:
   holding_horizon_bars: 4-24
   invalidation_conditions:
@@ -18,7 +15,6 @@ expected_behavior:
   - Funding reverses sign
   disabled_regimes:
   - 'Low liquidity regime: OI/vol signals unreliable'
-cluster_id: forced_liquidation
 identity:
   canonical_regime: LIQUIDATION_CASCADE
   legacy_family: POSITIONING_EXTREMES
@@ -56,6 +52,7 @@ runtime:
   - forced_liquidation
   - high_urgency
 semantics:
+  summary: Liquidation cascade marks direct forced-flow deleveraging under positioning stress.
   cluster_id: forced_liquidation
   notes: Structurally distinct canonical cascade regime.
   precedence_rank: 2

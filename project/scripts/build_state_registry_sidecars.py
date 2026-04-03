@@ -63,7 +63,16 @@ def build_runtime_state_registry_payload() -> Dict[str, Any]:
         if description:
             record["description"] = description
         states[state_id] = record
-    return {"version": 1, "states": states}
+    return {
+        "version": 1,
+        "kind": "runtime_state_registry",
+        "metadata": {
+            "status": "generated",
+            "authored_source": "spec/states/*.yaml",
+            "generated_from": "spec/states/state_registry.yaml",
+        },
+        "states": states,
+    }
 
 
 def build_state_grammar_payload() -> Dict[str, Any]:
@@ -90,7 +99,17 @@ def build_state_grammar_payload() -> Dict[str, Any]:
                 for label, state_id in mapping.items()
                 if str(label).strip() and str(state_id).strip()
             }
-    return {"regimes": regimes, "context_state_map": context_state_map}
+    return {
+        "version": 1,
+        "kind": "state_grammar_registry",
+        "metadata": {
+            "status": "generated",
+            "authored_source": "spec/states/*.yaml",
+            "generated_from": "spec/states/state_registry.yaml",
+        },
+        "regimes": regimes,
+        "context_state_map": context_state_map,
+    }
 
 
 def build_state_ontology_specs() -> Dict[str, Dict[str, Any]]:
@@ -106,6 +125,13 @@ def build_state_ontology_specs() -> Dict[str, Dict[str, Any]]:
         if not state_id:
             continue
         ontology_row: Dict[str, Any] = {
+            "version": 1,
+            "kind": "state_ontology_spec",
+            "metadata": {
+                "status": "generated",
+                "authored_source": f"spec/states/{state_id}.yaml",
+                "generated_from": "spec/states/state_registry.yaml",
+            },
             "state_id": state_id,
             "family": str(row.get("family", "")).strip().upper(),
             "source_event_type": str(row.get("source_event_type", "")).strip().upper(),

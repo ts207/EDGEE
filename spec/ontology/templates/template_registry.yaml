@@ -1,5 +1,8 @@
 version: 1
 kind: template_registry
+metadata:
+  status: generated
+  authored_source: spec/templates/registry.yaml
 defaults:
   templates:
   - mean_reversion

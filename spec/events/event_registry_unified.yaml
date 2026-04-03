@@ -504,9 +504,6 @@ events:
     suppressed_by: []
     parameters:
       synthetic_coverage: covered
-      canonical_family: STATISTICAL_DISLOCATION
-      trigger: Detector triggers on basis disloc pattern
-      confirmation: Post-detection price action confirms signal validity
       expected_behavior:
         holding_horizon_bars: 6-36
         invalidation_conditions:
@@ -514,7 +511,6 @@ events:
         - Z-score returns to mean
         disabled_regimes:
         - 'Low basis volatility: z-score undefined'
-      cluster_id: basis_dislocation
       z_threshold: 5.0
       lookback_window: 288
       cooldown_bars: 12
@@ -1814,9 +1810,6 @@ events:
       notes:
       - '`threshold_bps` is expressed in basis points and is converted against decimal
         `funding_rate_scaled` values at runtime.'
-      canonical_family: STATISTICAL_DISLOCATION
-      trigger: Detector triggers on fnd disloc pattern
-      confirmation: Post-detection price action confirms signal validity
       expected_behavior:
         holding_horizon_bars: 6-36
         invalidation_conditions:
@@ -1824,7 +1817,6 @@ events:
         - Z-score returns to mean
         disabled_regimes:
         - 'Low basis volatility: z-score undefined'
-      cluster_id: basis_dislocation
       threshold_bps: 2.0
       funding_quantile: 0.95
       alignment_window: 3
@@ -2714,9 +2706,6 @@ events:
     suppressed_by: []
     parameters:
       synthetic_coverage: covered
-      canonical_family: POSITIONING_EXTREMES
-      trigger: Detector triggers on liquidation cascade pattern
-      confirmation: Post-detection price action confirms signal validity
       expected_behavior:
         holding_horizon_bars: 4-24
         invalidation_conditions:
@@ -2724,7 +2713,6 @@ events:
         - Funding reverses sign
         disabled_regimes:
         - 'Low liquidity regime: OI/vol signals unreliable'
-      cluster_id: forced_liquidation
       liq_multiplier: 3.0
       median_window: 288
       liq_vol_th: 100000.0
@@ -5655,7 +5643,6 @@ events:
     suppressed_by: []
     parameters:
       synthetic_coverage: covered
-      canonical_family: VOLATILITY_TRANSITION
       detector_contract: true
       detector:
         signal_definition: 'Detects realized-volatility shock onset using a point-in-time-safe
@@ -5736,10 +5723,6 @@ events:
         - LIQUIDITY_VACUUM: moderate; both activate post-impulse
         - SPREAD_BLOWOUT: low; different mechanisms
         - TREND_ACCELERATION: low but possible; trending vol differs from shock vol
-      trigger: Detector triggers on the first dynamic-threshold shock crossing
-      confirmation: No separate detector-side confirmation gate; downstream research
-        uses relaxation telemetry and post-event evaluation
-      cluster_id: vol_regime
       m_controls: 5
       bootstrap_iters: 1000
       phase_tolerance_bars: 16

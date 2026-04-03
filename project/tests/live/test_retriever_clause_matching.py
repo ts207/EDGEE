@@ -3,7 +3,9 @@ from __future__ import annotations
 from project.live.contracts import (
     PromotedThesis,
     ThesisEvidence,
+    ThesisGovernance,
     ThesisLineage,
+    ThesisRequirements,
 )
 from project.live.contracts.live_trade_context import LiveTradeContext
 from project.live.retriever import retrieve_ranked_theses
@@ -28,6 +30,7 @@ def _canonical_confirm_thesis() -> PromotedThesis:
         supportive_context={"has_realized_oos_path": True},
         expected_response={},
         invalidation={},
+        freshness_policy={"allowed_staleness_classes": ["fresh", "watch"]},
         risk_notes=[],
         evidence=ThesisEvidence(
             sample_size=40,
@@ -43,6 +46,8 @@ def _canonical_confirm_thesis() -> PromotedThesis:
             run_id="shadow",
             candidate_id="THESIS_VOL_SHOCK_LIQUIDITY_CONFIRM",
         ),
+        governance=ThesisGovernance(trade_trigger_eligible=True),
+        requirements=ThesisRequirements(trigger_events=["VOL_SHOCK"], confirmation_events=["LIQUIDITY_VACUUM"]),
     )
 
 
@@ -98,3 +103,134 @@ def test_retriever_prefers_canonical_thesis_clauses_over_packaged_event_family()
     assert "trigger_clause_match:VOL_SHOCK" in match.reasons_for
     assert "confirmation_match:LIQUIDITY_VACUUM" in match.reasons_for
     assert "event_family_match:IGNORED_FALLBACK" not in match.reasons_for
+
+
+def test_retriever_rejects_required_context_mismatch() -> None:
+    thesis = _canonical_confirm_thesis().model_copy(
+        update={"required_context": {"symbol": "ETHUSDT"}}
+    )
+    store = ThesisStore([thesis])
+    context = LiveTradeContext(
+        timestamp="2026-04-02T00:00:00Z",
+        symbol="BTCUSDT",
+        timeframe="5m",
+        primary_event_id="VOL_SHOCK",
+        event_family="VOL_SHOCK",
+        canonical_regime="VOLATILITY_TRANSITION",
+        event_side="long",
+        live_features={},
+        regime_snapshot={"canonical_regime": "VOLATILITY_TRANSITION"},
+        execution_env={},
+        portfolio_state={},
+        active_event_ids=["VOL_SHOCK", "LIQUIDITY_VACUUM"],
+        active_episode_ids=[],
+    )
+
+    match = retrieve_ranked_theses(thesis_store=store, context=context, include_pending=False, limit=1)[0]
+
+    assert match.eligibility_passed is False
+    assert "required_context_mismatch:symbol" in match.reasons_against
+
+
+def test_retriever_rejects_stale_thesis_when_policy_disallows_it() -> None:
+    thesis = _canonical_confirm_thesis().model_copy(
+        update={
+            "staleness_class": "stale",
+            "freshness_policy": {"allowed_staleness_classes": ["fresh"]},
+        }
+    )
+    store = ThesisStore([thesis])
+    context = LiveTradeContext(
+        timestamp="2026-04-02T00:00:00Z",
+        symbol="BTCUSDT",
+        timeframe="5m",
+        primary_event_id="VOL_SHOCK",
+        event_family="VOL_SHOCK",
+        canonical_regime="VOLATILITY_TRANSITION",
+        event_side="long",
+        live_features={},
+        regime_snapshot={"canonical_regime": "VOLATILITY_TRANSITION"},
+        execution_env={},
+        portfolio_state={},
+        active_event_ids=["VOL_SHOCK", "LIQUIDITY_VACUUM"],
+        active_episode_ids=[],
+    )
+
+    match = retrieve_ranked_theses(thesis_store=store, context=context, include_pending=False, limit=1)[0]
+
+    assert match.eligibility_passed is False
+    assert "freshness_disallowed:stale" in match.reasons_against
+
+
+def test_retriever_blocks_non_live_deployment_state_in_trading_mode() -> None:
+    thesis = _canonical_confirm_thesis().model_copy(
+        update={"deployment_state": "paper_only"}
+    )
+    store = ThesisStore([thesis])
+    context = LiveTradeContext(
+        timestamp="2026-04-02T00:00:00Z",
+        symbol="BTCUSDT",
+        timeframe="5m",
+        primary_event_id="VOL_SHOCK",
+        event_family="VOL_SHOCK",
+        canonical_regime="VOLATILITY_TRANSITION",
+        event_side="long",
+        live_features={},
+        regime_snapshot={"canonical_regime": "VOLATILITY_TRANSITION"},
+        execution_env={"runtime_mode": "trading"},
+        portfolio_state={},
+        active_event_ids=["VOL_SHOCK", "LIQUIDITY_VACUUM"],
+        active_episode_ids=[],
+    )
+
+    match = retrieve_ranked_theses(thesis_store=store, context=context, include_pending=False, limit=1)[0]
+
+    assert match.eligibility_passed is False
+    assert "deployment_state_blocked:paper_only" in match.reasons_against
+
+
+def test_retriever_suppresses_lower_ranked_overlap_group_match() -> None:
+    winner = _canonical_confirm_thesis().model_copy(
+        update={
+            "thesis_id": "thesis::shadow::winner",
+            "governance": ThesisGovernance(overlap_group_id="grp_overlap", trade_trigger_eligible=True),
+        }
+    )
+    loser = _canonical_confirm_thesis().model_copy(
+        update={
+            "thesis_id": "thesis::shadow::loser",
+            "evidence": ThesisEvidence(
+                sample_size=20,
+                validation_samples=10,
+                test_samples=10,
+                estimate_bps=50.0,
+                net_expectancy_bps=45.0,
+                q_value=0.05,
+                stability_score=0.5,
+                rank_score=1.0,
+            ),
+            "governance": ThesisGovernance(overlap_group_id="grp_overlap", trade_trigger_eligible=True),
+        }
+    )
+    store = ThesisStore([loser, winner])
+    context = LiveTradeContext(
+        timestamp="2026-04-02T00:00:00Z",
+        symbol="BTCUSDT",
+        timeframe="5m",
+        primary_event_id="VOL_SHOCK",
+        event_family="VOL_SHOCK",
+        canonical_regime="VOLATILITY_TRANSITION",
+        event_side="long",
+        live_features={},
+        regime_snapshot={"canonical_regime": "VOLATILITY_TRANSITION"},
+        execution_env={},
+        portfolio_state={},
+        active_event_ids=["VOL_SHOCK", "LIQUIDITY_VACUUM"],
+        active_episode_ids=[],
+    )
+
+    matches = retrieve_ranked_theses(thesis_store=store, context=context, include_pending=False, limit=2)
+
+    assert matches[0].thesis.thesis_id == "thesis::shadow::winner"
+    assert matches[1].eligibility_passed is False
+    assert "overlap_suppressed:grp_overlap:thesis::shadow::winner" in matches[1].reasons_against

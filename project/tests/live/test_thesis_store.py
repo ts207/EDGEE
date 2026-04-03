@@ -32,6 +32,7 @@ def _write_store_fixture(root: Path, run_id: str) -> None:
                             "candidate_symbol": "BTCUSDT",
                         },
                         "timeframe": "5m",
+                        "primary_event_id": "VOL_SHOCK",
                         "event_family": "VOL_SHOCK",
                         "canonical_regime": "VOLATILITY_TRANSITION",
                         "event_side": "long",
@@ -63,6 +64,16 @@ def _write_store_fixture(root: Path, run_id: str) -> None:
                             "blueprint_id": "bp_1",
                             "proposal_id": "proposal_1",
                         },
+                        "requirements": {
+                            "trigger_events": ["VOL_SHOCK"],
+                            "confirmation_events": ["LIQUIDITY_VACUUM"],
+                            "required_episodes": [],
+                            "disallowed_regimes": [],
+                        },
+                        "source": {
+                            "event_contract_ids": ["VOL_SHOCK", "LIQUIDITY_VACUUM"],
+                            "episode_contract_ids": [],
+                        },
                     },
                     {
                         "thesis_id": "thesis::run_1::cand_2",
@@ -73,6 +84,7 @@ def _write_store_fixture(root: Path, run_id: str) -> None:
                             "candidate_symbol": "ETHUSDT",
                         },
                         "timeframe": "15m",
+                        "primary_event_id": "OI_FLUSH",
                         "event_family": "OI_FLUSH",
                         "canonical_regime": "POSITIONING_EXPANSION",
                         "event_side": "short",
@@ -151,6 +163,16 @@ def test_thesis_store_filters_active_by_canonical_regime(tmp_path: Path) -> None
 
     assert len(active) == 1
     assert active[0].canonical_regime == "VOLATILITY_TRANSITION"
+
+
+def test_thesis_store_event_id_filter_matches_clause_event_ids(tmp_path: Path) -> None:
+    _write_store_fixture(tmp_path, "run_1")
+
+    store = ThesisStore.from_run_id("run_1", data_root=tmp_path)
+    active = store.active_theses(symbol="BTCUSDT", timeframe="5m", event_id="LIQUIDITY_VACUUM")
+
+    assert len(active) == 1
+    assert active[0].primary_event_id == "VOL_SHOCK"
 
 
 def test_thesis_store_loads_latest_index(tmp_path: Path) -> None:

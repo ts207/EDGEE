@@ -198,7 +198,7 @@ def test_refresh_domain_registry_clears_caches(monkeypatch):
     clear_caches()
     called = {"n": 0}
 
-    def fake_compile():
+    def fake_load():
         called["n"] += 1
         return DomainRegistry(
             unified_payload={"defaults": {}, "families": {}},
@@ -210,7 +210,7 @@ def test_refresh_domain_registry_clears_caches(monkeypatch):
             unified_registry_path="x",
         )
 
-    monkeypatch.setattr("project.domain.compiled_registry.compile_domain_registry", fake_compile)
+    monkeypatch.setattr("project.domain.compiled_registry.load_domain_registry_from_graph", fake_load)
     monkeypatch.setattr("project.domain.compiled_registry.clear_caches", lambda: None)
     refresh_domain_registry()
     assert called["n"] == 1

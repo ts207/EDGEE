@@ -57,5 +57,10 @@ def test_promoted_thesis_contract_model_dump() -> None:
     assert payload["primary_event_id"] == "VOL_SHOCK"
     assert payload["event_family"] == "VOL_SHOCK"
     assert payload["canonical_regime"] == "VOLATILITY_TRANSITION"
+    assert payload["trigger_clause"] == {"events": []}
+    assert payload["confirmation_clause"] == {"events": []}
+    assert payload["invalidation_clause"]["metric"] == "adverse_proxy"
+    assert payload["context_clause"]["event_type"] == "VOL_SHOCK"
+    assert payload["overlap_group_id"] == ""
     assert payload["evidence"]["net_expectancy_bps"] == 9.0
     assert payload["lineage"]["blueprint_id"] == "bp_1"

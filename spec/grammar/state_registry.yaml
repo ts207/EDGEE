@@ -1,3 +1,9 @@
+version: 1
+kind: state_grammar_registry
+metadata:
+  status: generated
+  authored_source: spec/states/*.yaml
+  generated_from: spec/states/state_registry.yaml
 regimes:
   carry_state:
   - funding_pos

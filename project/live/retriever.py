@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import List
+from datetime import date
+from typing import Dict, List
 
 from project.domain.models import ThesisDefinition
 from project.live.contracts import PromotedThesis
@@ -9,6 +10,16 @@ from project.live.contracts.live_trade_context import LiveTradeContext
 from project.live.thesis_specs import resolve_promoted_thesis_definition
 from project.live.thesis_store import ThesisStore
 from project.research.meta_ranking import thesis_meta_quality_score
+
+
+def _normalized_tokens(items: list[str] | set[str] | tuple[str, ...] | None) -> set[str]:
+    if not items:
+        return set()
+    return {
+        str(item).strip().upper()
+        for item in items
+        if str(item).strip()
+    }
 
 
 @dataclass(frozen=True)
@@ -22,30 +33,27 @@ class ThesisMatch:
 
 
 def _context_events(context: LiveTradeContext) -> set[str]:
-    out = {
-        str(context.primary_event_id or context.event_family).strip().upper(),
-    }
-    active_ids = list(context.active_event_ids or []) or list(context.active_event_families or [])
-    out.update(str(item).strip().upper() for item in active_ids if str(item).strip())
-    return {item for item in out if item}
+    out = _normalized_tokens([context.primary_event_id or context.event_family])
+    active_event_ids = _normalized_tokens(list(context.active_event_ids or []))
+    if active_event_ids:
+        out.update(active_event_ids)
+    else:
+        out.update(_normalized_tokens(list(context.active_event_families or [])))
+    return out
 
 
 def _context_episodes(context: LiveTradeContext) -> set[str]:
-    out = set(str(item).strip().upper() for item in context.active_episode_ids if str(item).strip())
+    out = _normalized_tokens(list(context.active_episode_ids or []))
     snapshot = context.episode_snapshot or {}
-    out.update(str(item).strip().upper() for item in snapshot.get("episode_ids", []) if str(item).strip())
-    return {item for item in out if item}
+    out.update(_normalized_tokens(snapshot.get("episode_ids", [])))
+    return out
 
 
 def _context_contradictions(context: LiveTradeContext) -> set[str]:
-    contradiction_ids = list(context.contradiction_event_ids or []) or list(
-        context.contradiction_event_families or []
-    )
-    return {
-        str(item).strip().upper()
-        for item in contradiction_ids
-        if str(item).strip()
-    }
+    contradiction_ids = _normalized_tokens(list(context.contradiction_event_ids or []))
+    if contradiction_ids:
+        return contradiction_ids
+    return _normalized_tokens(list(context.contradiction_event_families or []))
 
 
 def _evaluate_invalidation(thesis: PromotedThesis, context: LiveTradeContext) -> bool:
@@ -132,9 +140,10 @@ def _requirements_for_matching(
         disallowed_regimes = {
             str(item).strip().upper() for item in definition.disallowed_regimes if str(item).strip()
         }
-        event_id = str(definition.event_family).strip().upper()
+        event_id = str(definition.primary_event_id or definition.event_family).strip().upper()
         canonical_regime = str(
-            definition.supportive_context.get("canonical_regime", thesis.canonical_regime)
+            definition.canonical_regime
+            or definition.supportive_context.get("canonical_regime", thesis.canonical_regime)
         ).strip().upper()
         return (
             trigger_events,
@@ -186,6 +195,139 @@ def _supportive_context_for_matching(
     return _merge_mapping(thesis.supportive_context or {}, fallback)
 
 
+def _required_context_for_matching(
+    thesis: PromotedThesis,
+    definition: ThesisDefinition | None,
+) -> dict:
+    fallback = definition.required_context if definition is not None else {}
+    return _merge_mapping(thesis.required_context or {}, fallback)
+
+
+def _freshness_policy_for_matching(
+    thesis: PromotedThesis,
+    definition: ThesisDefinition | None,
+) -> dict:
+    fallback = definition.freshness_policy if definition is not None else {}
+    return _merge_mapping(thesis.freshness_policy or {}, fallback)
+
+
+def _deployment_state_for_matching(
+    thesis: PromotedThesis,
+    definition: ThesisDefinition | None,
+) -> str:
+    if definition is not None and str(definition.deployment_state or "").strip():
+        return str(definition.deployment_state).strip().lower()
+    return str(thesis.deployment_state or "").strip().lower()
+
+
+def _overlap_group_for_matching(
+    thesis: PromotedThesis,
+    definition: ThesisDefinition | None,
+) -> str:
+    if str(thesis.governance.overlap_group_id or "").strip():
+        return str(thesis.governance.overlap_group_id).strip()
+    if definition is not None:
+        return str(definition.governance.get("overlap_group_id", "")).strip()
+    return ""
+
+
+def _evaluate_required_context(context_clause: dict, context: LiveTradeContext) -> tuple[bool, list[str], list[str]]:
+    reasons_for: list[str] = []
+    reasons_against: list[str] = []
+    if not context_clause:
+        return True, reasons_for, reasons_against
+    sources = [
+        context.regime_snapshot or {},
+        context.live_features or {},
+        context.execution_env or {},
+        context.portfolio_state or {},
+        {
+            "symbol": context.symbol,
+            "timeframe": context.timeframe,
+            "primary_event_id": context.primary_event_id,
+            "event_type": context.primary_event_id,
+            "event_family": context.event_family,
+            "canonical_regime": context.canonical_regime,
+            "event_side": context.event_side,
+        },
+    ]
+    passed = True
+    for key, expected in context_clause.items():
+        found = None
+        for source in sources:
+            if key in source:
+                found = source.get(key)
+                break
+        if found is None:
+            passed = False
+            reasons_against.append(f"required_context_missing:{key}")
+            continue
+        if str(found).strip().upper() != str(expected).strip().upper():
+            passed = False
+            reasons_against.append(f"required_context_mismatch:{key}")
+            continue
+        reasons_for.append(f"required_context_match:{key}")
+    return passed, reasons_for, reasons_against
+
+
+def _evaluate_freshness(
+    thesis: PromotedThesis,
+    freshness_policy: dict,
+) -> tuple[bool, list[str], list[str]]:
+    reasons_for: list[str] = []
+    reasons_against: list[str] = []
+    allowed = freshness_policy.get("allowed_staleness_classes", ["fresh", "watch"])
+    allowed_tokens = {
+        str(item).strip().lower()
+        for item in allowed
+        if str(item).strip()
+    }
+    staleness = str(thesis.staleness_class or "unknown").strip().lower()
+    if allowed_tokens and staleness and staleness not in {"", "unknown"} and staleness not in allowed_tokens:
+        reasons_against.append(f"freshness_disallowed:{staleness}")
+        return False, reasons_for, reasons_against
+
+    require_review_due = bool(freshness_policy.get("require_review_due_date", False))
+    review_due_date = str(thesis.review_due_date or "").strip()
+    if require_review_due and not review_due_date:
+        reasons_against.append("review_due_date_missing")
+        return False, reasons_for, reasons_against
+    if review_due_date:
+        try:
+            due = date.fromisoformat(review_due_date)
+            if due >= date.today():
+                reasons_for.append("review_window_open")
+            else:
+                reasons_against.append("review_overdue")
+                return False, reasons_for, reasons_against
+        except ValueError:
+            reasons_against.append("review_due_date_invalid")
+            return False, reasons_for, reasons_against
+    if staleness and staleness != "unknown":
+        reasons_for.append(f"freshness:{staleness}")
+    return True, reasons_for, reasons_against
+
+
+def _evaluate_deployment_state(
+    deployment_state: str,
+    context: LiveTradeContext,
+) -> tuple[bool, list[str], list[str]]:
+    reasons_for: list[str] = []
+    reasons_against: list[str] = []
+    token = str(deployment_state or "").strip().lower()
+    if not token:
+        return True, reasons_for, reasons_against
+    runtime_mode = str((context.execution_env or {}).get("runtime_mode", "")).strip().lower()
+    if token == "retired":
+        reasons_against.append("deployment_state_retired")
+        return False, reasons_for, reasons_against
+    if runtime_mode == "trading" and token != "live_enabled":
+        reasons_against.append(f"deployment_state_blocked:{token}")
+        return False, reasons_for, reasons_against
+    reasons_for.append(f"deployment_state:{token}")
+    return True, reasons_for, reasons_against
+
+
 def _governance_declared(thesis: PromotedThesis, definition: ThesisDefinition | None) -> bool:
     if any(
         [
@@ -215,6 +357,40 @@ def _trade_trigger_eligible(thesis: PromotedThesis, definition: ThesisDefinition
     if definition is None:
         return bool(thesis.governance.trade_trigger_eligible)
     return bool(definition.governance.get("trade_trigger_eligible", False))
+
+
+def _apply_overlap_suppression(results: list[ThesisMatch]) -> list[ThesisMatch]:
+    winners: Dict[str, ThesisMatch] = {}
+    adjusted: list[ThesisMatch] = []
+    for match in sorted(
+        results,
+        key=lambda item: (
+            int(item.eligibility_passed),
+            item.support_score - item.contradiction_penalty,
+            item.thesis.evidence.sample_size,
+        ),
+        reverse=True,
+    ):
+        overlap_group_id = str(match.thesis.governance.overlap_group_id or "").strip()
+        if not overlap_group_id or overlap_group_id not in winners:
+            if overlap_group_id and match.eligibility_passed:
+                winners[overlap_group_id] = match
+            adjusted.append(match)
+            continue
+        winner = winners[overlap_group_id]
+        reasons_against = list(match.reasons_against)
+        reasons_against.append(f"overlap_suppressed:{overlap_group_id}:{winner.thesis.thesis_id}")
+        adjusted.append(
+            ThesisMatch(
+                thesis=match.thesis,
+                eligibility_passed=False,
+                support_score=match.support_score,
+                contradiction_penalty=min(1.0, match.contradiction_penalty + 0.30),
+                reasons_for=list(match.reasons_for),
+                reasons_against=reasons_against,
+            )
+        )
+    return adjusted
 
 
 def retrieve_ranked_theses(
@@ -294,8 +470,25 @@ def retrieve_ranked_theses(
                 support_score += min(0.15, 0.08 * len(matched_episodes))
                 reasons_for.append(f"episode_match:{','.join(sorted(matched_episodes))}")
 
+        if _evaluate_invalidation(
+            thesis.model_copy(update={"invalidation": _invalidation_for_matching(thesis, definition)}),
+            context,
+        ):
+            contradiction_penalty += 0.60
+            reasons_against.append("invalidation_triggered")
+            eligibility_passed = False
+
         if current_regime and current_regime in disallowed_regimes:
             reasons_against.append(f"regime_disallowed:{current_regime}")
+            eligibility_passed = False
+
+        required_context_passed, context_for, context_against = _evaluate_required_context(
+            _required_context_for_matching(thesis, definition),
+            context,
+        )
+        reasons_for.extend(context_for)
+        reasons_against.extend(context_against)
+        if not required_context_passed:
             eligibility_passed = False
 
         if thesis_canonical_regime:
@@ -307,21 +500,6 @@ def retrieve_ranked_theses(
                     f"canonical_regime_mismatch:{thesis_canonical_regime}->{current_regime}"
                 )
 
-        contradiction_overlap = contradiction_events.intersection(
-            trigger_events | confirmation_events | {thesis_event_id}
-        )
-        if contradiction_overlap:
-            contradiction_penalty += 0.25
-            reasons_against.append(f"contradiction_event:{','.join(sorted(contradiction_overlap))}")
-
-        if _evaluate_invalidation(
-            thesis.model_copy(update={"invalidation": _invalidation_for_matching(thesis, definition)}),
-            context,
-        ):
-            contradiction_penalty += 0.60
-            reasons_against.append("invalidation_triggered")
-            eligibility_passed = False
-
         extra_score, extra_for, extra_against = _score_supportive_context(
             thesis.model_copy(
                 update={"supportive_context": _supportive_context_for_matching(thesis, definition)}
@@ -331,6 +509,31 @@ def retrieve_ranked_theses(
         support_score += extra_score
         reasons_for.extend(extra_for)
         reasons_against.extend(extra_against)
+
+        freshness_passed, freshness_for, freshness_against = _evaluate_freshness(
+            thesis,
+            _freshness_policy_for_matching(thesis, definition),
+        )
+        reasons_for.extend(freshness_for)
+        reasons_against.extend(freshness_against)
+        if not freshness_passed:
+            eligibility_passed = False
+
+        deployment_passed, deployment_for, deployment_against = _evaluate_deployment_state(
+            _deployment_state_for_matching(thesis, definition),
+            context,
+        )
+        reasons_for.extend(deployment_for)
+        reasons_against.extend(deployment_against)
+        if not deployment_passed:
+            eligibility_passed = False
+
+        contradiction_overlap = contradiction_events.intersection(
+            trigger_events | confirmation_events | {thesis_event_id}
+        )
+        if contradiction_overlap:
+            contradiction_penalty += 0.25
+            reasons_against.append(f"contradiction_event:{','.join(sorted(contradiction_overlap))}")
 
         if thesis.status == "active":
             support_score += 0.10
@@ -355,6 +558,7 @@ def retrieve_ranked_theses(
             )
         )
 
+    results = _apply_overlap_suppression(results)
     results.sort(
         key=lambda match: (
             int(match.eligibility_passed),

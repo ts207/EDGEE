@@ -7,6 +7,25 @@ from project.live.contracts.live_trade_context import LiveTradeContext
 from project.live.event_detector import DetectedEvent
 
 
+def _unique_tokens(*groups: object) -> list[str]:
+    out: list[str] = []
+    for group in groups:
+        if group is None:
+            continue
+        if isinstance(group, (str, bytes)):
+            items = [group]
+        else:
+            try:
+                items = list(group)
+            except TypeError:
+                items = [group]
+        for raw in items:
+            token = str(raw or "").strip().upper()
+            if token and token not in out:
+                out.append(token)
+    return out
+
+
 def _canonical_regime_from_move(move_bps: float) -> str:
     if abs(move_bps) >= 80.0:
         return "VOLATILITY"
@@ -36,26 +55,24 @@ def build_live_trade_context(
     else:
         regime_snapshot["microstructure_regime"] = "degraded"
 
-    active_events: list[str] = []
-    raw_active_events = list(market_features.get("active_event_ids", [])) or list(
-        market_features.get("active_event_families", [])
-    )
-    for raw in raw_active_events + [detected_event.event_id or detected_event.event_family]:
-        token = str(raw or "").strip().upper()
-        if token and token not in active_events:
-            active_events.append(token)
+    primary_event_id = str(detected_event.event_id or detected_event.event_family).strip().upper()
+    compat_event_family = str(detected_event.event_family or detected_event.event_id).strip().upper()
 
-    contradiction_events: list[str] = []
-    raw_contradictions = list(market_features.get("contradiction_event_ids", [])) or list(
-        market_features.get("contradiction_event_families", [])
+    active_event_ids = _unique_tokens(
+        market_features.get("active_event_ids", []),
+        [primary_event_id],
     )
-    for raw in raw_contradictions:
-        token = str(raw or "").strip().upper()
-        if token and token not in contradiction_events:
-            contradiction_events.append(token)
+    raw_active_families = list(market_features.get("active_event_families", []))
+    if compat_event_family and compat_event_family != primary_event_id:
+        raw_active_families.append(compat_event_family)
+    active_event_families = _unique_tokens(raw_active_families)
+
+    contradiction_event_ids = _unique_tokens(market_features.get("contradiction_event_ids", []))
+    raw_contradiction_families = list(market_features.get("contradiction_event_families", []))
+    contradiction_event_families = _unique_tokens(raw_contradiction_families)
 
     episode_matches = infer_live_episode_matches(
-        active_events,
+        active_event_ids,
         regime_snapshot=regime_snapshot,
         live_features=dict(market_features) | dict(detected_event.features),
     )
@@ -83,18 +100,18 @@ def build_live_trade_context(
         timestamp=str(timestamp),
         symbol=str(symbol).upper(),
         timeframe=str(timeframe),
-        primary_event_id=str(detected_event.event_id or detected_event.event_family).upper(),
-        event_family=str(detected_event.event_family).upper(),
+        primary_event_id=primary_event_id,
+        event_family=compat_event_family,
         canonical_regime=str(regime_snapshot.get("canonical_regime", "")).strip().upper(),
         event_side=str(detected_event.event_side).lower(),
         live_features=dict(market_features),
         regime_snapshot=regime_snapshot,
         execution_env=dict(execution_env),
         portfolio_state=dict(portfolio_state),
-        active_event_families=active_events,
-        active_event_ids=active_events,
+        active_event_families=active_event_families,
+        active_event_ids=active_event_ids,
         active_episode_ids=active_episode_ids,
-        contradiction_event_families=contradiction_events,
-        contradiction_event_ids=contradiction_events,
+        contradiction_event_families=contradiction_event_families,
+        contradiction_event_ids=contradiction_event_ids,
         episode_snapshot=episode_snapshot,
     )

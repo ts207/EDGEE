@@ -21,6 +21,8 @@ def test_template_registry_compat_payload_is_generated_from_canonical_source() -
 def test_runtime_template_registry_payload_uses_canonical_operator_runtime_fields() -> None:
     payload = build_runtime_template_registry_payload()
 
+    assert payload["metadata"]["status"] == "generated"
+    assert payload["metadata"]["authored_source"] == "spec/templates/registry.yaml"
     continuation = payload["templates"]["continuation"]
     assert continuation["enabled"] is True
     assert continuation["supports_contexts"] is True
@@ -30,6 +32,7 @@ def test_runtime_template_registry_payload_uses_canonical_operator_runtime_field
 def test_ontology_template_registry_payload_uses_canonical_family_and_filter_fields() -> None:
     payload = build_ontology_template_registry_payload()
 
+    assert payload["metadata"]["status"] == "generated"
     families = payload["families"]
     assert "LIQUIDITY_DISLOCATION" in families
     assert "mean_reversion" in families["LIQUIDITY_DISLOCATION"]["allowed_templates"]

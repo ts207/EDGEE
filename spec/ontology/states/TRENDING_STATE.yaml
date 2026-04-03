@@ -1,3 +1,9 @@
+version: 1
+kind: state_ontology_spec
+metadata:
+  status: generated
+  authored_source: spec/states/TRENDING_STATE.yaml
+  generated_from: spec/states/state_registry.yaml
 state_id: TRENDING_STATE
 family: TREND_STRUCTURE
 source_event_type: TREND_ACCELERATION

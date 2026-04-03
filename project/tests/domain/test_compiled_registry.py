@@ -3,7 +3,11 @@ from __future__ import annotations
 import pytest
 
 from project.domain.compiled_registry import get_domain_registry, refresh_domain_registry
-from project.domain.registry_loader import compile_domain_registry, domain_graph_path
+from project.domain.registry_loader import (
+    compile_domain_registry,
+    domain_graph_path,
+    load_domain_registry_from_graph,
+)
 from project.domain.hypotheses import HypothesisSpec, TriggerSpec
 from project.research.search.feasibility import check_hypothesis_feasibility
 
@@ -81,9 +85,12 @@ def test_domain_registry_exposes_runtime_metadata_from_event_specs():
     ]
     thesis = registry.get_thesis("THESIS_VOL_SHOCK_LIQUIDITY_CONFIRM")
     assert thesis is not None
+    assert thesis.primary_event_id == "VOL_SHOCK"
+    assert thesis.canonical_regime == "VOLATILITY_TRANSITION"
     assert thesis.event_family == "VOL_SHOCK"
     assert thesis.trigger_events == ("VOL_SHOCK",)
     assert thesis.confirmation_events == ("LIQUIDITY_VACUUM",)
+    assert thesis.freshness_policy["allowed_staleness_classes"] == ["fresh", "watch"]
     assert thesis.governance["operational_role"] == "confirm"
     regime = registry.get_regime("LIQUIDITY_STRESS")
     assert regime is not None
@@ -149,6 +156,16 @@ def test_compile_domain_registry_requires_generated_graph_by_default(monkeypatch
 
     with pytest.raises(FileNotFoundError, match="Compiled domain graph is missing or invalid"):
         compile_domain_registry()
+
+
+def test_load_domain_registry_from_graph_requires_generated_graph_by_default(monkeypatch):
+    monkeypatch.setattr(
+        "project.domain.registry_loader._load_domain_registry_from_graph",
+        lambda: None,
+    )
+
+    with pytest.raises(FileNotFoundError, match="Compiled domain graph is missing or invalid"):
+        load_domain_registry_from_graph()
 
 
 def test_refresh_domain_registry_can_explicitly_rebuild_from_sources(monkeypatch):
