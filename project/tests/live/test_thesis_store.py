@@ -175,6 +175,29 @@ def test_thesis_store_event_id_filter_matches_clause_event_ids(tmp_path: Path) -
     assert active[0].primary_event_id == "VOL_SHOCK"
 
 
+def test_thesis_store_event_family_filter_matches_legacy_family_only(tmp_path: Path) -> None:
+    _write_store_fixture(tmp_path, "run_1")
+
+    store = ThesisStore.from_run_id("run_1", data_root=tmp_path)
+    active = store.active_theses(symbol="BTCUSDT", timeframe="5m", event_family="VOL_SHOCK")
+
+    assert len(active) == 1
+    assert active[0].event_family == "VOL_SHOCK"
+
+
+def test_thesis_store_event_id_and_family_use_distinct_filter_paths(tmp_path: Path) -> None:
+    _write_store_fixture(tmp_path, "run_1")
+
+    store = ThesisStore.from_run_id("run_1", data_root=tmp_path)
+
+    by_event_id = store.active_theses(symbol="BTCUSDT", timeframe="5m", event_id="LIQUIDITY_VACUUM")
+    by_event_family = store.active_theses(symbol="BTCUSDT", timeframe="5m", event_family="LIQUIDITY_VACUUM")
+
+    assert len(by_event_id) == 1
+    assert by_event_id[0].thesis_id == "thesis::run_1::cand_1"
+    assert by_event_family == []
+
+
 def test_thesis_store_loads_latest_index(tmp_path: Path) -> None:
     _write_store_fixture(tmp_path, "run_1")
 

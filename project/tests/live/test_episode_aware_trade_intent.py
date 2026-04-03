@@ -81,7 +81,7 @@ def test_episode_requirement_enables_trade_when_context_matches() -> None:
     outcome = decide_trade_intent(context=context, thesis_store=_store(), include_pending=False)
 
     assert outcome.trade_intent.action in {"trade_small", "trade_normal"}
-    assert any(reason.startswith("episode_match:") for reason in outcome.trade_intent.reasons_for)
+    assert any(reason.startswith("required_episode_match:") for reason in outcome.trade_intent.reasons_for)
 
 
 def test_episode_requirement_blocks_trade_when_missing() -> None:

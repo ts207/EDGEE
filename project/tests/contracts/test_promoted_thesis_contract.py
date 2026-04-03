@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from project.live.contracts import PromotedThesis, ThesisEvidence, ThesisLineage
+from project.live.contracts import PromotedThesis, ThesisEvidence, ThesisLineage, ThesisRequirements
 
 
 def test_promoted_thesis_contract_model_dump() -> None:
@@ -64,3 +64,37 @@ def test_promoted_thesis_contract_model_dump() -> None:
     assert payload["overlap_group_id"] == ""
     assert payload["evidence"]["net_expectancy_bps"] == 9.0
     assert payload["lineage"]["blueprint_id"] == "bp_1"
+
+
+def test_promoted_thesis_primary_event_id_does_not_backfill_event_family() -> None:
+    thesis = PromotedThesis(
+        thesis_id="thesis::run_1::cand_2",
+        status="active",
+        symbol_scope={"mode": "single_symbol", "symbols": ["BTCUSDT"], "candidate_symbol": "BTCUSDT"},
+        timeframe="5m",
+        primary_event_id="VOL_SHOCK",
+        event_side="long",
+        evidence=ThesisEvidence(sample_size=1),
+        lineage=ThesisLineage(run_id="run_1", candidate_id="cand_2"),
+    )
+
+    assert thesis.primary_event_id == "VOL_SHOCK"
+    assert thesis.event_family == ""
+
+
+def test_promoted_thesis_uses_event_family_as_compatibility_fallback_only() -> None:
+    thesis = PromotedThesis(
+        thesis_id="thesis::run_1::cand_3",
+        status="active",
+        symbol_scope={"mode": "single_symbol", "symbols": ["BTCUSDT"], "candidate_symbol": "BTCUSDT"},
+        timeframe="5m",
+        event_family="VOL_SHOCK",
+        event_side="long",
+        requirements=ThesisRequirements(trigger_events=["VOL_SHOCK"]),
+        evidence=ThesisEvidence(sample_size=1),
+        lineage=ThesisLineage(run_id="run_1", candidate_id="cand_3"),
+    )
+
+    assert thesis.primary_event_id == "VOL_SHOCK"
+    assert thesis.event_family == "VOL_SHOCK"
+    assert thesis.trigger_clause == {"events": ["VOL_SHOCK"]}

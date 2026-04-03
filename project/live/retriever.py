@@ -32,14 +32,31 @@ class ThesisMatch:
     reasons_against: list[str]
 
 
+@dataclass(frozen=True)
+class MatchingRequirements:
+    trigger_events: set[str]
+    confirmation_events: set[str]
+    required_episodes: set[str]
+    disallowed_regimes: set[str]
+    thesis_event_ids: set[str]
+    compatibility_event_families: set[str]
+    canonical_regime: str
+
+
 def _context_events(context: LiveTradeContext) -> set[str]:
-    out = _normalized_tokens([context.primary_event_id or context.event_family])
-    active_event_ids = _normalized_tokens(list(context.active_event_ids or []))
-    if active_event_ids:
-        out.update(active_event_ids)
-    else:
-        out.update(_normalized_tokens(list(context.active_event_families or [])))
-    return out
+    event_ids = _normalized_tokens([context.primary_event_id])
+    event_ids.update(_normalized_tokens(list(context.active_event_ids or [])))
+    if event_ids:
+        return event_ids
+    compat_families = _normalized_tokens([context.event_family])
+    compat_families.update(_normalized_tokens(list(context.active_event_families or [])))
+    return compat_families
+
+
+def _context_event_families(context: LiveTradeContext) -> set[str]:
+    compat_families = _normalized_tokens([context.event_family])
+    compat_families.update(_normalized_tokens(list(context.active_event_families or [])))
+    return compat_families
 
 
 def _context_episodes(context: LiveTradeContext) -> set[str]:
@@ -50,9 +67,10 @@ def _context_episodes(context: LiveTradeContext) -> set[str]:
 
 
 def _context_contradictions(context: LiveTradeContext) -> set[str]:
-    contradiction_ids = _normalized_tokens(list(context.contradiction_event_ids or []))
-    if contradiction_ids:
-        return contradiction_ids
+    return _normalized_tokens(list(context.contradiction_event_ids or []))
+
+
+def _context_contradiction_families(context: LiveTradeContext) -> set[str]:
     return _normalized_tokens(list(context.contradiction_event_families or []))
 
 
@@ -91,27 +109,17 @@ def _score_supportive_context(thesis: PromotedThesis, context: LiveTradeContext)
     reasons_against: list[str] = []
     score = 0.0
     support = thesis.supportive_context or {}
-    regime = context.regime_snapshot or {}
-
-    canonical_regime = str(support.get("canonical_regime", "")).strip().upper()
-    current_regime = str(regime.get("canonical_regime", "")).strip().upper()
-    if canonical_regime:
-        if canonical_regime == current_regime:
-            score += 0.15
-            reasons_for.append(f"regime_match:{canonical_regime}")
-        else:
-            reasons_against.append(f"regime_mismatch:{canonical_regime}->{current_regime or 'unknown'}")
 
     bridge_certified = bool(support.get("bridge_certified", False))
     if bridge_certified:
         score += 0.05
-        reasons_for.append("bridge_certified")
+        reasons_for.append("supportive_context:bridge_certified")
 
     if bool(support.get("has_realized_oos_path", False)):
         score += 0.05
-        reasons_for.append("realized_oos_path")
+        reasons_for.append("supportive_context:realized_oos_path")
     else:
-        reasons_against.append("limited_realized_oos_path")
+        reasons_against.append("supportive_context_missing:realized_oos_path")
 
     return score, reasons_for, reasons_against
 
@@ -128,54 +136,63 @@ def _merge_mapping(primary: dict | None, fallback: dict | None) -> dict:
 def _requirements_for_matching(
     thesis: PromotedThesis,
     definition: ThesisDefinition | None,
-) -> tuple[set[str], set[str], set[str], set[str], str, str]:
+) -> MatchingRequirements:
+    thesis_requirements = thesis.requirements
     if definition is not None:
-        trigger_events = {str(item).strip().upper() for item in definition.trigger_events if str(item).strip()}
-        confirmation_events = {
-            str(item).strip().upper() for item in definition.confirmation_events if str(item).strip()
-        }
-        required_episodes = {
-            str(item).strip().upper() for item in definition.required_episodes if str(item).strip()
-        }
-        disallowed_regimes = {
-            str(item).strip().upper() for item in definition.disallowed_regimes if str(item).strip()
-        }
-        event_id = str(definition.primary_event_id or definition.event_family).strip().upper()
-        canonical_regime = str(
-            definition.canonical_regime
-            or definition.supportive_context.get("canonical_regime", thesis.canonical_regime)
-        ).strip().upper()
-        return (
-            trigger_events,
-            confirmation_events,
-            required_episodes,
-            disallowed_regimes,
-            event_id,
-            canonical_regime,
+        trigger_events = _normalized_tokens(
+            thesis_requirements.trigger_events or definition.trigger_events
+        )
+        confirmation_events = _normalized_tokens(
+            thesis_requirements.confirmation_events or definition.confirmation_events
+        )
+        required_episodes = _normalized_tokens(
+            thesis_requirements.required_episodes or definition.required_episodes
+        )
+        disallowed_regimes = _normalized_tokens(
+            thesis_requirements.disallowed_regimes or definition.disallowed_regimes
+        )
+        thesis_event_ids = set(trigger_events | confirmation_events)
+        thesis_event_ids.update(
+            _normalized_tokens(thesis.source.event_contract_ids or definition.source_event_contract_ids)
+        )
+        thesis_event_ids.update(
+            _normalized_tokens([thesis.primary_event_id or definition.primary_event_id])
+        )
+        # TODO: thread required/supportive state ids through runtime retrieval once the
+        # canonical thesis schema exposes them in live payloads.
+        return MatchingRequirements(
+            trigger_events=trigger_events,
+            confirmation_events=confirmation_events,
+            required_episodes=required_episodes,
+            disallowed_regimes=disallowed_regimes,
+            thesis_event_ids=thesis_event_ids,
+            compatibility_event_families=_normalized_tokens(
+                [thesis.event_family or definition.event_family]
+            ),
+            canonical_regime=str(
+                thesis.canonical_regime
+                or (thesis.supportive_context or {}).get("canonical_regime", "")
+                or definition.canonical_regime
+                or definition.supportive_context.get("canonical_regime", "")
+            ).strip().upper(),
         )
 
-    requirements = thesis.requirements
-    trigger_events = {str(item).strip().upper() for item in requirements.trigger_events if str(item).strip()}
-    confirmation_events = {
-        str(item).strip().upper() for item in requirements.confirmation_events if str(item).strip()
-    }
-    required_episodes = {
-        str(item).strip().upper() for item in requirements.required_episodes if str(item).strip()
-    }
-    disallowed_regimes = {
-        str(item).strip().upper() for item in requirements.disallowed_regimes if str(item).strip()
-    }
-    event_id = str(thesis.primary_event_id or thesis.event_family).strip().upper()
-    canonical_regime = str(
-        thesis.canonical_regime or (thesis.supportive_context or {}).get("canonical_regime", "")
-    ).strip().upper()
-    return (
-        trigger_events,
-        confirmation_events,
-        required_episodes,
-        disallowed_regimes,
-        event_id,
-        canonical_regime,
+    thesis_event_ids = _normalized_tokens(thesis_requirements.trigger_events)
+    thesis_event_ids.update(_normalized_tokens(thesis_requirements.confirmation_events))
+    thesis_event_ids.update(_normalized_tokens(thesis.source.event_contract_ids))
+    thesis_event_ids.update(_normalized_tokens([thesis.primary_event_id]))
+    # TODO: thread required/supportive state ids through runtime retrieval once the
+    # canonical thesis schema exposes them in live payloads.
+    return MatchingRequirements(
+        trigger_events=_normalized_tokens(thesis_requirements.trigger_events),
+        confirmation_events=_normalized_tokens(thesis_requirements.confirmation_events),
+        required_episodes=_normalized_tokens(thesis_requirements.required_episodes),
+        disallowed_regimes=_normalized_tokens(thesis_requirements.disallowed_regimes),
+        thesis_event_ids=thesis_event_ids,
+        compatibility_event_families=_normalized_tokens([thesis.event_family]),
+        canonical_regime=str(
+            thesis.canonical_regime or (thesis.supportive_context or {}).get("canonical_regime", "")
+        ).strip().upper(),
     )
 
 
@@ -402,8 +419,10 @@ def retrieve_ranked_theses(
 ) -> List[ThesisMatch]:
     candidates = thesis_store.filter(symbol=context.symbol, timeframe=context.timeframe)
     context_events = _context_events(context)
+    context_event_families = _context_event_families(context)
     context_episodes = _context_episodes(context)
     contradiction_events = _context_contradictions(context)
+    contradiction_event_families = _context_contradiction_families(context)
     current_regime = str(
         context.canonical_regime or (context.regime_snapshot or {}).get("canonical_regime", "")
     ).strip().upper()
@@ -427,48 +446,54 @@ def retrieve_ranked_theses(
             reasons_against.append("thesis_not_trade_trigger_eligible")
             eligibility_passed = False
 
-        (
-            trigger_events,
-            confirmation_events,
-            required_episodes,
-            disallowed_regimes,
-            thesis_event_id,
-            thesis_canonical_regime,
-        ) = _requirements_for_matching(thesis, definition)
+        requirements = _requirements_for_matching(thesis, definition)
 
-        clause_triggers = trigger_events or ({thesis_event_id} if thesis_event_id else set())
+        clause_triggers = requirements.trigger_events or requirements.thesis_event_ids
         matched_triggers = clause_triggers.intersection(context_events)
+        matched_trigger_families: set[str] = set()
+        if not matched_triggers and not clause_triggers and requirements.compatibility_event_families:
+            matched_trigger_families = requirements.compatibility_event_families.intersection(
+                context_event_families
+            )
         if matched_triggers:
             support_score += 0.20
             reasons_for.append(f"trigger_clause_match:{','.join(sorted(matched_triggers))}")
+        elif matched_trigger_families:
+            support_score += 0.12
+            reasons_for.append(
+                f"trigger_clause_match_compat_family:{','.join(sorted(matched_trigger_families))}"
+            )
         else:
-            reasons_against.append("no_trigger_event_match")
+            required_trigger_tokens = clause_triggers or requirements.compatibility_event_families
+            reasons_against.append(
+                f"trigger_clause_missing:{','.join(sorted(required_trigger_tokens))}"
+            )
             eligibility_passed = False
 
-        if clause_triggers:
-            if not matched_triggers:
-                reasons_against.append("required_trigger_missing")
-                eligibility_passed = False
-            else:
-                support_score += min(0.10, 0.05 * len(matched_triggers))
+        if matched_triggers:
+            support_score += min(0.10, 0.05 * len(matched_triggers))
 
-        if confirmation_events:
-            matched_confirmations = confirmation_events.intersection(context_events)
+        if requirements.confirmation_events:
+            matched_confirmations = requirements.confirmation_events.intersection(context_events)
             if matched_confirmations:
                 support_score += min(0.10, 0.05 * len(matched_confirmations))
                 reasons_for.append(f"confirmation_match:{','.join(sorted(matched_confirmations))}")
             else:
                 contradiction_penalty += 0.10
-                reasons_against.append(f"confirmation_missing:{','.join(sorted(confirmation_events))}")
+                reasons_against.append(
+                    f"confirmation_missing:{','.join(sorted(requirements.confirmation_events))}"
+                )
 
-        if required_episodes:
-            matched_episodes = required_episodes.intersection(context_episodes)
+        if requirements.required_episodes:
+            matched_episodes = requirements.required_episodes.intersection(context_episodes)
             if not matched_episodes:
-                reasons_against.append(f"required_episode_missing:{','.join(sorted(required_episodes))}")
+                reasons_against.append(
+                    f"required_episode_missing:{','.join(sorted(requirements.required_episodes))}"
+                )
                 eligibility_passed = False
             else:
                 support_score += min(0.15, 0.08 * len(matched_episodes))
-                reasons_for.append(f"episode_match:{','.join(sorted(matched_episodes))}")
+                reasons_for.append(f"required_episode_match:{','.join(sorted(matched_episodes))}")
 
         if _evaluate_invalidation(
             thesis.model_copy(update={"invalidation": _invalidation_for_matching(thesis, definition)}),
@@ -478,7 +503,7 @@ def retrieve_ranked_theses(
             reasons_against.append("invalidation_triggered")
             eligibility_passed = False
 
-        if current_regime and current_regime in disallowed_regimes:
+        if current_regime and current_regime in requirements.disallowed_regimes:
             reasons_against.append(f"regime_disallowed:{current_regime}")
             eligibility_passed = False
 
@@ -491,13 +516,13 @@ def retrieve_ranked_theses(
         if not required_context_passed:
             eligibility_passed = False
 
-        if thesis_canonical_regime:
-            if thesis_canonical_regime == current_regime:
+        if requirements.canonical_regime:
+            if requirements.canonical_regime == current_regime:
                 support_score += 0.05
-                reasons_for.append(f"canonical_regime_match:{thesis_canonical_regime}")
+                reasons_for.append(f"canonical_regime_match:{requirements.canonical_regime}")
             elif current_regime:
                 reasons_against.append(
-                    f"canonical_regime_mismatch:{thesis_canonical_regime}->{current_regime}"
+                    f"canonical_regime_mismatch:{requirements.canonical_regime}->{current_regime}"
                 )
 
         extra_score, extra_for, extra_against = _score_supportive_context(
@@ -528,9 +553,13 @@ def retrieve_ranked_theses(
         if not deployment_passed:
             eligibility_passed = False
 
-        contradiction_overlap = contradiction_events.intersection(
-            trigger_events | confirmation_events | {thesis_event_id}
-        )
+        contradiction_targets = requirements.trigger_events | requirements.confirmation_events
+        contradiction_targets.update(requirements.thesis_event_ids)
+        contradiction_overlap = contradiction_events.intersection(contradiction_targets)
+        if not contradiction_overlap and not contradiction_targets:
+            contradiction_overlap = contradiction_event_families.intersection(
+                requirements.compatibility_event_families
+            )
         if contradiction_overlap:
             contradiction_penalty += 0.25
             reasons_against.append(f"contradiction_event:{','.join(sorted(contradiction_overlap))}")

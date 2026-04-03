@@ -78,21 +78,21 @@ def test_retriever_uses_canonical_confirmation_clause_when_present() -> None:
     assert "confirmation_missing:LIQUIDITY_VACUUM" in match.reasons_against
 
 
-def test_retriever_prefers_canonical_thesis_clauses_over_packaged_event_family() -> None:
+def test_retriever_matches_trigger_without_family_metadata() -> None:
     store = ThesisStore([_canonical_confirm_thesis()])
     context = LiveTradeContext(
         timestamp="2026-04-02T00:00:00Z",
         symbol="BTCUSDT",
         timeframe="5m",
         primary_event_id="VOL_SHOCK",
-        event_family="VOL_SHOCK",
+        event_family="",
         canonical_regime="VOLATILITY_TRANSITION",
         event_side="long",
         live_features={},
         regime_snapshot={"canonical_regime": "VOLATILITY_TRANSITION"},
         execution_env={},
         portfolio_state={},
-        active_event_families=["VOL_SHOCK", "LIQUIDITY_VACUUM"],
+        active_event_families=[],
         active_event_ids=["VOL_SHOCK", "LIQUIDITY_VACUUM"],
         active_episode_ids=[],
     )
@@ -102,7 +102,32 @@ def test_retriever_prefers_canonical_thesis_clauses_over_packaged_event_family()
     assert match.eligibility_passed is True
     assert "trigger_clause_match:VOL_SHOCK" in match.reasons_for
     assert "confirmation_match:LIQUIDITY_VACUUM" in match.reasons_for
-    assert "event_family_match:IGNORED_FALLBACK" not in match.reasons_for
+
+
+def test_retriever_rejects_family_only_trigger_match_when_ids_disagree() -> None:
+    store = ThesisStore([_canonical_confirm_thesis()])
+    context = LiveTradeContext(
+        timestamp="2026-04-02T00:00:00Z",
+        symbol="BTCUSDT",
+        timeframe="5m",
+        primary_event_id="OTHER_EVENT",
+        event_family="IGNORED_FALLBACK",
+        canonical_regime="VOLATILITY_TRANSITION",
+        event_side="long",
+        live_features={},
+        regime_snapshot={"canonical_regime": "VOLATILITY_TRANSITION"},
+        execution_env={},
+        portfolio_state={},
+        active_event_families=["IGNORED_FALLBACK"],
+        active_event_ids=["OTHER_EVENT"],
+        active_episode_ids=[],
+    )
+
+    match = retrieve_ranked_theses(thesis_store=store, context=context, include_pending=False, limit=1)[0]
+
+    assert match.eligibility_passed is False
+    assert "trigger_clause_missing:VOL_SHOCK,LIQUIDITY_VACUUM" not in match.reasons_against
+    assert "trigger_clause_missing:VOL_SHOCK" in match.reasons_against
 
 
 def test_retriever_rejects_required_context_mismatch() -> None:
@@ -162,6 +187,66 @@ def test_retriever_rejects_stale_thesis_when_policy_disallows_it() -> None:
     assert "freshness_disallowed:stale" in match.reasons_against
 
 
+def test_retriever_hard_fails_on_invalidation_trigger() -> None:
+    thesis = _canonical_confirm_thesis().model_copy(
+        update={"invalidation": {"metric": "adverse_proxy", "operator": ">", "value": 0.02}}
+    )
+    store = ThesisStore([thesis])
+    context = LiveTradeContext(
+        timestamp="2026-04-02T00:00:00Z",
+        symbol="BTCUSDT",
+        timeframe="5m",
+        primary_event_id="VOL_SHOCK",
+        event_family="VOL_SHOCK",
+        canonical_regime="VOLATILITY_TRANSITION",
+        event_side="long",
+        live_features={"adverse_proxy": 0.03},
+        regime_snapshot={"canonical_regime": "VOLATILITY_TRANSITION"},
+        execution_env={},
+        portfolio_state={},
+        active_event_ids=["VOL_SHOCK"],
+        active_episode_ids=[],
+    )
+
+    match = retrieve_ranked_theses(thesis_store=store, context=context, include_pending=False, limit=1)[0]
+
+    assert match.eligibility_passed is False
+    assert "invalidation_triggered" in match.reasons_against
+
+
+def test_retriever_hard_fails_on_disallowed_regime() -> None:
+    thesis = _canonical_confirm_thesis().model_copy(
+        update={
+            "requirements": ThesisRequirements(
+                trigger_events=["VOL_SHOCK"],
+                confirmation_events=["LIQUIDITY_VACUUM"],
+                disallowed_regimes=["VOLATILITY_TRANSITION"],
+            )
+        }
+    )
+    store = ThesisStore([thesis])
+    context = LiveTradeContext(
+        timestamp="2026-04-02T00:00:00Z",
+        symbol="BTCUSDT",
+        timeframe="5m",
+        primary_event_id="VOL_SHOCK",
+        event_family="VOL_SHOCK",
+        canonical_regime="VOLATILITY_TRANSITION",
+        event_side="long",
+        live_features={},
+        regime_snapshot={"canonical_regime": "VOLATILITY_TRANSITION"},
+        execution_env={},
+        portfolio_state={},
+        active_event_ids=["VOL_SHOCK", "LIQUIDITY_VACUUM"],
+        active_episode_ids=[],
+    )
+
+    match = retrieve_ranked_theses(thesis_store=store, context=context, include_pending=False, limit=1)[0]
+
+    assert match.eligibility_passed is False
+    assert "regime_disallowed:VOLATILITY_TRANSITION" in match.reasons_against
+
+
 def test_retriever_blocks_non_live_deployment_state_in_trading_mode() -> None:
     thesis = _canonical_confirm_thesis().model_copy(
         update={"deployment_state": "paper_only"}
@@ -187,6 +272,56 @@ def test_retriever_blocks_non_live_deployment_state_in_trading_mode() -> None:
 
     assert match.eligibility_passed is False
     assert "deployment_state_blocked:paper_only" in match.reasons_against
+
+
+def test_retriever_supportive_context_boosts_score_without_gating() -> None:
+    boosted = _canonical_confirm_thesis().model_copy(
+        update={
+            "thesis_id": "thesis::shadow::boosted",
+            "supportive_context": {
+                "bridge_certified": True,
+                "has_realized_oos_path": True,
+            },
+        }
+    )
+    plain = _canonical_confirm_thesis().model_copy(
+        update={
+            "thesis_id": "thesis::shadow::plain",
+            "supportive_context": {"has_realized_oos_path": False},
+            "evidence": ThesisEvidence(
+                sample_size=40,
+                validation_samples=20,
+                test_samples=20,
+                estimate_bps=90.0,
+                net_expectancy_bps=84.0,
+                q_value=0.02,
+                stability_score=0.8,
+                rank_score=3.0,
+            ),
+        }
+    )
+    store = ThesisStore([plain, boosted])
+    context = LiveTradeContext(
+        timestamp="2026-04-02T00:00:00Z",
+        symbol="BTCUSDT",
+        timeframe="5m",
+        primary_event_id="VOL_SHOCK",
+        event_family="VOL_SHOCK",
+        canonical_regime="VOLATILITY_TRANSITION",
+        event_side="long",
+        live_features={},
+        regime_snapshot={"canonical_regime": "VOLATILITY_TRANSITION"},
+        execution_env={},
+        portfolio_state={},
+        active_event_ids=["VOL_SHOCK", "LIQUIDITY_VACUUM"],
+        active_episode_ids=[],
+    )
+
+    matches = retrieve_ranked_theses(thesis_store=store, context=context, include_pending=False, limit=2)
+
+    assert matches[0].thesis.thesis_id == "thesis::shadow::boosted"
+    assert "supportive_context:bridge_certified" in matches[0].reasons_for
+    assert matches[1].eligibility_passed is True
 
 
 def test_retriever_suppresses_lower_ranked_overlap_group_match() -> None:

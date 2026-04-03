@@ -37,10 +37,9 @@ def _matches_symbol(thesis: PromotedThesis, symbol: str) -> bool:
     return token in symbols
 
 
-def _event_tokens_for_matching(thesis: PromotedThesis) -> set[str]:
+def _event_ids_for_matching(thesis: PromotedThesis) -> set[str]:
     tokens = {
         str(thesis.primary_event_id or "").strip().upper(),
-        str(thesis.event_family or "").strip().upper(),
     }
     tokens.update(
         str(item).strip().upper()
@@ -58,6 +57,11 @@ def _event_tokens_for_matching(thesis: PromotedThesis) -> set[str]:
         if str(item).strip()
     )
     return {token for token in tokens if token}
+
+
+def _family_tokens_for_matching(thesis: PromotedThesis) -> set[str]:
+    token = str(thesis.event_family or "").strip().upper()
+    return {token} if token else set()
 
 
 class ThesisStore:
@@ -130,12 +134,19 @@ class ThesisStore:
             filtered = [
                 thesis for thesis in filtered if thesis.timeframe.strip().lower() == timeframe_token
             ]
-        event_token = str(event_id if event_id is not None else event_family or "").strip().upper()
-        if event_token:
+        event_id_token = str(event_id or "").strip().upper()
+        if event_id_token:
             filtered = [
                 thesis
                 for thesis in filtered
-                if event_token in _event_tokens_for_matching(thesis)
+                if event_id_token in _event_ids_for_matching(thesis)
+            ]
+        event_family_token = str(event_family or "").strip().upper()
+        if event_family_token:
+            filtered = [
+                thesis
+                for thesis in filtered
+                if event_family_token in _family_tokens_for_matching(thesis)
             ]
         if canonical_regime is not None:
             regime_token = str(canonical_regime).strip().upper()

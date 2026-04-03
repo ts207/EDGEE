@@ -12,6 +12,8 @@ class LiveTradeContext(BaseModel):
     symbol: str = Field(min_length=1)
     timeframe: str = Field(min_length=1)
     primary_event_id: str = Field(min_length=1)
+    # Legacy compatibility metadata only. Runtime matching should prefer
+    # primary_event_id, active_event_ids, and contradiction_event_ids.
     event_family: str = ""
     canonical_regime: str = ""
     event_side: str = Field(min_length=1)
@@ -31,12 +33,10 @@ class LiveTradeContext(BaseModel):
     def _populate_compat_event_fields(cls, data: Any) -> Any:
         if not isinstance(data, dict):
             return data
-        primary_event_id = str(
-            data.get("primary_event_id", "") or data.get("event_family", "")
-        ).strip()
-        event_family = str(
-            data.get("event_family", "") or data.get("primary_event_id", "")
-        ).strip()
+        primary_event_id = str(data.get("primary_event_id", "")).strip()
+        event_family = str(data.get("event_family", "")).strip()
+        if not primary_event_id and event_family:
+            primary_event_id = event_family
         if primary_event_id:
             data["primary_event_id"] = primary_event_id
         if event_family:

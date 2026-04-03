@@ -83,11 +83,15 @@ class PromotedThesis(BaseModel):
     symbol_scope: Dict[str, Any] = Field(default_factory=dict)
     timeframe: str = Field(min_length=1)
     primary_event_id: str = Field(min_length=1)
+    # Legacy compatibility metadata only. Runtime matching should prefer
+    # primary_event_id and requirements.trigger_events.
     event_family: str = ""
     canonical_regime: str = ""
     event_side: Literal["long", "short", "both", "conditional", "unknown"] = "unknown"
     required_context: Dict[str, Any] = Field(default_factory=dict)
     supportive_context: Dict[str, Any] = Field(default_factory=dict)
+    required_state_ids: List[str] = Field(default_factory=list)
+    supportive_state_ids: List[str] = Field(default_factory=list)
     expected_response: Dict[str, Any] = Field(default_factory=dict)
     invalidation: Dict[str, Any] = Field(default_factory=dict)
     freshness_policy: Dict[str, Any] = Field(default_factory=dict)
@@ -135,12 +139,10 @@ class PromotedThesis(BaseModel):
         if governance:
             data["governance"] = governance
 
-        primary_event_id = str(
-            data.get("primary_event_id", "") or data.get("event_family", "")
-        ).strip()
-        event_family = str(
-            data.get("event_family", "") or data.get("primary_event_id", "")
-        ).strip()
+        primary_event_id = str(data.get("primary_event_id", "")).strip()
+        event_family = str(data.get("event_family", "")).strip()
+        if not primary_event_id and event_family:
+            primary_event_id = event_family
         if primary_event_id:
             data["primary_event_id"] = primary_event_id
         if event_family:
