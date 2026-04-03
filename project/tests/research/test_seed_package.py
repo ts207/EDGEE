@@ -209,6 +209,7 @@ def test_package_seed_promoted_theses_creates_store_cards_and_overlap(tmp_path: 
     assert thesis.evidence_freshness_date
     assert thesis.review_due_date
     assert thesis.staleness_class == "fresh"
+    assert thesis.required_context == {}
 
     confirm = thesis_by_id["THESIS_VOL_SHOCK_LIQUIDITY_CONFIRM"]
     assert confirm.requirements.trigger_events == ["VOL_SHOCK"]
@@ -219,9 +220,16 @@ def test_package_seed_promoted_theses_creates_store_cards_and_overlap(tmp_path: 
     assert index["latest_run_id"] == "seed_pack_test"
 
     summary = json.loads(outputs["summary_json"].read_text(encoding="utf-8"))
+    assert summary["schema_version"] == "seed_thesis_packaging_summary_v1"
+    assert summary["workspace_root"] == "."
+    assert summary["artifact_root"].startswith("docs/")
+    assert summary["source_run_id"] == "seed_pack_test"
+    assert summary["all_referenced_files_exist"] is True
     assert summary["invalid_artifact_refs"] == []
     assert summary["artifact_refs"]["thesis_store"]["path"].startswith("data/")
-    assert "/home/irene/" not in outputs["summary_md"].read_text(encoding="utf-8")
+    summary_md = outputs["summary_md"].read_text(encoding="utf-8")
+    assert "## Artifact metadata" in summary_md
+    assert "/home/irene/" not in summary_md
 
     overlap_payload = json.loads(outputs["overlap_json"].read_text(encoding="utf-8"))
     assert overlap_payload["thesis_count"] == 2

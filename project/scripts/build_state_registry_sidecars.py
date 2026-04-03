@@ -7,7 +7,11 @@ from typing import Any, Dict, Iterable
 import yaml
 
 from project import PROJECT_ROOT
-from project.spec_registry import load_state_registry, resolve_relative_spec_path
+from project.spec_registry import (
+    load_state_family_registry,
+    load_state_registry,
+    resolve_relative_spec_path,
+)
 
 
 def _state_registry_payload() -> Dict[str, Any]:
@@ -69,7 +73,8 @@ def build_runtime_state_registry_payload() -> Dict[str, Any]:
         "metadata": {
             "status": "generated",
             "authored_source": "spec/states/*.yaml",
-            "generated_from": "spec/states/state_registry.yaml",
+            "generated_notice": "GENERATED FILE - DO NOT EDIT",
+            "generated_from": "spec/states/*.yaml",
         },
         "states": states,
     }
@@ -105,7 +110,8 @@ def build_state_grammar_payload() -> Dict[str, Any]:
         "metadata": {
             "status": "generated",
             "authored_source": "spec/states/*.yaml",
-            "generated_from": "spec/states/state_registry.yaml",
+            "generated_notice": "GENERATED FILE - DO NOT EDIT",
+            "generated_from": "spec/states/*.yaml",
         },
         "regimes": regimes,
         "context_state_map": context_state_map,
@@ -130,7 +136,8 @@ def build_state_ontology_specs() -> Dict[str, Dict[str, Any]]:
             "metadata": {
                 "status": "generated",
                 "authored_source": f"spec/states/{state_id}.yaml",
-                "generated_from": "spec/states/state_registry.yaml",
+                "generated_notice": "GENERATED FILE - DO NOT EDIT",
+                "generated_from": "spec/states/*.yaml",
             },
             "state_id": state_id,
             "family": str(row.get("family", "")).strip().upper(),
@@ -180,13 +187,16 @@ def _write_ontology_specs(ontology_specs: Dict[str, Dict[str, Any]]) -> None:
 
 def main() -> int:
     registry_path = resolve_relative_spec_path("spec/states/state_registry.yaml", repo_root=PROJECT_ROOT.parent)
+    family_registry_path = resolve_relative_spec_path("spec/states/state_families.yaml", repo_root=PROJECT_ROOT.parent)
     runtime_path = PROJECT_ROOT / "configs" / "registries" / "states.yaml"
     grammar_path = resolve_relative_spec_path("spec/grammar/state_registry.yaml", repo_root=PROJECT_ROOT.parent)
     _write_yaml(registry_path, _state_registry_payload())
+    _write_yaml(family_registry_path, load_state_family_registry())
     _write_yaml(runtime_path, build_runtime_state_registry_payload())
     _write_yaml(grammar_path, build_state_grammar_payload())
     _write_ontology_specs(build_state_ontology_specs())
     print(f"Wrote {registry_path}")
+    print(f"Wrote {family_registry_path}")
     print(f"Wrote {runtime_path}")
     print(f"Wrote {grammar_path}")
     return 0

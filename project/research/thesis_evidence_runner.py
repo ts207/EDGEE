@@ -14,6 +14,13 @@ from scipy import stats
 from project.core.config import get_data_root
 from project.events.governance import get_event_governance_metadata
 from project.io.utils import list_parquet_files, resolve_raw_dataset_dir
+from project.research.artifact_hygiene import (
+    build_artifact_refs,
+    build_summary_metadata,
+    infer_workspace_root,
+    invalid_artifact_header,
+    metadata_markdown_lines,
+)
 from project.spec_registry.loaders import repo_root
 
 POLICY_PATH = repo_root() / "spec" / "promotion" / "founding_thesis_eval_policy.yaml"
@@ -720,14 +727,45 @@ def build_founding_thesis_evidence(*, policy_path: str | Path | None = None, dat
 
     json_path = resolved_docs / "founding_thesis_evidence_summary.json"
     md_path = resolved_docs / "founding_thesis_evidence_summary.md"
-    json_path.write_text(json.dumps({"generated": summary_rows, "unsupported": unsupported}, indent=2), encoding="utf-8")
+    workspace_root = infer_workspace_root(resolved_data_root, resolved_docs)
+    bundle_refs = {
+        f"bundle::{row['candidate_id']}": resolved_data_root / "reports" / "promotions" / str(row["candidate_id"]) / "evidence_bundles.jsonl"
+        for row in summary_rows
+    }
+    initial_payload = {"generated": summary_rows, "unsupported": unsupported}
+    json_path.write_text(json.dumps(initial_payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    md_path.write_text("# Founding thesis evidence summary\n", encoding="utf-8")
+    artifact_refs, invalid_refs = build_artifact_refs(
+        {
+            "summary_json": json_path,
+            "summary_md": md_path,
+            **bundle_refs,
+        },
+        workspace_root=workspace_root,
+    )
+    metadata = build_summary_metadata(
+        schema_version="founding_thesis_evidence_summary_v1",
+        artifact_root=resolved_docs,
+        source_run_id="founding_thesis_evidence",
+        workspace_root=workspace_root,
+        invalid_artifact_refs=invalid_refs,
+    )
+    payload = {
+        **metadata,
+        "generated": summary_rows,
+        "unsupported": unsupported,
+        "artifact_refs": artifact_refs,
+        "invalid_artifact_refs": invalid_refs,
+    }
+    json_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
-    lines = [
+    lines = invalid_artifact_header(invalid_refs) + [
         "# Founding thesis evidence summary",
         "",
         "This artifact records the first raw-data empirical bundle generation pass against the founding thesis queue.",
         "",
     ]
+    lines.extend(metadata_markdown_lines(metadata))
     notes = policy.get("notes", []) if isinstance(policy.get("notes", []), list) else []
     if notes:
         lines.extend(["## Policy notes", ""])
@@ -740,12 +778,14 @@ def build_founding_thesis_evidence(*, policy_path: str | Path | None = None, dat
         "",
         "## Generated evidence bundles",
         "",
-        "| Candidate | Event | Symbols | Horizon | Bundles | Sample size | Mean net expectancy (bps) |",
-        "|---|---|---|---:|---:|---:|---:|",
+        "| Candidate | Event | Symbols | Horizon | Bundles | Sample size | Mean net expectancy (bps) | Bundle path |",
+        "|---|---|---|---:|---:|---:|---:|---|",
     ])
     for row in summary_rows:
+        bundle_key = f"bundle::{row['candidate_id']}"
+        bundle_path = artifact_refs.get(bundle_key, {}).get("path", "")
         lines.append(
-            f"| {row['candidate_id']} | {row['event_type']} | {row['symbols']} | {row['horizon_bars']} | {row['bundle_count']} | {row['sample_size_total']} | {row['mean_net_expectancy_bps']:.2f} |"
+            f"| {row['candidate_id']} | {row['event_type']} | {row['symbols']} | {row['horizon_bars']} | {row['bundle_count']} | {row['sample_size_total']} | {row['mean_net_expectancy_bps']:.2f} | `{bundle_path}` |"
         )
     if unsupported:
         lines.extend(["", "## Unsupported or skipped", ""])

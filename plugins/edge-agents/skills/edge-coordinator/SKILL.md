@@ -30,12 +30,14 @@ This skill follows `agents/coordinator_playbook.md`.
 ## Standard bounded research flow
 
 1. Read the proposal and identify the exact bounded claim.
-2. Run or inspect preflight and plan output first.
-3. Diagnose the completed run with the analyst workflow.
-4. Formulate 1-3 frozen hypotheses from the analyst report.
-5. Compile only valid hypotheses into repo-native proposal YAML.
-6. Review the plan before execution.
-7. Execute at most one bounded run at a time.
+2. Run or inspect preflight plus lint/explain output first.
+3. Run or inspect the validated plan before any execution.
+4. Execute at most one bounded run at a time.
+5. Diagnose the completed run with the analyst workflow.
+6. Use `regime-report` or bounded `compare` when stability or confirmation matters.
+7. Formulate 1-3 frozen hypotheses from the analyst report.
+8. Compile only valid hypotheses into repo-native proposal YAML.
+9. Review lint/explain/plan again before any follow-up execution.
 
 ## Thesis bootstrap flow
 

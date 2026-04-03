@@ -3,7 +3,8 @@ kind: state_ontology_spec
 metadata:
   status: generated
   authored_source: spec/states/CORRELATION_BROKEN_STATE.yaml
-  generated_from: spec/states/state_registry.yaml
+  generated_notice: GENERATED FILE - DO NOT EDIT
+  generated_from: spec/states/*.yaml
 state_id: CORRELATION_BROKEN_STATE
 family: REGIME_TRANSITION
 source_event_type: CORRELATION_BREAKDOWN_EVENT

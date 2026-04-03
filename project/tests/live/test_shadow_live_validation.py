@@ -212,11 +212,23 @@ def test_run_shadow_live_thesis_validation_tracks_confirmation_only_when_window_
 
     summary = json.loads(out["summary_json"].read_text(encoding="utf-8"))
     stats = summary["confirmation_thesis_stats"]
+    thesis_stats = summary["thesis_cycle_stats"]
     assert summary["contexts_evaluated"] > 0
+    assert thesis_stats["retrieved_cycles"] > 0
+    assert thesis_stats["eligible_cycles"] > 0
+    assert thesis_stats["trigger_clause_match"] > 0
     assert stats["retrieved_cycles"] > 0
     assert stats["confirmation_match_cycles"] > 0
     assert summary["confirmation_thesis_stats_by_id"]["THESIS_VOL_SHOCK_LIQUIDITY_CONFIRM"]["confirmation_match_cycles"] > 0
+    assert summary["thesis_cycle_stats_by_id"]["THESIS_VOL_SHOCK"]["supportive_context_bonus_applied"] > 0
     assert summary["quality_checks"]["overlap_metadata_visible_consistently"] is True
+    assert summary["schema_version"] == "shadow_live_thesis_summary_v1"
+    assert summary["workspace_root"] == "."
+    assert summary["artifact_root"] == "shadow"
+    assert summary["source_run_id"] == "shadow_test"
+    assert summary["all_referenced_files_exist"] is True
     assert summary["invalid_artifact_refs"] == []
     assert summary["artifact_refs"]["trace"]["path"].startswith("shadow/")
-    assert "/home/irene/" not in out["summary_md"].read_text(encoding="utf-8")
+    summary_md = out["summary_md"].read_text(encoding="utf-8")
+    assert "## Artifact metadata" in summary_md
+    assert "/home/irene/" not in summary_md

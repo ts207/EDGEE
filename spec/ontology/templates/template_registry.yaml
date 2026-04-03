@@ -150,22 +150,6 @@ filter_templates:
     feature: logret_1
     operator: <
     threshold: -0.002
-  stop_run_repair:
-    feature: liquidation_count
-    operator: '>'
-    threshold: 0.0
-  overshoot_repair:
-    feature: basis_zscore
-    operator: '>'
-    threshold: 1.5
-  desync_repair:
-    feature: cross_exchange_spread_z
-    operator: '>'
-    threshold: 1.5
-  basis_repair:
-    feature: basis_zscore
-    operator: '>'
-    threshold: 1.0
   only_if_regime:
     feature: rv_pct_17280
     operator: '>'
@@ -174,34 +158,6 @@ filter_templates:
     feature: logret_1
     operator: '>'
     threshold: 0.001
-  divergence_continuation:
-    feature: cross_exchange_spread_z
-    operator: '>'
-    threshold: 1.0
-  momentum_fade:
-    feature: logret_1
-    operator: <
-    threshold: -0.001
-  range_reversion:
-    feature: basis_zscore
-    operator: '>'
-    threshold: 0.5
-  volatility_expansion_follow:
-    feature: rv_96
-    operator: '>'
-    threshold: 0.0
-  exhaustion_reversal:
-    feature: rv_pct_17280
-    operator: '>'
-    threshold: 0.8
-  reversal_or_squeeze:
-    feature: funding_rate_scaled
-    operator: '>'
-    threshold: 1.0
-  convexity_capture:
-    feature: oi_delta_1h
-    operator: <
-    threshold: 0.0
   only_if_no_news_window:
     feature: calendar_event
     operator: ==

@@ -1,7 +1,7 @@
 {
   "name": "edge-agents",
-  "version": "0.1.0",
-  "description": "Repo-local Codex plugin for the Edge specialist-agent workflow.",
+  "version": "0.4.0",
+  "description": "Repo-local Codex plugin for Edge operator, maintenance, ChatGPT-app, review, and thesis-bootstrap workflows.",
   "author": {
     "name": "irene",
     "email": "irene@local.invalid",
@@ -21,8 +21,8 @@
   "hooks": "./hooks.json",
   "interface": {
     "displayName": "Edge Agents",
-    "shortDescription": "Agent-dir workflows for bounded research and repo work.",
-    "longDescription": "Project-local Codex plugin for Edge. It packages the existing agent specifications under agents/ into reusable Codex skills for repo orientation, coordination, diagnosis, bounded hypothesis formulation, and proposal compilation.",
+    "shortDescription": "Bounded operator, maintenance, app-surface, review, and thesis-bootstrap workflows for Edge.",
+    "longDescription": "Project-local Codex plugin for Edge. It wraps the repo's canonical make, edge operator, and edge-chatgpt-app surfaces with reusable Codex skills, maintenance routing, proposal inspection helpers, run-review helpers, developer wrappers, and guardrail hooks for bounded research, diagnosis, app upkeep, and thesis packaging.",
     "developerName": "Edge",
     "category": "Developer Tools",
     "capabilities": [
@@ -34,9 +34,11 @@
     "privacyPolicyURL": "https://github.com/ts207/Edge",
     "termsOfServiceURL": "https://github.com/ts207/Edge",
     "defaultPrompt": [
-      "Diagnose an Edge run using the analyst workflow.",
-      "Turn an analyst report into bounded hypotheses.",
-      "Compile a mechanism hypothesis into proposal YAML."
+      "Explain and plan a bounded proposal using the Edge operator workflow.",
+      "Route a repo change through the right validation and generated-doc maintenance loop.",
+      "Inspect or develop the Edge ChatGPT app surface without bypassing canonical operator flows.",
+      "Diagnose an Edge run and decide keep, modify, or kill.",
+      "Package tested claims through the thesis bootstrap lane."
     ],
     "brandColor": "#0F766E"
   }

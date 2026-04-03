@@ -13,6 +13,12 @@ def test_operator_inventory_covers_new_commands():
     assert "edge operator diagnose" in commands
 
 
+def test_operator_inventory_covers_action_aliases():
+    inventory = build_inventory()
+    actions = set(inventory["operator_action_targets"])
+    assert actions == {"discover", "package", "validate", "review"}
+
+
 def test_operator_inventory_doc_is_in_sync():
     inventory = build_inventory()
     expected = render_markdown(inventory)
@@ -23,6 +29,7 @@ def test_operator_inventory_doc_is_in_sync():
 def test_readme_and_start_here_anchor_canonical_operator_flow():
     readme = Path("README.md").read_text(encoding="utf-8")
     start_here = Path("docs/00_START_HERE.md").read_text(encoding="utf-8")
-    assert "edge operator preflight" in readme
-    assert "edge operator diagnose" in start_here
-    assert "edge operator compare" in start_here
+    assert "make discover" in readme
+    assert "make validate" in readme
+    assert "make review" in start_here
+    assert "make package" in start_here

@@ -193,7 +193,17 @@ def test_build_founding_thesis_evidence_writes_bundle(tmp_path: Path, monkeypatc
     assert row["candidate_id"] == "THESIS_VOL_TEST"
     assert row["sample_definition"]["test_samples"] > 0
     assert row["metadata"]["has_realized_oos_path"] is True
-    assert "THESIS_VOL_TEST" in out["json"].read_text(encoding="utf-8")
+    payload = json.loads(out["json"].read_text(encoding="utf-8"))
+    assert payload["schema_version"] == "founding_thesis_evidence_summary_v1"
+    assert payload["workspace_root"] == "."
+    assert payload["artifact_root"] == "docs"
+    assert payload["source_run_id"] == "founding_thesis_evidence"
+    assert payload["all_referenced_files_exist"] is True
+    assert payload["invalid_artifact_refs"] == []
+    assert any(key.startswith("bundle::THESIS_VOL_TEST") for key in payload["artifact_refs"])
+    summary_md = out["md"].read_text(encoding="utf-8")
+    assert "## Artifact metadata" in summary_md
+    assert "THESIS_VOL_TEST" in summary_md
 
 
 def test_empirical_confirm_candidate_requires_explicit_bundle(tmp_path: Path, monkeypatch) -> None:

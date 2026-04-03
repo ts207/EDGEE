@@ -1,154 +1,180 @@
-# Artifacts And Interpretation
+# Artifacts and interpretation
 
-Artifacts are the source of truth. Logs and summaries only matter when they reconcile with artifacts.
+This document explains where outputs go and how to read them.
 
-## Read order
+## Artifact classes
 
-For every meaningful run, read in this order:
+Edge produces four different artifact classes.
 
-1. top-level run manifest
-2. stage manifests
-3. stage logs
-4. report artifacts
-5. diagnostics
+### 1. Proposal artifacts
 
-If these disagree, the disagreement is a first-class finding.
+Written during proposal issuance.
 
-## Core artifact paths
+Typical paths:
 
-### Run and search artifacts
+- `data/artifacts/experiments/<program_id>/memory/proposals.parquet`
+- `data/artifacts/experiments/<program_id>/memory/proposals/<run_id>/proposal.yaml`
+- `data/artifacts/experiments/<program_id>/memory/proposals/<run_id>/experiment.yaml`
+- `data/artifacts/experiments/<program_id>/memory/proposals/<run_id>/run_all_overrides.json`
 
-- run manifest: `data/runs/<run_id>/run_manifest.json`
-- stage logs: `data/runs/<run_id>/*.log`
-- phase-2 search outputs: `data/reports/phase2/<run_id>/search_engine/`
-- edge candidates: `data/reports/edge_candidates/<run_id>/`
-- event outputs: `data/reports/<detector_reports_dir>/<run_id>/`
+Use these when you need to know exactly what was asked and how it was translated.
 
-### Thesis bootstrap and promotion artifacts
+### 2. Run artifacts
 
-- founding queue: `docs/generated/promotion_seed_inventory.csv`
-- thesis testing scorecards: `docs/generated/thesis_testing_scorecards.csv`
-- thesis empirical scorecards: `docs/generated/thesis_empirical_scorecards.csv`
-- founding evidence bundles: `data/reports/promotions/<thesis_id>/evidence_bundles.jsonl`
-- packaging summary: `docs/generated/seed_thesis_packaging_summary.json`
-- seed thesis cards: `docs/generated/seed_thesis_cards/<THESIS_ID>.md`
-- thesis catalog: `docs/generated/seed_thesis_catalog.md`
-- thesis store index: `data/live/theses/index.json`
-- packaged thesis batch: `data/live/theses/<batch>/promoted_theses.json`
-- overlap graph: `docs/generated/thesis_overlap_graph.json`
+Written during execution.
 
-## High-value files
+Core path:
 
-Inspect these first for bounded experiment work:
+- `data/runs/<run_id>/run_manifest.json`
 
-- `run_manifest.json`
+The manifest is the run spine. It is the first file to inspect after execution.
+
+Typical questions answered by the manifest:
+
+- what run actually executed
+- status and terminal status
+- what configs and parameters were used
+- what artifacts were produced or expected
+- whether the run ended mechanically or statistically cleanly
+
+### 3. Research and promotion reports
+
+Common report roots:
+
+- `data/reports/phase2/<run_id>/`
+- `data/reports/promotions/<run_id>/`
+- `data/reports/operator/<run_id>/`
+- `data/reports/shadow_live/<run_id>/`
+
+Common files include:
+
 - `phase2_candidates.parquet`
 - `phase2_diagnostics.json`
-- `discovery_quality_summary.json`
-- `funnel_summary.json`
-- detector event parquet outputs
+- `promotion_statistical_audit.parquet`
+- `promoted_candidates.parquet`
+- `promotion_decisions.parquet`
+- `promotion_summary.csv`
+- `operator_summary.json`
+- `operator_summary.md`
 
-Inspect these first for thesis bootstrap work:
+Use these to answer what survived, what failed, and why.
 
+### 4. Packaged thesis artifacts
+
+Primary packaged-thesis surfaces:
+
+- `data/live/theses/index.json`
+- `data/live/theses/<run_or_batch>/promoted_theses.json`
+- `docs/generated/seed_thesis_catalog.md`
+- `docs/generated/seed_thesis_packaging_summary.md`
+- `docs/generated/thesis_overlap_graph.md`
+
+Use these when the question is no longer “did the run look good?” and instead becomes “what reusable thesis objects exist right now?”
+
+## How to inspect a bounded run
+
+Inspect in this order.
+
+### Step 1 — run manifest
+
+Read `data/runs/<run_id>/run_manifest.json` first.
+
+Why:
+
+- it anchors status
+- it defines the run identifier and primary provenance
+- it tells you whether the failure was mechanical before you waste time on candidate-level interpretation
+
+### Step 2 — phase-2 outputs
+
+Read the phase-2 candidate table and diagnostics.
+
+Typical paths:
+
+- `data/reports/phase2/<run_id>/phase2_candidates.parquet`
+- `data/reports/phase2/<run_id>/phase2_diagnostics.json`
+
+Questions to answer:
+
+- was there any signal at all
+- which event/template/direction/horizon rows were strongest
+- was the sample size large enough to trust the rejection or survival
+- did stability or regime issues appear early
+
+### Step 3 — promotion outputs
+
+Read the promotion tables next.
+
+Typical paths:
+
+- `data/reports/promotions/<run_id>/promotion_statistical_audit.parquet`
+- `data/reports/promotions/<run_id>/promoted_candidates.parquet`
+- `data/reports/promotions/<run_id>/promotion_decisions.parquet`
+- `data/reports/promotions/<run_id>/promotion_summary.csv`
+
+Questions to answer:
+
+- did the candidate survive promotion-oriented gates
+- what was the primary fail gate
+- what evidence class and promotion class does it support
+- was the problem statistical, stability-related, cost-related, or contract-related
+
+### Step 4 — operator summary
+
+Read the operator summary for compact decision support.
+
+Paths:
+
+- `data/reports/operator/<run_id>/operator_summary.json`
+- `data/reports/operator/<run_id>/operator_summary.md`
+
+Use this when you need a short diagnosis without re-reading raw tables.
+
+## How to inspect packaged thesis state
+
+Inspect in this order.
+
+1. `data/live/theses/index.json`
+2. `data/live/theses/<batch>/promoted_theses.json`
+3. `docs/generated/seed_thesis_catalog.md`
+4. `docs/generated/thesis_overlap_graph.md`
+5. `docs/generated/founding_thesis_evidence_summary.md`
+
+Questions to answer:
+
+- what the latest packaged batch is
+- how many active theses exist
+- which promotion classes and deployment states are present
+- how overlap groups are formed
+- where evidence gaps remain
+
+## Current snapshot note
+
+This snapshot already contains a packaged thesis store and several promotion evidence bundles under `data/reports/promotions/`.
+
+That means the docs should treat the thesis store as an active surface, not a future concept.
+
+## Generated docs to use as inventory
+
+Already present in `docs/generated/`:
+
+- `system_map.md`
+- `event_contract_reference.md`
 - `promotion_seed_inventory.md`
-- `thesis_testing_summary.md`
 - `thesis_empirical_summary.md`
-- `founding_thesis_evidence_summary.md`
-- `seed_thesis_packaging_summary.md`
 - `seed_thesis_catalog.md`
+- `seed_thesis_packaging_summary.md`
 - `thesis_overlap_graph.md`
+- `founding_thesis_evidence_summary.md`
+- `structural_confirmation_summary.md`
+- `shadow_live_thesis_summary.md`
 
-## The four required conclusions
+These are inventory and summary views. They do not replace manifest- and code-level interpretation.
 
-### Mechanical integrity
+## Common interpretation errors
 
-Questions:
-
-- Did the required stages run?
-- Did expected artifacts exist?
-- Did postflight pass?
-- Were there fallbacks, sequential degradations, or drift warnings?
-
-Mechanical success means the system executed correctly. It does not prove edge.
-
-### Statistical quality
-
-Questions:
-
-- How many events were detected?
-- How many hypotheses were generated?
-- How many were feasible?
-- How many died on sample size, invalid metrics, or `t_stat`?
-- What are `q_value`, after-cost expectancy, and stressed expectancy?
-
-Statistical success means there is evidence. It does not prove packagability.
-
-### Promotion or thesis-class relevance
-
-Questions:
-
-- Did bridge tradability pass?
-- Did robustness clear threshold?
-- Did stress survival clear threshold?
-- Does the evidence support only `candidate`/`tested`, or does it clear `seed_promoted` or `paper_promoted`?
-
-Promotion success means the candidate survived a stricter filter than discovery.
-
-### Packaging relevance
-
-Questions:
-
-- Does a canonical thesis object exist under `data/live/theses/`?
-- Does the thesis card explain trigger, invalidation, regimes, and gaps?
-- Does the overlap graph now include the thesis in a meaningful node or edge?
-
-Packaging success means downstream live and allocator surfaces can consume the result.
-
-## Typical failure shapes
-
-### Mechanical failure
-
-Examples:
-
-- missing artifacts
-- stale path assumptions
-- postflight causality violations
-- failed stage contracts
-
-### Statistical failure
-
-Examples:
-
-- low `n`
-- weak `t_stat`
-- failed FDR control
-- positive in one bucket but unsupported broadly
-
-### Promotion failure
-
-Examples:
-
-- poor robustness across regimes
-- poor stress survival
-- missing holdout or confounder checks
-- candidate never became bridge-tradable
-
-### Packaging failure
-
-Examples:
-
-- evidence exists but no canonical thesis object was created
-- thesis class is overstated relative to evidence
-- overlap graph stays disconnected because the thesis lacks structurally related packaged peers
-- live retrieval cannot load the thesis due to missing contract fields
-
-## Example interpretation pattern
-
-Use a structure like this after every run or thesis bootstrap cycle:
-
-- mechanical: "Run completed, artifacts reconciled, postflight passed."
-- statistical: "Detector produced 128 events; 80 hypotheses were evaluated; 10 candidates survived phase 2."
-- promotion: "One thesis cleared the seed gate but not the paper gate because direct paired-event evidence is still missing."
-- packaging: "The thesis store was refreshed and the overlap graph gained two edges."
-
-That format forces you to separate pipeline health from research quality from packaging truth.
+- reading only markdown summaries and ignoring the manifest
+- treating a positive phase-2 row as equivalent to promotion survival
+- treating packaged thesis presence as proof of production readiness
+- confusing proposal memory with run execution output
+- interpreting missing generated docs as absence of capability rather than absence of regeneration

@@ -11,6 +11,10 @@ metadata:
   - spec/multiplicity/taxonomy.yaml
   notes: Canonical authored template source. Generated runtime and ontology template
     registries are rebuilt from this file.
+  phase2_search_unit: trigger_x_expression_template
+  template_kind_policy: Expression templates are the primary search unit. Filter templates
+    are optional overlays. Execution-template-only search branches are reserved and
+    must not be emitted as standalone hypotheses.
   authored_source: spec/templates/registry.yaml
 defaults:
   templates:
@@ -1013,22 +1017,6 @@ filter_templates:
     feature: logret_1
     operator: <
     threshold: -0.002
-  stop_run_repair:
-    feature: liquidation_count
-    operator: '>'
-    threshold: 0.0
-  overshoot_repair:
-    feature: basis_zscore
-    operator: '>'
-    threshold: 1.5
-  desync_repair:
-    feature: cross_exchange_spread_z
-    operator: '>'
-    threshold: 1.5
-  basis_repair:
-    feature: basis_zscore
-    operator: '>'
-    threshold: 1.0
   only_if_regime:
     feature: rv_pct_17280
     operator: '>'
@@ -1037,34 +1025,6 @@ filter_templates:
     feature: logret_1
     operator: '>'
     threshold: 0.001
-  divergence_continuation:
-    feature: cross_exchange_spread_z
-    operator: '>'
-    threshold: 1.0
-  momentum_fade:
-    feature: logret_1
-    operator: <
-    threshold: -0.001
-  range_reversion:
-    feature: basis_zscore
-    operator: '>'
-    threshold: 0.5
-  volatility_expansion_follow:
-    feature: rv_96
-    operator: '>'
-    threshold: 0.0
-  exhaustion_reversal:
-    feature: rv_pct_17280
-    operator: '>'
-    threshold: 0.8
-  reversal_or_squeeze:
-    feature: funding_rate_scaled
-    operator: '>'
-    threshold: 1.0
-  convexity_capture:
-    feature: oi_delta_1h
-    operator: <
-    threshold: 0.0
   only_if_no_news_window:
     feature: calendar_event
     operator: ==
@@ -1088,7 +1048,7 @@ operators:
     - INFORMATION_DESYNC
     default_conditioning: {}
     risk_metrics_required: []
-    template_kind: filter_template
+    template_kind: expression_template
     feature: basis_zscore
     operator: '>'
     threshold: 1.0
@@ -1121,7 +1081,7 @@ operators:
     - LIQUIDATION_EXHAUSTION_REVERSAL
     default_conditioning: {}
     risk_metrics_required: []
-    template_kind: execution_template
+    template_kind: expression_template
   continuation:
     enabled: true
     supports_contexts: true
@@ -1156,7 +1116,7 @@ operators:
     - LIQUIDATION_EXHAUSTION_REVERSAL
     default_conditioning: {}
     risk_metrics_required: []
-    template_kind: execution_template
+    template_kind: expression_template
   convergence:
     enabled: true
     supports_contexts: true
@@ -1175,7 +1135,7 @@ operators:
     - INFORMATION_DESYNC
     default_conditioning: {}
     risk_metrics_required: []
-    template_kind: execution_template
+    template_kind: expression_template
   convexity_capture:
     enabled: true
     supports_contexts: true
@@ -1195,7 +1155,7 @@ operators:
     default_conditioning: {}
     risk_metrics_required:
     - tail_risk_avoid
-    template_kind: filter_template
+    template_kind: expression_template
     feature: oi_delta_1h
     operator: <
     threshold: 0.0
@@ -1217,7 +1177,7 @@ operators:
     - INFORMATION_DESYNC
     default_conditioning: {}
     risk_metrics_required: []
-    template_kind: filter_template
+    template_kind: expression_template
     feature: cross_exchange_spread_z
     operator: '>'
     threshold: 1.5
@@ -1241,7 +1201,7 @@ operators:
     default_conditioning: {}
     risk_metrics_required:
     - tail_risk_avoid
-    template_kind: filter_template
+    template_kind: expression_template
     feature: cross_exchange_spread_z
     operator: '>'
     threshold: 1.0
@@ -1290,7 +1250,7 @@ operators:
     default_conditioning: {}
     risk_metrics_required:
     - drawdown_filter
-    template_kind: filter_template
+    template_kind: expression_template
     feature: rv_pct_17280
     operator: '>'
     threshold: 0.8
@@ -1320,7 +1280,7 @@ operators:
     - LIQUIDATION_EXHAUSTION_REVERSAL
     default_conditioning: {}
     risk_metrics_required: []
-    template_kind: execution_template
+    template_kind: expression_template
   lead_lag_follow:
     enabled: true
     supports_contexts: true
@@ -1340,7 +1300,7 @@ operators:
     - INFORMATION_DESYNC
     default_conditioning: {}
     risk_metrics_required: []
-    template_kind: execution_template
+    template_kind: expression_template
   mean_reversion:
     enabled: true
     supports_contexts: true
@@ -1377,7 +1337,7 @@ operators:
     default_conditioning: {}
     risk_metrics_required:
     - tail_risk_avoid
-    template_kind: execution_template
+    template_kind: expression_template
   momentum_fade:
     enabled: true
     supports_contexts: true
@@ -1397,7 +1357,7 @@ operators:
     - TREND_STRUCTURE
     default_conditioning: {}
     risk_metrics_required: []
-    template_kind: filter_template
+    template_kind: expression_template
     feature: logret_1
     operator: <
     threshold: -0.001
@@ -1569,7 +1529,7 @@ operators:
     default_conditioning: {}
     risk_metrics_required:
     - tail_risk_avoid
-    template_kind: filter_template
+    template_kind: expression_template
     feature: basis_zscore
     operator: '>'
     threshold: 1.5
@@ -1603,7 +1563,7 @@ operators:
     default_conditioning: {}
     risk_metrics_required:
     - drawdown_filter
-    template_kind: execution_template
+    template_kind: expression_template
   range_reversion:
     enabled: true
     supports_contexts: true
@@ -1624,7 +1584,7 @@ operators:
     - STATISTICAL_DISLOCATION
     default_conditioning: {}
     risk_metrics_required: []
-    template_kind: filter_template
+    template_kind: expression_template
     feature: basis_zscore
     operator: '>'
     threshold: 0.5
@@ -1648,7 +1608,7 @@ operators:
     default_conditioning: {}
     risk_metrics_required:
     - tail_risk_avoid
-    template_kind: filter_template
+    template_kind: expression_template
     feature: funding_rate_scaled
     operator: '>'
     threshold: 1.0
@@ -1694,7 +1654,7 @@ operators:
     default_conditioning: {}
     risk_metrics_required:
     - slippage_aware_filter
-    template_kind: filter_template
+    template_kind: expression_template
     feature: liquidation_count
     operator: '>'
     threshold: 0.0
@@ -1756,7 +1716,7 @@ operators:
     default_conditioning: {}
     risk_metrics_required:
     - drawdown_filter
-    template_kind: execution_template
+    template_kind: expression_template
   volatility_expansion_follow:
     enabled: true
     supports_contexts: true
@@ -1776,7 +1736,52 @@ operators:
     default_conditioning: {}
     risk_metrics_required:
     - drawdown_filter
-    template_kind: filter_template
+    template_kind: expression_template
+    feature: rv_96
+    operator: '>'
+    threshold: 0.0
+expression_templates:
+  basis_repair:
+    feature: basis_zscore
+    operator: '>'
+    threshold: 1.0
+  convexity_capture:
+    feature: oi_delta_1h
+    operator: <
+    threshold: 0.0
+  desync_repair:
+    feature: cross_exchange_spread_z
+    operator: '>'
+    threshold: 1.5
+  divergence_continuation:
+    feature: cross_exchange_spread_z
+    operator: '>'
+    threshold: 1.0
+  exhaustion_reversal:
+    feature: rv_pct_17280
+    operator: '>'
+    threshold: 0.8
+  momentum_fade:
+    feature: logret_1
+    operator: <
+    threshold: -0.001
+  overshoot_repair:
+    feature: basis_zscore
+    operator: '>'
+    threshold: 1.5
+  range_reversion:
+    feature: basis_zscore
+    operator: '>'
+    threshold: 0.5
+  reversal_or_squeeze:
+    feature: funding_rate_scaled
+    operator: '>'
+    threshold: 1.0
+  stop_run_repair:
+    feature: liquidation_count
+    operator: '>'
+    threshold: 0.0
+  volatility_expansion_follow:
     feature: rv_96
     operator: '>'
     threshold: 0.0

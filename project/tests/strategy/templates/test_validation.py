@@ -84,3 +84,17 @@ def test_compiler_blocks_on_non_monotone_entry_signal(monkeypatch):
 
     with pytest.raises(ValueError, match="PIT"):
         compiler.compile_positions(spec, _BadBundle())
+
+
+
+def test_validate_template_stack_accepts_expression_plus_filter():
+    from project.strategy.templates.validation import validate_template_stack
+
+    assert validate_template_stack("continuation", filter_template_id="only_if_regime") == []
+
+
+def test_validate_template_stack_rejects_filter_as_primary():
+    from project.strategy.templates.validation import validate_template_stack
+
+    errors = validate_template_stack("only_if_regime")
+    assert any("expression templates" in err for err in errors)

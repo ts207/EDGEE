@@ -1,110 +1,143 @@
-# Best Practices And Failure Modes
+# Best practices and failure modes
 
-This file is the shortest practical answer to "How should I use this repo well?"
+This document is the operating rulebook for bounded work.
 
-## Best Usage
+## Best practices
 
-### Start narrow
+### Bound one mechanism slice at a time
 
-Default to:
+A good proposal narrows at least four dimensions:
 
-- one event or one tight family
-- one symbol
-- one timeframe
-- one bounded date range
-- one main template family
-
-Narrow runs leave behind clear attribution. Broad runs mostly leave confusion.
-
-### Plan first
-
-Use plan-only before expensive execution. Verify:
-
-- symbols
-- date range
 - trigger scope
-- templates
-- horizons
-- output locations
+- template scope
+- time window
+- context or regime scope
 
-### Prefer maintained entry points
+If all four are broad, the proposal is probably too loose.
 
-Use:
+### Prefer explicit baselines for confirmation work
 
-- `knowledge.query`
-- `proposal_to_experiment`
-- `execute_proposal`
-- `issue_proposal`
-- `run_all`
-- `make` targets
+If the run is meant to confirm or challenge an earlier result, encode that relationship and use compare-oriented review afterward.
 
-Avoid ad hoc shell pipelines when a maintained entry point already captures the workflow.
+### Separate discovery from packaging intent
 
-### Separate conclusions
+Discovery asks whether a claim exists.
+Packaging asks whether the claim deserves to become a reusable thesis object.
 
-Always end with:
+Do not move into packaging because a run “felt good.” Move when the evidence and operating need justify a packaged thesis.
 
-- mechanical conclusion
-- statistical conclusion
-- deployment conclusion
-- next action
+### Read manifests before summaries
 
-### Trust artifacts over impressions
+The manifest tells you whether the run is interpretable at all. Summary markdown does not.
 
-If a run "felt successful" but artifacts disagree, the artifacts win.
+### Use generated docs as inventory, not as truth by themselves
 
-## Common Failure Modes
+Generated docs are helpful because they compact state. They are dangerous when used without understanding the code and artifact contracts beneath them.
 
-### Broad search when the question is narrow
+## Failure modes
 
-This wastes compute and destroys attribution.
+### Broad search surface disguised as a bounded proposal
 
-Fix:
+Symptoms:
 
-- scope search to the event or family you actually care about
-- avoid unrelated states, sequences, and interactions in the same run unless they are the question
-
-### Treating detector output as strategy proof
-
-An event detector producing rows is not evidence of deployable edge.
+- huge estimated hypothesis count
+- many templates, events, horizons, and contexts combined at once
+- results that are hard to explain mechanistically
 
 Fix:
 
-- inspect phase-2 and bridge outputs separately
+- reduce events
+- reduce template count
+- reduce horizon range
+- make context filters explicit
 
-### Reading only winners
+### Mechanical success mistaken for research success
 
-Ignoring rejected hypotheses hides the real reason a run failed.
+Symptoms:
 
-Fix:
-
-- inspect diagnostics and gate-failure surfaces, not just surviving candidates
-
-### Blending live and synthetic conclusions
-
-Synthetic is for calibration and truth recovery, not direct live edge proof.
-
-Fix:
-
-- keep synthetic and historical-live conclusions separate
-
-### Exit-code trust
-
-Commands can return success while the research result is still invalid or weak.
+- run exits cleanly
+- artifacts exist
+- no strong candidate or promotion survival exists
 
 Fix:
 
-- reconcile manifests, artifacts, and logs every time
+- separate artifact correctness from signal quality
+- use diagnose and regime-report before drawing conclusions
 
-## Strong Default Recommendation
+### Statistical survival mistaken for packaging readiness
 
-If you are unsure how to proceed, do this:
+Symptoms:
 
-1. query memory and knobs
-2. define one explicit claim
-3. plan the run
-4. run a narrow slice
-5. read the manifest, diagnostics, and funnel
-6. record one next action
+- a strong candidate row exists
+- user assumes it should be live-consumable immediately
 
-That path prevents most self-inflicted errors.
+Fix:
+
+- inspect promotion outputs
+- inspect bootstrap artifacts
+- inspect packaged thesis store state
+
+### Promotion class mistaken for deployment permission
+
+Symptoms:
+
+- `seed_promoted` interpreted as live-ready
+- `paper_promoted` interpreted as production-enabled
+
+Fix:
+
+- read both `promotion_class` and `deployment_state`
+- treat them as different axes
+
+### Compatibility wrapper treated as canonical implementation
+
+Symptoms:
+
+- work starts from wrappers rather than service modules
+- policy logic gets duplicated in thin shims
+
+Fix:
+
+- route understanding through `project.research.services` and `project.cli`
+- use `docs/generated/system_map.md` to verify current canonical surfaces
+
+### Generated-doc drift mistaken for code drift
+
+Symptoms:
+
+- docs/generated is stale
+- user infers the implementation is stale
+
+Fix:
+
+- verify generation scripts and actual artifact roots
+- regenerate before concluding the system is broken
+
+## Writing and maintenance rules
+
+- One concept should have one canonical owner doc.
+- Subsystem READMEs should orient, not duplicate the whole system docs.
+- Do not create planning docs when the relevant canonical doc can be updated directly.
+- Do not make the docs depend on absent generated files without saying they are generated.
+
+## Practical discipline checklist
+
+Before running:
+
+- Is the proposal narrow?
+- Is the data window intentional?
+- Are contexts explicit?
+- Is the objective clear?
+
+After planning:
+
+- Is the estimated hypothesis count still bounded?
+- Are required detectors/features/states understood?
+- Does the run-all override bundle make sense?
+
+After running:
+
+- Did the manifest reconcile?
+- Are phase2 artifacts present?
+- Did promotion fail mechanically or statistically?
+- Is the next action repair, confirm, kill, or package?

@@ -1,7 +1,7 @@
 version: 1
 
 limits:
-  max_events_per_run: 12
+  max_events_per_run: 20
   max_templates_per_run: 6
   max_horizons_per_run: 5
   max_directions_per_run: 2
@@ -14,6 +14,6 @@ limits:
   max_hypotheses_per_event_family: 300
 
 defaults:
-  horizons_bars: [1, 3, 12, 24, 72] # 5m, 15m, 1h, 2h, 6h
+  horizons_bars: [12, 24, 48] # Tier 1 default search horizons
   directions: [long, short]
-  entry_lags: [1, 2]
+  entry_lags: [1]

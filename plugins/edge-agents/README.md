@@ -1,38 +1,64 @@
-# Edge Agents
+# Edge agents plugin
 
-Repo-local Codex plugin for the `Edge` repository.
+Repo-local Codex/plugin surface for the Edge repository.
 
-This plugin is aligned to the repository's existing `agents/` workflow rather
-than to a separate parallel process.
+## Purpose
 
-Included surfaces:
+Provide guided wrappers around the canonical bounded workflow without creating a parallel operator model.
 
-- `skills/edge-repo/` for repo orientation and guardrails
-- `skills/edge-coordinator/` for the coordinator playbook
-- `skills/edge-analyst/` for completed-run diagnosis
-- `skills/edge-mechanism-hypothesis/` for bounded follow-up hypotheses
-- `skills/edge-compiler/` for proposal compilation
-- `skills/edge-thesis-bootstrap/` for the packaging lane
-- `scripts/` for common operator and verification wrappers
-- `hooks.json` as a local hook config placeholder
+## What is included
 
-Scripts:
+- skills for repo orientation, maintenance, ChatGPT-app development, coordination, analysis, compiler flow, and thesis bootstrap
+- thin wrappers around the canonical `make discover|package|validate|review` and `edge operator ...` surfaces
+- hook definitions for contract-sensitive edits and recent-run awareness
+
+## Important scripts
 
 - `scripts/edge_query_knowledge.sh`
 - `scripts/edge_preflight_proposal.sh`
+- `scripts/edge_lint_proposal.sh`
+- `scripts/edge_explain_proposal.sh`
 - `scripts/edge_plan_proposal.sh`
 - `scripts/edge_run_proposal.sh`
+- `scripts/edge_diagnose_run.sh`
+- `scripts/edge_regime_report.sh`
+- `scripts/edge_chatgpt_app.sh`
+- `scripts/edge_sync_plugin.sh`
+- `scripts/edge_governance.sh`
+- `scripts/edge_validate_repo.sh`
 - `scripts/edge_verify_contracts.sh`
 - `scripts/edge_verify_run.sh`
 - `scripts/edge_compare_runs.sh`
 - `scripts/edge_show_run_artifacts.sh`
+- `scripts/edge_package_theses.sh`
 - `scripts/edge_bootstrap_theses.sh`
 
-Active hooks:
+## Dependency rule
 
-- post-write guardrail hook
-  - warns on forbidden contract surfaces
-  - suggests preflight and plan after proposal edits
-  - suggests contract verification after contract-sensitive repo edits
-- post-bash run watcher
-  - detects fresh run manifests and suggests artifact inspection plus run verification
+These wrappers should remain thin around:
+
+- `make discover|package|validate|review`
+- `edge operator ...`
+- `python -m project.scripts.run_researcher_verification`
+- generated run and thesis artifacts
+
+They are convenience surfaces, not policy owners.
+
+## Maintenance focus
+
+The plugin now helps route common developer change types:
+
+- operator or proposal-surface changes -> `make validate` plus operator inventory regeneration
+- event, ontology, or registry changes -> validation plus event-contract and system-map regeneration
+- thesis packaging or overlap changes -> `make package` and overlap regeneration
+- ChatGPT app changes -> `edge-chatgpt-app` inspection/serve helpers plus canonical operator surfaces
+- plugin changes -> local plugin-cache sync and sync checks
+
+## Relationship to docs
+
+See:
+
+- `docs/03_OPERATOR_WORKFLOW.md`
+- `docs/04_COMMANDS_AND_ENTRY_POINTS.md`
+- `docs/09_THESIS_BOOTSTRAP_AND_PROMOTION.md`
+- `docs/VERIFICATION.md`

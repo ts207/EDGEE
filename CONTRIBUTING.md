@@ -1,6 +1,6 @@
 # Contributing
 
-## Development Setup
+## Development setup
 
 Install the package in editable mode:
 
@@ -8,41 +8,34 @@ Install the package in editable mode:
 pip install -e .
 ```
 
-Use the repository virtualenv if present. The codebase assumes Python 3.11+.
+Use the repo virtualenv if present. The codebase assumes Python 3.11+.
 
-## Workflow
+## Working rules
 
 1. Make changes in the canonical path, not compatibility wrappers.
-2. Keep pipeline names, contracts, and tests aligned.
-3. Add or update regression coverage for any behavior change.
-4. Prefer service-owned workflow changes over CLI-owned orchestration changes.
+2. Keep pipeline names, contracts, docs, and tests aligned.
+3. Add or update regression coverage for behavior changes.
+4. Prefer service-owned workflow changes over wrapper-owned policy changes.
 
-## Current Project Conventions
+## Useful commands
 
-- The canonical feature builder is `project/pipelines/features/build_features.py`
-- Feature schema is `v2`
-- Canonical feature artifacts are `features.perp.v2` and `features.spot.v2`
-- `project/contracts` and `project/research` should not grow new dependencies on `project.pipelines`
-- Detector registration is explicit, not import-side-effect driven
-
-## Useful Commands
-
-Plan a run:
+Plan or inspect a bounded proposal:
 
 ```bash
-edge-run-all --run_id local_plan --symbols BTCUSDT --start 2024-01-01 --end 2024-01-07 --plan_only 1
+edge operator plan --proposal <proposal.yaml>
+edge operator explain --proposal <proposal.yaml>
 ```
 
-Run fast smoke coverage:
+Run the canonical daily validation surface:
 
 ```bash
-edge-smoke --mode research
+make validate
 ```
 
-Inspect the live bootstrap contract:
+Run the deeper researcher verification block:
 
 ```bash
-edge-live-engine --config project/configs/golden_certification.yaml --print_session_metadata
+python -m project.scripts.run_researcher_verification --mode contracts
 ```
 
 Run tests:
@@ -63,12 +56,18 @@ Format:
 python -m ruff format .
 ```
 
-## Documentation Rule
+## Documentation rule
 
-If you rename stages, artifact tokens, schemas, or entrypoints, update:
+If you change commands, contracts, workflows, stage ownership, or packaging semantics, update the canonical docs that own those concepts:
 
 - `README.md`
+- `docs/00_START_HERE.md`
 - `docs/02_REPOSITORY_MAP.md`
 - `docs/03_OPERATOR_WORKFLOW.md`
 - `docs/04_COMMANDS_AND_ENTRY_POINTS.md`
-- any local README in the affected subsystem
+- `docs/05_ARTIFACTS_AND_INTERPRETATION.md`
+- `docs/06_QUALITY_GATES_AND_PROMOTION.md`
+- `docs/09_THESIS_BOOTSTRAP_AND_PROMOTION.md`
+- `docs/11_LIVE_THESIS_STORE_AND_OVERLAP.md`
+
+Regenerate generated inventories when needed instead of editing them by hand.

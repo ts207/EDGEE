@@ -11,6 +11,7 @@ from project.core.constants import parse_horizon_bars
 from project.research.search.feasibility import check_hypothesis_feasibility
 from project.domain.hypotheses import HypothesisSpec, TriggerType
 from project.research.context_labels import canonicalize_context_label
+from project.strategy.templates.validation import validate_template_stack
 
 VALID_DIRECTIONS = {"long", "short", "both"}
 # Canonical labels kept for diagnostics and backward-compatible documentation.
@@ -41,6 +42,13 @@ def validate_hypothesis_spec(spec: HypothesisSpec) -> List[str]:
 
     if not spec.template_id or not spec.template_id.strip():
         errors.append("template_id must not be empty")
+    else:
+        errors.extend(
+            validate_template_stack(
+                spec.template_id,
+                filter_template_id=spec.filter_template_id,
+            )
+        )
 
     if spec.entry_lag < 1:
         errors.append(f"entry_lag must be >= 1 to prevent same-bar entry leakage, got {spec.entry_lag}")

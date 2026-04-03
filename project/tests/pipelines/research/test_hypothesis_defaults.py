@@ -13,10 +13,11 @@ from project.research._hypothesis_defaults import (
 
 def test_load_hypothesis_defaults_reads_global_defaults():
     defaults = load_hypothesis_defaults(project_root=PROJECT_ROOT)
-    assert "5m" in defaults["horizons"]
+    assert defaults["horizons"] == ["12b", "24b", "48b"]
     assert "mean_reversion" in defaults["rule_templates"]
     assert "vol_regime" in defaults["conditioning"]
     assert "severity_bucket" in defaults["conditioning"]
+    assert defaults["symbols"] == ["BTCUSDT", "ETHUSDT"]
 
 
 def test_parse_symbols_filter_restricts_to_run_universe():

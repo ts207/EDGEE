@@ -37,6 +37,9 @@ def test_build_promotion_seed_inventory_contains_fallback_candidates(tmp_path: P
     assert "THESIS_VOL_SHOCK" in ids
     assert "THESIS_BASIS_FND_CONFIRM" in ids
     assert "THESIS_EP_LIQUIDITY_SHOCK" in ids
+    status_by_id = {row['candidate_id']: row['promotion_status'] for row in rows}
+    assert status_by_id['THESIS_VOL_SHOCK'] == 'test_now'
+    assert status_by_id['THESIS_VOL_SHOCK_LIQUIDITY_CONFIRM'] == 'test_now'
     assert "needs_repair" in statuses
     assert "test_now" in statuses
 

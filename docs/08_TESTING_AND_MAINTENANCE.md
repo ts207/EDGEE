@@ -1,80 +1,163 @@
-# Testing And Maintenance
+# Testing and maintenance
 
-This repository has a research-quality bar, not just a syntax bar. A run can be mechanically executable while still failing the maintained quality gate.
+This document explains how to keep the repo and its documentation coherent.
 
-## Fastest Useful Checks
+## Core principle
 
-Use these first:
+This repo is guarded by tests that enforce both behavior and architectural shape. Documentation has to stay aligned with those contracts.
+
+## Main verification surfaces
+
+### Canonical validation shortcut
 
 ```bash
-make test-fast
-.venv/bin/python -m project.reliability.cli_smoke --mode full --root /tmp/edge_smoke
+make validate
 ```
 
-`test-fast` is the maintained quick regression gate. The full smoke path is useful after pipeline or artifact-contract changes.
+This is the easiest repo-level gate for day-to-day work.
 
-## Stronger Baseline
+### Researcher verification
 
-Use this when you want the repo's stricter stabilization baseline:
+```bash
+python -m project.scripts.run_researcher_verification --mode contracts
+```
+
+For a completed run:
+
+```bash
+python -m project.scripts.run_researcher_verification --mode experiment --run-id <run_id>
+```
+
+The detailed contract is documented in [VERIFICATION.md](VERIFICATION.md).
+
+### Minimum green gate
 
 ```bash
 make minimum-green-gate
 ```
 
-This is the best single command when you need confidence that the repository is in a generally acceptable state.
+This exercises a deeper repo-health block that includes compile checks, architecture tests, generated-doc drift checks, selected regressions, and golden workflows.
 
-## Other Important Maintenance Targets
+## Generated-doc maintenance
 
-From the maintained `make` surface:
+Generated docs should be rebuilt when the underlying contract or inventory changes.
 
-- `golden-workflow`
-- `golden-certification`
-- `governance`
-- `benchmark-maintenance-smoke`
-- `benchmark-maintenance`
-- `lint`
-- `format-check`
-- `style`
+Important regeneration surfaces include:
 
-## When To Run Which Check
+```bash
+python -m project.scripts.build_system_map
+python -m project.scripts.generate_operator_surface_inventory
+python -m project.scripts.build_event_contract_artifacts
+python -m project.scripts.build_seed_bootstrap_artifacts
+python -m project.scripts.build_seed_empirical_artifacts
+python -m project.scripts.build_seed_packaging_artifacts
+python -m project.scripts.build_thesis_overlap_artifacts
+./project/scripts/regenerate_artifacts.sh
+```
 
-### Docs-only changes
+Use the full regeneration script when multiple inventory surfaces may have drifted together.
 
-Usually:
+## What docs are test-coupled
 
-- structural spot-check
-- stale-link check if relevant
+A few docs are effectively part of the contract surface because tests assert their content or existence.
 
-### Detector, search, robustness, or gate changes
+Examples:
 
-At minimum:
+- `README.md`
+- `docs/00_START_HERE.md`
+- `docs/02_REPOSITORY_MAP.md`
+- `docs/operator_command_inventory.md`
+- `docs/ARCHITECTURE_SURFACE_INVENTORY.md`
+- `docs/ARCHITECTURE_MAINTENANCE_CHECKLIST.md`
+- `docs/RESEARCH_CALIBRATION_BASELINE.md`
 
-- `make test-fast`
-- relevant targeted tests
-- smoke if the change touches stage wiring or artifacts
+When editing these, run targeted tests or full validation.
 
-### Pipeline orchestration or contract changes
+## Maintenance loops by change type
 
-At minimum:
+### You changed a proposal or operator surface
 
-- `make test-fast`
-- full smoke
-- artifact reconciliation on one bounded real or synthetic run
+Run:
 
-## Maintenance Rules
+```bash
+make validate
+python -m project.scripts.generate_operator_surface_inventory
+```
 
-- do not rely on exit code alone
-- inspect artifacts after any material pipeline change
-- prefer bounded reruns over broad reruns
-- leave behind the exact command and run id used for verification
+Then check:
 
-## What To Record After Verification
+- `README.md`
+- `docs/00_START_HERE.md`
+- `docs/03_OPERATOR_WORKFLOW.md`
+- `docs/04_COMMANDS_AND_ENTRY_POINTS.md`
 
-For every meaningful change, record:
+### You changed event, ontology, or registry contracts
 
-- what was changed
-- what command was run
-- whether artifacts reconciled
-- whether the result was a mechanical pass, statistical pass, or both
+Run:
 
-That keeps maintenance evidence aligned with the repo's research discipline.
+```bash
+make validate
+python -m project.scripts.build_event_contract_artifacts
+python -m project.scripts.build_system_map
+```
+
+Then check:
+
+- `docs/generated/event_contract_reference.md`
+- `docs/02_REPOSITORY_MAP.md`
+- `docs/05_ARTIFACTS_AND_INTERPRETATION.md`
+
+### You changed thesis packaging or overlap logic
+
+Run:
+
+```bash
+make package
+python -m project.scripts.build_thesis_overlap_artifacts
+```
+
+Then check:
+
+- `data/live/theses/index.json`
+- `docs/generated/seed_thesis_catalog.md`
+- `docs/generated/seed_thesis_packaging_summary.md`
+- `docs/generated/thesis_overlap_graph.md`
+- `docs/09_THESIS_BOOTSTRAP_AND_PROMOTION.md`
+- `docs/11_LIVE_THESIS_STORE_AND_OVERLAP.md`
+
+### You changed architectural boundaries
+
+Run:
+
+```bash
+make validate
+python -m project.scripts.build_system_map
+```
+
+Then check:
+
+- `docs/ARCHITECTURE_SURFACE_INVENTORY.md`
+- `docs/ARCHITECTURE_MAINTENANCE_CHECKLIST.md`
+- `docs/generated/system_map.md`
+
+## Documentation maintenance rule
+
+When behavior changes, update the doc that owns the concept instead of adding a new one-off note.
+
+Ownership map:
+
+- repo mental model -> `README.md`, `docs/00_START_HERE.md`, `docs/01_PROJECT_MODEL.md`
+- repo structure -> `docs/02_REPOSITORY_MAP.md`
+- operator lifecycle -> `docs/03_OPERATOR_WORKFLOW.md`
+- command selection -> `docs/04_COMMANDS_AND_ENTRY_POINTS.md`
+- artifacts and reports -> `docs/05_ARTIFACTS_AND_INTERPRETATION.md`
+- quality and promotion -> `docs/06_QUALITY_GATES_AND_PROMOTION.md`
+- packaging lane -> `docs/09_THESIS_BOOTSTRAP_AND_PROMOTION.md`
+- runtime thesis consumption -> `docs/11_LIVE_THESIS_STORE_AND_OVERLAP.md`
+
+## Anti-patterns
+
+- updating generated docs manually instead of regenerating them
+- creating new planning markdown instead of updating canonical docs
+- teaching wrappers instead of canonical surfaces
+- changing command behavior without updating the operator docs and README

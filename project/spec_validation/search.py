@@ -20,6 +20,8 @@ def validate_search_spec_doc(search_cfg: Dict[str, Any], *, source: str = "<memo
     # Validate optional search-surface controls eagerly so spec docs and runtime contract stay aligned.
     resolve_cost_profiles(search_cfg)
     resolve_conditioning_intersections(search_cfg)
+    resolve_filter_template_names(search_cfg)
+    resolve_execution_template_names(search_cfg)
 
     # Resolve and validate entry lags eagerly so stale same-bar configs fail before generation.
     resolve_entry_lags(search_cfg)
@@ -81,7 +83,7 @@ def expand_triggers(search_cfg: Dict[str, Any]) -> Dict[str, Any]:
 
 def resolve_templates(search_cfg: Dict[str, Any]) -> List[str]:
     registry = get_domain_registry()
-    templates = search_cfg.get("templates", [])
+    templates = search_cfg.get("expression_templates", search_cfg.get("templates", []))
     if templates == "*":
         return list(registry.default_hypothesis_templates())
 
@@ -89,6 +91,7 @@ def resolve_templates(search_cfg: Dict[str, Any]) -> List[str]:
     normalized: List[str] = []
     seen: set[str] = set()
     invalid_filter_templates: List[str] = []
+    invalid_execution_templates: List[str] = []
     for raw in resolved:
         token = str(raw).strip()
         if not token:
@@ -96,18 +99,85 @@ def resolve_templates(search_cfg: Dict[str, Any]) -> List[str]:
         if registry.is_filter_template(token):
             invalid_filter_templates.append(token)
             continue
+        if registry.is_execution_template(token):
+            invalid_execution_templates.append(token)
+            continue
         if token not in seen:
             normalized.append(token)
             seen.add(token)
     if invalid_filter_templates:
         raise ValueError(
-            "Search spec templates must be hypothesis templates; "
-            "filter templates belong in filter-template expansion, not top-level templates: "
+            "Search spec templates must be expression templates; "
+            "filter templates belong in optional filter-template overlays, not top-level templates: "
             + ", ".join(sorted(set(invalid_filter_templates)))
+        )
+    if invalid_execution_templates:
+        raise ValueError(
+            "Search spec templates must be expression templates; "
+            "execution templates cannot be emitted as standalone top-level search units: "
+            + ", ".join(sorted(set(invalid_execution_templates)))
         )
     return normalized
 
 
+
+
+def resolve_filter_template_names(search_cfg: Dict[str, Any]) -> List[str]:
+    registry = get_domain_registry()
+    templates = search_cfg.get("filter_templates", [])
+    if templates in (None, "", [], ()): 
+        return []
+    if templates == "*":
+        return ["*"]
+    resolved = [templates] if isinstance(templates, str) else list(templates)
+    normalized: List[str] = []
+    seen: set[str] = set()
+    invalid: List[str] = []
+    for raw in resolved:
+        token = str(raw).strip()
+        if not token:
+            raise ValueError("filter_templates entries must be non-empty strings")
+        if not registry.is_filter_template(token):
+            invalid.append(token)
+            continue
+        if token not in seen:
+            normalized.append(token)
+            seen.add(token)
+    if invalid:
+        raise ValueError(
+            "filter_templates entries must resolve to filter_template operators: "
+            + ", ".join(sorted(set(invalid)))
+        )
+    return normalized
+
+
+def resolve_execution_template_names(search_cfg: Dict[str, Any]) -> List[str]:
+    registry = get_domain_registry()
+    templates = search_cfg.get("execution_templates", [])
+    if templates in (None, "", [], ()): 
+        return []
+    if templates == "*":
+        return ["*"]
+    resolved = [templates] if isinstance(templates, str) else list(templates)
+    normalized: List[str] = []
+    seen: set[str] = set()
+    invalid: List[str] = []
+    for raw in resolved:
+        token = str(raw).strip()
+        if not token:
+            raise ValueError("execution_templates entries must be non-empty strings")
+        if not registry.is_execution_template(token):
+            invalid.append(token)
+            continue
+        if token not in seen:
+            normalized.append(token)
+            seen.add(token)
+    if invalid:
+        raise ValueError(
+            "execution_templates entries must resolve to execution_template operators: "
+            + ", ".join(sorted(set(invalid)))
+        )
+    return normalized
 def resolve_execution_templates(family: str) -> List[str]:
     """
     Return execution template names for a family — allowed_templates minus filter_templates.

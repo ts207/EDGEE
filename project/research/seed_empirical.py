@@ -18,6 +18,7 @@ from project.research.seed_testing import (
     _next_action_for_decision,
     _ontology_fidelity,
     _regime_clarity,
+    _row_is_governance_blocked,
     _testing_thresholds,
 )
 
@@ -335,7 +336,7 @@ def _evidence_gaps(evidence: CandidateEvidence, scores: Mapping[str, int]) -> li
 
 def _decision_for_row(row: Mapping[str, str], evidence: CandidateEvidence, scores: Mapping[str, int], policy: Mapping[str, Any]) -> str:
     thresholds = _testing_thresholds(policy)
-    if str(row.get("promotion_status", "")).strip().lower() == "needs_repair" or scores["deployment_suitability"] <= 1:
+    if _row_is_governance_blocked(row) or scores["deployment_suitability"] <= 1:
         return "needs_repair"
     if not evidence.bundles:
         return "needs_more_evidence"

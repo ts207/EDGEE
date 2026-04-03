@@ -28,4 +28,8 @@ for run_id in "${fresh_runs[@]}"; do
   echo "  ./plugins/edge-agents/scripts/edge_show_run_artifacts.sh $run_id"
   echo "[edge-hook] Verify:"
   echo "  ./plugins/edge-agents/scripts/edge_verify_run.sh $run_id"
+  echo "[edge-hook] Diagnose:"
+  echo "  ./plugins/edge-agents/scripts/edge_diagnose_run.sh $run_id"
+  echo "[edge-hook] Regime stability:"
+  echo "  ./plugins/edge-agents/scripts/edge_regime_report.sh $run_id"
 done

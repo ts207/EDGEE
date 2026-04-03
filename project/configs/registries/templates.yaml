@@ -6,7 +6,7 @@ metadata:
 templates:
   basis_repair:
     enabled: true
-    template_kind: filter_template
+    template_kind: expression_template
     supports_contexts: true
     supports_directions:
     - long
@@ -15,7 +15,7 @@ templates:
     - EVENT
   breakout_followthrough:
     enabled: true
-    template_kind: execution_template
+    template_kind: expression_template
     supports_contexts: true
     supports_directions:
     - long
@@ -25,7 +25,7 @@ templates:
     - SEQUENCE
   continuation:
     enabled: true
-    template_kind: execution_template
+    template_kind: expression_template
     supports_contexts: true
     supports_directions:
     - long
@@ -37,7 +37,7 @@ templates:
     - INTERACTION
   convergence:
     enabled: true
-    template_kind: execution_template
+    template_kind: expression_template
     supports_contexts: true
     supports_directions:
     - long
@@ -46,7 +46,7 @@ templates:
     - EVENT
   convexity_capture:
     enabled: true
-    template_kind: filter_template
+    template_kind: expression_template
     supports_contexts: true
     supports_directions:
     - long
@@ -55,7 +55,7 @@ templates:
     - EVENT
   desync_repair:
     enabled: true
-    template_kind: filter_template
+    template_kind: expression_template
     supports_contexts: true
     supports_directions:
     - long
@@ -64,7 +64,7 @@ templates:
     - EVENT
   divergence_continuation:
     enabled: true
-    template_kind: filter_template
+    template_kind: expression_template
     supports_contexts: true
     supports_directions:
     - long
@@ -83,7 +83,7 @@ templates:
     - STATE
   exhaustion_reversal:
     enabled: true
-    template_kind: filter_template
+    template_kind: expression_template
     supports_contexts: true
     supports_directions:
     - long
@@ -93,7 +93,7 @@ templates:
     - SEQUENCE
   false_breakout_reversal:
     enabled: true
-    template_kind: execution_template
+    template_kind: expression_template
     supports_contexts: true
     supports_directions:
     - long
@@ -102,7 +102,7 @@ templates:
     - EVENT
   lead_lag_follow:
     enabled: true
-    template_kind: execution_template
+    template_kind: expression_template
     supports_contexts: true
     supports_directions:
     - long
@@ -112,7 +112,7 @@ templates:
     - SEQUENCE
   mean_reversion:
     enabled: true
-    template_kind: execution_template
+    template_kind: expression_template
     supports_contexts: true
     supports_directions:
     - long
@@ -124,7 +124,7 @@ templates:
     - INTERACTION
   momentum_fade:
     enabled: true
-    template_kind: filter_template
+    template_kind: expression_template
     supports_contexts: true
     supports_directions:
     - long
@@ -193,7 +193,7 @@ templates:
     - STATE
   overshoot_repair:
     enabled: true
-    template_kind: filter_template
+    template_kind: expression_template
     supports_contexts: true
     supports_directions:
     - long
@@ -202,7 +202,7 @@ templates:
     - EVENT
   pullback_entry:
     enabled: true
-    template_kind: execution_template
+    template_kind: expression_template
     supports_contexts: true
     supports_directions:
     - long
@@ -212,7 +212,7 @@ templates:
     - STATE
   range_reversion:
     enabled: true
-    template_kind: filter_template
+    template_kind: expression_template
     supports_contexts: true
     supports_directions:
     - long
@@ -222,7 +222,7 @@ templates:
     - STATE
   reversal_or_squeeze:
     enabled: true
-    template_kind: filter_template
+    template_kind: expression_template
     supports_contexts: true
     supports_directions:
     - long
@@ -241,7 +241,7 @@ templates:
     - EVENT
   stop_run_repair:
     enabled: true
-    template_kind: filter_template
+    template_kind: expression_template
     supports_contexts: true
     supports_directions:
     - long
@@ -260,7 +260,7 @@ templates:
     - STATE
   trend_continuation:
     enabled: true
-    template_kind: execution_template
+    template_kind: expression_template
     supports_contexts: true
     supports_directions:
     - long
@@ -271,7 +271,7 @@ templates:
     - SEQUENCE
   volatility_expansion_follow:
     enabled: true
-    template_kind: filter_template
+    template_kind: expression_template
     supports_contexts: true
     supports_directions:
     - long

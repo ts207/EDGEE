@@ -3,7 +3,8 @@ kind: runtime_state_registry
 metadata:
   status: generated
   authored_source: spec/states/*.yaml
-  generated_from: spec/states/state_registry.yaml
+  generated_notice: GENERATED FILE - DO NOT EDIT
+  generated_from: spec/states/*.yaml
 states:
   AFTERSHOCK_STATE:
     enabled: true

@@ -35,6 +35,7 @@ This skill follows `agents/analyst.md`.
 - Use exact repo column names such as `effect_raw`, `q_value`, and `selection_score`.
 - Do not propose hypotheses or compile proposals here.
 - Follow the fixed analyst report schema from `agents/analyst.md`.
+- Keep the output compatible with the repo's run-review surfaces: `edge operator diagnose`, `edge operator regime-report`, and bounded follow-up comparison.
 
 ## Minimum result
 
@@ -43,5 +44,6 @@ This skill follows `agents/analyst.md`.
 - Primary rejection mechanism
 - Top near-misses
 - Mechanistic meaning
+- Whether the run only informs the bounded loop or is thesis-bootstrap-queue-worthy
 - 1-3 bounded next experiments
 - keep / modify / kill classification

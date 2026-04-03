@@ -37,6 +37,15 @@ from project.io.utils import write_parquet
 
 LOG = logging.getLogger(__name__)
 
+DEFAULT_SEARCH_SPACE_PATH = Path(__file__).resolve().parents[2] / "spec" / "search_space.yaml"
+
+
+def _resolve_search_space_path(explicit_path: str | Path | None) -> Path:
+    if explicit_path:
+        return Path(explicit_path)
+    return DEFAULT_SEARCH_SPACE_PATH
+
+
 
 def _resolve_search_min_t_stat(explicit_min_t_stat: float | None) -> float:
     if explicit_min_t_stat is not None:
@@ -334,7 +343,7 @@ def _make_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--search_space_path",
         default=None,
-        help="Optional override for search-space YAML path",
+        help="Optional override for search-space YAML path (defaults to spec/search_space.yaml)",
     )
     parser.add_argument(
         "--cluster_deduplication",
@@ -375,7 +384,7 @@ def main() -> int:
 
     symbols = [s.strip().upper() for s in str(args.symbols).split(",") if s.strip()]
     n_workers = args.n_workers if args.n_workers > 0 else None
-    search_space_path = Path(args.search_space_path) if args.search_space_path else None
+    search_space_path = _resolve_search_space_path(args.search_space_path)
     resolved_min_t_stat = _resolve_search_min_t_stat(args.min_t_stat)
 
     features = _load_all_features(symbols, args.run_id, args.timeframe, data_root)
@@ -456,10 +465,17 @@ def main() -> int:
         if (not metrics.empty and "is_cluster_redundant" in metrics.columns)
         else 0
     )
+    filter_overlay_count = (
+        int(sum(1 for spec in hypotheses if getattr(spec, "filter_template_id", None)))
+        if hypotheses
+        else 0
+    )
     summary = {
         "run_id": args.run_id,
         "symbols": symbols,
         "timeframe": args.timeframe,
+        "search_space_path": str(search_space_path),
+        "search_tier": "tier1_default",
         "total_hypotheses": int(
             generation_audit.get("counts", {}).get("generated", len(hypotheses))
         ),
@@ -468,6 +484,8 @@ def main() -> int:
         ),
         "rejected_hypotheses": int(generation_audit.get("counts", {}).get("rejected", 0)),
         "rejection_reason_counts": dict(generation_audit.get("rejection_reason_counts", {})),
+        "primary_search_unit": "trigger_x_expression_template",
+        "filter_overlay_hypotheses": filter_overlay_count,
         "evaluated": int(len(metrics)) if not metrics.empty else 0,
         "passing_filter": passing,
         "cluster_redundant": redundant_count,

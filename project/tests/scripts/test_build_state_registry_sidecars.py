@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from project.spec_registry import load_state_registry
+from project.spec_registry import load_state_family_registry, load_state_registry, load_yaml_relative
 from project.scripts.build_state_registry_sidecars import (
     build_runtime_state_registry_payload,
     build_state_grammar_payload,
@@ -12,6 +12,7 @@ def test_state_registry_is_aggregated_from_state_specs() -> None:
     payload = load_state_registry()
 
     assert payload["metadata"]["status"] == "generated"
+    assert payload["metadata"]["authored_sources"] == ["spec/states/*.yaml"]
     assert payload["defaults"]["min_events"] == 200
     state_ids = {row["state_id"] for row in payload["states"]}
     assert "HIGH_VOL_REGIME" in state_ids
@@ -51,3 +52,31 @@ def test_state_ontology_specs_cover_materialized_state_rows() -> None:
     assert payload["LOW_LIQUIDITY_STATE"]["metadata"]["status"] == "generated"
     assert payload["LOW_LIQUIDITY_STATE"]["family"] == "LIQUIDITY_DISLOCATION"
     assert "mean_reversion" in payload["LOW_LIQUIDITY_STATE"]["allowed_templates"]
+
+
+def test_state_family_registry_is_generated_from_canonical_state_specs() -> None:
+    payload = load_state_family_registry()
+
+    assert payload["metadata"]["status"] == "generated"
+    assert payload["metadata"]["authored_sources"] == ["spec/states/*.yaml"]
+    names = [row["name"] for row in payload["state_families"]]
+    assert "vol_regime" in names
+    assert "carry_state" in names
+    vol_row = next(row for row in payload["state_families"] if row["name"] == "vol_regime")
+    assert vol_row["canonical_metrics"] == ["rv_percentile_24h"]
+    assert vol_row["thresholds"] == [0.33, 0.66]
+
+
+def test_generated_state_read_models_match_canonical_loader_output() -> None:
+    registry_payload = load_yaml_relative("spec/states/state_registry.yaml")
+    family_payload = load_yaml_relative("spec/states/state_families.yaml")
+
+    assert registry_payload == load_state_registry()
+    assert family_payload == load_state_family_registry()
+
+
+def test_every_context_dimension_has_a_canonical_authored_spec_file() -> None:
+    payload = load_state_registry()
+
+    for family_name in payload["context_dimensions"]:
+        assert load_yaml_relative(f"spec/states/{family_name}.yaml")["state_name"] == family_name

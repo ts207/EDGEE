@@ -1,85 +1,105 @@
-# Live Thesis Store And Overlap
+# Live thesis store and overlap
 
-This document explains the canonical packaged thesis surfaces that downstream live and allocation systems consume.
+This document explains the runtime-facing packaged thesis model.
 
-## Canonical thesis store
+## Why the thesis store matters
 
-The canonical packaged thesis store lives under:
+The live/runtime layer should not reason from raw run notes, loose candidate rows, or human summaries.
+
+It should reason from packaged thesis objects with explicit clauses and governance metadata.
+
+That is why `data/live/theses/` exists.
+
+## Canonical thesis-store paths
+
+Primary paths:
 
 - `data/live/theses/index.json`
 - `data/live/theses/<batch>/promoted_theses.json`
 
-The index points at one or more packaged batches. Each batch contains thesis objects with:
+In this snapshot, the store already contains a packaged batch and the index points to it.
+
+## What a packaged thesis contains
+
+A packaged thesis object typically carries:
 
 - thesis id
+- primary event id and event family
+- canonical regime
+- trigger clause
+- confirmation clause
+- context clause
+- invalidation clause
+- governance fields
+- evidence summary
 - promotion class
 - deployment state
-- source event and episode contracts
-- trigger requirements
-- confirmation requirements
-- invalidation requirements
-- allowed/disallowed regimes
 - overlap group id
-- evidence gaps and lineage
+- source lineage
+- symbol scope and timeframe
 
-## What the live layer should consume
+This is the runtime contract. It is much richer than a simple research candidate row.
 
-The live layer should consume packaged thesis objects, not raw event rows or hand-authored notes.
+## Runtime ownership
 
-That means:
+Primary live/runtime modules include:
 
-- `project/live/retriever.py` loads from the thesis store
-- `project/live/decision.py` reasons about thesis clauses, contradictions, and invalidators
-- `project/live/context_builder.py` and the event detector provide context to thesis matching
-- `project/live/execution_attribution.py` records thesis and overlap metadata on fills
+- `project/live/thesis_store.py`
+- `project/live/retriever.py`
+- `project/live/context_builder.py`
+- `project/live/decision.py`
+- `project/live/policy.py`
+- `project/live/execution_attribution.py`
+- `project/portfolio/thesis_overlap.py`
+- `project/portfolio/risk_budget.py`
 
-## Promotion class and deployment state
-
-Promotion class answers **how much support exists**.
-
-Deployment state answers **where the thesis may be used right now**.
-
-Typical combinations:
-
-- `seed_promoted` + `monitor_only`
-- `paper_promoted` + `paper_only`
-- `production_promoted` + a narrower live-eligible deployment state
-
-Do not collapse these two fields into one informal maturity label.
+These modules assume packaged thesis objects exist and are structurally valid.
 
 ## Overlap graph
 
-The overlap graph lives under:
+The overlap graph describes when packaged theses should not be treated as independent bets.
+
+Current generated surfaces:
 
 - `docs/generated/thesis_overlap_graph.json`
 - `docs/generated/thesis_overlap_graph.md`
 
-It is built from packaged theses rather than from raw queue entries.
+Overlap can be driven by shared structure such as:
 
-An overlap edge exists when packaged theses share enough structure that the allocator should not treat them as independent. Current overlap signals include:
+- event families
+- episode requirements
+- canonical regime dependencies
+- confirmation structure
+- invalidation structure
+- mechanism similarity
 
-- shared event families
-- shared episode contracts
-- shared regime dependencies
-- shared invalidation structure
-- shared mechanism class
+The point is not just reporting. The overlap graph informs downstream allocation and throttling logic.
 
-## What a useful overlap graph looks like
+## Promotion class and deployment state in runtime
 
-A useful overlap graph has:
+Runtime should read both fields explicitly.
 
-- real nodes from the packaged thesis store
-- overlap groups that explain allocator throttling
-- edges only when the structural similarity is meaningful
+Examples:
 
-A graph with nodes but zero edges is not wrong. It simply means the current packaged thesis set is disconnected.
+- `seed_promoted` + `monitor_only` means the thesis is packaged but still restricted
+- `paper_promoted` + `paper_only` means stronger evidence, still not live execution permission by itself
+- `production_promoted` + a live-enabled state is the highest-confidence path
 
-## Typical maintenance loop
+Any runtime shortcut that collapses these into one maturity flag is conceptually wrong.
 
-After adding or refreshing packaged theses:
+## What to inspect after packaging changes
 
-1. regenerate packaging artifacts
-2. regenerate overlap artifacts
-3. inspect `seed_thesis_catalog.md`
-4. inspect `thesis_overlap_graph.md`
-5. verify that the allocator and live retriever still load the packaged store correctly
+Use this order:
+
+1. `data/live/theses/index.json`
+2. `data/live/theses/<batch>/promoted_theses.json`
+3. `docs/generated/seed_thesis_catalog.md`
+4. `docs/generated/seed_thesis_packaging_summary.md`
+5. `docs/generated/thesis_overlap_graph.md`
+6. any shadow-live summaries under `docs/generated/` or `data/reports/shadow_live/`
+
+## Current snapshot implication
+
+Because the thesis store and overlap graph are already present, runtime docs should be written from the standpoint of an active packaged-thesis system.
+
+The runtime layer is not waiting for a future packaging design. It already consumes a real packaged-thesis contract.

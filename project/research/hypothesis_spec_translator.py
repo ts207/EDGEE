@@ -14,6 +14,7 @@ from project.research.condition_key_contract import (
     missing_condition_keys,
     normalize_condition_keys,
 )
+from project.strategy.templates.validation import validate_template_stack
 
 DEFAULT_OUTPUT_SCHEMA = [
     "lift_bps",
@@ -28,6 +29,8 @@ DEFAULT_OUTPUT_SCHEMA = [
 CANDIDATE_HASH_FIELDS = (
     "event_type",
     "template_id",
+    "filter_template_id",
+    "execution_template_id",
     "horizon_bars",
     "entry_lag_bars",
     "direction_rule",
@@ -150,6 +153,8 @@ def _candidate_hash_inputs(
     horizon_bars: int,
     entry_lag_bars: int,
     direction_rule: str,
+    filter_template_id: str,
+    execution_template_id: str,
     condition_signature: str,
     hypothesis_id: str,
     hypothesis_version: int,
@@ -164,6 +169,8 @@ def _candidate_hash_inputs(
         "horizon_bars": int(horizon_bars),
         "entry_lag_bars": int(entry_lag_bars),
         "direction_rule": _norm(direction_rule).lower() or "both",
+        "filter_template_id": _norm(filter_template_id),
+        "execution_template_id": _norm(execution_template_id),
         "condition_signature": _norm(condition_signature) or "all",
         "hypothesis_id": _norm(hypothesis_id),
         "hypothesis_version": int(hypothesis_version),
@@ -255,6 +262,24 @@ def translate_candidate_hypotheses(
             continue
 
         template_verb = _norm(base_candidate.get("rule_template"))
+        filter_template_id = _norm(base_candidate.get("filter_template") or base_candidate.get("filter_template_id"))
+        execution_template_id = _norm(base_candidate.get("execution_template") or base_candidate.get("execution_template_id"))
+        template_errors = validate_template_stack(
+            template_verb,
+            filter_template_id=filter_template_id or None,
+            execution_template_id=execution_template_id or None,
+        )
+        if template_errors:
+            detail = {
+                "hypothesis_id": hypothesis_id,
+                "status": "skipped_invalid_template_stack",
+                "missing_keys": [],
+                "errors": list(template_errors),
+            }
+            audit.append(detail)
+            if strict:
+                raise ValueError("; ".join(template_errors))
+            continue
         direction_rule = _norm(template_side_policy.get(template_verb, "both")).lower() or "both"
         condition_signature = _condition_signature(conditioning)
         condition_dsl = _condition_dsl(conditioning)
@@ -270,6 +295,8 @@ def translate_candidate_hypotheses(
                 "horizon_bars": _horizon_bars(horizon),
                 "entry_lag_bars": int(base_candidate.get("entry_lag_bars", 0) or 0),
                 "direction_rule": direction_rule,
+                "filter_template_id": filter_template_id,
+                "execution_template_id": execution_template_id,
                 "condition_signature": condition_signature,
                 "condition": condition_dsl,
                 "hypothesis_metric": _norm(spec.get("metric", "lift_bps")) or "lift_bps",
@@ -282,6 +309,8 @@ def translate_candidate_hypotheses(
             horizon_bars=int(row["horizon_bars"]),
             entry_lag_bars=int(row["entry_lag_bars"]),
             direction_rule=_norm(row["direction_rule"]),
+            filter_template_id=_norm(row.get("filter_template_id")),
+            execution_template_id=_norm(row.get("execution_template_id")),
             condition_signature=_norm(row["condition_signature"]),
             hypothesis_id=_norm(row["hypothesis_id"]),
             hypothesis_version=int(row["hypothesis_version"]),

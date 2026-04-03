@@ -1,106 +1,138 @@
-# Start Here
+# Start here
 
-Edge is a governed event-driven crypto research platform. The repository is designed to test explicit claims under artifact, cost, and promotion discipline, then package only the claims that survive into canonical thesis objects.
+This repo is easiest to understand if you stop thinking in terms of scripts and start thinking in terms of **contracts**.
 
-The shortest correct mental model is:
+A bounded research cycle in Edge is:
 
-`proposal -> validated config -> planned run -> artifacted execution -> statistical filtering -> promotion gates -> thesis class decision -> thesis store or rejection`
+`proposal -> preflight -> validated plan -> run -> run manifest -> candidate artifacts -> promotion artifacts -> diagnostics or packaging`
 
-This is not a notebook sandbox. A run or thesis is good when it leaves:
+A thesis packaging cycle is:
 
-- a bounded question
-- a reproducible configuration
-- a clean artifact trail
-- a mechanical conclusion
-- a statistical conclusion
-- a promotion-class conclusion
-- one next action
+`seed inventory -> testing -> empirical evidence -> evidence bundle -> packaged thesis -> overlap graph -> live/runtime consumption`
 
-## What you should learn first
+## What this repository is for
 
-Before you run anything, understand:
+Edge exists to answer bounded market questions such as:
 
-1. the difference between `event`, `episode`, `family`, `template`, `state`, `regime`, and `thesis`
-2. how the bounded experiment lane differs from the thesis bootstrap lane
-3. how generated thesis artifacts differ from raw run artifacts
-4. how `seed_promoted`, `paper_promoted`, and `production_promoted` differ
+- under which event contracts does a pattern appear
+- under which regimes does it survive
+- whether it survives after costs, negative controls, and promotion gates
+- whether the surviving claim is strong enough to package as a reusable thesis
 
-Read in this order:
+The repo is not organized around ad hoc exploration. It is organized around explicit scope control and artifacted conclusions.
 
-1. [01_PROJECT_MODEL.md](01_PROJECT_MODEL.md)
-2. [02_REPOSITORY_MAP.md](02_REPOSITORY_MAP.md)
-3. [03_OPERATOR_WORKFLOW.md](03_OPERATOR_WORKFLOW.md)
-4. [05_ARTIFACTS_AND_INTERPRETATION.md](05_ARTIFACTS_AND_INTERPRETATION.md)
-5. [09_THESIS_BOOTSTRAP_AND_PROMOTION.md](09_THESIS_BOOTSTRAP_AND_PROMOTION.md)
-6. [11_LIVE_THESIS_STORE_AND_OVERLAP.md](11_LIVE_THESIS_STORE_AND_OVERLAP.md)
+## First concepts to lock in
 
-## Source of truth rule
+Before you run anything, understand these distinctions.
 
-Use this precedence when sources disagree:
+### Event versus episode
 
-1. run artifacts and generated thesis artifacts
-2. code
-3. specs
-4. hand-authored prose
+- **event**: a discrete trigger or condition firing at a timestamp
+- **episode**: a higher-order sequence or stateful unfolding built from one or more events
 
-That rule matters because a successful process exit does not prove a good run, and older prose can lag implementation.
+### Candidate versus thesis
+
+- **candidate**: a bounded statistical result produced by a run
+- **thesis**: a packaged object with trigger, context, invalidation, governance, and evidence fields suitable for downstream consumption
+
+### Promotion class versus deployment state
+
+- **promotion class** answers how strong the evidence is
+- **deployment state** answers where the thesis is allowed to be used right now
+
+### Narrative docs versus generated docs
+
+- narrative docs explain how the system works
+- generated docs summarize current repo or artifact state
 
 ## Canonical actions
 
 Treat the repo as four operator actions:
 
-1. `discover` — bounded proposal issuance and run execution
-2. `package` — thesis bootstrap, empirical evidence, packaging, overlap
-3. `validate` — contract, smoke, governance, and replay checks
-4. `review` — diagnose, compare, and regime-report after a run
+1. `discover`
+2. `package`
+3. `validate`
+4. `review`
 
-Everything else is support machinery.
+Use these aliases first:
 
-## First day tasks
+```bash
+make discover PROPOSAL=<proposal.yaml> DISCOVER_ACTION=preflight|plan|run
+make package
+make validate
+make review RUN_ID=<run_id> REVIEW_ACTION=diagnose|regime-report
+make review REVIEW_ACTION=compare RUN_IDS=<baseline_run,followup_run>
+```
 
-If you are new, do these in order:
+Everything else is either an implementation detail, an advanced surface, or maintenance machinery.
 
-1. read one completed run end to end from manifest to funnel summary
-2. inspect the generated seed inventory under `docs/generated/promotion_seed_inventory.md`
-3. inspect the current packaged thesis catalog under `docs/generated/seed_thesis_catalog.md` if present
-4. run a proposal in `plan_only` mode
-5. execute one narrow confirmatory slice
+## First-day reading order
 
-If you cannot explain what was tested, where hypotheses died, what thesis class the result supports, and whether the failure was mechanical, statistical, or packaging-related, you are not done reading.
+1. [01_PROJECT_MODEL.md](01_PROJECT_MODEL.md)
+2. [02_REPOSITORY_MAP.md](02_REPOSITORY_MAP.md)
+3. [03_OPERATOR_WORKFLOW.md](03_OPERATOR_WORKFLOW.md)
+4. [04_COMMANDS_AND_ENTRY_POINTS.md](04_COMMANDS_AND_ENTRY_POINTS.md)
+5. [05_ARTIFACTS_AND_INTERPRETATION.md](05_ARTIFACTS_AND_INTERPRETATION.md)
+6. [06_QUALITY_GATES_AND_PROMOTION.md](06_QUALITY_GATES_AND_PROMOTION.md)
+7. [09_THESIS_BOOTSTRAP_AND_PROMOTION.md](09_THESIS_BOOTSTRAP_AND_PROMOTION.md)
+8. [11_LIVE_THESIS_STORE_AND_OVERLAP.md](11_LIVE_THESIS_STORE_AND_OVERLAP.md)
 
-## Canonical first run
+## First-day execution path
 
-Use exactly this order for operator work:
+Start with one narrow proposal and do this exact sequence:
 
-1. `edge operator preflight --proposal <proposal.yaml>`
-2. `edge operator plan --proposal <proposal.yaml>`
-3. `edge operator run --proposal <proposal.yaml>`
+```bash
+make discover PROPOSAL=<proposal.yaml> DISCOVER_ACTION=preflight
+make discover PROPOSAL=<proposal.yaml> DISCOVER_ACTION=plan
+make discover PROPOSAL=<proposal.yaml> DISCOVER_ACTION=run
+make review RUN_ID=<run_id> REVIEW_ACTION=diagnose
+make review RUN_ID=<run_id> REVIEW_ACTION=regime-report
+```
 
-Do not start with `run_all` unless you already know the exact bounded slice and are intentionally bypassing the proposal surface.
+If the run is meant to compare against a baseline slice, then also run:
 
-## Review after a run
+```bash
+make review REVIEW_ACTION=compare RUN_IDS=<baseline_run,followup_run>
+```
 
-Use these commands after a bounded run when you need a structured follow-up surface:
+If the work graduates from bounded run analysis into reusable packaging, move to the bootstrap lane and run:
 
-1. `edge operator diagnose --run_id <run_id>`
-2. `edge operator regime-report --run_id <run_id>`
-3. `edge operator compare --run_ids <baseline_run,followup_run>`
+```bash
+make package
+```
 
-## When to switch to thesis bootstrap
+## What to ignore initially
 
-Use the bootstrap lane when:
+Do not begin with:
 
-- you already have a bounded claim worth queueing
-- the thesis store is empty or sparse
-- you need testing, empirical scoring, or packaging artifacts rather than another discovery run
-- you are trying to populate `data/live/theses/` or regenerate `docs/generated/thesis_overlap_graph.*`
-
-## What to ignore at first
-
-Do not start from:
-
-- raw loader internals
-- sidecar registries and compatibility aliases
+- raw ingest internals
 - long `make` target inventories
-- migration notes
-- low-level pipeline wrappers unless you already know why you need them
+- compatibility wrappers
+- one-off builder scripts
+- maintenance-only generated docs
+- architecture migration references
+
+Those matter later. They are not the learning path.
+
+## Source-of-truth order
+
+When sources disagree, use this precedence:
+
+1. generated run artifacts and manifests
+2. generated thesis artifacts
+3. code and tests
+4. authored specs
+5. hand-written prose
+
+That ordering matters because the repo contains generated inventories and a large amount of implementation detail. Older prose can drift.
+
+## Definition of done for understanding a run
+
+You understand a run only if you can answer all of these without guessing:
+
+- what exact claim was tested
+- what detectors, features, and states were required
+- where the run manifest lives
+- where phase-2 and promotion artifacts live
+- why the result was kept, rejected, repaired, or promoted
+- whether the failure was mechanical, statistical, regime-specific, or packaging-related

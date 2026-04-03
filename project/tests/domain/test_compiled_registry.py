@@ -136,7 +136,8 @@ def test_domain_registry_exposes_sequence_and_interaction_runtime_config():
 
 def test_domain_registry_loads_from_generated_domain_graph():
     registry = refresh_domain_registry()
-    assert registry.unified_registry_path.endswith("event_registry_unified.yaml")
+    assert registry.unified_payload.get("kind") in {"event_runtime_defaults", "event_unified_registry"}
+    assert registry.unified_registry_path in {"", "spec/events/event_registry_unified.yaml"}
     assert registry.event_definitions["DEPTH_COLLAPSE"].canonical_regime == "LIQUIDITY_STRESS"
 
 

@@ -2,24 +2,22 @@ version: 1
 kind: search_spec
 metadata:
   phase: benchmark
-  description: "Narrow maintained benchmark search spec for LIQUIDITY_GAP_PRINT context comparison."
+  description: Narrow maintained benchmark search spec for LIQUIDITY_GAP_PRINT context
+    comparison.
 search_mode: subset
-
 triggers:
   events:
-    - LIQUIDITY_GAP_PRINT
-
+  - LIQUIDITY_GAP_PRINT
 contexts:
   vol_regime: high
-
-templates:
-  - mean_reversion
 horizons:
-  - 15m
+- 15m
 directions:
-  - long
-  - short
+- long
+- short
 entry_lag:
-  - 1
+- 1
 cost_profiles:
-  - standard
+- standard
+expression_templates:
+- mean_reversion

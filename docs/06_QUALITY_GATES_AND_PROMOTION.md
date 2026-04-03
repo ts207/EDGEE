@@ -1,125 +1,169 @@
-# Quality Gates And Promotion
+# Quality gates and promotion
 
-This repository uses multiple gate layers. You should know where a candidate died before you argue about its quality.
+A run is trustworthy only when it survives more than one kind of check.
 
-## Gate policy source
+## Quality is multi-layered
 
-The maintained gate policy is [spec/gates.yaml](../spec/gates.yaml).
+Do not compress quality into one number.
 
-Code-side accessors live in [project/specs/gates.py](../project/specs/gates.py).
+A good result in this repo has to survive at least these layers:
 
-Promotion staging for thesis bootstrap lives in:
+1. **contract integrity** — proposal, schema, and artifact contracts are valid
+2. **mechanical integrity** — required inputs and outputs exist and reconcile
+3. **statistical quality** — the candidate survives phase-2 style filters
+4. **promotion quality** — the candidate survives stronger promotion-oriented rules
+5. **packaging quality** — the thesis object is packaged with evidence, governance, and runtime-safe fields
+6. **deployment discipline** — promotion class and deployment state are not conflated
 
-- [spec/promotion/seed_promotion_policy.yaml](../spec/promotion/seed_promotion_policy.yaml)
-- [spec/promotion/founding_thesis_eval_policy.yaml](../spec/promotion/founding_thesis_eval_policy.yaml)
+## Mechanical quality
 
-## Phase-2 gates
+Mechanical quality asks whether the run is even interpretable.
 
-`gate_v1_phase2` defines the main search filtering policy.
+Typical blockers:
 
-Important controls include:
+- missing manifest or missing required outputs
+- broken schema or artifact contracts
+- missing dataset coverage
+- replay or runtime-invariant failures
+- inconsistent generated artifacts
 
-- `max_q_value`
-- `min_after_cost_expectancy_bps`
-- `conservative_cost_multiplier`
-- `require_sign_stability`
-- `min_sample_size`
-- regime ESS constraints
-- timeframe consensus constraints
+A run that fails mechanically is a repair problem, not a market-signal conclusion.
 
-There are also profiles under `gate_v1_phase2_profiles`, including a `discovery` profile that is intentionally looser than promotion-oriented settings.
+## Statistical quality
 
-## Bridge gates
+Phase-2 style quality asks whether a bounded claim has enough evidence to stay alive.
 
-`gate_v1_bridge` governs search-to-bridge tradability.
+Typical dimensions include:
 
-Important controls include:
+- sample count
+- sign stability
+- robustness
+- cost-adjusted expectancy
+- multiple-testing controls
+- regime behavior
 
-- `edge_cost_k`
-- `stressed_cost_multiplier`
-- `min_validation_trades`
-- `search_bridge_min_t_stat`
-- `search_bridge_min_robustness_score`
-- `search_bridge_min_regime_stability_score`
-- `search_bridge_min_stress_survival`
-- `search_bridge_stress_cost_buffer_bps`
+This is where candidates are kept, weakened, or rejected as research results.
 
-These gates are materially stricter than simple discovery survival.
+## Promotion quality
 
-## Thesis promotion ladder
+Promotion asks a stricter question:
 
-A candidate that survives phase 2 still is not automatically promotion-worthy.
+> Is the surviving candidate strong enough to be carried forward as a governed edge or packaged thesis input?
 
-Use this ladder:
+Promotion logic is owned by `project/research/services/promotion_service.py`.
+
+Common promotion concerns include:
+
+- q-value thresholds
+- minimum event/sample support
+- stability score
+- sign consistency
+- cost survival ratio
+- negative-control behavior
+- time-slice or regime-slice support
+- overlap or redundancy concerns
+
+## Promotion ladder
+
+The lifecycle used by the repo is:
 
 1. `candidate`
-   - structured idea or queue entry
 2. `tested`
-   - bounded claim with testing artifacts but not yet packaged
 3. `seed_promoted`
-   - packaged for monitor-only / bootstrap use
 4. `paper_promoted`
-   - packaged and eligible for paper-style retrieval / review
 5. `production_promoted`
-   - rare, highest bar
 
-### Important restrictions
+This ladder is meaningful. Do not collapse it into a generic “good thesis” label.
 
-- `seed_promoted` is enough for thesis store membership and overlap graph generation.
-- `seed_promoted` is not enough for production deployment.
-- `paper_promoted` still does not imply production readiness.
-- `deployment_state` further narrows what a packaged thesis may be used for (`monitor_only`, `paper_only`, etc.).
+### `candidate`
 
-## Bootstrap-specific gates
+The claim exists as a structured research output, but it is not yet packaged as a reusable thesis.
 
-The bootstrap lane adds evidence and packaging requirements on top of discovery:
+### `tested`
 
-- founding queue membership in `promotion_seed_inventory.*`
-- testing scorecards in `thesis_testing_scorecards.*`
-- empirical evidence in `thesis_empirical_scorecards.*`
-- canonical evidence bundles under `data/reports/promotions/<thesis_id>/evidence_bundles.jsonl`
-- packaging summary and thesis cards before the thesis store is treated as authoritative
+The claim has enough supporting testing structure to be tracked in the bootstrap lane.
 
-A thesis that has not cleared these bootstrap steps must not be treated as a canonical packaged edge.
+### `seed_promoted`
 
-## Fallback gates
+The claim is packaged strongly enough for thesis-store membership and monitor-oriented use.
 
-`gate_v1_fallback` exists for alternate filtering logic when fallback behavior is required. It is not the default interpretation surface for a normal narrow research run.
+This is not the same thing as production readiness.
 
-## Promotion discipline
+### `paper_promoted`
 
-Promotion-oriented reasoning should ask:
+The claim clears a stronger bar for paper-style review or downstream non-live evaluation.
 
-- did the candidate survive phase 2
-- did bridge tradability survive
-- did negative controls behave acceptably
-- did stressed expectancy remain positive
-- is there enough holdout and confounder coverage for the intended thesis class
-- does the packaging class match the evidence class
+### `production_promoted`
 
-## Common analytical mistakes
+This is the strongest class. It should be rare and deliberately earned.
 
-New researchers often stop at:
+## Promotion class versus deployment state
 
-- event count exists
-- `t_stat` is above 2
-- after-cost expectancy is positive
+These are separate fields for a reason.
 
-That is not sufficient in this repo. A candidate still fails if robustness and stress-survival are weak.
+- **promotion class** = how strong the evidence is
+- **deployment state** = where the thesis may be used now
 
-The current bootstrap lane adds two more common mistakes to avoid:
+Typical pairings:
 
-- treating `seed_promoted` as equivalent to `paper_promoted`
-- treating derived or bridge evidence as equivalent to direct paired-event evidence
+- `seed_promoted` + `monitor_only`
+- `paper_promoted` + `paper_only`
+- `production_promoted` + `live_enabled` or another explicitly live-eligible state
 
-## Practical reading rule
+Never infer one from the other.
 
-When you see a candidate or thesis row, identify all five statuses:
+## Bootstrap lane quality
 
-1. phase-2 statistical survival
-2. bridge tradability
-3. thesis testing status
-4. promotion class
-5. deployment state / packaging relevance
+The bootstrap lane adds another layer beyond candidate survival.
 
-Do not compress these into a single "good" or "bad" label.
+A packaging-ready thesis should have a coherent chain across:
+
+- seed inventory membership
+- testing scorecards
+- empirical summaries
+- evidence bundles
+- packaging summary
+- overlap graph membership
+- thesis-store serialization
+
+If one of those is missing, the thesis may still be interesting, but the packaging state is incomplete.
+
+## Current packaging policy implication
+
+In this snapshot, the thesis store already exists under `data/live/theses/`. That means promotion and packaging are active concepts in the repo rather than placeholders.
+
+## How to classify a bad result
+
+Use these buckets.
+
+### Mechanical failure
+
+The run or artifact path is broken.
+
+Action: repair the pipeline, config, or artifact contract.
+
+### Low-power failure
+
+The strongest row exists but sample size is too small to treat the outcome as decisive.
+
+Action: widen sample or coarsen the slice carefully.
+
+### Regime-instability failure
+
+The effect flips or collapses across regimes or time slices.
+
+Action: freeze regime assumptions and run confirmatory follow-ups.
+
+### No-effect failure
+
+The bounded claim is simply not supported.
+
+Action: kill or reframe.
+
+## Common mistakes
+
+- treating positive expectancy as enough
+- ignoring multiple-testing and stability issues
+- assuming a promoted row is a packaged thesis
+- assuming `seed_promoted` means live-ready
+- reading only one table and inferring the entire quality story

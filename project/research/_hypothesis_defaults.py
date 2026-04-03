@@ -4,15 +4,40 @@ import re
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence
 
+from project.spec_registry import load_yaml_path
 from project.specs.loader import load_global_defaults
 
-DEFAULT_UNIVERSE = ["BTCUSDT", "ETHUSDT", "SOLUSDT"]
+DEFAULT_UNIVERSE = ["BTCUSDT", "ETHUSDT"]
+_DEFAULT_HORIZONS = ["12b", "24b", "48b"]
+_DEFAULT_RULE_TEMPLATES = [
+    "mean_reversion",
+    "continuation",
+    "trend_continuation",
+    "exhaustion_reversal",
+    "momentum_fade",
+    "pullback_entry",
+    "overshoot_repair",
+]
+
+
+def _load_default_search_surface(project_root: Path) -> Dict[str, object]:
+    search_space_path = project_root.parent / "spec" / "search_space.yaml"
+    if not search_space_path.exists():
+        return {}
+    payload = load_yaml_path(search_space_path)
+    return payload if isinstance(payload, dict) else {}
 
 
 def load_hypothesis_defaults(project_root: Path) -> Dict[str, object]:
     defaults = load_global_defaults(project_root=project_root)
-    horizons = defaults.get("horizons", ["5m", "15m", "60m"])
-    rule_templates = defaults.get("rule_templates", ["mean_reversion", "continuation"])
+    search_surface = _load_default_search_surface(project_root)
+    metadata = search_surface.get("metadata", {}) if isinstance(search_surface.get("metadata"), dict) else {}
+
+    horizons = search_surface.get("horizons", defaults.get("horizons", _DEFAULT_HORIZONS))
+    rule_templates = search_surface.get(
+        "expression_templates",
+        defaults.get("rule_templates", _DEFAULT_RULE_TEMPLATES),
+    )
     conditioning = defaults.get(
         "conditioning",
         {
@@ -20,10 +45,12 @@ def load_hypothesis_defaults(project_root: Path) -> Dict[str, object]:
             "severity_bucket": ["top_10pct", "extreme_5pct"],
         },
     )
+    default_symbols = metadata.get("default_symbols", DEFAULT_UNIVERSE)
     return {
         "horizons": [str(x) for x in horizons],
         "rule_templates": [str(x) for x in rule_templates],
         "conditioning": dict(conditioning) if isinstance(conditioning, dict) else {},
+        "symbols": [str(x).strip().upper() for x in default_symbols if str(x).strip()],
     }
 
 

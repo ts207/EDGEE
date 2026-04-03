@@ -134,7 +134,7 @@ def _unified_registry() -> Dict[str, Any]:
     if not payload:
         return {}
     kind = str(payload.get("kind", "")).strip().lower()
-    if kind != "event_unified_registry":
+    if kind not in {"event_unified_registry", "event_runtime_defaults"}:
         raise ValueError(f"Malformed unified registry kind at {UNIFIED_REGISTRY_PATH}")
     return payload
 
@@ -199,8 +199,16 @@ def compose_config(
     selected_spec_path = Path(
         domain_registry.event_spec_path(normalized) or (RUNTIME_SPEC_DIR / f"{normalized}.yaml")
     )
+    event_def = domain_registry.get_event(normalized)
     if isinstance(events, dict) and normalized in events:
-        row = dict(events[normalized])
+        row = dict(event_def.raw) if event_def is not None else {}
+        if event_def is not None and isinstance(event_def.parameters, dict) and event_def.parameters:
+            merged_parameters = {}
+            if isinstance(row.get("parameters"), dict):
+                merged_parameters.update(row["parameters"])
+            merged_parameters.update(event_def.parameters)
+            row["parameters"] = merged_parameters
+        row.update(dict(events[normalized]))
     elif normalized.startswith("TEST_") and not domain_registry.has_event(normalized):
         row = {
             "reports_dir": "test_reports",
@@ -209,7 +217,6 @@ def compose_config(
             "parameters": {},
         }
     else:
-        event_def = domain_registry.get_event(normalized)
         if event_def is None:
             ontology_path, runtime_path = _event_spec_candidates(normalized)
             raise KeyError(
@@ -217,6 +224,12 @@ def compose_config(
                 f"{ontology_path} / {runtime_path}"
             )
         row = dict(event_def.raw)
+        if isinstance(event_def.parameters, dict) and event_def.parameters:
+            merged_parameters = {}
+            if isinstance(row.get("parameters"), dict):
+                merged_parameters.update(row["parameters"])
+            merged_parameters.update(event_def.parameters)
+            row["parameters"] = merged_parameters
     source_spec = load_yaml_path(selected_spec_path) if selected_spec_path.exists() else {}
     if isinstance(source_spec, dict) and source_spec:
         source_parameters = source_spec.get("parameters", {})

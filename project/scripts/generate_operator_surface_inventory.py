@@ -36,12 +36,18 @@ def extract_make_targets(makefile_text: str) -> list[str]:
     return sorted(dict.fromkeys(targets))
 
 
+ACTION_TARGETS = ["discover", "package", "validate", "review"]
+
+
 def build_inventory() -> dict[str, list[str]]:
     cli_text = CLI_PATH.read_text(encoding="utf-8")
     makefile_text = MAKEFILE_PATH.read_text(encoding="utf-8") if MAKEFILE_PATH.exists() else ""
+    make_targets = extract_make_targets(makefile_text)
     return {
         "canonical_operator_commands": [f"edge operator {name}" for name in extract_operator_commands(cli_text)],
-        "make_targets": extract_make_targets(makefile_text),
+        "operator_action_targets": [target for target in ACTION_TARGETS if target in make_targets],
+        "advanced_make_targets": [target for target in make_targets if target not in ACTION_TARGETS],
+        "make_targets": make_targets,
     }
 
 
@@ -55,18 +61,27 @@ def render_markdown(inventory: dict[str, list[str]]) -> str:
         "",
         "Use these surfaces first:",
         "",
+        "- `make discover PROPOSAL=<proposal.yaml> DISCOVER_ACTION=preflight|plan|run`",
+        "- `make package`",
+        "- `make validate`",
+        "- `make review RUN_ID=<run_id> REVIEW_ACTION=diagnose|regime-report`",
+        "- `make review REVIEW_ACTION=compare RUN_IDS=<baseline_run,followup_run>`",
+        "",
+        "Direct CLI equivalents:",
+        "",
         "- `edge operator preflight|plan|run` for bounded research issuance",
-        "- thesis bootstrap builders for `package` and thesis-store refresh",
         "- `edge operator diagnose|regime-report|compare` for post-run review",
-        "- maintained `make` targets only for common workflow bundles and maintenance",
         "",
         "## Canonical operator commands",
         "",
     ]
     for command in inventory["canonical_operator_commands"]:
         lines.append(f"- `{command}`")
-    lines += ["", "## Make targets", ""]
-    for target in inventory["make_targets"]:
+    lines += ["", "## Operator action targets", ""]
+    for target in inventory["operator_action_targets"]:
+        lines.append(f"- `{target}`")
+    lines += ["", "## Advanced / maintenance make targets", ""]
+    for target in inventory["advanced_make_targets"]:
         lines.append(f"- `{target}`")
     lines += ["", "## Inventory payload", "", "```json", json.dumps(inventory, indent=2, sort_keys=True), "```", ""]
     return "\n".join(lines)

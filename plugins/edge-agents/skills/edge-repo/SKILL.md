@@ -12,7 +12,8 @@ Use this as the default project skill for `/home/irene/Edge`.
 1. `CLAUDE.md`
 2. `docs/AGENT_CONTRACT.md`
 3. `docs/03_OPERATOR_WORKFLOW.md`
-4. `docs/VERIFICATION.md`
+4. `docs/04_COMMANDS_AND_ENTRY_POINTS.md`
+5. `docs/VERIFICATION.md`
 
 ## Core model
 
@@ -40,16 +41,28 @@ Use this as the default project skill for `/home/irene/Edge`.
 ## Default command surface
 
 ```bash
-make test-fast
-make minimum-green-gate
+make discover PROPOSAL=/abs/path/to/proposal.yaml DISCOVER_ACTION=preflight
+make discover PROPOSAL=/abs/path/to/proposal.yaml DISCOVER_ACTION=plan
+make discover PROPOSAL=/abs/path/to/proposal.yaml DISCOVER_ACTION=run
+make review RUN_ID=<run_id> REVIEW_ACTION=diagnose|regime-report
+make review REVIEW_ACTION=compare RUN_IDS=<baseline_run,followup_run>
+make validate
+make package
+edge operator lint --proposal /abs/path/to/proposal.yaml
+edge operator explain --proposal /abs/path/to/proposal.yaml
 edge operator preflight --proposal /abs/path/to/proposal.yaml
 edge operator plan --proposal /abs/path/to/proposal.yaml
 edge operator run --proposal /abs/path/to/proposal.yaml
+edge operator diagnose --run_id <run_id>
+edge operator regime-report --run_id <run_id>
+edge operator compare --run_ids <baseline_run,followup_run>
 .venv/bin/python -m project.scripts.run_researcher_verification --mode contracts
 ```
 
 ## Routing
 
+- If the task is repo maintenance, generated-doc drift, validation routing, or plugin upkeep, use `edge-maintainer`.
+- If the task is developing or inspecting `project/apps/chatgpt/`, use `edge-chatgpt-app-developer`.
 - If the task is end-to-end research flow control, use `edge-coordinator`.
 - If the task is diagnosing a completed run, use `edge-analyst`.
 - If the task is turning an analyst report into next hypotheses, use `edge-mechanism-hypothesis`.
@@ -57,6 +70,6 @@ edge operator run --proposal /abs/path/to/proposal.yaml
 
 ## Verification default
 
-- After code or config changes, run the contract block from `docs/VERIFICATION.md`.
+- After code, plugin, hook, or config changes, run the contract block from `docs/VERIFICATION.md`.
 - After bounded experiment work, run the experiment verification block.
 - Keep verification targeted to the surface changed unless the repo contract requires more.

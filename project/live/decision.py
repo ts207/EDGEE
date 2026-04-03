@@ -85,12 +85,22 @@ def decide_trade_intent(
             metadata={
                 "primary_event_id": str(context.primary_event_id or context.event_family),
                 "canonical_regime": str(
-                    context.canonical_regime or context.regime_snapshot.get("canonical_regime", "")
+                    _thesis_canonical_regime(top_match.thesis)
+                    or context.canonical_regime
+                    or context.regime_snapshot.get("canonical_regime", "")
                 ),
                 "active_event_ids": list(context.active_event_ids),
                 "compat_active_event_families": list(context.active_event_families),
                 "active_episode_ids": list(context.active_episode_ids),
                 "compat_event_family": str(context.event_family),
+                "overlap_group_id": str(top_match.thesis.governance.overlap_group_id or ""),
+                "governance_tier": str(top_match.thesis.governance.tier or ""),
+                "operational_role": str(top_match.thesis.governance.operational_role or ""),
+                "compat_thesis_event_family": str(
+                    top_match.thesis.event_family or top_match.thesis.primary_event_id or ""
+                ),
+                "thesis_canonical_regime": _thesis_canonical_regime(top_match.thesis),
+                "meta_rank_score": float(top_match.thesis.evidence.rank_score or 0.0),
             },
         )
         return DecisionOutcome(

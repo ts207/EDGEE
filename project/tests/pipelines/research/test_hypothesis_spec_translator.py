@@ -209,3 +209,37 @@ def test_candidate_id_changes_when_hypothesis_spec_hash_changes():
         implemented_event_types={"VOL_SHOCK"},
     )
     assert rows_a[0]["candidate_id"] != rows_b[0]["candidate_id"]
+
+
+
+def test_translate_candidate_hypotheses_strict_fails_on_filter_primary_template():
+    specs = [
+        {
+            "hypothesis_id": "H_ACTIVE",
+            "version": 1,
+            "spec_path": "spec/hypotheses/a.yaml",
+            "spec_hash": "sha256:speca",
+            "conditioning_features": [],
+            "metric": "lift_bps",
+            "output_schema": ["lift_bps"],
+        }
+    ]
+    base = {
+        "event_type": "VOL_SHOCK",
+        "canonical_event_type": "VOL_SHOCK",
+        "rule_template": "only_if_regime",
+        "horizon": "5m",
+        "entry_lag_bars": 0,
+        "symbol": "BTCUSDT",
+        "conditioning": {},
+        "state_id": None,
+    }
+    with pytest.raises(ValueError, match="expression templates"):
+        hst.translate_candidate_hypotheses(
+            base_candidate=base,
+            hypothesis_specs=specs,
+            available_condition_keys={"vol_regime"},
+            template_side_policy={},
+            strict=True,
+            implemented_event_types={"VOL_SHOCK"},
+        )

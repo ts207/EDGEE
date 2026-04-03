@@ -1,55 +1,47 @@
-# Research Layer (`project/research`)
+# Research layer
 
-The research layer owns hypothesis generation, statistical evaluation, promotion policy, and research memory.
+`project/research/` owns bounded search, candidate evaluation, promotion policy, reporting, knowledge, and thesis packaging support.
 
-## Ownership
+## What this layer owns
 
-- Candidate discovery and phase-2 evaluation
-- Promotion policy and audit generation
-- Research reporting and run comparison
-- Knowledge, memory, and reflection surfaces for agent-driven workflows
-- Search, robustness, gating, and recommendation helpers used by the research pipeline
+- proposal translation and issuance support under `agent_io/`
+- candidate discovery and phase-2 evaluation
+- promotion policy and promotion reporting
+- research diagnostics and run comparison
+- campaign memory and knowledge tables
+- packaging and thesis-export support
+- service surfaces under `project/research/services/`
 
-## Non-Ownership
+## Canonical public surfaces
 
-- Live execution and OMS behavior
-- Raw data ingestion and cleaning
-- Venue-specific adapters and low-level market interfaces
-- Top-level orchestration of the full pipeline DAG
-
-## Canonical Public Surfaces
+Read and depend on these first:
 
 - `project.research.services.candidate_discovery_service`
 - `project.research.services.promotion_service`
 - `project.research.services.reporting_service`
 - `project.research.services.run_comparison_service`
-- `project.research.knowledge.query`
-- `project.research.agent_io.{proposal_to_experiment,execute_proposal,issue_proposal}`
+- `project.research.agent_io.proposal_schema`
+- `project.research.agent_io.proposal_to_experiment`
+- `project.research.agent_io.execute_proposal`
+- `project.research.agent_io.issue_proposal`
 
-## Explicit Package Surfaces
+## What this layer does not own
 
-The layer also exposes lightweight package roots for stable helper families:
+- raw data ingestion and cleaning
+- top-level DAG coordination
+- live execution behavior
+- OMS implementation
 
-- `project.research.clustering`
-- `project.research.reports`
-- `project.research.utils`
+## Design rule
 
-## Internal Support Modules
+Keep policy in services and contract-aware modules. Do not spread research policy across wrappers or convenience scripts.
 
-Some large research modules now split internal helper logic into focused support files. These are implementation details, not preferred public surfaces.
+## Relationship to docs
 
-Current examples:
+See:
 
-- `project.research.services.candidate_discovery_diagnostics`
-- `project.research.services.candidate_discovery_scoring`
-- `project.research.promotion.promotion_decision_support`
-- `project.research.promotion.promotion_result_support`
-- `project.research.promotion.promotion_reporting_support`
-
-## Working Rules
-
-- Keep stable workflow APIs in service modules, not ad hoc wrappers.
-- Keep policy logic separate from raw metric computation.
-- Keep the layer deterministic for identical inputs and configs.
-- Prefer repo-native contracts and schemas over one-off dataframe conventions.
-- If a research module starts turning into a monolith, split internal support helpers without changing the canonical service surface.
+- `docs/01_PROJECT_MODEL.md`
+- `docs/03_OPERATOR_WORKFLOW.md`
+- `docs/04_COMMANDS_AND_ENTRY_POINTS.md`
+- `docs/06_QUALITY_GATES_AND_PROMOTION.md`
+- `docs/09_THESIS_BOOTSTRAP_AND_PROMOTION.md`

@@ -1,119 +1,171 @@
-# Thesis Bootstrap And Promotion
+# Thesis bootstrap and promotion
 
-This document explains the founding-thesis workflow that sits between bounded research runs and the canonical thesis store.
+This document explains the packaging lane that turns surviving research into packaged thesis objects.
 
-## Why this lane exists
+## Why the bootstrap lane exists
 
-A strong event system and a strong phase-2 pipeline are not enough by themselves. The live retriever, overlap graph, and allocator consume **packaged theses**, not raw event rows or raw run summaries.
+A bounded run can produce promising candidates without producing reusable live/runtime objects.
 
-The bootstrap lane exists to answer:
+The bootstrap lane exists to answer a different question:
 
-- which candidate theses deserve deeper testing
-- which ones have enough empirical support to package
-- which packaged theses are only `seed_promoted`
-- which packaged theses clear the stronger `paper_promoted` bar
+> Which claims deserve to become packaged theses that the runtime can retrieve and reason over?
 
-## Canonical lifecycle
+That requires more than a good candidate row. It requires evidence packaging, governance metadata, and packaging outputs that downstream systems can consume.
 
-Use this lifecycle exactly:
+## Bootstrap lifecycle
 
-1. `candidate`
-2. `tested`
-3. `seed_promoted`
-4. `paper_promoted`
-5. `production_promoted`
+The repo uses this progression:
 
-A thesis must never skip directly from candidate to production.
+`candidate -> tested -> seed_promoted -> paper_promoted -> production_promoted`
+
+No thesis should jump from candidate directly to production.
 
 ## Bootstrap blocks
 
-### Block A — seed inventory
+### Block A — seed inventory and baseline
 
-Creates the bounded founding queue.
+Purpose:
 
-Outputs:
+- inspect pre-existing thesis-store state
+- build the queue of candidate theses worth deeper packaging work
+- materialize seed-promotion policy references
+
+Primary scripts:
+
+```bash
+python -m project.scripts.build_seed_bootstrap_artifacts
+```
+
+Typical outputs:
 
 - `docs/generated/thesis_bootstrap_baseline.md`
+- `docs/generated/promotion_seed_inventory.md`
 - `docs/generated/promotion_seed_inventory.csv`
 - `docs/generated/seed_promotion_policy.md`
 
 ### Block B — thesis testing
 
-Scores queue entries on governance, contract fit, invalidation clarity, and readiness.
+Purpose:
 
-Outputs:
+- score seed candidates on testing readiness and governance-oriented criteria
 
-- `docs/generated/thesis_testing_scorecards.csv`
-- `docs/generated/thesis_testing_summary.md`
+Primary script:
+
+```bash
+python -m project.scripts.build_seed_testing_artifacts
+```
 
 ### Block C — empirical mapping
 
-Maps real evidence bundles onto the queue and decides whether a thesis still needs evidence, needs repair, or clears a higher stage.
+Purpose:
 
-Outputs:
+- connect actual evidence and scorecards to thesis candidates
+- classify where evidence is sufficient, weak, or missing
+
+Primary script:
+
+```bash
+python -m project.scripts.build_seed_empirical_artifacts
+```
+
+Typical outputs already present in this snapshot include:
 
 - `docs/generated/thesis_empirical_scorecards.csv`
 - `docs/generated/thesis_empirical_summary.md`
 
-### Block D — founding evidence generation
+### Block D — evidence bundle generation
 
-Generates canonical evidence bundles for selected theses.
+Purpose:
 
-Outputs:
+- write canonical evidence bundles for packaging-ready theses
 
-- `data/reports/promotions/<THESIS_ID>/evidence_bundles.jsonl`
-- `docs/generated/founding_thesis_evidence_summary.md`
+Primary script:
 
-### Block E — packaging
+```bash
+python -m project.scripts.build_founding_thesis_evidence
+```
 
-Writes the canonical thesis store and human-readable cards.
+Current snapshot evidence bundles exist under paths such as:
 
-Outputs:
+- `data/reports/promotions/THESIS_VOL_SHOCK/evidence_bundles.jsonl`
+- `data/reports/promotions/THESIS_LIQUIDATION_CASCADE/evidence_bundles.jsonl`
+
+### Block E — thesis packaging
+
+Purpose:
+
+- serialize promoted thesis objects into the live thesis store
+- generate human-readable packaging summaries
+
+Primary script:
+
+```bash
+python -m project.scripts.build_seed_packaging_artifacts
+```
+
+Core outputs:
 
 - `data/live/theses/index.json`
 - `data/live/theses/<batch>/promoted_theses.json`
-- `docs/generated/seed_thesis_cards/*.md`
 - `docs/generated/seed_thesis_catalog.md`
 - `docs/generated/seed_thesis_packaging_summary.md`
 
-### Block F — structural confirmation
+### Block F — structural confirmation and overlap
 
-Allows conservative bridge theses derived from supported component evidence. These are intentionally capped at `seed_promoted` until direct paired evidence exists.
+Purpose:
 
-Outputs:
+- support conservative bridge theses where policy allows it
+- build the overlap graph used by downstream allocation logic
 
-- `docs/generated/structural_confirmation_summary.md`
-- updated packaged thesis store and overlap graph
-
-## Commands
-
-Use these maintained entry points:
+Primary scripts:
 
 ```bash
-python -m project.scripts.build_seed_bootstrap_artifacts
-python -m project.scripts.build_seed_testing_artifacts
-python -m project.scripts.build_seed_empirical_artifacts
-python -m project.scripts.build_founding_thesis_evidence
-python -m project.scripts.build_seed_packaging_artifacts
 python -m project.scripts.build_structural_confirmation_artifacts
 python -m project.scripts.build_thesis_overlap_artifacts
-./project/scripts/regenerate_artifacts.sh
 ```
 
-## Current policy rules
+Outputs already present in this snapshot:
 
-- `seed_promoted` is enough for monitor-only retrieval and overlap graph generation.
-- `paper_promoted` is enough for paper-style retrieval and review.
-- `production_promoted` remains a separate later-phase decision.
-- Derived structural confirmation support must not be upgraded to `paper_promoted` without direct paired-event evidence.
+- `docs/generated/structural_confirmation_summary.md`
+- `docs/generated/thesis_overlap_graph.md`
 
-## What to inspect first
+## Canonical packaging shortcut
 
-If you need to understand the current bootstrap state, read in this order:
+The easiest supported path is:
+
+```bash
+make package
+```
+
+This runs the maintained packaging chain in the intended order.
+
+Use the underlying scripts directly only when repairing or inspecting a particular packaging block.
+
+## How to read bootstrap state
+
+Inspect in this order:
 
 1. `docs/generated/promotion_seed_inventory.md`
-2. `docs/generated/thesis_testing_summary.md`
-3. `docs/generated/thesis_empirical_summary.md`
-4. `docs/generated/founding_thesis_evidence_summary.md`
-5. `docs/generated/seed_thesis_catalog.md`
+2. `docs/generated/thesis_empirical_summary.md`
+3. `docs/generated/founding_thesis_evidence_summary.md`
+4. `docs/generated/seed_thesis_catalog.md`
+5. `docs/generated/seed_thesis_packaging_summary.md`
 6. `docs/generated/thesis_overlap_graph.md`
+7. `data/live/theses/index.json`
+
+## Policy implications
+
+- `seed_promoted` is enough for thesis-store membership and monitor-oriented use.
+- `paper_promoted` is stronger but still not equivalent to production.
+- `production_promoted` should remain the rare high-bar class.
+- Derived or structurally confirmed support must not be treated as equivalent to direct evidence without the policy explicitly allowing it.
+
+## Current snapshot state
+
+This snapshot already contains:
+
+- a packaged thesis store under `data/live/theses/`
+- multiple evidence-bundle directories under `data/reports/promotions/`
+- generated packaging summaries under `docs/generated/`
+
+So the packaging lane is active and should be documented as present-tense infrastructure, not future work.

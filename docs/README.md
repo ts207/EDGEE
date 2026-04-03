@@ -1,82 +1,89 @@
-# Edge Documentation
+# Edge documentation
 
-Start here if you need to understand the repository, run research correctly, or interpret outputs without guessing.
+This directory is organized around one question: **what is the shortest correct path from repo orientation to a trustworthy run or packaged thesis?**
 
-## Current state
+The documentation set is intentionally split into four classes.
 
-The repo now has two connected lanes:
+## 1. Canonical operating docs
 
-1. **bounded experiment lane** — proposal -> plan -> run -> diagnose -> keep/modify/kill
-2. **thesis bootstrap lane** — seed inventory -> testing -> empirical evidence -> packaging -> thesis store -> overlap graph
+Read these first.
 
-Read the bounded lane first, then the bootstrap lane if you are trying to populate or maintain the canonical thesis store.
+1. [00_START_HERE.md](00_START_HERE.md) — shortest onboarding path
+2. [01_PROJECT_MODEL.md](01_PROJECT_MODEL.md) — system overview, core objects, lifecycle
+3. [02_REPOSITORY_MAP.md](02_REPOSITORY_MAP.md) — top-level map and subsystem ownership
+4. [03_OPERATOR_WORKFLOW.md](03_OPERATOR_WORKFLOW.md) — proposal issuance, run lifecycle, review flow
+5. [04_COMMANDS_AND_ENTRY_POINTS.md](04_COMMANDS_AND_ENTRY_POINTS.md) — what to run and when
+6. [05_ARTIFACTS_AND_INTERPRETATION.md](05_ARTIFACTS_AND_INTERPRETATION.md) — where outputs land and how to read them
+7. [06_QUALITY_GATES_AND_PROMOTION.md](06_QUALITY_GATES_AND_PROMOTION.md) — quality model, promotion ladder, deployment meaning
+8. [07_BEST_PRACTICES_AND_FAILURE_MODES.md](07_BEST_PRACTICES_AND_FAILURE_MODES.md) — bounded-work operating rules and common failure patterns
+9. [08_TESTING_AND_MAINTENANCE.md](08_TESTING_AND_MAINTENANCE.md) — test surfaces, regeneration, maintenance workflow
+10. [09_THESIS_BOOTSTRAP_AND_PROMOTION.md](09_THESIS_BOOTSTRAP_AND_PROMOTION.md) — thesis packaging lane
+11. [10_APPS_PLUGINS_AND_AGENTS.md](10_APPS_PLUGINS_AND_AGENTS.md) — app, plugin, and agent surfaces
+12. [11_LIVE_THESIS_STORE_AND_OVERLAP.md](11_LIVE_THESIS_STORE_AND_OVERLAP.md) — packaged thesis runtime model
+13. [14_PROPOSAL_TO_LIVE_TRADE_TRACE.md](14_PROPOSAL_TO_LIVE_TRADE_TRACE.md) — full proposal-to-runtime and live-trading trace
 
-## Recommended reading order
+## 2. Maintenance and architecture references
 
-1. [00_START_HERE.md](00_START_HERE.md)
-2. [01_PROJECT_MODEL.md](01_PROJECT_MODEL.md) — core objects + glossary
-3. [02_REPOSITORY_MAP.md](02_REPOSITORY_MAP.md)
-4. [03_OPERATOR_WORKFLOW.md](03_OPERATOR_WORKFLOW.md) — canonical loop + thesis bootstrap lane
-5. [04_COMMANDS_AND_ENTRY_POINTS.md](04_COMMANDS_AND_ENTRY_POINTS.md)
-6. [05_ARTIFACTS_AND_INTERPRETATION.md](05_ARTIFACTS_AND_INTERPRETATION.md)
-7. [06_QUALITY_GATES_AND_PROMOTION.md](06_QUALITY_GATES_AND_PROMOTION.md)
-8. [07_BEST_PRACTICES_AND_FAILURE_MODES.md](07_BEST_PRACTICES_AND_FAILURE_MODES.md)
-9. [08_TESTING_AND_MAINTENANCE.md](08_TESTING_AND_MAINTENANCE.md)
-10. [09_THESIS_BOOTSTRAP_AND_PROMOTION.md](09_THESIS_BOOTSTRAP_AND_PROMOTION.md)
-11. [11_LIVE_THESIS_STORE_AND_OVERLAP.md](11_LIVE_THESIS_STORE_AND_OVERLAP.md)
+Use these when changing architecture, contracts, or verification behavior.
 
-## Worked examples
-
-- [10b_WORKED_EXAMPLE_ENGINE_BACKTEST.md](10b_WORKED_EXAMPLE_ENGINE_BACKTEST.md)
-
-## Reference
-
-- [13_TRIGGER_TYPES.md](13_TRIGGER_TYPES.md)
-- [15_EVENT_REFERENCE.md](15_EVENT_REFERENCE.md)
-
-## Agent and operator contracts
-
-- [AGENT_CONTRACT.md](AGENT_CONTRACT.md) — allowed/forbidden actions, hypothesis definition, thesis lifecycle restrictions, verification obligations
-- [VERIFICATION.md](VERIFICATION.md) — verification script commands
-
-## Architecture references
-
-- [ARCHITECTURE_MAINTENANCE_CHECKLIST.md](ARCHITECTURE_MAINTENANCE_CHECKLIST.md)
+- [VERIFICATION.md](VERIFICATION.md)
 - [ARCHITECTURE_SURFACE_INVENTORY.md](ARCHITECTURE_SURFACE_INVENTORY.md)
+- [ARCHITECTURE_MAINTENANCE_CHECKLIST.md](ARCHITECTURE_MAINTENANCE_CHECKLIST.md)
 - [RESEARCH_CALIBRATION_BASELINE.md](RESEARCH_CALIBRATION_BASELINE.md)
-- [chatgpt_apps_sdk_plan.md](chatgpt_apps_sdk_plan.md)
+- [AGENT_CONTRACT.md](AGENT_CONTRACT.md)
+- [operator_command_inventory.md](operator_command_inventory.md)
 
-## Operator templates
+## 3. Generated inventories and artifact summaries
 
-For bounded research work, use the templates in `docs/templates/`:
+These files are generated. They are evidence and inventory, not narrative onboarding.
 
-- [hypothesis_template.md](templates/hypothesis_template.md) — fill in before executing
-- [experiment_review_template.md](templates/experiment_review_template.md) — fill in after executing
-- [edge_registry_template.md](templates/edge_registry_template.md) — update after every run
-- [bounded_experiment_template.md](templates/bounded_experiment_template.md) — lane selection, governance, promotion gates
+- [generated/system_map.md](generated/system_map.md)
+- [generated/event_contract_reference.md](generated/event_contract_reference.md)
+- [generated/promotion_seed_inventory.md](generated/promotion_seed_inventory.md)
+- [generated/thesis_empirical_summary.md](generated/thesis_empirical_summary.md)
+- [generated/seed_thesis_catalog.md](generated/seed_thesis_catalog.md)
+- [generated/seed_thesis_packaging_summary.md](generated/seed_thesis_packaging_summary.md)
+- [generated/thesis_overlap_graph.md](generated/thesis_overlap_graph.md)
+- [generated/founding_thesis_evidence_summary.md](generated/founding_thesis_evidence_summary.md)
+- [generated/structural_confirmation_summary.md](generated/structural_confirmation_summary.md)
+- [generated/shadow_live_thesis_summary.md](generated/shadow_live_thesis_summary.md)
 
-## Spec sources
+## 4. Templates and research notes
 
-- event registry: [spec/events/event_registry_unified.yaml](../spec/events/event_registry_unified.yaml)
-- episode registry: [spec/episodes/episode_registry.yaml](../spec/episodes/episode_registry.yaml)
-- campaign contract: [spec/campaigns/campaign_contract_v1.yaml](../spec/campaigns/campaign_contract_v1.yaml)
-- seed promotion policy: [spec/promotion/seed_promotion_policy.yaml](../spec/promotion/seed_promotion_policy.yaml)
-- founding thesis evaluation policy: [spec/promotion/founding_thesis_eval_policy.yaml](../spec/promotion/founding_thesis_eval_policy.yaml)
-- search surface: [spec/search_space.yaml](../spec/search_space.yaml)
-- gate policy: [spec/gates.yaml](../spec/gates.yaml)
-- stage and artifact contract source: [project/contracts/pipeline_registry.py](../project/contracts/pipeline_registry.py)
-- full orchestrator: [project/pipelines/run_all.py](../project/pipelines/run_all.py)
+Use templates when authoring bounded work. Treat research notes as non-canonical support material.
 
-## Generated inventories
+Templates:
 
-Generated inventories and audits are written under [docs/generated/](generated). Hand-authored docs in this directory explain the system without depending on generated markdown being present.
+- [templates/bounded_experiment_template.md](templates/bounded_experiment_template.md)
+- [templates/experiment_review_template.md](templates/experiment_review_template.md)
+- [templates/hypothesis_template.md](templates/hypothesis_template.md)
+- [templates/edge_registry_template.md](templates/edge_registry_template.md)
 
-Pay special attention to:
+Research notes:
 
-- `control_plane_inventory.*`
-- `promotion_seed_inventory.*`
-- `thesis_testing_scorecards.*`
-- `thesis_empirical_scorecards.*`
-- `seed_thesis_catalog.md`
-- `seed_thesis_packaging_summary.*`
-- `thesis_overlap_graph.*`
+- `docs/research/`
+
+## Recommended reading paths
+
+### New operator
+
+Read `00 -> 01 -> 02 -> 03 -> 04 -> 05`.
+
+### Research maintainer
+
+Read `01 -> 02 -> 03 -> 04 -> 06 -> 08 -> VERIFICATION.md`.
+
+### Thesis packaging maintainer
+
+Read `03 -> 05 -> 06 -> 09 -> 11`.
+
+### Live/runtime maintainer
+
+Read `01 -> 02 -> 05 -> 06 -> 11 -> 10`.
+
+## Documentation rules
+
+- Narrative docs explain stable concepts and recommended usage.
+- Generated docs reflect current repo or artifact state.
+- When a command, path, or policy changes, update the canonical doc that owns that concept.
+- Do not create new one-off narrative docs when an existing canonical doc already owns the topic.

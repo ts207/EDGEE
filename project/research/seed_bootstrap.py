@@ -12,6 +12,7 @@ from project.core.config import get_data_root
 from project.events.contract_registry import load_active_event_contracts
 from project.events.governance import get_event_governance_metadata
 from project.episodes import load_episode_registry
+from project.live.thesis_specs import get_thesis_definition
 from project.live.thesis_store import ThesisStore
 from project.spec_registry.loaders import repo_root
 
@@ -78,12 +79,29 @@ def _expected_path(*tokens: str) -> str:
     return "Expect a bounded post-trigger response that should be testable in forward bars."
 
 
-def _seed_status(role: str, disposition: str, trade_trigger_eligible: bool) -> str:
-    if not trade_trigger_eligible:
-        return "needs_repair"
+def _seed_status(
+    role: str,
+    disposition: str,
+    trade_trigger_eligible: bool,
+    *,
+    candidate_id: str = "",
+) -> str:
     blocked_dispositions = {"context_only", "research_only", "repair_before_promotion", "inactive", "deprecated", "alias_only"}
     blocked_roles = {"context", "filter", "research_only", "sequence_component"}
+
     if role in blocked_roles or disposition in blocked_dispositions:
+        return "needs_repair"
+
+    authored = get_thesis_definition(candidate_id) if str(candidate_id).strip() else None
+    authored_governance = authored.governance if authored is not None else {}
+    authored_role = str(authored_governance.get("operational_role", "") or role).strip().lower()
+    authored_trade_trigger_eligible = bool(
+        authored_governance.get("trade_trigger_eligible", trade_trigger_eligible)
+    )
+    if authored is not None and authored_role and authored_role not in blocked_roles and authored_trade_trigger_eligible:
+        return "test_now"
+
+    if not trade_trigger_eligible:
         return "needs_repair"
     return "test_now"
 
@@ -102,10 +120,12 @@ def _event_candidate_row(event_id: str) -> dict[str, str]:
     contracts = load_active_event_contracts()
     contract = contracts[event_id]
     governance = get_event_governance_metadata(event_id)
+    candidate_id = f"THESIS_{event_id}"
     status = _seed_status(
         str(governance.get("operational_role", "")).lower(),
         str(governance.get("deployment_disposition", "")).lower(),
         bool(governance.get("trade_trigger_eligible", False)),
+        candidate_id=candidate_id,
     )
     horizon = _horizon_guess(contract.get("phase"), contract.get("canonical_family"), event_id)
     expected = _expected_path(contract.get("phase"), contract.get("canonical_family"), event_id)
@@ -115,7 +135,7 @@ def _event_candidate_row(event_id: str) -> dict[str, str]:
         f"over {horizon} unless {invalidation.lower()}"
     )
     return {
-        "candidate_id": f"THESIS_{event_id}",
+        "candidate_id": candidate_id,
         "source_type": "event",
         "source_contract_ids": event_id,
         "event_contract_ids": event_id,
@@ -140,9 +160,12 @@ def _event_candidate_row(event_id: str) -> dict[str, str]:
 def _confirm_candidate_row(candidate_id: str, event_ids: Iterable[str]) -> dict[str, str]:
     event_list = [str(event_id).strip().upper() for event_id in event_ids if str(event_id).strip()]
     governance_rows = [get_event_governance_metadata(event_id) for event_id in event_list]
-    status = "test_now"
-    if any(not bool(row.get("trade_trigger_eligible", False)) for row in governance_rows):
-        status = "needs_repair"
+    status = _seed_status(
+        "confirm",
+        "seed_review_required",
+        all(bool(row.get("trade_trigger_eligible", False)) for row in governance_rows),
+        candidate_id=candidate_id,
+    )
     horizon = _horizon_guess(*event_list)
     expected = _expected_path(*event_list)
     invalidation = " OR ".join(
@@ -182,6 +205,7 @@ def _episode_candidate_row(episode_id: str) -> dict[str, str]:
         episode.operational_role.lower(),
         episode.deployment_disposition.lower(),
         episode.operational_role.lower() in {"trigger", "confirm"} and episode.deployment_disposition.lower() not in {"context_only", "research_only", "repair_before_promotion", "inactive", "deprecated", "alias_only"},
+        candidate_id=f"THESIS_{episode_id}",
     )
     required = "|".join(episode.required_events)
     invalidation = "|".join(episode.invalidation_events) or "Explicit episode invalidation still needs empirical refinement."

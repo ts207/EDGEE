@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from project.spec_registry.loaders import repo_root
+from project.live.thesis_specs import get_thesis_definition
 from project.research.seed_bootstrap import (
     DOCS_GENERATED,
     SEED_POLICY_PATH,
@@ -152,20 +153,64 @@ def _holdout_quality(row: Mapping[str, str]) -> int:
     return 0
 
 
-def _deployment_suitability(row: Mapping[str, str]) -> int:
+BLOCKED_DEPLOYMENT_DISPOSITIONS = {"context_only", "research_only", "repair_before_promotion", "inactive", "deprecated", "alias_only"}
+BLOCKED_OPERATIONAL_ROLES = {"context", "filter", "research_only", "sequence_component"}
+
+
+def _authored_governance_override(row: Mapping[str, str]) -> dict[str, object] | None:
+    candidate_id = str(row.get("candidate_id", "")).strip()
+    thesis_def = get_thesis_definition(candidate_id)
+    if thesis_def is None:
+        return None
+    governance = thesis_def.governance or {}
+    role = str(governance.get("operational_role", row.get("operational_role", ""))).strip().lower()
+    disposition = str(row.get("deployment_disposition", "")).strip().lower()
+    source_type = str(row.get("source_type", "")).strip().lower()
+    if not disposition:
+        if role == "confirm" or source_type == "event_plus_confirm":
+            disposition = "seed_review_required"
+        elif source_type == "episode" and role in {"trigger", "confirm"}:
+            disposition = "secondary_trigger_candidate"
+        elif role == "trigger":
+            disposition = "review_required"
+    trade_trigger_eligible = bool(governance.get("trade_trigger_eligible", False))
+    blocked = role in BLOCKED_OPERATIONAL_ROLES or disposition in BLOCKED_DEPLOYMENT_DISPOSITIONS or not trade_trigger_eligible
+    return {
+        "role": role,
+        "disposition": disposition,
+        "trade_trigger_eligible": trade_trigger_eligible,
+        "blocked": blocked,
+    }
+
+
+def _row_is_governance_blocked(row: Mapping[str, str]) -> bool:
+    authored = _authored_governance_override(row)
+    if authored is not None:
+        return bool(authored["blocked"])
     role = str(row.get("operational_role", "")).strip().lower()
     disposition = str(row.get("deployment_disposition", "")).strip().lower()
     status = str(row.get("promotion_status", "")).strip().lower()
+    return bool(
+        status == "needs_repair"
+        or role in BLOCKED_OPERATIONAL_ROLES
+        or disposition in BLOCKED_DEPLOYMENT_DISPOSITIONS
+    )
+
+
+def _deployment_suitability(row: Mapping[str, str]) -> int:
+    authored = _authored_governance_override(row)
+    role = str((authored or {}).get("role", row.get("operational_role", ""))).strip().lower()
+    disposition = str((authored or {}).get("disposition", row.get("deployment_disposition", ""))).strip().lower()
     tier = str(row.get("governance_tier", "")).strip().upper()
-    if status == "needs_repair" or role in {"context", "filter", "research_only", "sequence_component"}:
-        return 1
-    if disposition in {"context_only", "research_only", "repair_before_promotion", "inactive", "deprecated", "alias_only"}:
+    if _row_is_governance_blocked(row):
         return 1
     if role == "trigger" and tier == "A":
         return 5
     if role in {"trigger", "confirm"} and tier in {"A", "B"}:
         return 4
-    return 3
+    if role in {"trigger", "confirm"}:
+        return 3
+    return 2
 
 
 def _testing_thresholds(policy: Mapping[str, Any]) -> dict[str, int]:
@@ -217,7 +262,7 @@ def _decision_for_row(row: Mapping[str, str], scores: Mapping[str, int], policy:
     thresholds = _testing_thresholds(policy)
     promotion_status = str(row.get("promotion_status", "")).strip().lower()
     total = int(scores["total_score"])
-    if promotion_status == "needs_repair" or scores["deployment_suitability"] <= 1:
+    if _row_is_governance_blocked(row) or scores["deployment_suitability"] <= 1:
         return "needs_repair"
     if total <= thresholds["reject_max_total"]:
         return "reject"

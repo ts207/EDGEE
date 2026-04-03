@@ -11,7 +11,13 @@ This skill follows `agents/compiler.md`.
 
 1. `agents/compiler.md`
 2. `agents/handoffs/mechanism_hypothesis_to_compiler.md`
-3. `project/research/agent_io/proposal_schema.py`
+3. `docs/04_COMMANDS_AND_ENTRY_POINTS.md`
+4. `project/research/agent_io/proposal_schema.py`
+
+## Current operator front door
+
+- Prefer canonical `edge operator lint|explain|plan|run` commands in user-facing output.
+- Mention lower-level `project.research.agent_io.*` commands only when debugging the proposal path or tracing contract drift.
 
 ## Required checks before compiling
 
@@ -33,7 +39,8 @@ This skill follows `agents/compiler.md`.
 
 - proposal path under `spec/proposals/`
 - full proposal YAML
-- translation command
+- lint command
+- explain command
 - plan-only command
 - execution command
 - explicit plan review checklist

@@ -113,7 +113,8 @@ def _write_event_scoped_search_spec(
     narrowed["events"] = [event_type]
     event_templates = event_row.get("templates", [])
     if isinstance(event_templates, (list, tuple)) and event_templates:
-        narrowed["templates"] = [str(item) for item in event_templates if str(item).strip()]
+        narrowed["expression_templates"] = [str(item) for item in event_templates if str(item).strip()]
+        narrowed.pop("templates", None)
     event_horizons = event_row.get("horizons", [])
     if isinstance(event_horizons, (list, tuple)) and event_horizons:
         narrowed["horizons"] = [str(item) for item in event_horizons if str(item).strip()]

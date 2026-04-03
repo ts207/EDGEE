@@ -40,6 +40,25 @@ class PromotedThesisExportResult:
     contract_md_path: Path | None = None
 
 
+
+
+def _fallback_authored_definition_for_event(*event_tokens: str):
+    from project.domain.compiled_registry import get_domain_registry
+
+    registry = get_domain_registry()
+    normalized = [str(token or "").strip().upper() for token in event_tokens if str(token or "").strip()]
+    if not normalized:
+        return None
+    for definition in registry.thesis_definitions.values():
+        if str(definition.governance.get("operational_role", "")).strip().lower() != "trigger":
+            continue
+        primary = str(definition.primary_event_id or "").strip().upper()
+        family = str(definition.event_family or "").strip().upper()
+        triggers = [str(token or "").strip().upper() for token in definition.trigger_events]
+        if any(token and token in {primary, family, *triggers} for token in normalized):
+            return definition
+    return None
+
 def _utc_now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
@@ -282,17 +301,33 @@ def _build_expected_response(
     return response
 
 
-def _build_governance(bundle: Mapping[str, Any], promoted_row: Mapping[str, Any], *, overlap_group_id: str = "") -> ThesisGovernance:
-    event_id = str(bundle.get("event_type", "") or promoted_row.get("event_type", "")).strip()
+def _build_governance(
+    bundle: Mapping[str, Any],
+    promoted_row: Mapping[str, Any],
+    *,
+    overlap_group_id: str = "",
+    authored_def: Any | None = None,
+    primary_event_id: str = "",
+) -> ThesisGovernance:
+    event_id = str(primary_event_id or bundle.get("event_type", "") or promoted_row.get("event_type", "")).strip()
     meta = get_event_governance_metadata(event_id) if event_id else {}
+    authored_governance = authored_def.governance if authored_def is not None else {}
+    if not isinstance(authored_governance, Mapping):
+        authored_governance = {}
     return ThesisGovernance(
-        tier=str(meta.get("tier", "")).strip(),
-        operational_role=str(meta.get("operational_role", "")).strip(),
-        deployment_disposition=str(meta.get("deployment_disposition", "")).strip(),
-        evidence_mode=str(meta.get("evidence_mode", "")).strip(),
-        overlap_group_id=str(overlap_group_id or "").strip(),
-        trade_trigger_eligible=bool(meta.get("trade_trigger_eligible", False)),
-        requires_stronger_evidence=bool(meta.get("requires_stronger_evidence", False)),
+        tier=str(authored_governance.get("tier", meta.get("tier", ""))).strip(),
+        operational_role=str(authored_governance.get("operational_role", meta.get("operational_role", ""))).strip(),
+        deployment_disposition=str(
+            authored_governance.get("deployment_disposition", meta.get("deployment_disposition", ""))
+        ).strip(),
+        evidence_mode=str(authored_governance.get("evidence_mode", meta.get("evidence_mode", ""))).strip(),
+        overlap_group_id=str(overlap_group_id or authored_governance.get("overlap_group_id", "")).strip(),
+        trade_trigger_eligible=bool(
+            authored_governance.get("trade_trigger_eligible", meta.get("trade_trigger_eligible", False))
+        ),
+        requires_stronger_evidence=bool(
+            authored_governance.get("requires_stronger_evidence", meta.get("requires_stronger_evidence", False))
+        ),
     )
 
 
@@ -633,6 +668,19 @@ def _build_thesis(
         metadata if isinstance(metadata, Mapping) else {},
         promoted_row,
     )
+    metadata_mapping = metadata if isinstance(metadata, Mapping) else {}
+    explicit_contract_shape = bool(
+        metadata_mapping.get("event_contract_ids")
+        or metadata_mapping.get("episode_ids")
+        or metadata_mapping.get("episodes")
+        or str(metadata_mapping.get("source_type", "")).strip()
+    )
+    if authored_def is None and not explicit_contract_shape:
+        authored_def = _fallback_authored_definition_for_event(
+            bundle.get("event_type", ""),
+            bundle.get("event_family", ""),
+            promoted_row.get("event_type", ""),
+        )
     symbol = str(sample.get("symbol", "") or promoted_row.get("symbol", "")).strip().upper()
     timeframe = _timeframe_from_minutes(split.get("bar_duration_minutes", 0))
     event_family = str(bundle.get("event_family", "") or bundle.get("event_type", "")).strip()
@@ -674,7 +722,11 @@ def _build_thesis(
         status=status,
         symbol_scope=_coerce_symbol_scope(symbol, blueprint),
         timeframe=str(getattr(authored_def, "timeframe", "")).strip() or timeframe,
-        primary_event_id=str(getattr(authored_def, "event_family", "")).strip() or event_family,
+        primary_event_id=(
+            str(getattr(authored_def, "primary_event_id", "")).strip()
+            or str((event_contract_ids or [event_id or event_family])[:1][0]).strip()
+            or event_family
+        ),
         event_family=str(getattr(authored_def, "event_family", "")).strip() or event_family,
         canonical_regime=(
             str(
@@ -736,7 +788,15 @@ def _build_thesis(
     )
     overlap_group_id = overlap_group_id_for_thesis(thesis)
     thesis = thesis.model_copy(
-        update={"governance": _build_governance(bundle, promoted_row, overlap_group_id=overlap_group_id)}
+        update={
+            "governance": _build_governance(
+                bundle,
+                promoted_row,
+                overlap_group_id=overlap_group_id,
+                authored_def=authored_def,
+                primary_event_id=thesis.primary_event_id,
+            )
+        }
     )
     return thesis
 

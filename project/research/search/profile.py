@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any, Dict
 
 
-DEFAULT_SEARCH_SPEC = "full"
+DEFAULT_SEARCH_SPEC = "spec/search_space.yaml"
 DEFAULT_SEARCH_MIN_N = 30
 DEFAULT_MIN_T_STAT = 1.5
 
@@ -23,7 +23,7 @@ def resolve_search_profile(
     )
 
     if profile == "synthetic":
-        if resolved_search_spec in {"", DEFAULT_SEARCH_SPEC, "spec/search_space.yaml"}:
+        if resolved_search_spec in {"", DEFAULT_SEARCH_SPEC, "spec/search_space.yaml", "search_space.yaml"}:
             resolved_search_spec = "synthetic_truth"
         if resolved_min_n >= DEFAULT_SEARCH_MIN_N:
             resolved_min_n = 8

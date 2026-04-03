@@ -290,6 +290,7 @@ class HypothesisSpec:
     template_id: str
     context: Optional[Dict[str, str]] = field(default=None)
     feature_condition: Optional[TriggerSpec] = field(default=None)
+    filter_template_id: Optional[str] = field(default=None)
     entry_lag: int = 1
     cost_profile: str = "standard"
     objective_profile: str = "mean_return"
@@ -306,6 +307,8 @@ class HypothesisSpec:
         else:
             object.__setattr__(self, "context", {k: v for k, v in sorted(self.context.items())})
         object.__setattr__(self, "direction", self.direction.lower().strip())
+        if self.filter_template_id is not None:
+            object.__setattr__(self, "filter_template_id", str(self.filter_template_id).strip())
         self.trigger.validate()
         if self.feature_condition:
             self.feature_condition.validate()
@@ -328,6 +331,8 @@ class HypothesisSpec:
             d["context"] = {k: v for k, v in sorted(self.context.items())}
         if self.feature_condition is not None:
             d["feature_condition"] = self.feature_condition.to_dict()
+        if self.filter_template_id:
+            d["filter_template_id"] = self.filter_template_id
         return d
 
     def hypothesis_id(self) -> str:
@@ -342,6 +347,8 @@ class HypothesisSpec:
         parts = [self.trigger.label(), self.direction, self.horizon, self.template_id]
         if self.context:
             parts.append(f"[{','.join(f'{k}={v}' for k, v in sorted(self.context.items()))}]")
+        if self.filter_template_id:
+            parts.append(f"filter={self.filter_template_id}")
         return "|".join(parts)
 
     @classmethod
@@ -355,6 +362,7 @@ class HypothesisSpec:
             template_id=d["template_id"],
             context=d.get("context"),
             feature_condition=fc,
+            filter_template_id=d.get("filter_template_id"),
             entry_lag=d.get("entry_lag", 1),
             cost_profile=d.get("cost_profile", "standard"),
             objective_profile=d.get("objective_profile", "mean_return"),

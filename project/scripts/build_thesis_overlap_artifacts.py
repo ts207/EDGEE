@@ -9,12 +9,14 @@ DOCS = Path("docs/generated")
 
 
 def main() -> None:
+    run_id = "thesis_overlap_artifacts"
     try:
         store = ThesisStore.latest()
         theses = store.all()
+        run_id = store.run_id or run_id
     except Exception:
         theses = []
-    write_thesis_overlap_artifacts(theses, DOCS)
+    write_thesis_overlap_artifacts(theses, DOCS, source_run_id=run_id)
 
 
 if __name__ == "__main__":

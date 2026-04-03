@@ -31,6 +31,7 @@ class CandidateHypothesis:
             "direction": self.spec.direction,
             "horizon": self.spec.horizon,
             "template_id": self.spec.template_id,
+            "filter_template_id": self.spec.filter_template_id,
             "entry_lag": int(self.spec.entry_lag),
             "entry_lag_bars": int(self.spec.entry_lag),
             "context": dict(self.spec.context or {}),

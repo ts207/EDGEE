@@ -16,18 +16,26 @@ ENABLE_CROSS_VENUE_SPOT_PIPELINE ?= 0
 CHANGED_BASE ?= origin/main
 CHANGED_HEAD ?= HEAD
 
-.PHONY: help run baseline discover-blueprints discover-edges discover-edges-from-raw discover-hybrid golden-workflow golden-certification test test-fast lint format format-check style compile clean clean-runtime clean-all-data clean-repo debloat check-hygiene clean-hygiene governance pre-commit bench-pipeline benchmark-m0 minimum-green-gate benchmark-maintenance-smoke benchmark-maintenance
+.PHONY: help discover package validate review run baseline discover-blueprints discover-edges discover-edges-from-raw discover-hybrid golden-workflow golden-certification test test-fast lint format format-check style compile clean clean-runtime clean-all-data clean-repo debloat check-hygiene clean-hygiene governance pre-commit bench-pipeline benchmark-m0 minimum-green-gate benchmark-maintenance-smoke benchmark-maintenance
 
 help:
-	@echo "Primary Research Targets:"
+	@echo "Operator actions:"
+	@echo "  discover           - Canonical bounded research entry. Usage: make discover PROPOSAL=spec/proposals/demo_synthetic_fast.yaml DISCOVER_ACTION=preflight|plan|run"
+	@echo "  package            - Thesis bootstrap lane: seed inventory -> testing -> empirical -> evidence -> packaging -> overlap"
+	@echo "  validate           - Canonical validation surface: contracts + minimum green gate"
+	@echo "  review             - Post-run review. Usage: make review RUN_ID=<run_id> REVIEW_ACTION=diagnose|regime-report or make review REVIEW_ACTION=compare RUN_IDS=run_a,run_b"
+	@echo ""
+	@echo "Advanced workflow bundles:"
 	@echo "  discover-blueprints - Full research pipeline: Ingest -> Discovery -> Blueprints"
 	@echo "  discover-edges      - Phase 2 discovery for all events"
 	@echo "  discover-target     - Targeted discovery for specific symbols/events"
 	@echo "                        Usage: make discover-target SYMBOLS=BTCUSDT EVENT=VOL_SHOCK"
-	@echo "  run                - Ingest + Clean + Features (Preparation only)"
-	@echo "  baseline           - Full discovery + profitable strategy packaging"
-	@echo "  golden-workflow    - Canonical end-to-end smoke workflow"
+	@echo "  run                 - Ingest + Clean + Features (Preparation only)"
+	@echo "  baseline            - Full discovery + profitable strategy packaging"
+	@echo "  golden-workflow     - Canonical end-to-end smoke workflow"
 	@echo "  golden-certification - Golden workflow plus runtime certification manifest"
+	@echo ""
+	@echo "Maintenance and quality:"
 	@echo "  test-fast          - Run fast research test profile"
 	@echo "  lint               - Ruff lint on changed Python files"
 	@echo "  format-check       - Ruff formatter check on changed Python files"
@@ -77,6 +85,41 @@ minimum-green-gate:
 	PYTHONPATH=. $(PYTHON) project/scripts/run_golden_regression.py --run_id smoke_run
 	PYTHONPATH=. $(PYTHON) project/scripts/run_golden_workflow.py
 	@echo "Minimum green gate PASSED."
+
+
+DISCOVER_ACTION ?= plan
+REVIEW_ACTION ?= diagnose
+PROPOSAL ?=
+RUN_IDS ?=
+
+discover:
+	@if [ -z "$(PROPOSAL)" ]; then echo "Usage: make discover PROPOSAL=path/to/proposal.yaml DISCOVER_ACTION=preflight|plan|run"; exit 2; fi
+	@if [ "$(DISCOVER_ACTION)" != "preflight" ] && [ "$(DISCOVER_ACTION)" != "plan" ] && [ "$(DISCOVER_ACTION)" != "run" ]; then echo "DISCOVER_ACTION must be one of: preflight, plan, run"; exit 2; fi
+	PYTHONPATH=. $(PYTHON) -m project.cli operator $(DISCOVER_ACTION) --proposal $(PROPOSAL)
+
+package:
+	PYTHONPATH=. $(PYTHON) -m project.scripts.build_seed_bootstrap_artifacts
+	PYTHONPATH=. $(PYTHON) -m project.scripts.build_seed_testing_artifacts
+	PYTHONPATH=. $(PYTHON) -m project.scripts.build_seed_empirical_artifacts
+	PYTHONPATH=. $(PYTHON) -m project.scripts.build_founding_thesis_evidence
+	PYTHONPATH=. $(PYTHON) -m project.scripts.build_seed_packaging_artifacts
+	PYTHONPATH=. $(PYTHON) -m project.scripts.build_structural_confirmation_artifacts
+	PYTHONPATH=. $(PYTHON) -m project.scripts.build_thesis_overlap_artifacts
+	./project/scripts/regenerate_artifacts.sh
+
+validate:
+	PYTHONPATH=. $(PYTHON) -m project.scripts.run_researcher_verification --mode contracts
+	$(MAKE) minimum-green-gate
+
+review:
+	@if [ "$(REVIEW_ACTION)" = "compare" ]; then \
+		if [ -z "$(RUN_IDS)" ]; then echo "Usage: make review REVIEW_ACTION=compare RUN_IDS=run_a,run_b"; exit 2; fi; \
+		PYTHONPATH=. $(PYTHON) -m project.cli operator compare --run_ids $(RUN_IDS); \
+	else \
+		if [ -z "$(RUN_ID)" ]; then echo "Usage: make review RUN_ID=<run_id> REVIEW_ACTION=diagnose|regime-report"; exit 2; fi; \
+		if [ "$(REVIEW_ACTION)" != "diagnose" ] && [ "$(REVIEW_ACTION)" != "regime-report" ]; then echo "REVIEW_ACTION must be one of: diagnose, regime-report, compare"; exit 2; fi; \
+		PYTHONPATH=. $(PYTHON) -m project.cli operator $(REVIEW_ACTION) --run_id $(RUN_ID); \
+	fi
 TIMEFRAMES ?= 5m
 CONCEPT ?= 
 

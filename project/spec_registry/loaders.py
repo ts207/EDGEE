@@ -33,6 +33,9 @@ RUNTIME_SPEC_RELATIVE_PATHS: Dict[str, str] = {
     "hashing": "spec/runtime/hashing.yaml",
 }
 
+_STATE_GENERATED_FILENAMES = {"state_registry.yaml", "state_families.yaml"}
+_STATE_DEFAULTS_FILENAME = "state_defaults.yaml"
+
 
 def repo_root() -> Path:
     return REPO_ROOT
@@ -122,33 +125,18 @@ def load_regime_registry() -> Dict[str, Any]:
     return load_yaml_relative("spec/regimes/registry.yaml")
 
 
-@functools.lru_cache(maxsize=1)
-def load_state_family_registry() -> Dict[str, Any]:
-    return load_yaml_relative("spec/states/state_families.yaml")
-
-
 def _iter_state_spec_paths() -> Iterable[Path]:
     state_dir = SPEC_ROOT / "states"
-    excluded = {"state_registry.yaml", "state_families.yaml"}
     for path in sorted(state_dir.glob("*.yaml")):
-        if path.name in excluded:
+        if path.name in _STATE_GENERATED_FILENAMES:
             continue
         yield path
 
 
-@functools.lru_cache(maxsize=1)
-def load_state_registry() -> Dict[str, Any]:
-    family_payload = load_state_family_registry()
-    defaults = family_payload.get("defaults", {}) if isinstance(family_payload, dict) else {}
-    if not isinstance(defaults, dict):
-        defaults = {}
-    context_dimensions = (
-        family_payload.get("context_dimensions", {}) if isinstance(family_payload, dict) else {}
-    )
-    if not isinstance(context_dimensions, dict):
-        context_dimensions = {}
-    state_rows: list[Dict[str, Any]] = []
+def _iter_state_definition_rows() -> Iterable[tuple[Path, Dict[str, Any]]]:
     for path in _iter_state_spec_paths():
+        if path.name == _STATE_DEFAULTS_FILENAME:
+            continue
         row = _read_yaml(path, required=False)
         if not isinstance(row, dict):
             continue
@@ -159,21 +147,141 @@ def load_state_registry() -> Dict[str, Any]:
         normalized["state_id"] = state_id
         normalized.setdefault("version", 1)
         normalized.setdefault("kind", "state_definition")
-        state_rows.append(normalized)
+        yield path, normalized
+
+
+def _iter_context_dimension_rows() -> Iterable[tuple[Path, Dict[str, Any]]]:
+    for path in _iter_state_spec_paths():
+        if path.name == _STATE_DEFAULTS_FILENAME:
+            continue
+        row = _read_yaml(path, required=False)
+        if not isinstance(row, dict):
+            continue
+        state_name = str(row.get("state_name", row.get("dimension_id", ""))).strip()
+        if not state_name:
+            continue
+        mapping = row.get("mapping", {})
+        if not isinstance(mapping, dict) or not mapping:
+            continue
+        normalized_mapping = {
+            str(label).strip(): str(state_id).strip().upper()
+            for label, state_id in mapping.items()
+            if str(label).strip() and str(state_id).strip()
+        }
+        if not normalized_mapping:
+            continue
+        allowed_values = row.get("allowed_values", list(normalized_mapping.keys()))
+        if not isinstance(allowed_values, list):
+            allowed_values = list(normalized_mapping.keys())
+        normalized = {
+            "version": int(row.get("version", 1) or 1),
+            "kind": str(row.get("kind", "state_context_dimension")).strip() or "state_context_dimension",
+            "state_name": state_name,
+            "source_feature": str(row.get("source_feature", "")).strip(),
+            "allowed_values": [
+                str(item).strip() for item in allowed_values if str(item).strip()
+            ],
+            "mapping": normalized_mapping,
+        }
+        for key in ("acceptance_test_id", "canonical_metrics", "thresholds", "update_cadence", "description"):
+            value = row.get(key)
+            if value in (None, "", [], {}):
+                continue
+            normalized[key] = copy.deepcopy(value)
+        yield path, normalized
+
+
+def _load_state_defaults() -> Dict[str, Any]:
+    path = SPEC_ROOT / "states" / _STATE_DEFAULTS_FILENAME
+    payload = _read_yaml(path, required=False)
+    defaults = payload.get("defaults", payload) if isinstance(payload, dict) else {}
+    if not isinstance(defaults, dict):
+        defaults = {}
+    runtime = defaults.get("runtime", {})
+    if not isinstance(runtime, dict):
+        runtime = {}
+    normalized = copy.deepcopy(defaults)
+    normalized["state_scope"] = str(defaults.get("state_scope", "source_only")).strip() or "source_only"
+    normalized["min_events"] = int(defaults.get("min_events", 200) or 200)
+    normalized["runtime"] = {
+        "enabled": bool(runtime.get("enabled", True)),
+        "instrument_classes": [
+            str(item).strip() for item in runtime.get("instrument_classes", ["crypto"]) if str(item).strip()
+        ] or ["crypto"],
+        "tags": [str(item).strip() for item in runtime.get("tags", []) if str(item).strip()],
+    }
+    return normalized
+
+
+@functools.lru_cache(maxsize=1)
+def load_state_registry() -> Dict[str, Any]:
+    defaults = _load_state_defaults()
+    context_dimensions = {
+        str(row["state_name"]).strip(): {
+            "allowed_values": list(row["allowed_values"]),
+            "mapping": dict(row["mapping"]),
+        }
+        for _, row in _iter_context_dimension_rows()
+    }
+    state_rows = [row for _, row in _iter_state_definition_rows()]
     state_rows.sort(key=lambda row: str(row.get("state_id", "")).strip().upper())
     return {
         "version": 1,
         "kind": "state_registry",
         "metadata": {
             "status": "generated",
+            "generated_notice": "GENERATED FILE - DO NOT EDIT",
             "authored_sources": [
-                "spec/states/state_families.yaml",
                 "spec/states/*.yaml",
             ],
         },
         "defaults": copy.deepcopy(defaults),
         "context_dimensions": copy.deepcopy(context_dimensions),
         "states": state_rows,
+    }
+
+
+@functools.lru_cache(maxsize=1)
+def load_state_family_registry() -> Dict[str, Any]:
+    defaults = _load_state_defaults()
+    context_rows = [row for _, row in _iter_context_dimension_rows()]
+    context_rows.sort(key=lambda row: str(row.get("state_name", "")).strip())
+    context_dimensions = {
+        str(row["state_name"]).strip(): {
+            "allowed_values": list(row["allowed_values"]),
+            "mapping": dict(row["mapping"]),
+        }
+        for row in context_rows
+    }
+    family_rows: list[Dict[str, Any]] = []
+    for row in context_rows:
+        family_row: Dict[str, Any] = {
+            "name": str(row["state_name"]).strip(),
+            "allowed_values": list(row["allowed_values"]),
+        }
+        if row.get("source_feature"):
+            family_row["source_feature"] = str(row["source_feature"]).strip()
+        if row.get("canonical_metrics"):
+            family_row["canonical_metrics"] = copy.deepcopy(row["canonical_metrics"])
+        if row.get("thresholds"):
+            family_row["thresholds"] = copy.deepcopy(row["thresholds"])
+        if row.get("update_cadence"):
+            family_row["update_cadence"] = row["update_cadence"]
+        if row.get("acceptance_test_id"):
+            family_row["acceptance_test_id"] = row["acceptance_test_id"]
+        family_rows.append(family_row)
+    return {
+        "version": 1,
+        "kind": "state_family_registry",
+        "metadata": {
+            "status": "generated",
+            "generated_notice": "GENERATED FILE - DO NOT EDIT",
+            "authored_sources": ["spec/states/*.yaml"],
+            "read_model": True,
+        },
+        "defaults": copy.deepcopy(defaults),
+        "context_dimensions": copy.deepcopy(context_dimensions),
+        "state_families": family_rows,
     }
 
 

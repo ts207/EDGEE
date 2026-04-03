@@ -2,8 +2,8 @@ version: 1
 kind: state_registry
 metadata:
   status: generated
+  generated_notice: GENERATED FILE - DO NOT EDIT
   authored_sources:
-  - spec/states/state_families.yaml
   - spec/states/*.yaml
 defaults:
   state_scope: source_only
@@ -14,41 +14,13 @@ defaults:
     - crypto
     tags: []
 context_dimensions:
-  vol_regime:
-    allowed_values:
-    - low
-    - high
-    mapping:
-      high: HIGH_VOL_REGIME
-      low: LOW_VOL_REGIME
   carry_state:
     allowed_values:
-    - funding_pos
     - funding_neg
+    - funding_pos
     mapping:
-      funding_pos: FUNDING_POSITIVE
       funding_neg: FUNDING_NEGATIVE
-  ms_trend_state:
-    allowed_values:
-    - trend
-    - chop
-    mapping:
-      trend: TREND_ACTIVE
-      chop: CHOP_ACTIVE
-  ms_spread_state:
-    allowed_values:
-    - tight
-    - wide
-    mapping:
-      tight: SPREAD_TIGHT
-      wide: SPREAD_WIDE
-  liquidity_regime:
-    allowed_values:
-    - low
-    - refill
-    mapping:
-      low: LOW_LIQUIDITY_STATE
-      refill: REFILL_LAG_STATE
+      funding_pos: FUNDING_POSITIVE
   funding_regime:
     allowed_values:
     - crowded
@@ -56,6 +28,27 @@ context_dimensions:
     mapping:
       crowded: CROWDING_STATE
       normalizing: FUNDING_NORMALIZATION_STATE
+  liquidity_regime:
+    allowed_values:
+    - low
+    - refill
+    mapping:
+      low: LOW_LIQUIDITY_STATE
+      refill: REFILL_LAG_STATE
+  ms_spread_state:
+    allowed_values:
+    - tight
+    - wide
+    mapping:
+      tight: SPREAD_TIGHT
+      wide: SPREAD_WIDE
+  ms_trend_state:
+    allowed_values:
+    - trend
+    - chop
+    mapping:
+      trend: TREND_ACTIVE
+      chop: CHOP_ACTIVE
   trend_structure:
     allowed_values:
     - trend
@@ -63,6 +56,13 @@ context_dimensions:
     mapping:
       trend: TRENDING_STATE
       chop: CHOP_STATE
+  vol_regime:
+    allowed_values:
+    - low
+    - high
+    mapping:
+      low: LOW_VOL_REGIME
+      high: HIGH_VOL_REGIME
 states:
 - version: 1
   kind: state_definition

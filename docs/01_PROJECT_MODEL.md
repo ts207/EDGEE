@@ -1,146 +1,188 @@
-# Project Model
+# Project model
 
-This repository is built around explicit research and packaging objects. Most confusion comes from mixing them up.
+This document defines the stable mental model for the repository.
+
+## System overview
+
+Edge is a governed research-and-packaging system for event-driven crypto hypotheses.
+
+At a high level, it does five things:
+
+1. **defines domain contracts** for events, episodes, states, templates, regimes, and promotion rules
+2. **turns proposals into bounded experiment plans**
+3. **executes orchestrated pipeline stages** to produce candidate and promotion artifacts
+4. **packages surviving claims into promoted thesis objects**
+5. **serves packaged theses to live/runtime and portfolio logic**
+
+That makes the repo neither purely backtest-only nor purely live-only. It is a bridge from governed research to packaged runtime inputs.
 
 ## Core objects
 
+### Proposal
+
+A proposal is the operator-facing contract for bounded research.
+
+It specifies at least:
+
+- `program_id`
+- date window
+- symbol scope
+- timeframe
+- trigger space
+- template scope
+- horizon scope
+- direction scope
+- entry lag scope
+- objective and promotion profile
+
+The proposal contract lives in `project/research/agent_io/proposal_schema.py`.
+
+### Experiment plan
+
+A validated plan is the translated form of a proposal. It resolves:
+
+- required detectors
+- required features
+- required states
+- estimated hypothesis count
+- run-all overrides
+- boundedness warnings or blocks
+
+The translation path lives in `project/research/agent_io/proposal_to_experiment.py`.
+
 ### Event
 
-An event is a discrete trigger at a timestamp.
+An event is a discrete, timestamped trigger.
 
-Examples:
+Examples in the repo include:
 
 - `VOL_SHOCK`
-- `BASIS_DISLOC`
 - `LIQUIDATION_CASCADE`
+- `BASIS_DISLOC`
+- `LIQUIDITY_VACUUM`
 
-Question it answers:
-"What happened now?"
+Event specifications live primarily in `spec/events/` and the canonical registry surfaces.
 
 ### Episode
 
-An episode is a higher-order stateful sequence composed of one or more events with onset, persistence, and expiry semantics.
+An episode is a structured multi-step process built from one or more events.
 
-Examples:
+Episodes matter when the repo needs stateful semantics rather than single-bar semantics.
 
-- compression -> breakout
-- liquidity vacuum -> vol shock
-- dislocation -> repair
-
-Question it answers:
-"What multi-step process is unfolding, not just what happened on one bar?"
-
-### Family
-
-A family is the higher-level category an event or state belongs to. Families constrain compatible templates and organize search.
-
-Examples:
-
-- `VOLATILITY_TRANSITION`
-- `LIQUIDITY_DISLOCATION`
-- `TREND_STRUCTURE`
-
-Question it answers:
-"What class of phenomenon is this?"
+Episode contracts live in `spec/episodes/` and `project/episodes/`.
 
 ### Template
 
-A template is the hypothesis shape tested around a trigger.
+A template describes the shape of the claim being tested around a trigger.
 
-Examples:
+Typical examples are continuation- or reversal-style hypothesis shapes. Templates constrain how the search surface is expanded.
 
-- `mean_reversion`
-- `continuation`
-- `trend_continuation`
-- `only_if_regime`
+Template and search-limit data come from the registry layer under `project/configs/registries/`.
 
-Question it answers:
-"How are we trying to extract edge from this trigger?"
+### Candidate
 
-### State
+A candidate is the structured output of phase-2 search or downstream promotion filtering.
 
-A state is a market-condition label on bars.
+It is not yet a packaged runtime thesis. It is still a research output that must survive additional gates.
 
-Examples:
+### Promotion artifact
 
-- `TRENDING_STATE`
-- `CHOP_STATE`
-- `HIGH_VOL_REGIME`
-- `LOW_LIQUIDITY_STATE`
+Promotion artifacts record whether a candidate survives promotion-oriented rules such as:
 
-Question it answers:
-"What condition is the market in around the trigger?"
+- q-value constraints
+- sample quality
+- stability
+- sign consistency
+- cost survival
+- negative-control behavior
+- coverage and support checks
 
-### Regime
-
-Regime is used in two distinct ways in this repo:
-
-1. canonical grouping on an event row, such as `VOLATILITY_TRANSITION`
-2. composite evaluation buckets built from states, such as `high_vol.funding_pos.trend.wide`
-
-Question it answers:
-"Does this candidate survive across environments?"
+The canonical service ownership for promotion logic is in `project/research/services/promotion_service.py`.
 
 ### Thesis
 
-A thesis is the governed operational claim that downstream live and allocation systems consume.
+A thesis is a packaged object that downstream consumers can retrieve and reason over.
 
-A thesis binds together:
+A promoted thesis contains fields such as:
 
-- event or episode contracts
-- trigger requirements
-- optional confirmations
-- invalidation requirements
-- bounded horizon
-- expected path or direction
-- allowed/disallowed regimes
+- trigger clause
+- confirmation clause
+- context clause
+- invalidation clause
+- governance metadata
+- evidence summary
 - promotion class
 - deployment state
+- overlap metadata
 
-Question it answers:
-"What exactly are we willing to claim, package, retrieve, and potentially act on?"
+Packaged theses live under `data/live/theses/` and the contract lives in `project/live/contracts/promoted_thesis.py`.
 
-### Promotion class
+## Lifecycle model
 
-Promotion class is the repo’s maturity staging for theses.
+### Bounded discovery lifecycle
 
-Current classes:
+`proposal -> preflight -> plan -> run -> run manifest -> phase2 candidates -> promotion outputs -> diagnose/compare/regime report`
 
-- `candidate` — structured idea or queue entry, not yet tested enough
-- `tested` — bounded claim with testing artifacts, not yet packaged
-- `seed_promoted` — packaged and usable for monitor-only / bootstrap surfaces
-- `paper_promoted` — packaged and eligible for paper-style live retrieval
-- `production_promoted` — rare, highest bar
+This lifecycle is for answering a bounded question.
 
-Question it answers:
-"How much evidence and operational trust does this thesis have?"
+### Thesis packaging lifecycle
 
-### Overlap group
+`candidate -> tested -> seed_promoted -> paper_promoted -> production_promoted`
 
-An overlap group is the allocator-facing cluster of theses that share enough mechanism, event structure, episode structure, or invalidation logic that they should not be treated as independent.
+This lifecycle is for making a claim reusable by live/runtime systems.
 
-Question it answers:
-"Which packaged theses are too similar to size as if they were unrelated?"
+## Subsystem roles
 
-## Example: `VOL_SHOCK`
+### Specs and registries
 
-`VOL_SHOCK` is a good anchor example.
+These surfaces define what the repo is allowed to talk about.
 
-- object type: event
-- family: `VOLATILITY_TRANSITION`
-- detector meaning: realized-volatility shock onset
-- later tested with templates like `mean_reversion`, `continuation`, `only_if_regime`
-- evaluated across state-derived regime buckets
-- can also appear inside a packaged thesis such as a standalone `VOL_SHOCK` thesis or a confirmation-aware thesis like `VOL_SHOCK_LIQUIDITY_CONFIRM`
+- `spec/` — domain specs and authored policies
+- `project/configs/registries/` — runtime-friendly registry inputs for events, states, templates, detectors, and search limits
+- `project/domain/` and `project/spec_registry/` — compiled/domain views of those specs
 
-So `VOL_SHOCK` is not a family and not a thesis. It is one contract input that can later support one or more theses.
+### Pipelines
 
-## Practical distinction
+These surfaces coordinate data preparation and stage execution.
 
-Do not confuse these layers:
+- `project/pipelines/` — orchestration, stage planning, execution, provenance, wrappers
+- `project/contracts/pipeline_registry.py` — stage-family and artifact contracts
 
-- event detection answers **what happened**
-- proposal/run artifacts answer **what was tested**
-- evidence bundles answer **how much support exists**
-- packaged theses answer **what downstream systems are allowed to retrieve**
-- overlap graph answers **which packaged theses are structurally related**
+### Research
+
+These surfaces own search, evaluation, promotion, reporting, knowledge, and packaging.
+
+- `project/research/`
+- `project/research/services/`
+- `project/research/agent_io/`
+
+### Live/runtime
+
+These surfaces consume packaged theses and current context.
+
+- `project/live/`
+- `project/portfolio/`
+- `project/engine/`
+
+## Current canonical surfaces
+
+The repo has many modules, but only a small set should anchor your mental model.
+
+Primary surfaces:
+
+- `project.cli`
+- `project.pipelines.run_all`
+- `project.contracts.pipeline_registry`
+- `project.research.services.*`
+- `project.research.agent_io.*`
+- `project.live.*`
+
+Generated inventory for those surfaces exists in `docs/generated/system_map.md`.
+
+## Design constraints that shape the docs
+
+- Proposals bound the search surface before execution.
+- Services own policy; wrappers should stay thin.
+- Packaged theses are the runtime contract, not raw candidate rows.
+- Quality is multi-stage; statistical survival alone is not enough.
+- Generated inventories are important, but they are not the teaching surface.

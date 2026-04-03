@@ -1,172 +1,157 @@
 # Edge
 
-Edge is a governed event-driven crypto research platform.
+Edge is a proposal-driven crypto research and packaging repository.
 
-The repository now supports the full path from:
+The repo is built to move a bounded claim through a governed path:
 
-`event contract -> bounded experiment -> evidence bundle -> promoted thesis -> thesis store -> overlap-aware live/runtime input`
+`proposal -> validated experiment plan -> artifacted run -> candidate filtering -> promotion decision -> packaged thesis -> live/runtime consumption`
 
-The operating unit is still a bounded hypothesis, but the downstream output is no longer just a candidate row. The repo now carries:
+This is not a loose notebook workspace. The default operating unit is a **bounded proposal** with explicit trigger scope, template scope, horizons, directions, contexts, and promotion intent.
 
-- an authoritative event contract and maturity layer
-- a canonical campaign contract
-- episode contracts and episode registry support
-- staged thesis promotion classes (`candidate`, `tested`, `seed_promoted`, `paper_promoted`, `production_promoted`)
-- a canonical thesis store under `data/live/theses/`
-- overlap-aware portfolio artifacts generated from packaged theses
+## What the repository actually does
 
-## Current Repo Model
+The codebase has four operator-facing actions:
 
-Use this mental model first:
+1. `discover` — translate a proposal, validate it, and run a bounded research slice
+2. `package` — build or refresh the thesis bootstrap lane and packaged thesis store
+3. `validate` — run contract, governance, and minimum green gate checks
+4. `review` — diagnose a run, compare runs, or inspect regime stability
 
-1. **Event contracts** define what happened and whether it is trigger-, confirm-, context-, or research-only material.
-2. **Bounded proposals** test a single regime/mechanism slice.
-3. **Evidence bundles** decide whether a thesis is still only exploratory, seed-promotable, paper-promotable, or not promotable.
-4. **Promoted theses** are the canonical live-consumable objects.
-5. **Overlap graphs** and live retrieval consume packaged theses, not raw event rows.
+Behind those actions are three connected layers:
 
-## Pipeline
+- **pipeline orchestration** in `project/pipelines/`
+- **research and promotion logic** in `project/research/`
+- **live/runtime consumption** in `project/live/` and `project/portfolio/`
 
-The end-to-end orchestrator is `project/pipelines/run_all.py`.
+## Fastest correct mental model
 
-At a high level the run flow is defined in `project/pipelines/stages/`:
+Use this sequence when reading the repo:
 
-1. `ingest` & `core`
-   - build cleaned bars
-   - build features & market context
-   - validate missing data & integrity
-2. `runtime_invariants`
-   - materializes replay stream
-   - causal lane ticks & replay validation
-3. `research`
-   - phase1 event analysis & correlation
-   - phase2 search engine / hypothesis generation
-   - edge candidate export & naive entry evaluation
-   - promote candidates & negative controls
-   - memory update & registry management
-   - expectancy trappedness checklist
-4. `evaluation`
-   - strategy blueprint compilation
-   - strategy candidate packaging
-   - profitable strategy selection
+1. **Specs define the allowed domain.**
+   `spec/` holds event, episode, regime, promotion, runtime, and search specifications.
+2. **A proposal narrows the search surface.**
+   `project/research/agent_io/proposal_schema.py` defines the proposal contract.
+3. **The operator path turns the proposal into a validated plan.**
+   `edge operator preflight|plan|run` is the canonical entry.
+4. **`run_all` orchestrates the underlying stages.**
+   `project/pipelines/run_all.py` coordinates ingest, core, research, runtime-invariant, and evaluation stages.
+5. **Research services produce candidate and promotion artifacts.**
+   `project/research/services/` is the canonical service layer.
+6. **Packaging creates promoted theses.**
+   `data/live/theses/` is the packaged thesis store consumed by live/runtime code.
+7. **The live layer consumes packaged theses, not raw notes.**
+   `project/live/` and `project/portfolio/` work from packaged thesis objects and overlap metadata.
 
-The source of truth for stage families and artifact contracts is `project/contracts/pipeline_registry.py`.
+## Preferred front door
 
-## Repo Layout
-
-There are three different configuration layers:
-
-- `spec/` — YAML domain specs: events, episodes, campaigns, promotion policies, ontology, grammar, proposals
-- `project/configs/` — runnable workflow configs, live configs, synthetic suites, registry defaults, retail profiles
-- `project/` — Python implementation
-
-High-value code surfaces:
-
-- `project/events/` — detectors, families, registries, ontology helpers
-- `project/episodes/` — episode registry and episode contract loaders
-- `project/research/` — proposal I/O, discovery, promotion, diagnostics, knowledge memory, thesis bootstrap, packaging
-- `project/live/` — thesis retrieval, context building, decisioning, attribution, OMS integration
-- `project/portfolio/` and `project/engine/` — overlap-aware risk allocation and budget controls
-- `project/scripts/` — maintained artifact builders and bootstrap utilities
-- `project/tests/` — architecture, smoke, contracts, regressions, replay, runtime, docs, domain, strategy, synthetic truth
-
-## Operator surface
-
-Treat the repo as four actions:
-
-1. `discover`
-2. `package`
-3. `validate`
-4. `review`
-
-Preferred front door:
-
-- `edge operator preflight --proposal <proposal.yaml>`
-- `edge operator plan --proposal <proposal.yaml>`
-- `edge operator run --proposal <proposal.yaml>`
-- `edge operator diagnose --run_id <run_id>`
-- `edge operator regime-report --run_id <run_id>`
-- `edge operator compare --run_ids <baseline_run,followup_run>`
-
-Use broad `make` targets and direct `run_all` entrypoints only when you already know the exact bounded slice or need workflow maintenance.
-
-## Thesis Bootstrap Surface
-
-When the thesis store is empty or sparse, use the thesis bootstrap scripts instead of trying to jump directly to live deployment:
+Use these surfaces first:
 
 ```bash
-python -m project.scripts.build_seed_bootstrap_artifacts
-python -m project.scripts.build_seed_testing_artifacts
-python -m project.scripts.build_seed_empirical_artifacts
-python -m project.scripts.build_founding_thesis_evidence
-python -m project.scripts.build_seed_packaging_artifacts
-python -m project.scripts.build_structural_confirmation_artifacts
-python -m project.scripts.build_thesis_overlap_artifacts
-./project/scripts/regenerate_artifacts.sh
+make discover PROPOSAL=<proposal.yaml> DISCOVER_ACTION=preflight|plan|run
+make package
+make validate
+make review RUN_ID=<run_id> REVIEW_ACTION=diagnose|regime-report
+make review REVIEW_ACTION=compare RUN_IDS=<baseline_run,followup_run>
 ```
 
-These surfaces produce the founding thesis queue, testing scorecards, empirical summaries, canonical thesis store, seed thesis cards, and overlap graph.
+Direct CLI equivalents:
 
-## Quality Model
+```bash
+edge operator preflight --proposal <proposal.yaml>
+edge operator plan --proposal <proposal.yaml>
+edge operator run --proposal <proposal.yaml>
+edge operator diagnose --run_id <run_id>
+edge operator regime-report --run_id <run_id>
+edge operator compare --run_ids <run_a,run_b>
+```
 
-A run or thesis is only trustworthy when:
+Use `run_all`, stage scripts, and packaging scripts directly only when you intentionally need advanced control.
 
-- manifests reconcile
-- artifacts exist and validate
-- costs are accounted for
-- promotion evidence is explicit
-- drift checks stay within tolerance
-- replay / determinism expectations remain intact
-- thesis packaging lineage is visible
-- promotion class and deployment state are not conflated
+## Current repo shape
 
-Exit status alone is not sufficient.
+High-value top-level areas:
 
-## Generated Artifacts
+- `project/` — Python implementation
+- `spec/` — authored domain, search, runtime, and promotion specs
+- `docs/` — canonical human docs, generated inventories, and maintenance references
+- `data/` — lake, reports, live thesis store, and runtime artifacts
+- `deploy/` — systemd and env examples for live engine surfaces
+- `agents/` — analyst/compiler/coordinator playbooks
+- `plugins/` — repo-local plugin surfaces and helper wrappers
 
-Do not treat hand-authored docs as live inventory.
+Largest implementation surfaces in this snapshot:
 
-Use `docs/generated/` for current generated surfaces, especially:
+- `project/research/` — research, search, promotion, reporting, knowledge, packaging
+- `project/pipelines/` — orchestration, stage planning, ingestion, features, runtime invariants
+- `project/events/` — event contracts, canonicalization, registries, detectors, ontology helpers
+- `project/live/` — thesis retrieval, context building, scoring, OMS, policy, replay
+- `project/tests/` — architecture, contracts, runtime, research, pipeline, strategy, docs, specs
 
-- `event_contract_completeness.{md,json}`
-- `event_tiers.md`
-- `promotion_seed_inventory.{md,csv}`
-- `thesis_testing_scorecards.{csv,json}`
-- `thesis_empirical_scorecards.{csv,json}`
-- `seed_thesis_catalog.md`
-- `seed_thesis_packaging_summary.{md,json}`
-- `thesis_overlap_graph.{md,json}`
-- `founding_thesis_evidence_summary.{md,json}`
-- `structural_confirmation_summary.{md,json}`
+## Canonical documents
 
-## Canonical operator flow
+Read these in order:
 
-- `edge operator preflight --proposal <proposal.yaml>`
-- `edge operator plan --proposal <proposal.yaml>`
-- `edge operator run --proposal <proposal.yaml>`
-- `edge operator diagnose --run_id <run_id>`
-- `edge operator regime-report --run_id <run_id>`
-- `edge operator compare --run_ids <baseline_run,followup_run>`
+1. [docs/00_START_HERE.md](docs/00_START_HERE.md)
+2. [docs/01_PROJECT_MODEL.md](docs/01_PROJECT_MODEL.md)
+3. [docs/02_REPOSITORY_MAP.md](docs/02_REPOSITORY_MAP.md)
+4. [docs/03_OPERATOR_WORKFLOW.md](docs/03_OPERATOR_WORKFLOW.md)
+5. [docs/04_COMMANDS_AND_ENTRY_POINTS.md](docs/04_COMMANDS_AND_ENTRY_POINTS.md)
+6. [docs/05_ARTIFACTS_AND_INTERPRETATION.md](docs/05_ARTIFACTS_AND_INTERPRETATION.md)
+7. [docs/06_QUALITY_GATES_AND_PROMOTION.md](docs/06_QUALITY_GATES_AND_PROMOTION.md)
+8. [docs/09_THESIS_BOOTSTRAP_AND_PROMOTION.md](docs/09_THESIS_BOOTSTRAP_AND_PROMOTION.md)
+9. [docs/11_LIVE_THESIS_STORE_AND_OVERLAP.md](docs/11_LIVE_THESIS_STORE_AND_OVERLAP.md)
+10. [docs/10_APPS_PLUGINS_AND_AGENTS.md](docs/10_APPS_PLUGINS_AND_AGENTS.md)
 
-Use the bootstrap scripts only when you are moving from tested claims into canonical thesis objects.
+Use [docs/README.md](docs/README.md) as the full index.
 
-## Documentation
+## Generated inventory versus narrative docs
 
-- [docs/README.md](docs/README.md) — full doc index
-- [docs/00_START_HERE.md](docs/00_START_HERE.md) — shortest canonical repo entry
-- [docs/03_OPERATOR_WORKFLOW.md](docs/03_OPERATOR_WORKFLOW.md) — canonical research loop + thesis bootstrap lane
-- [docs/04_COMMANDS_AND_ENTRY_POINTS.md](docs/04_COMMANDS_AND_ENTRY_POINTS.md) — command reference
-- [docs/06_QUALITY_GATES_AND_PROMOTION.md](docs/06_QUALITY_GATES_AND_PROMOTION.md) — gate policy + promotion classes
-- [docs/09_THESIS_BOOTSTRAP_AND_PROMOTION.md](docs/09_THESIS_BOOTSTRAP_AND_PROMOTION.md) — founding thesis workflow
-- [docs/11_LIVE_THESIS_STORE_AND_OVERLAP.md](docs/11_LIVE_THESIS_STORE_AND_OVERLAP.md) — packaged thesis store + overlap graph
-- [docs/AGENT_CONTRACT.md](docs/AGENT_CONTRACT.md) — agent operating contract
+The repo contains two different doc classes:
 
-## Fast synthetic demo
+- **narrative docs** in `docs/*.md` that explain structure, workflow, and operating rules
+- **generated docs** in `docs/generated/` that reflect current inventory or current artifact state
 
-This repository includes a proposal-driven synthetic demo path that does not require a populated `data/lake/` checkout.
+Do not confuse them.
 
-- Proposal spec: `spec/proposals/demo_synthetic_fast.yaml`
-- Direct command: `python -m project.scripts.run_demo_synthetic_proposal --plan_only 1`
-- Make target: `make synthetic-demo`
+Narrative docs answer: *how the system works and how to use it correctly.*
+Generated docs answer: *what the current repo or artifact state looks like right now.*
 
-Synthetic proposals can now carry explicit pipeline overlays through `config_overlays`, plus `discovery_profile`, `phase2_gate_profile`, and `search_spec`, so synthetic routing is selected by configuration rather than by filename or description alone.
+Important generated docs already present in this snapshot include:
+
+- `docs/generated/system_map.md`
+- `docs/generated/event_contract_reference.md`
+- `docs/generated/promotion_seed_inventory.md`
+- `docs/generated/thesis_empirical_summary.md`
+- `docs/generated/seed_thesis_catalog.md`
+- `docs/generated/seed_thesis_packaging_summary.md`
+- `docs/generated/thesis_overlap_graph.md`
+- `docs/generated/founding_thesis_evidence_summary.md`
+- `docs/generated/structural_confirmation_summary.md`
+- `docs/generated/shadow_live_thesis_summary.md`
+
+## Synthetic demo
+
+This snapshot now includes a proposal example at:
+
+- `spec/proposals/demo_synthetic_fast.yaml`
+
+Use it with:
+
+```bash
+make synthetic-demo
+```
+
+or:
+
+```bash
+python -m project.scripts.run_demo_synthetic_proposal --plan_only 1
+```
+
+## Ground rules
+
+- Learn the operator path before low-level scripts.
+- Treat proposals and packaged theses as first-class contracts.
+- Prefer canonical service and CLI surfaces over compatibility wrappers.
+- Do not treat exit status alone as proof that a run is good.
+- Do not treat `seed_promoted` as equivalent to production readiness.
+- Do not treat generated markdown as a substitute for understanding the code path that produced it.

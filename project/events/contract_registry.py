@@ -409,6 +409,10 @@ def _merged_row(event_type: str) -> dict[str, Any]:
     row.setdefault("asset_scope", event_def.asset_scope)
     row.setdefault("venue_scope", event_def.venue_scope)
     row.setdefault("notes", event_def.notes)
+    row.setdefault("tier", event_def.tier)
+    row.setdefault("operational_role", event_def.operational_role)
+    row.setdefault("deployment_disposition", event_def.deployment_disposition)
+    row.setdefault("runtime_category", event_def.runtime_category)
     return row
 
 

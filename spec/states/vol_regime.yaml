@@ -1,7 +1,17 @@
+version: 1
+kind: state_context_dimension
 state_name: vol_regime
 source_feature: rv_percentile_24h
+allowed_values:
+  - low
+  - high
 mapping:
-  low: [0.0, 0.33]
-  mid: [0.33, 0.66]
-  high: [0.66, 1.0]
+  low: LOW_VOL_REGIME
+  high: HIGH_VOL_REGIME
+canonical_metrics:
+  - rv_percentile_24h
+thresholds:
+  - 0.33
+  - 0.66
+update_cadence: 1h
 acceptance_test_id: VOL_REG_STABILITY_V1

@@ -193,7 +193,9 @@ def _validate_instrument_compatibility(
         if event_id not in allowed_events:
             continue  # Let _validate_event_trigger handle it
         event_meta = allowed_events.get(event_id, {})
-        event_ics = event_meta.get("instrument_classes", [])
+        event_ics = [str(ic).strip() for ic in event_meta.get("instrument_classes", []) if str(ic).strip()]
+        if not event_ics:
+            continue
         for ic in requested_ics:
             if ic not in event_ics:
                 raise ValueError(f"Event '{event_id}' is not allowed for instrument class '{ic}'.")
@@ -204,7 +206,9 @@ def _validate_instrument_compatibility(
         if state_id not in allowed_states:
             continue  # Let _validate_state_trigger handle it
         state_meta = allowed_states.get(state_id, {})
-        state_ics = state_meta.get("instrument_classes", [])
+        state_ics = [str(ic).strip() for ic in state_meta.get("instrument_classes", []) if str(ic).strip()]
+        if not state_ics:
+            continue
         for ic in requested_ics:
             if ic not in state_ics:
                 raise ValueError(f"State '{state_id}' is not allowed for instrument class '{ic}'.")

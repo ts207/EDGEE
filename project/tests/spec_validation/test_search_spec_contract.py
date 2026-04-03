@@ -13,7 +13,7 @@ def test_validate_search_spec_accepts_supported_optional_fields() -> None:
         {
             "kind": "search_spec",
             "triggers": {"events": ["VOL_SHOCK"]},
-            "templates": ["continuation"],
+            "expression_templates": ["continuation"],
             "horizons": ["15m"],
             "directions": ["long"],
             "entry_lag": 1,
@@ -30,7 +30,7 @@ def test_validate_search_spec_rejects_unsupported_cost_profiles() -> None:
             {
                 "kind": "search_spec",
                 "triggers": {"events": ["VOL_SHOCK"]},
-                "templates": ["continuation"],
+                "expression_templates": ["continuation"],
                 "horizons": ["15m"],
                 "directions": ["long"],
                 "entry_lag": 1,
@@ -46,7 +46,7 @@ def test_validate_search_spec_rejects_zero_entry_lag() -> None:
             {
                 "kind": "search_spec",
                 "triggers": {"events": ["VOL_SHOCK"]},
-                "templates": ["continuation"],
+                "expression_templates": ["continuation"],
                 "horizons": ["15m"],
                 "directions": ["long"],
                 "entry_lag": 0,
@@ -56,12 +56,12 @@ def test_validate_search_spec_rejects_zero_entry_lag() -> None:
 
 
 def test_validate_search_spec_rejects_filter_templates_as_top_level_hypothesis_templates() -> None:
-    with pytest.raises(ValueError, match="filter templates belong in filter-template expansion"):
+    with pytest.raises(ValueError, match="filter templates belong in .*top-level templates"):
         validate_search_spec_doc(
             {
                 "kind": "search_spec",
                 "triggers": {"events": ["VOL_SHOCK"]},
-                "templates": ["only_if_regime"],
+                "expression_templates": ["only_if_regime"],
                 "horizons": ["15m"],
                 "directions": ["long"],
                 "entry_lag": 1,
@@ -80,7 +80,7 @@ def test_spec_validation_cli_checks_real_search_specs(tmp_path: Path, monkeypatc
                 "triggers:",
                 "  events:",
                 "    - VOL_SHOCK",
-                "templates: [continuation]",
+                "expression_templates: [continuation]",
                 "horizons: [15m]",
                 "directions: [long]",
                 "entry_lag: 1",
@@ -97,7 +97,7 @@ def test_spec_validation_cli_checks_real_search_specs(tmp_path: Path, monkeypatc
                 "triggers:",
                 "  events:",
                 "    - VOL_SHOCK",
-                "templates: [continuation]",
+                "expression_templates: [continuation]",
                 "horizons: [15m]",
                 "directions: [long]",
                 "entry_lag: 0",
@@ -110,3 +110,19 @@ def test_spec_validation_cli_checks_real_search_specs(tmp_path: Path, monkeypatc
     monkeypatch.setattr("project.spec_validation.cli.SEARCH_DIR", search_dir)
 
     assert run_all_validations() == 1
+
+
+
+def test_validate_search_spec_accepts_optional_filter_templates() -> None:
+    validate_search_spec_doc(
+        {
+            "kind": "search_spec",
+            "triggers": {"events": ["VOL_SHOCK"]},
+            "expression_templates": ["continuation"],
+            "filter_templates": ["only_if_regime"],
+            "horizons": ["15m"],
+            "directions": ["long"],
+            "entry_lag": 1,
+        },
+        source="inline_search_spec",
+    )

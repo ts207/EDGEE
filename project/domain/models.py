@@ -140,13 +140,13 @@ class ThesisDefinition:
 
 @dataclass(frozen=True)
 class DomainRegistry:
-    unified_payload: Dict[str, Any]
-    event_definitions: Dict[str, EventDefinition]
-    state_definitions: Dict[str, StateDefinition]
-    template_operator_definitions: Dict[str, TemplateOperatorDefinition]
-    regime_definitions: Dict[str, RegimeDefinition]
-    gates_spec: Dict[str, Any]
-    unified_registry_path: str
+    unified_payload: Dict[str, Any] = field(default_factory=dict)
+    event_definitions: Dict[str, EventDefinition] = field(default_factory=dict)
+    state_definitions: Dict[str, StateDefinition] = field(default_factory=dict)
+    template_operator_definitions: Dict[str, TemplateOperatorDefinition] = field(default_factory=dict)
+    regime_definitions: Dict[str, RegimeDefinition] = field(default_factory=dict)
+    gates_spec: Dict[str, Any] = field(default_factory=dict)
+    unified_registry_path: str = ""
     template_registry_payload: Dict[str, Any] = field(default_factory=dict)
     family_registry_payload: Dict[str, Any] = field(default_factory=dict)
     thesis_definitions: Dict[str, ThesisDefinition] = field(default_factory=dict)
@@ -189,12 +189,14 @@ class DomainRegistry:
     def is_filter_template(self, template_id: str) -> bool:
         return self.template_kind(template_id) == "filter_template"
 
+    def is_expression_template(self, template_id: str) -> bool:
+        return self.template_kind(template_id) in {"", "expression_template"}
+
     def is_execution_template(self, template_id: str) -> bool:
         return self.template_kind(template_id) == "execution_template"
 
     def is_hypothesis_template(self, template_id: str) -> bool:
-        kind = self.template_kind(template_id)
-        return kind in {"", "execution_template", "expression_template"}
+        return self.is_expression_template(template_id)
 
     def has_regime(self, canonical_regime: str) -> bool:
         return str(canonical_regime).strip().upper() in self.regime_definitions
@@ -458,15 +460,31 @@ class DomainRegistry:
             if self.is_hypothesis_template(template_id)
         )
 
+    def default_expression_templates(self) -> tuple[str, ...]:
+        return self.default_hypothesis_templates()
+
     def family_filter_templates(self, family_name: str) -> tuple[Dict[str, Any], ...]:
         allowed = set(self.family_templates(family_name))
+        registry_filters = self.template_registry_payload.get("filter_templates", {})
+        if not isinstance(registry_filters, Mapping) or not registry_filters:
+            try:
+                from project.spec_registry import load_template_registry
+
+                canonical_registry = load_template_registry()
+                fallback_filters = canonical_registry.get("filter_templates", {}) if isinstance(canonical_registry, Mapping) else {}
+                registry_filters = fallback_filters if isinstance(fallback_filters, Mapping) else {}
+            except Exception:
+                registry_filters = {}
         out: list[Dict[str, Any]] = []
         for name in sorted(allowed):
             operator = self.get_operator(name)
             if operator is None or operator.template_kind != "filter_template":
                 continue
             cond = operator.raw if isinstance(operator.raw, dict) else {}
-            if isinstance(cond, Mapping):
+            if not isinstance(cond, Mapping) or not {"feature", "operator", "threshold"}.issubset(cond.keys()):
+                sidecar_cond = registry_filters.get(str(name), {}) if isinstance(registry_filters, Mapping) else {}
+                cond = sidecar_cond if isinstance(sidecar_cond, Mapping) else cond
+            if isinstance(cond, Mapping) and {"feature", "operator", "threshold"}.issubset(cond.keys()):
                 out.append(
                     {
                         "name": str(name),
@@ -477,8 +495,14 @@ class DomainRegistry:
                 )
         return tuple(out)
 
-    def family_execution_templates(self, family_name: str) -> tuple[str, ...]:
+    def family_expression_templates(self, family_name: str) -> tuple[str, ...]:
         return self.family_hypothesis_templates(family_name)
+
+    def family_execution_templates(self, family_name: str) -> tuple[str, ...]:
+        allowed = self.family_templates(family_name)
+        if not allowed:
+            return ()
+        return tuple(name for name in allowed if self.is_execution_template(name))
 
     def family_hypothesis_templates(self, family_name: str) -> tuple[str, ...]:
         allowed = self.family_templates(family_name)

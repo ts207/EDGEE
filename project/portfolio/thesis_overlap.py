@@ -5,6 +5,13 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from project.live.contracts import PromotedThesis
+from project.research.artifact_hygiene import (
+    build_artifact_refs,
+    build_summary_metadata,
+    infer_workspace_root,
+    invalid_artifact_header,
+    metadata_markdown_lines,
+)
 
 
 THESIS_OVERLAP_SCHEMA_VERSION = "thesis_overlap_graph_v1"
@@ -141,9 +148,9 @@ def build_thesis_overlap_graph(theses: Iterable[PromotedThesis]) -> dict[str, An
     }
 
 
-def render_overlap_graph_markdown(payload: dict[str, Any]) -> str:
-    lines = ["# Thesis Overlap Graph", ""]
-    lines.append(f"- Schema version: `{payload.get('schema_version', '')}`")
+def render_overlap_graph_markdown(payload: dict[str, Any], *, metadata: dict[str, Any], invalid_refs: list[str]) -> str:
+    lines = invalid_artifact_header(invalid_refs) + ["# Thesis Overlap Graph", ""]
+    lines.extend(metadata_markdown_lines(metadata))
     lines.append(f"- Thesis count: {int(payload.get('thesis_count', 0) or 0)}")
     lines.append(f"- Overlap groups: {int(payload.get('overlap_group_count', 0) or 0)}")
     lines.append("")
@@ -172,12 +179,40 @@ def render_overlap_graph_markdown(payload: dict[str, Any]) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
-def write_thesis_overlap_artifacts(theses: Iterable[PromotedThesis], out_dir: str | Path) -> dict[str, Any]:
+def write_thesis_overlap_artifacts(
+    theses: Iterable[PromotedThesis],
+    out_dir: str | Path,
+    *,
+    source_run_id: str | None = None,
+    workspace_root: str | Path | None = None,
+) -> dict[str, Any]:
     out_path = Path(out_dir)
     out_path.mkdir(parents=True, exist_ok=True)
+    resolved_workspace_root = infer_workspace_root(workspace_root, out_path)
     payload = build_thesis_overlap_graph(theses)
     json_path = out_path / "thesis_overlap_graph.json"
     md_path = out_path / "thesis_overlap_graph.md"
+
     json_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    md_path.write_text(render_overlap_graph_markdown(payload), encoding="utf-8")
+    md_path.write_text("# Thesis Overlap Graph\n", encoding="utf-8")
+
+    artifact_refs, invalid_refs = build_artifact_refs(
+        {
+            "overlap_json": json_path,
+            "overlap_md": md_path,
+        },
+        workspace_root=resolved_workspace_root,
+    )
+    metadata = build_summary_metadata(
+        schema_version=THESIS_OVERLAP_SCHEMA_VERSION,
+        artifact_root=out_path,
+        source_run_id=source_run_id,
+        workspace_root=resolved_workspace_root,
+        invalid_artifact_refs=invalid_refs,
+    )
+    payload.update(metadata)
+    payload["artifact_refs"] = artifact_refs
+    payload["invalid_artifact_refs"] = invalid_refs
+    json_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    md_path.write_text(render_overlap_graph_markdown(payload, metadata=metadata, invalid_refs=invalid_refs), encoding="utf-8")
     return payload

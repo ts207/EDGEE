@@ -38,7 +38,7 @@ def test_write_event_scoped_search_spec_narrows_default_broad_spec(tmp_path: Pat
     payload = yaml.safe_load(resolved_path.read_text(encoding="utf-8"))
     assert payload["events"] == ["VOL_SHOCK"]
     assert payload["triggers"]["events"] == ["VOL_SHOCK"]
-    assert payload["templates"] == [
+    assert payload["expression_templates"] == [
         "mean_reversion",
         "continuation",
         "trend_continuation",

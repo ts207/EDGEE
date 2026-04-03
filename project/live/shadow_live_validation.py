@@ -13,7 +13,13 @@ from project.core.config import get_data_root
 from project.live.contracts.live_trade_context import LiveTradeContext
 from project.live.decision import decide_trade_intent
 from project.live.thesis_store import ThesisStore
-from project.research.artifact_hygiene import build_artifact_refs, infer_workspace_root, invalid_artifact_header
+from project.research.artifact_hygiene import (
+    build_artifact_refs,
+    build_summary_metadata,
+    infer_workspace_root,
+    invalid_artifact_header,
+    metadata_markdown_lines,
+)
 from project.research.thesis_evidence_runner import (
     DOCS_DIR,
     _liquidation_cascade_events,
@@ -140,6 +146,64 @@ def _contexts_for_symbol(
     return contexts
 
 
+def _diagnostic_counts_for_match(reasons_for: list[str], reasons_against: list[str]) -> dict[str, int]:
+    counts = {
+        "trigger_clause_match": 0,
+        "missing_trigger_events": 0,
+        "missing_confirmation_events": 0,
+        "missing_required_episodes": 0,
+        "rejected_disallowed_regime": 0,
+        "rejected_invalidation": 0,
+        "rejected_deployment_state": 0,
+        "rejected_staleness": 0,
+        "supportive_context_bonus_applied": 0,
+    }
+    if any(reason.startswith("trigger_clause_match") for reason in reasons_for):
+        counts["trigger_clause_match"] = 1
+    if any(reason.startswith("trigger_clause_missing:") for reason in reasons_against):
+        counts["missing_trigger_events"] = 1
+    if any(reason.startswith("confirmation_missing:") for reason in reasons_against):
+        counts["missing_confirmation_events"] = 1
+    if any(reason.startswith("required_episode_missing:") for reason in reasons_against):
+        counts["missing_required_episodes"] = 1
+    if any(reason.startswith("regime_disallowed:") for reason in reasons_against):
+        counts["rejected_disallowed_regime"] = 1
+    if any(reason == "invalidation_triggered" for reason in reasons_against):
+        counts["rejected_invalidation"] = 1
+    if any(reason.startswith("deployment_state_") for reason in reasons_against):
+        counts["rejected_deployment_state"] = 1
+    if any(
+        reason.startswith("freshness_disallowed:")
+        or reason in {"review_due_date_missing", "review_overdue", "review_due_date_invalid"}
+        for reason in reasons_against
+    ):
+        counts["rejected_staleness"] = 1
+    if any(reason.startswith("supportive_context:") for reason in reasons_for):
+        counts["supportive_context_bonus_applied"] = 1
+    return counts
+
+
+def _empty_diagnostic_counter() -> Counter[str]:
+    return Counter(
+        {
+            "retrieved_cycles": 0,
+            "eligible_cycles": 0,
+            "confirmation_match_cycles": 0,
+            "confirmation_missing_cycles": 0,
+            "top_ranked_cycles": 0,
+            "trigger_clause_match": 0,
+            "missing_trigger_events": 0,
+            "missing_confirmation_events": 0,
+            "missing_required_episodes": 0,
+            "rejected_disallowed_regime": 0,
+            "rejected_invalidation": 0,
+            "rejected_deployment_state": 0,
+            "rejected_staleness": 0,
+            "supportive_context_bonus_applied": 0,
+        }
+    )
+
+
 def _trace_row(context: LiveTradeContext, outcome: Any) -> dict[str, Any]:
     retrieved = []
     matched_clauses: list[str] = []
@@ -147,6 +211,7 @@ def _trace_row(context: LiveTradeContext, outcome: Any) -> dict[str, Any]:
     contradictions: list[str] = []
     invalidators: list[str] = []
     overlap_groups: list[str] = []
+    thesis_rejection_counters: dict[str, dict[str, int]] = {}
     for match in outcome.ranked_matches:
         overlap_group = str(match.thesis.governance.overlap_group_id or "")
         if overlap_group and overlap_group not in overlap_groups:
@@ -155,6 +220,8 @@ def _trace_row(context: LiveTradeContext, outcome: Any) -> dict[str, Any]:
         missing_confirmations.extend(item for item in match.reasons_against if item.startswith("confirmation_missing:"))
         contradictions.extend(item for item in match.reasons_against if item.startswith("contradiction_event:"))
         invalidators.extend(item for item in match.reasons_against if item == "invalidation_triggered")
+        diagnostic_counts = _diagnostic_counts_for_match(list(match.reasons_for), list(match.reasons_against))
+        thesis_rejection_counters[match.thesis.thesis_id] = diagnostic_counts
         retrieved.append(
             {
                 "thesis_id": match.thesis.thesis_id,
@@ -165,6 +232,7 @@ def _trace_row(context: LiveTradeContext, outcome: Any) -> dict[str, Any]:
                 "overlap_group_id": overlap_group,
                 "reasons_for": list(match.reasons_for),
                 "reasons_against": list(match.reasons_against),
+                "diagnostic_counts": diagnostic_counts,
             }
         )
     top_metadata = dict(outcome.trade_intent.metadata or {})
@@ -195,6 +263,7 @@ def _trace_row(context: LiveTradeContext, outcome: Any) -> dict[str, Any]:
         "missing_confirmations": sorted(set(missing_confirmations)),
         "contradictions": sorted(set(contradictions)),
         "invalidators": sorted(set(invalidators)),
+        "thesis_rejection_counters": thesis_rejection_counters,
         "overlap_group_diagnostics": {
             "active_overlap_group_ids": overlap_groups,
             "top_overlap_group_id": str(top_metadata.get("overlap_group_id", "")),
@@ -250,7 +319,11 @@ def run_shadow_live_thesis_validation(
     action_counts: Counter[str] = Counter()
     chosen_theses: Counter[str] = Counter()
     confirm_thesis_ids = {thesis.thesis_id for thesis in thesis_store.active_theses() if str(thesis.governance.operational_role or '').strip().lower() == 'confirm'}
-    confirmation_stats_by_id: dict[str, Counter[str]] = {thesis_id: Counter() for thesis_id in sorted(confirm_thesis_ids)}
+    confirmation_stats_by_id: dict[str, Counter[str]] = {thesis_id: _empty_diagnostic_counter() for thesis_id in sorted(confirm_thesis_ids)}
+    thesis_stats_by_id: dict[str, Counter[str]] = {}
+    retrieved_cycles = 0
+    eligible_cycles = 0
+    top_ranked_cycles = 0
     silent_match_count = 0
     unexplained_hold_count = 0
     overlap_metadata_missing = 0
@@ -261,17 +334,23 @@ def run_shadow_live_thesis_validation(
         action_counts[row["action_chosen"]] += 1
         if outcome.trade_intent.thesis_id:
             chosen_theses[outcome.trade_intent.thesis_id] += 1
-        if not row["matched_clauses"]:
+        if row["retrieved_theses"]:
+            retrieved_cycles += 1
+        if any(bool(retrieved.get("eligibility_passed")) for retrieved in row["retrieved_theses"]):
+            eligible_cycles += 1
+        if row["overlap_group_diagnostics"].get("top_thesis_id"):
+            top_ranked_cycles += 1
+        if row["retrieved_theses"] and not row["matched_clauses"]:
             silent_match_count += 1
         if row["action_chosen"] == "watch" and not row["suppression_reason"]:
             unexplained_hold_count += 1
-        if not row["overlap_group_diagnostics"].get("top_overlap_group_id"):
+        if row["retrieved_theses"] and not row["overlap_group_diagnostics"].get("top_overlap_group_id"):
             overlap_metadata_missing += 1
         for retrieved in row["retrieved_theses"]:
             thesis_id = str(retrieved.get("thesis_id", "")).strip()
-            if thesis_id not in confirmation_stats_by_id:
+            if not thesis_id:
                 continue
-            stats = confirmation_stats_by_id[thesis_id]
+            stats = thesis_stats_by_id.setdefault(thesis_id, _empty_diagnostic_counter())
             stats["retrieved_cycles"] += 1
             if retrieved["eligibility_passed"]:
                 stats["eligible_cycles"] += 1
@@ -281,6 +360,22 @@ def run_shadow_live_thesis_validation(
                 stats["confirmation_missing_cycles"] += 1
             if row["overlap_group_diagnostics"].get("top_thesis_id") == thesis_id:
                 stats["top_ranked_cycles"] += 1
+            diagnostic_counts = dict(retrieved.get("diagnostic_counts", {}))
+            for key, value in diagnostic_counts.items():
+                stats[key] += int(value or 0)
+            if thesis_id in confirmation_stats_by_id:
+                confirm_stats = confirmation_stats_by_id[thesis_id]
+                confirm_stats["retrieved_cycles"] += 1
+                if retrieved["eligibility_passed"]:
+                    confirm_stats["eligible_cycles"] += 1
+                if any(reason.startswith("confirmation_match:") for reason in retrieved["reasons_for"]):
+                    confirm_stats["confirmation_match_cycles"] += 1
+                if any(reason.startswith("confirmation_missing:") for reason in retrieved["reasons_against"]):
+                    confirm_stats["confirmation_missing_cycles"] += 1
+                if row["overlap_group_diagnostics"].get("top_thesis_id") == thesis_id:
+                    confirm_stats["top_ranked_cycles"] += 1
+                for key, value in diagnostic_counts.items():
+                    confirm_stats[key] += int(value or 0)
 
     trace_path = report_dir / "shadow_live_thesis_trace.jsonl"
     with trace_path.open("w", encoding="utf-8") as handle:
@@ -297,14 +392,38 @@ def run_shadow_live_thesis_validation(
         }
         for thesis_id, stats in confirmation_stats_by_id.items()
     }
+    thesis_payload_by_id = {
+        thesis_id: {key: int(stats.get(key, 0)) for key in _empty_diagnostic_counter().keys()}
+        for thesis_id, stats in thesis_stats_by_id.items()
+    }
+    aggregate_thesis_payload = {
+        "retrieved_cycles": int(retrieved_cycles),
+        "eligible_cycles": int(eligible_cycles),
+        "top_ranked_cycles": int(top_ranked_cycles),
+        **{
+            key: int(sum(payload.get(key, 0) for payload in thesis_payload_by_id.values()))
+            for key in (
+                "confirmation_match_cycles",
+                "confirmation_missing_cycles",
+                "trigger_clause_match",
+                "missing_trigger_events",
+                "missing_confirmation_events",
+                "missing_required_episodes",
+                "rejected_disallowed_regime",
+                "rejected_invalidation",
+                "rejected_deployment_state",
+                "rejected_staleness",
+                "supportive_context_bonus_applied",
+            )
+        },
+    }
     aggregate_confirmation_payload = {
         key: int(sum(payload.get(key, 0) for payload in confirmation_payload_by_id.values()))
-        for key in ("retrieved_cycles", "eligible_cycles", "confirmation_match_cycles", "confirmation_missing_cycles", "top_ranked_cycles")
+        for key in _empty_diagnostic_counter().keys()
     }
 
     summary_payload = {
         "run_id": run_id,
-        "generated_at_utc": _utc_now(),
         "window": {
             "start": str(start_time),
             "end": str(max_ts),
@@ -315,6 +434,8 @@ def run_shadow_live_thesis_validation(
         "contexts_evaluated": len(trace_rows),
         "action_counts": dict(action_counts),
         "chosen_thesis_counts": dict(chosen_theses),
+        "thesis_cycle_stats": aggregate_thesis_payload,
+        "thesis_cycle_stats_by_id": thesis_payload_by_id,
         "confirmation_thesis_stats": aggregate_confirmation_payload,
         "confirmation_thesis_stats_by_id": confirmation_payload_by_id,
         "quality_checks": {
@@ -327,22 +448,37 @@ def run_shadow_live_thesis_validation(
         },
     }
     workspace_root = infer_workspace_root(resolved_data_root, resolved_docs, report_dir)
+    summary_json = report_dir / "shadow_live_thesis_summary.json"
+    summary_md = report_dir / "shadow_live_thesis_summary.md"
+    summary_json.write_text(json.dumps(summary_payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    summary_md.write_text("# Shadow live thesis summary\n", encoding="utf-8")
     artifact_refs, invalid_refs = build_artifact_refs(
         {
             "trace": trace_path,
+            "summary_json": summary_json,
+            "summary_md": summary_md,
         },
         workspace_root=workspace_root,
     )
-    summary_payload["workspace_root"] = workspace_root.as_posix()
+    metadata = build_summary_metadata(
+        schema_version="shadow_live_thesis_summary_v1",
+        artifact_root=report_dir,
+        source_run_id=run_id,
+        workspace_root=workspace_root,
+        invalid_artifact_refs=invalid_refs,
+        generated_at_utc=_utc_now(),
+    )
+    summary_payload.update(metadata)
     summary_payload["artifact_refs"] = artifact_refs
     summary_payload["invalid_artifact_refs"] = invalid_refs
-    summary_json = report_dir / "shadow_live_thesis_summary.json"
-    summary_md = report_dir / "shadow_live_thesis_summary.md"
     summary_json.write_text(json.dumps(summary_payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
     lines = invalid_artifact_header(invalid_refs) + [
         "# Shadow live thesis summary",
         "",
+    ]
+    lines.extend(metadata_markdown_lines(metadata))
+    lines.extend([
         f"- run_id: `{run_id}`",
         f"- contexts_evaluated: `{len(trace_rows)}`",
         f"- window: `{start_time}` -> `{max_ts}`",
@@ -351,18 +487,30 @@ def run_shadow_live_thesis_validation(
         "",
         "## Action counts",
         "",
-    ]
+    ])
     for action, count in sorted(action_counts.items()):
         lines.append(f"- `{action}`: `{count}`")
     lines.extend([
         "",
         "## Confirmation thesis diagnostics",
         "",
-        f"- retrieved_cycles: `{aggregate_confirmation_payload['retrieved_cycles']}`",
-        f"- eligible_cycles: `{aggregate_confirmation_payload['eligible_cycles']}`",
-        f"- confirmation_match_cycles: `{aggregate_confirmation_payload['confirmation_match_cycles']}`",
-        f"- confirmation_missing_cycles: `{aggregate_confirmation_payload['confirmation_missing_cycles']}`",
-        f"- top_ranked_cycles: `{aggregate_confirmation_payload['top_ranked_cycles']}`",
+        f"- retrieved_cycles: `{aggregate_thesis_payload['retrieved_cycles']}`",
+        f"- eligible_cycles: `{aggregate_thesis_payload['eligible_cycles']}`",
+        f"- confirmation_match_cycles: `{aggregate_thesis_payload['confirmation_match_cycles']}`",
+        f"- confirmation_missing_cycles: `{aggregate_thesis_payload['confirmation_missing_cycles']}`",
+        f"- top_ranked_cycles: `{aggregate_thesis_payload['top_ranked_cycles']}`",
+        "",
+        "## Structured rejection counters",
+        "",
+        f"- trigger_clause_match: `{aggregate_thesis_payload['trigger_clause_match']}`",
+        f"- missing_trigger_events: `{aggregate_thesis_payload['missing_trigger_events']}`",
+        f"- missing_confirmation_events: `{aggregate_thesis_payload['missing_confirmation_events']}`",
+        f"- missing_required_episodes: `{aggregate_thesis_payload['missing_required_episodes']}`",
+        f"- rejected_disallowed_regime: `{aggregate_thesis_payload['rejected_disallowed_regime']}`",
+        f"- rejected_invalidation: `{aggregate_thesis_payload['rejected_invalidation']}`",
+        f"- rejected_deployment_state: `{aggregate_thesis_payload['rejected_deployment_state']}`",
+        f"- rejected_staleness: `{aggregate_thesis_payload['rejected_staleness']}`",
+        f"- supportive_context_bonus_applied: `{aggregate_thesis_payload['supportive_context_bonus_applied']}`",
         "",
         "## Confirmation thesis breakdown",
         "",
@@ -381,22 +529,6 @@ def run_shadow_live_thesis_validation(
         "",
     ])
     summary_md.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
-
-    artifact_refs, invalid_refs = build_artifact_refs(
-        {
-            "trace": trace_path,
-            "summary_json": summary_json,
-            "summary_md": summary_md,
-        },
-        workspace_root=workspace_root,
-    )
-    summary_payload["artifact_refs"] = artifact_refs
-    summary_payload["invalid_artifact_refs"] = invalid_refs
-    summary_json.write_text(json.dumps(summary_payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    summary_md.write_text(
-        "\n".join(invalid_artifact_header(invalid_refs) + lines[len(invalid_artifact_header(invalid_refs)):]).rstrip() + "\n",
-        encoding="utf-8",
-    )
 
     docs_summary_json = resolved_docs / "shadow_live_thesis_summary.json"
     docs_summary_md = resolved_docs / "shadow_live_thesis_summary.md"

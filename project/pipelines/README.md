@@ -1,49 +1,48 @@
-# Pipelines Layer (`project/pipelines`)
+# Pipelines layer
 
-The pipelines layer handles data ingestion, feature generation, orchestration, manifest bookkeeping, and stage execution.
+`project/pipelines/` owns orchestration, stage planning, execution coordination, provenance, and run-level bookkeeping.
 
-## Ownership
+## What this layer owns
 
-- `run_all.py` and its helper modules for full-pipeline orchestration
-- ingestion, clean, feature, and context stage scripts
-- pipeline planning, execution, provenance, and summary utilities
-- compatibility wrappers and replay shims under `project/pipelines/research/` for canonical research stages that now live under `project/research/`
+- `run_all.py` and its support modules
+- stage planning and dependency resolution
+- stage-family assembly through `project/pipelines/stages/`
+- execution/provenance helpers
+- ingest, clean, feature, runtime-invariant, and evaluation stage wrappers
 
-## Non-Ownership
+## What this layer does not own
 
-- detector business logic
-- research policy and promotion rules
-- low-latency runtime execution
-- schema ownership for stage and artifact contracts
+- research policy
+- promotion policy
+- live/runtime decisioning
+- thesis packaging semantics
+- domain meaning of events, states, templates, or regimes
 
-## Important Modules
+Those belong elsewhere.
+
+## Most important files
 
 - `run_all.py`
-- `run_all_bootstrap.py`
-- `run_all_support.py`
-- `run_all_finalize.py`
-- `run_all_provenance.py`
-- `execution_engine.py`
-- `execution_engine_support.py`
 - `pipeline_planning.py`
 - `pipeline_execution.py`
 - `pipeline_provenance.py`
-- `pipeline_summary.py`
+- `stage_registry.py`
+- `stages/ingest.py`
+- `stages/core.py`
+- `stages/research.py`
+- `stages/evaluation.py`
 
-## Explicit Package Surfaces
+## How to read this layer
 
-The layer now exposes package-root entrypoint groups for active stage families:
+Start from `project.pipelines.run_all`, then the stage builders, then the stage scripts themselves.
 
-- `project.pipelines.clean`
-- `project.pipelines.features`
-- `project.pipelines.ingest`
-- `project.pipelines.smoke`
+Do not start from individual stage scripts unless you already know which stage family you are tracing.
 
-These package roots should stay lightweight. They exist to make stage-family imports explicit, not to become new orchestration layers.
+## Relationship to docs
 
-## Constraints
+See:
 
-- Each stage should communicate through declared artifacts rather than shared in-memory state.
-- Wrappers should stay thin when a canonical service module already exists.
-- Orchestration code should remain coordinator-oriented rather than absorbing domain logic.
-- If a pipeline module grows large, extract pure support helpers before weakening size or import-boundary guardrails.
+- `docs/02_REPOSITORY_MAP.md`
+- `docs/03_OPERATOR_WORKFLOW.md`
+- `docs/04_COMMANDS_AND_ENTRY_POINTS.md`
+- `docs/05_ARTIFACTS_AND_INTERPRETATION.md`
