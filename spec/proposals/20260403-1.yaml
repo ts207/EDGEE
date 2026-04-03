@@ -1,8 +1,8 @@
-program_id: volshock_btc_long_12b
-description: Long continuation after VOL_SHOCK on BTCUSDT 5m
+program_id: 20260403-1
+description: First run - long continuation after VOL_SHOCK on BTCUSDT 5m
 
-start: "2024-01-01"
-end: "2024-01-31"
+start: "2022-01-01"
+end: "2023-12-31"
 symbols:
   - BTCUSDT
 timeframe: 5m

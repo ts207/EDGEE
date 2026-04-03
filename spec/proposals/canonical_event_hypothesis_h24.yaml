@@ -20,8 +20,6 @@ hypothesis:
 
 run_mode: research
 promotion_profile: research
-config_overlays:
-  - project/configs/golden_synthetic_discovery_fast.yaml
 
 bounded:
   baseline_run_id: volshock_btc_long_12b_20260403T214050Z_38fb41d30e
