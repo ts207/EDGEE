@@ -17,20 +17,27 @@ Use this skill for the packaging lane, not for raw discovery.
 
 ## Preferred front door
 
-- Use `make package` for the maintained end-to-end packaging chain.
+- Use explicit run export when the goal is a runtime thesis batch from one run.
+- Use `make package` or the plugin package wrapper only for the advanced packaging lane.
 - Use the underlying script sequence only when repairing or inspecting a specific packaging block.
+
+Canonical run-export bridge:
+
+```bash
+./plugins/edge-agents/scripts/edge_export_theses.sh <run_id>
+```
 
 ## Canonical sequence
 
 ```bash
-make package
+./plugins/edge-agents/scripts/edge_package_theses.sh [thesis_run_id]
 python -m project.scripts.build_seed_bootstrap_artifacts
 python -m project.scripts.build_seed_testing_artifacts
 python -m project.scripts.build_seed_empirical_artifacts
 python -m project.scripts.build_founding_thesis_evidence
 python -m project.scripts.build_seed_packaging_artifacts
 python -m project.scripts.build_structural_confirmation_artifacts
-python -m project.scripts.build_thesis_overlap_artifacts
+python -m project.scripts.build_thesis_overlap_artifacts --run_id <run_id>
 ./project/scripts/regenerate_artifacts.sh
 ```
 

@@ -2,6 +2,7 @@
 set -euo pipefail
 
 step="${1:-all}"
+thesis_source="${2:-}"
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=/dev/null
@@ -14,7 +15,15 @@ cd "$repo_root"
 run_step() {
   case "$1" in
     seed-bootstrap)
-      "$repo_root/.venv/bin/python" -m project.scripts.build_seed_bootstrap_artifacts
+      cmd=("$repo_root/.venv/bin/python" -m project.scripts.build_seed_bootstrap_artifacts)
+      if [ -n "$thesis_source" ]; then
+        if [ -f "$thesis_source" ]; then
+          cmd+=(--thesis_path "$thesis_source")
+        else
+          cmd+=(--thesis_run_id "$thesis_source")
+        fi
+      fi
+      "${cmd[@]}"
       ;;
     seed-testing)
       "$repo_root/.venv/bin/python" -m project.scripts.build_seed_testing_artifacts
@@ -32,9 +41,23 @@ run_step() {
       "$repo_root/.venv/bin/python" -m project.scripts.build_structural_confirmation_artifacts
       ;;
     thesis-overlap)
-      "$repo_root/.venv/bin/python" -m project.scripts.build_thesis_overlap_artifacts
+      if [ -z "$thesis_source" ]; then
+        echo "thesis-overlap requires an explicit thesis source: RUN_ID or promoted_theses.json path" >&2
+        exit 2
+      fi
+      cmd=("$repo_root/.venv/bin/python" -m project.scripts.build_thesis_overlap_artifacts)
+      if [ -f "$thesis_source" ]; then
+        cmd+=(--thesis_path "$thesis_source")
+      else
+        cmd+=(--run_id "$thesis_source")
+      fi
+      "${cmd[@]}"
       ;;
     all)
+      if [ -z "$thesis_source" ]; then
+        echo "all requires an explicit thesis source so thesis-overlap can run: RUN_ID or promoted_theses.json path" >&2
+        exit 2
+      fi
       run_step seed-bootstrap
       run_step seed-testing
       run_step seed-empirical
@@ -44,7 +67,7 @@ run_step() {
       run_step thesis-overlap
       ;;
     *)
-      echo "usage: $0 [all|seed-bootstrap|seed-testing|seed-empirical|founding-evidence|seed-packaging|structural-confirmation|thesis-overlap]" >&2
+      echo "usage: $0 [all|seed-bootstrap|seed-testing|seed-empirical|founding-evidence|seed-packaging|structural-confirmation|thesis-overlap] [RUN_ID|PROMOTED_THESES_JSON]" >&2
       exit 2
       ;;
   esac

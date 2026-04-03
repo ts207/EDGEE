@@ -55,23 +55,36 @@ Then inspect:
 - `docs/02_REPOSITORY_MAP.md`
 - `docs/05_ARTIFACTS_AND_INTERPRETATION.md`
 
-### Thesis packaging or overlap change
+### Runtime-thesis export or overlap change
 
 Use:
 
 ```bash
-make package
-PYTHONPATH=. ./.venv/bin/python -m project.scripts.build_thesis_overlap_artifacts
+make validate
+./plugins/edge-agents/scripts/edge_export_theses.sh <run_id>
+PYTHONPATH=. ./.venv/bin/python -m project.scripts.build_thesis_overlap_artifacts --run_id <run_id>
 ```
 
 Then inspect:
 
+- `data/live/theses/<run_id>/promoted_theses.json`
 - `data/live/theses/index.json`
+- `docs/generated/thesis_overlap_graph.md`
+- `docs/11_LIVE_THESIS_STORE_AND_OVERLAP.md`
+
+### Advanced bootstrap or package change
+
+Use:
+
+```bash
+./plugins/edge-agents/scripts/edge_package_theses.sh [thesis_run_id]
+```
+
+Then inspect:
+
 - `docs/generated/seed_thesis_catalog.md`
 - `docs/generated/seed_thesis_packaging_summary.md`
-- `docs/generated/thesis_overlap_graph.md`
 - `docs/09_THESIS_BOOTSTRAP_AND_PROMOTION.md`
-- `docs/11_LIVE_THESIS_STORE_AND_OVERLAP.md`
 
 ### Architectural boundary change
 

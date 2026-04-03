@@ -19,8 +19,8 @@ Use this as the default project skill for `/home/irene/Edge`.
 
 - Edge is a governed event-driven crypto research platform.
 - Normal progress happens in one of two lanes:
-  - bounded experiment lane: `observe -> preflight -> plan -> run -> evaluate -> adapt`
-  - thesis bootstrap lane: `seed inventory -> testing -> empirical evidence -> package -> overlap graph`
+  - bounded experiment lane: `proposal -> explain -> preflight -> plan -> run -> review -> export`
+  - advanced bootstrap lane: `seed inventory -> testing -> empirical evidence -> package -> overlap graph`
 - The operating unit is a bounded hypothesis, not a broad discovery brief.
 
 ## Hard guardrails
@@ -46,8 +46,8 @@ make discover PROPOSAL=/abs/path/to/proposal.yaml DISCOVER_ACTION=plan
 make discover PROPOSAL=/abs/path/to/proposal.yaml DISCOVER_ACTION=run
 make review RUN_ID=<run_id> REVIEW_ACTION=diagnose|regime-report
 make review REVIEW_ACTION=compare RUN_IDS=<baseline_run,followup_run>
+make export RUN_ID=<run_id>
 make validate
-make package
 edge operator lint --proposal /abs/path/to/proposal.yaml
 edge operator explain --proposal /abs/path/to/proposal.yaml
 edge operator preflight --proposal /abs/path/to/proposal.yaml
@@ -56,6 +56,8 @@ edge operator run --proposal /abs/path/to/proposal.yaml
 edge operator diagnose --run_id <run_id>
 edge operator regime-report --run_id <run_id>
 edge operator compare --run_ids <baseline_run,followup_run>
+./plugins/edge-agents/scripts/edge_export_theses.sh <run_id>
+./plugins/edge-agents/scripts/edge_package_theses.sh [thesis_run_id]
 .venv/bin/python -m project.scripts.run_researcher_verification --mode contracts
 ```
 

@@ -5,11 +5,14 @@ Repo-local Codex/plugin surface for the Edge repository.
 ## Purpose
 
 Provide guided wrappers around the canonical bounded workflow without creating a parallel operator model.
+The plugin should track the repo's current front door:
+
+`proposal -> explain -> plan/run -> review -> export thesis batch`
 
 ## What is included
 
 - skills for repo orientation, maintenance, ChatGPT-app development, coordination, analysis, compiler flow, and thesis bootstrap
-- thin wrappers around the canonical `make discover|package|validate|review` and `edge operator ...` surfaces
+- thin wrappers around the canonical `make discover|review|export|validate` and `edge operator ...` surfaces
 - hook definitions for contract-sensitive edits and recent-run awareness
 
 ## Important scripts
@@ -30,6 +33,7 @@ Provide guided wrappers around the canonical bounded workflow without creating a
 - `scripts/edge_verify_run.sh`
 - `scripts/edge_compare_runs.sh`
 - `scripts/edge_show_run_artifacts.sh`
+- `scripts/edge_export_theses.sh`
 - `scripts/edge_package_theses.sh`
 - `scripts/edge_bootstrap_theses.sh`
 
@@ -37,8 +41,9 @@ Provide guided wrappers around the canonical bounded workflow without creating a
 
 These wrappers should remain thin around:
 
-- `make discover|package|validate|review`
+- `make discover|review|export|validate`
 - `edge operator ...`
+- `python -m project.research.export_promoted_theses`
 - `python -m project.scripts.run_researcher_verification`
 - generated run and thesis artifacts
 
@@ -50,7 +55,8 @@ The plugin now helps route common developer change types:
 
 - operator or proposal-surface changes -> `make validate` plus operator inventory regeneration
 - event, ontology, or registry changes -> validation plus event-contract and system-map regeneration
-- thesis packaging or overlap changes -> `make package` and overlap regeneration
+- runtime-thesis or overlap changes -> explicit run export plus overlap regeneration
+- advanced bootstrap packaging changes -> `make package`
 - ChatGPT app changes -> `edge-chatgpt-app` inspection/serve helpers plus canonical operator surfaces
 - plugin changes -> local plugin-cache sync and sync checks
 
@@ -60,5 +66,6 @@ See:
 
 - `docs/03_OPERATOR_WORKFLOW.md`
 - `docs/04_COMMANDS_AND_ENTRY_POINTS.md`
+- `docs/10_APPS_PLUGINS_AND_AGENTS.md`
 - `docs/09_THESIS_BOOTSTRAP_AND_PROMOTION.md`
 - `docs/VERIFICATION.md`

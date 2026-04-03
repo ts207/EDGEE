@@ -154,11 +154,15 @@ if [ "${#event_registry_hits[@]}" -gt 0 ]; then
 fi
 
 if [ "${#packaging_hits[@]}" -gt 0 ]; then
-  echo "[edge-hook] Thesis packaging / overlap surface change detected."
+  echo "[edge-hook] Runtime-thesis / packaging / overlap surface change detected."
   echo "[edge-hook] Maintenance loop:"
-  echo "  make package"
-  echo "  PYTHONPATH=. ./.venv/bin/python -m project.scripts.build_thesis_overlap_artifacts"
+  echo "  make validate"
+  echo "  ./plugins/edge-agents/scripts/edge_export_theses.sh <run_id>"
+  echo "  PYTHONPATH=. ./.venv/bin/python -m project.scripts.build_thesis_overlap_artifacts --run_id <run_id>"
+  echo "[edge-hook] Advanced bootstrap lane only when broader packaging maintenance is intended:"
+  echo "  ./plugins/edge-agents/scripts/edge_package_theses.sh [thesis_run_id]"
   echo "[edge-hook] Review docs and artifacts:"
+  echo "  data/live/theses/<run_id>/promoted_theses.json"
   echo "  data/live/theses/index.json"
   echo "  docs/generated/seed_thesis_catalog.md"
   echo "  docs/generated/seed_thesis_packaging_summary.md"

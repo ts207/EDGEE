@@ -19,27 +19,17 @@ Original proposal: `spec/proposals/btcvolexp2122.yaml`
 The coordinator runs the existing proposal:
 
 ```bash
-# Translate
-.venv/bin/python -m project.research.agent_io.proposal_to_experiment \
-  --proposal $(pwd)/spec/proposals/btcvolexp2122.yaml \
-  --registry_root project/configs/registries \
-  --config_path /tmp/btcvolexp2122_experiment.yaml \
-  --overrides_path /tmp/btcvolexp2122_overrides.json
+# Explain normalization first
+edge operator explain --proposal $(pwd)/spec/proposals/btcvolexp2122.yaml
 
-# Plan only (verify before executing)
-.venv/bin/python -m project.research.agent_io.execute_proposal \
-  --proposal $(pwd)/spec/proposals/btcvolexp2122.yaml \
-  --run_id btc_obs_2021_2022_campai_20260330_obs \
-  --registry_root project/configs/registries \
-  --out_dir data/artifacts/experiments/btc_obs_2021_2022_campaign/proposals/btc_obs_2021_2022_campai_20260330_obs \
-  --plan_only 1
+# Preflight and plan
+edge operator preflight --proposal $(pwd)/spec/proposals/btcvolexp2122.yaml
+edge operator plan --proposal $(pwd)/spec/proposals/btcvolexp2122.yaml \
+  --run_id btc_obs_2021_2022_campai_20260330_obs
 
 # Execute (after plan review)
-.venv/bin/python -m project.research.agent_io.issue_proposal \
-  --proposal $(pwd)/spec/proposals/btcvolexp2122.yaml \
-  --registry_root project/configs/registries \
-  --run_id btc_obs_2021_2022_campai_20260330_obs \
-  --plan_only 0
+edge operator run --proposal $(pwd)/spec/proposals/btcvolexp2122.yaml \
+  --run_id btc_obs_2021_2022_campai_20260330_obs
 ```
 
 ---
@@ -280,32 +270,26 @@ search_control:
   max_hypotheses_per_event_family: 100
 ```
 
-## Translation Command
+## Explain Command
 ```bash
-.venv/bin/python -m project.research.agent_io.proposal_to_experiment \
-  --proposal $(pwd)/spec/proposals/btc_obs_2021_2022_campaign_h1_v1.yaml \
-  --registry_root project/configs/registries \
-  --config_path /tmp/btc_obs_2021_2022_campaign_h1_v1_experiment.yaml \
-  --overrides_path /tmp/btc_obs_2021_2022_campaign_h1_v1_overrides.json
+edge operator explain --proposal $(pwd)/spec/proposals/btc_obs_2021_2022_campaign_h1_v1.yaml
 ```
 
-## Plan-Only Command
+## Preflight Command
 ```bash
-.venv/bin/python -m project.research.agent_io.execute_proposal \
-  --proposal $(pwd)/spec/proposals/btc_obs_2021_2022_campaign_h1_v1.yaml \
-  --run_id btc_obs_2021_2022_campai_h1v1_20260331 \
-  --registry_root project/configs/registries \
-  --out_dir data/artifacts/experiments/btc_obs_2021_2022_campaign/proposals/btc_obs_2021_2022_campai_h1v1_20260331 \
-  --plan_only 1
+edge operator preflight --proposal $(pwd)/spec/proposals/btc_obs_2021_2022_campaign_h1_v1.yaml
+```
+
+## Plan Command
+```bash
+edge operator plan --proposal $(pwd)/spec/proposals/btc_obs_2021_2022_campaign_h1_v1.yaml \
+  --run_id btc_obs_2021_2022_campai_h1v1_20260331
 ```
 
 ## Execution Command
 ```bash
-.venv/bin/python -m project.research.agent_io.issue_proposal \
-  --proposal $(pwd)/spec/proposals/btc_obs_2021_2022_campaign_h1_v1.yaml \
-  --registry_root project/configs/registries \
-  --run_id btc_obs_2021_2022_campai_h1v1_20260331 \
-  --plan_only 0
+edge operator run --proposal $(pwd)/spec/proposals/btc_obs_2021_2022_campaign_h1_v1.yaml \
+  --run_id btc_obs_2021_2022_campai_h1v1_20260331
 ```
 
 ## Plan Review Checklist
@@ -331,8 +315,8 @@ search_control:
 
 The coordinator:
 1. Writes the proposal YAML to `spec/proposals/btc_obs_2021_2022_campaign_h1_v1.yaml`
-2. Runs the translation command — verifies it produces valid experiment.yaml
-3. Runs the plan-only command — verifies the plan looks correct
+2. Runs the explain command — verifies normalization and search surface
+3. Runs preflight and plan — verifies the plan looks correct
 4. Presents to the user for approval
 5. On approval, runs the execution command
 6. After completion, returns to Step 2 with the new run_id

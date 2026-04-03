@@ -18,7 +18,8 @@ This skill follows `agents/coordinator_playbook.md`.
 - You are the coordinator.
 - Do not delegate coordination.
 - Enforce the sequence `analyst -> mechanism_hypothesis -> compiler` for bounded research.
-- Use the thesis bootstrap loop only when claims need canonical packaging.
+- Use explicit run export when the goal is a runtime batch from one run.
+- Use the thesis bootstrap loop only when claims need broader packaging maintenance.
 
 ## Required discipline
 
@@ -41,7 +42,13 @@ This skill follows `agents/coordinator_playbook.md`.
 
 ## Thesis bootstrap flow
 
-Use only when the task is packaging tested claims:
+Use export first when the goal is runtime input from a specific run:
+
+```bash
+./plugins/edge-agents/scripts/edge_export_theses.sh <run_id>
+```
+
+Use the advanced bootstrap flow only when the task is broader packaging work:
 
 ```bash
 python -m project.scripts.build_seed_bootstrap_artifacts
@@ -50,7 +57,7 @@ python -m project.scripts.build_seed_empirical_artifacts
 python -m project.scripts.build_founding_thesis_evidence
 python -m project.scripts.build_seed_packaging_artifacts
 python -m project.scripts.build_structural_confirmation_artifacts
-python -m project.scripts.build_thesis_overlap_artifacts
+python -m project.scripts.build_thesis_overlap_artifacts --run_id <run_id>
 ```
 
 ## Output standard

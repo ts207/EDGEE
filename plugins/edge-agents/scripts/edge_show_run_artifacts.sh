@@ -20,6 +20,7 @@ paths=(
   "data/reports/phase2/$run_id/phase2_diagnostics.json"
   "data/reports/phase2/$run_id/phase2_candidates.parquet"
   "data/reports/promotions/$run_id"
+  "data/live/theses/$run_id/promoted_theses.json"
 )
 
 for path in "${paths[@]}"; do

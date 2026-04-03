@@ -32,4 +32,6 @@ for run_id in "${fresh_runs[@]}"; do
   echo "  ./plugins/edge-agents/scripts/edge_diagnose_run.sh $run_id"
   echo "[edge-hook] Regime stability:"
   echo "  ./plugins/edge-agents/scripts/edge_regime_report.sh $run_id"
+  echo "[edge-hook] Export thesis batch if the run is promotable:"
+  echo "  ./plugins/edge-agents/scripts/edge_export_theses.sh $run_id"
 done

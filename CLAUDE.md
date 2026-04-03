@@ -4,7 +4,7 @@ Governed event-driven crypto research engine.
 
 Current end-to-end path:
 
-`proposal -> plan -> run -> artifacts -> diagnosis -> bounded claim -> evidence bundle -> promoted thesis -> thesis store -> overlap-aware live/runtime input`
+`single hypothesis proposal -> explain -> preflight -> plan -> run -> review -> export thesis batch -> explicit runtime selection`
 
 ## Commands
 
@@ -22,24 +22,45 @@ make lint                           # ruff check
 make format                         # ruff format in-place
 make style                          # lint + format-check
 
-# Research proposal lifecycle
-.venv/bin/python -m project.research.agent_io.proposal_to_experiment   --proposal <path>.yaml --registry_root project/configs/registries   --config_path /tmp/experiment.yaml --overrides_path /tmp/overrides.json
-.venv/bin/python -m project.research.agent_io.execute_proposal   --proposal <path>.yaml --run_id <id> --registry_root project/configs/registries   --out_dir <out> --plan_only 1                          # plan only
-.venv/bin/python -m project.research.agent_io.issue_proposal   --proposal <path>.yaml --registry_root project/configs/registries   --run_id <id> --plan_only 0                            # execute
+# Canonical operator workflow
+make discover PROPOSAL=<path>.yaml DISCOVER_ACTION=preflight
+make discover PROPOSAL=<path>.yaml DISCOVER_ACTION=plan
+make discover PROPOSAL=<path>.yaml DISCOVER_ACTION=run
+make review RUN_ID=<run_id> REVIEW_ACTION=diagnose
+make review RUN_ID=<run_id> REVIEW_ACTION=regime-report
+make review REVIEW_ACTION=compare RUN_IDS=<baseline_run,followup_run>
+make export RUN_ID=<run_id>
+make validate
+
+edge operator explain --proposal <path>.yaml
+edge operator preflight --proposal <path>.yaml
+edge operator plan --proposal <path>.yaml
+edge operator run --proposal <path>.yaml
+edge operator diagnose --run_id <run_id>
+edge operator regime-report --run_id <run_id>
+edge operator compare --run_ids <baseline_run,followup_run>
+
+# Compatibility / low-level proposal surfaces
+.venv/bin/python -m project.research.agent_io.proposal_to_experiment --proposal <path>.yaml --registry_root project/configs/registries --config_path /tmp/experiment.yaml --overrides_path /tmp/overrides.json
+.venv/bin/python -m project.research.agent_io.execute_proposal --proposal <path>.yaml --run_id <id> --registry_root project/configs/registries --out_dir <out> --plan_only 1
+.venv/bin/python -m project.research.agent_io.issue_proposal --proposal <path>.yaml --registry_root project/configs/registries --run_id <id> --plan_only 0
 
 # Discovery
 make discover-target SYMBOLS=BTCUSDT EVENT=VOL_SHOCK     # single-event targeted
 make discover-edges                                       # full phase2 all events
 make discover-blueprints                                  # full pipeline + strategy
 
-# Thesis bootstrap and packaging
+# Canonical thesis export
+python -m project.research.export_promoted_theses --run_id <run_id>
+
+# Advanced bootstrap and packaging
 python -m project.scripts.build_seed_bootstrap_artifacts
 python -m project.scripts.build_seed_testing_artifacts
 python -m project.scripts.build_seed_empirical_artifacts
 python -m project.scripts.build_founding_thesis_evidence
 python -m project.scripts.build_seed_packaging_artifacts
 python -m project.scripts.build_structural_confirmation_artifacts
-python -m project.scripts.build_thesis_overlap_artifacts
+python -m project.scripts.build_thesis_overlap_artifacts --run_id <run_id>
 ./project/scripts/regenerate_artifacts.sh
 
 # Artifact inspection
@@ -79,18 +100,15 @@ docs/              Extensive documentation (00-15 numbered guides)
 
 ## Current thesis lifecycle
 
-Treat these as distinct states:
+Treat evidence state and runtime permission as separate:
 
-- `candidate`
-- `tested`
-- `seed_promoted`
-- `paper_promoted`
-- `production_promoted`
+- internal promotion ladder: `candidate -> tested -> seed_promoted -> paper_promoted -> production_promoted`
+- operator-facing permission: `monitor_only | paper_only | live_enabled`
 
 Important:
-- `seed_promoted` is enough for monitor-only retrieval and overlap generation.
-- `paper_promoted` is still not equivalent to production-ready.
-- `deployment_state` narrows what even a packaged thesis may be used for.
+- runtime should consume one explicit run-derived thesis batch
+- `deployment_state` is the first field to inspect for runtime permission
+- `live_enabled` is the only state that may reach trading runtime
 
 ## Forbidden files
 
@@ -112,12 +130,13 @@ Do NOT treat derived confirmation support as equivalent to direct paired-event e
 
 One regime-scoped experiment at a time. Workflow:
 1. Write proposal YAML (`spec/proposals/`)
-2. Translate: `proposal_to_experiment`
-3. Plan: `execute_proposal --plan_only 1`
-4. Execute: `issue_proposal --plan_only 0`
-5. Inspect: `run_manifest.json`, `phase2_diagnostics.json`, `phase2_candidates.parquet`
-6. Decide: keep / modify / kill
-7. If the result is thesis-queue-worthy, move through the bootstrap lane before treating it as canonical live input
+2. Inspect normalization: `edge operator explain --proposal <path>`
+3. Preflight and plan: `edge operator preflight|plan --proposal <path>`
+4. Execute: `edge operator run --proposal <path>`
+5. Inspect: `run_manifest.json`, `phase2_diagnostics.json`, `phase2_candidates.parquet`, promotion outputs
+6. Decide: repair / confirm / kill / export
+7. Export explicit runtime input: `python -m project.research.export_promoted_theses --run_id <run_id>`
+8. Use the bootstrap lane only for broader packaging maintenance, not as the default runtime path
 
 See `docs/AGENT_CONTRACT.md` for the full operating contract.
 
@@ -137,6 +156,7 @@ See `agents/coordinator_playbook.md` for the full pipeline.
 ## Gotchas
 
 - **entry_lags must be >= 1**: enforced in `proposal_schema.py:252` to prevent same-bar entry leakage
+- **operator proposals are now single-hypothesis front-door YAML**: they normalize through `load_operator_proposal(...)` into legacy `AgentProposal`
 - **Horizon mismatch**: Proposals use integer bar counts via `expand_hypotheses` (Path A).
   The search engine's `validate_hypothesis_spec` only accepts 8 time-label strings (Path B).
   Proposal path works, but `72b` would fail if routed through Path B. See `agents/compiler.md`.
@@ -144,7 +164,8 @@ See `agents/coordinator_playbook.md` for the full pipeline.
   `project/research/search/validation.py:VALID_HORIZONS` (generator whitelist, only 8 labels). Proposals bypass the whitelist.
 - **Search limits**: `project/configs/registries/search_limits.yaml` — max 1000 hypotheses, 12 events, 6 templates, 5 horizons per run
 - **promotion_profile=disabled** means the run is exploratory-only, not valid for the default autonomous loop
-- **bootstrap artifacts are authoritative for packaged thesis state**: prefer `seed_thesis_catalog`, `seed_thesis_packaging_summary`, and `thesis_overlap_graph` over hand-edited notes
+- **export is the canonical runtime bridge**: use explicit run export before any advanced bootstrap maintenance
+- **bootstrap artifacts are advanced packaging surfaces**: use them for maintenance, not as the default way to answer “what will runtime consume?”
 - **Ruff lint/format runs on changed files only** (vs `origin/main`), not the whole repo
 - **`data/` is gitignored** — all runtime artifacts are local
 - **pytest markers**: `slow` (deselect with `-m "not slow"`), `contract`, `audit`

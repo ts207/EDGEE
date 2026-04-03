@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [ "$#" -ne 0 ]; then
-  echo "usage: $0" >&2
+if [ "$#" -gt 1 ]; then
+  echo "usage: $0 [THESIS_RUN_ID]" >&2
   exit 2
 fi
+
+thesis_run_id="${1:-}"
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=/dev/null
@@ -14,4 +16,8 @@ repo_root="$(edge_repo_root)"
 ensure_edge_env "$repo_root"
 cd "$repo_root"
 
-make package
+if [ -n "$thesis_run_id" ]; then
+  THESIS_RUN_ID="$thesis_run_id" make package
+else
+  make package
+fi

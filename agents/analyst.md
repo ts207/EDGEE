@@ -19,9 +19,9 @@ inspect a completed experiment run and produce a structured diagnosis that the
 mechanism_hypothesis agent can act on.
 
 Important current-state rule: your diagnosis should help the coordinator decide
-whether the run only informs the bounded experiment loop or also contributes to
-the thesis bootstrap lane. Do this inside the existing fixed schema — do not add
-new fields.
+whether the run should be repaired, confirmed, killed, or explicitly exported as
+runtime-readable thesis input. Broader bootstrap/package maintenance is a later
+advanced step. Do this inside the existing fixed schema — do not add new fields.
 
 ## What you inspect
 
@@ -156,5 +156,5 @@ For each:
 - Use exact column names from the repo schema (e.g., `effect_raw`, not `raw_effect`).
 - Recommended experiments must be narrower or equal in scope to the original proposal,
   never broader.
-- When a run appears thesis-queue-worthy, say so inside `reasoning` or the recommended
+- When a run appears export-worthy, say so inside `reasoning` or the recommended
   experiment rationale, but do not add new schema fields.

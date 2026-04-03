@@ -12,12 +12,13 @@ You (Claude Code) are the coordinator. You do not delegate coordination.
 You invoke specialist agents in sequence, enforce stage discipline, and run
 repo commands directly.
 
-Important current-state rule: the repo now has two connected loops.
+Important current-state rule: the repo now has three connected loops.
 
-1. **bounded research loop** — run -> diagnose -> formulate -> compile -> execute
-2. **thesis bootstrap loop** — seed queue -> testing -> empirical evidence -> package -> overlap graph
+1. **bounded research loop** — proposal -> explain -> preflight -> plan -> run -> diagnose -> formulate -> compile -> rerun
+2. **runtime/export loop** — promoted run -> explicit export -> explicit runtime selection
+3. **advanced bootstrap loop** — seed queue -> testing -> empirical evidence -> package -> overlap graph
 
-Use the bounded research loop to discover or validate claims. Use the bootstrap loop only when those claims need to become canonical thesis objects.
+Use the bounded research loop to discover or validate claims. Use explicit export when one run should become runtime input. Use the bootstrap loop only when those claims need broader packaging maintenance.
 
 ## Pipeline stages
 
@@ -98,7 +99,7 @@ invoke mechanism_hypothesis. Instead, record the kill decision and stop.
    - The handoff template from `agents/handoffs/mechanism_hypothesis_to_compiler.md`
 4. Receive the compiled proposal + commands
 
-**Required output:** Proposal YAML, translation/plan/execution commands, review checklist.
+**Required output:** Proposal YAML, explain/preflight/plan/execution commands, review checklist.
 
 **Stop condition:** If the compiler rejects the hypothesis (unsupported horizon,
 invalid template, nonexistent event), route the rejection back to
@@ -107,7 +108,12 @@ to the user.
 
 ## Thesis bootstrap loop
 
-When the thesis store is empty or sparse, or when recent runs produced bounded claims that deserve packaging, use this sequence after the bounded research loop:
+When one specific run deserves runtime-readable thesis input, do this first:
+
+1. `python -m project.research.export_promoted_theses --run_id <run_id>`
+2. optionally record runtime registration or deployment-state overrides on that export surface
+
+When the thesis store is empty or sparse, or when recent runs need broader packaging maintenance, use this sequence after the bounded research loop:
 
 1. `python -m project.scripts.build_seed_bootstrap_artifacts`
 2. `python -m project.scripts.build_seed_testing_artifacts`
@@ -115,7 +121,7 @@ When the thesis store is empty or sparse, or when recent runs produced bounded c
 4. `python -m project.scripts.build_founding_thesis_evidence` for selected high-priority theses
 5. `python -m project.scripts.build_seed_packaging_artifacts`
 6. `python -m project.scripts.build_structural_confirmation_artifacts` only when conservative bridge packaging is intended
-7. `python -m project.scripts.build_thesis_overlap_artifacts`
+7. `python -m project.scripts.build_thesis_overlap_artifacts --run_id <run_id>`
 
 Use this loop to answer:
 
@@ -124,11 +130,12 @@ Use this loop to answer:
 - which can be `seed_promoted`
 - which can be `paper_promoted`
 - whether the packaged thesis set is structurally disconnected or overlap-aware
+- not “what runtime will use by default” — runtime selection is explicit now
 
 ## Stage discipline
 
 ### Observation / Research stage
-- Run the experiment via `issue_proposal`
+- Run the experiment via `edge operator run`
 - Invoke analyst on the completed run
 - This is read-only diagnosis — no hypothesis formulation here
 
@@ -144,9 +151,14 @@ Use this loop to answer:
 ### Final holdout stage
 - Invoke compiler on each validated hypothesis
 - Review the compiled proposal against the plan review checklist
-- Run the translation command yourself to validate
-- Run the plan-only command to verify the plan
+- Run the explain command yourself to validate normalization
+- Run preflight and plan to verify the plan
 - Only after plan review: execute
+
+### Export stage
+- Export a run explicitly when the result should become runtime-readable input
+- Do not confuse export with live trading permission
+- Inspect `deployment_state` before answering “can this trade?”
 
 ### Packaging stage
 - Do not package a thesis until testing and empirical evidence are both reviewed

@@ -37,7 +37,7 @@ This is a repo-local Codex/plugin surface aligned with the repo's bounded workfl
 It contains:
 
 - skill folders for repo orientation, coordinator flow, analyst review, compiler flow, and thesis bootstrap
-- shell wrappers for preflight, plan, run, compare, verify, and bootstrap actions
+- shell wrappers for explain, preflight, plan, run, compare, export, verify, and advanced bootstrap actions
 - local hooks that warn on contract-sensitive edits and recent runs
 
 This is an interface layer around the canonical repo flow, not an alternate architecture.
