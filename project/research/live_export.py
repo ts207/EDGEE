@@ -714,6 +714,24 @@ def _build_thesis(
             proposal_id = str(lineage.get("proposal_id", "")).strip()
 
     track = _promotion_track(bundle, promoted_row)
+    # Load validation bundle if available
+    from project.research.validation.result_writer import load_validation_bundle
+    val_bundle = load_validation_bundle(run_id)
+    validation_run_id = ""
+    validation_status = ""
+    validation_reasons = []
+    validation_artifacts = {}
+    
+    if val_bundle:
+        validation_run_id = val_bundle.run_id
+        # Find this candidate in the bundle
+        for c in val_bundle.validated_candidates + val_bundle.rejected_candidates + val_bundle.inconclusive_candidates:
+            if c.candidate_id == candidate_id:
+                validation_status = c.decision.status
+                validation_reasons = c.decision.reason_codes
+                validation_artifacts = {a.artifact_type: a.path for a in c.artifact_refs}
+                break
+
     thesis = PromotedThesis(
         thesis_id=f"thesis::{run_id}::{candidate_id}",
         promotion_class="paper_promoted",
@@ -769,6 +787,10 @@ def _build_thesis(
             plan_row_id=str(metadata.get("plan_row_id", "")).strip(),
             blueprint_id=blueprint_id,
             proposal_id=proposal_id,
+            validation_run_id=validation_run_id,
+            validation_status=validation_status,
+            validation_reason_codes=validation_reasons,
+            validation_artifact_paths=validation_artifacts,
         ),
         governance=ThesisGovernance(),
         requirements=_build_requirements_from_contract(

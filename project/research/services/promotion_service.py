@@ -815,26 +815,50 @@ def execute_promotion(config: PromotionConfig) -> PromotionServiceResult:
             retail_profiles_spec_path=config.retail_profiles_spec,
             required=True,
         )
-        candidates_path = (
-            data_root
-            / "reports"
-            / "edge_candidates"
-            / config.run_id
-            / "edge_candidates_normalized.parquet"
-        )
-        if not candidates_path.exists():
-            candidates_path = candidates_path.with_suffix(".csv")
-        if candidates_path.exists():
-            candidates_df = _read_csv_or_parquet(candidates_path)
-        else:
-            candidates_df = _hydrate_edge_candidates_from_phase2(
-                run_id=config.run_id,
-                run_symbols=run_symbols,
-                source_run_mode=source_run_mode,
-                data_root=data_root,
-            )
-            if candidates_df.empty:
-                raise FileNotFoundError(f"Missing required candidates file: {candidates_path}")
+
+        # New Requirement: Require validation bundle or use compatibility bridge
+        from project.research.validation.result_writer import load_validation_bundle
+        from project.research.services.evaluation_service import ValidationService
+        from project.research.validation.contracts import PromotionReasonCodes
+        
+        val_bundle = load_validation_bundle(config.run_id)
+        if val_bundle is None:
+            # Fallback to compatibility bridge
+            val_svc = ValidationService(data_root=data_root)
+            val_bundle = val_svc.build_validation_bundle_from_legacy_run(config.run_id)
+            if val_bundle:
+                logging.info(
+                    "Using compatibility bridge for validation bundle for run %s", 
+                    config.run_id
+                )
+            else:
+                raise ValueError(
+                    f"Promotion rejected for {config.run_id}: "
+                    f"missing validation bundle. {PromotionReasonCodes.NOT_VALIDATED}"
+                )
+        
+        # Reconstruct candidates_df from bundle for promotion processing
+        # We need all columns that promote_candidates might use.
+        # For compatibility, we'll try to load the full table and then filter by validated ones.
+        val_svc = ValidationService(data_root=data_root)
+        tables = val_svc.load_candidate_tables(config.run_id)
+        full_candidates_df = pd.DataFrame()
+        for source in ("edge_candidates", "promotion_audit", "phase2_candidates"):
+            if not tables[source].empty:
+                full_candidates_df = tables[source]
+                break
+        
+        if full_candidates_df.empty:
+             # If table is empty but bundle has candidates, we can't do much without the full metrics
+             # but this shouldn't happen if the bundle was created from those tables.
+             raise FileNotFoundError(f"Missing required candidates tables for run {config.run_id}")
+
+        validated_ids = {c.candidate_id for c in val_bundle.validated_candidates}
+        candidates_df = full_candidates_df[full_candidates_df["candidate_id"].isin(validated_ids)].copy()
+        
+        if candidates_df.empty and val_bundle.validated_candidates:
+             logging.warning("No validated candidates from bundle found in source tables for run %s", config.run_id)
+
         candidates_df = _canonicalize_candidate_audit_keys(candidates_df)
 
         if is_confirmatory and not candidates_df.empty:

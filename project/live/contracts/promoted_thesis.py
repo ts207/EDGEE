@@ -32,6 +32,10 @@ class ThesisLineage(BaseModel):
     plan_row_id: str = ""
     blueprint_id: str = ""
     proposal_id: str = ""
+    validation_run_id: str = ""
+    validation_status: str = ""
+    validation_reason_codes: List[str] = Field(default_factory=list)
+    validation_artifact_paths: Dict[str, str] = Field(default_factory=dict)
 
 
 class ThesisGovernance(BaseModel):
