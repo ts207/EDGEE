@@ -36,6 +36,7 @@ def _build_parser() -> argparse.ArgumentParser:
     discover_run.add_argument("--run_id", default=None)
     discover_run.add_argument("--out_dir", default=None)
     discover_run.add_argument("--check", type=int, default=0)
+    discover_run.add_argument("--legacy_compatibility", type=int, default=0)
 
     discover_plan = discover_sub.add_parser("plan", help="Plan discovery without executing.")
     discover_plan.add_argument("--proposal", required=True)
@@ -43,6 +44,7 @@ def _build_parser() -> argparse.ArgumentParser:
     discover_plan.add_argument("--data_root", default=None)
     discover_plan.add_argument("--run_id", default=None)
     discover_plan.add_argument("--out_dir", default=None)
+    discover_plan.add_argument("--legacy_compatibility", type=int, default=0)
 
     discover_artifacts = discover_sub.add_parser("list-artifacts", help="List discovery artifacts.")
     discover_artifacts.add_argument("--run_id", required=True)
@@ -203,8 +205,19 @@ def _build_parser() -> argparse.ArgumentParser:
     ingest_parser.add_argument("--force", type=int, default=0)
     ingest_parser.add_argument("--log_path", default=None)
 
-    subparsers.required = True
-    return parser
+    # 5. CATALOG (Sprint 7)
+    catalog_parser = subparsers.add_parser("catalog", help="Research operations and artifact intelligence.")
+    catalog_sub = catalog_parser.add_subparsers(dest="subcommand")
+    
+    catalog_list = catalog_sub.add_parser("list", help="List runs with artifact manifests.")
+    catalog_list.add_argument("--stage", choices=["discover", "validate", "promote", "deploy"])
+    catalog_list.add_argument("--data_root", default=None)
+
+    catalog_compare = catalog_sub.add_parser("compare", help="Compare two runs at a specific stage.")
+    catalog_compare.add_argument("--run_id_a", required=True)
+    catalog_compare.add_argument("--run_id_b", required=True)
+    catalog_compare.add_argument("--stage", required=True, choices=["discover", "validate", "promote"])
+    catalog_compare.add_argument("--data_root", default=None)
 
 
 def _default_out_dir(proposal_path: str | Path, run_id: str | None) -> Path:
@@ -221,19 +234,19 @@ def main() -> int:
 
     if args.command == "discover":
         if args.subcommand in {"plan", "run"}:
-            from project.research.agent_io.issue_proposal import issue_proposal
-            plan_only = args.subcommand == "plan"
-            result = issue_proposal(
+            from project import discover
+            result = discover.run(
                 args.proposal,
                 registry_root=Path(args.registry_root),
                 data_root=Path(args.data_root) if args.data_root else None,
                 run_id=args.run_id,
-                plan_only=plan_only,
+                plan_only=(args.subcommand == "plan"),
                 dry_run=False,
                 check=bool(args.check),
+                legacy_compatibility=bool(args.legacy_compatibility),
             )
             print(json.dumps(result, indent=2, sort_keys=True))
-            return 0 if int(result.get("returncode", 0)) == 0 else int(result["returncode"])
+            return 0 if int(result.get("execution", {}).get("returncode", 0)) == 0 else int(result["execution"]["returncode"])
         
         if args.subcommand == "list-artifacts":
             from project.core.config import get_data_root
@@ -255,34 +268,20 @@ def main() -> int:
             return 0
 
     if args.command == "validate":
+        from project import validate
         if args.subcommand == "run":
-            from project.research.services.evaluation_service import ValidationService
-            import pandas as pd
-            data_root = Path(args.data_root) if args.data_root else None
-            val_svc = ValidationService(data_root=data_root)
-            tables = val_svc.load_candidate_tables(args.run_id)
-            candidates_df = pd.DataFrame()
-            for source in ("edge_candidates", "promotion_audit", "phase2_candidates"):
-                if not tables[source].empty:
-                    candidates_df = tables[source]
-                    break
-            if candidates_df.empty:
-                print(f"Error: No candidates found for run {args.run_id}")
-                return 1
-            bundle = val_svc.run_validation_stage(args.run_id, candidates_df)
+            bundle = validate.run(args.run_id, data_root=Path(args.data_root) if args.data_root else None)
             print(f"Validation completed. Validated: {len(bundle.validated_candidates)}, Rejected: {len(bundle.rejected_candidates)}")
             return 0
         if args.subcommand == "report":
-            from project.operator.stability import write_regime_split_report
-            result = write_regime_split_report(
+            result = validate.report(
                 run_id=args.run_id,
                 data_root=Path(args.data_root) if args.data_root else None,
             )
             print(json.dumps(result, indent=2, sort_keys=True))
             return 0
         if args.subcommand == "diagnose":
-            from project.operator.stability import write_negative_result_diagnostics
-            result = write_negative_result_diagnostics(
+            result = validate.diagnose(
                 run_id=args.run_id,
                 program_id=args.program_id,
                 data_root=Path(args.data_root) if args.data_root else None,
@@ -302,39 +301,19 @@ def main() -> int:
             return 0
 
     if args.command == "promote":
+        from project import promote
         if args.subcommand == "run":
-            from project.research.services.promotion_service import execute_promotion, PromotionConfig
-            config = PromotionConfig(
+            result = promote.run(
                 run_id=args.run_id,
                 symbols=args.symbols,
                 out_dir=Path(args.out_dir) if args.out_dir else None,
-                max_q_value=0.05,
-                min_events=20,
-                min_stability_score=0.5,
-                min_sign_consistency=0.5,
-                min_cost_survival_ratio=0.5,
-                max_negative_control_pass_rate=0.05,
-                min_tob_coverage=0.5,
-                require_hypothesis_audit=False,
-                allow_missing_negative_controls=True,
-                require_multiplicity_diagnostics=False,
-                min_dsr=0.0,
-                max_overlap_ratio=1.0,
-                max_profile_correlation=1.0,
-                allow_discovery_promotion=True,
-                program_id="",
                 retail_profile=args.retail_profile,
-                objective_name="",
-                objective_spec=None,
-                retail_profiles_spec=None,
                 use_compatibility_bridge=bool(args.use_compatibility_bridge)
             )
-            result = execute_promotion(config)
             print(f"Promotion completed with exit code: {result.exit_code}")
             return result.exit_code
         if args.subcommand == "export":
-            from project.research.live_export import export_promoted_theses_for_run
-            result = export_promoted_theses_for_run(
+            result = promote.export(
                 args.run_id,
                 data_root=Path(args.data_root) if args.data_root else None,
             )
@@ -449,6 +428,7 @@ def main() -> int:
                 plan_only=plan_only,
                 dry_run=False,
                 check=bool(args.check),
+                legacy_compatibility=bool(args.legacy_compatibility),
             )
             print(json.dumps(result, indent=2, sort_keys=True))
             return 0 if int(result.get("returncode", 0)) == 0 else int(result["returncode"])
@@ -539,6 +519,23 @@ def main() -> int:
             return _ingest_ohlcv.main()
         finally:
             sys.argv = orig_argv
+
+    if args.command == "catalog":
+        from project.research.services import run_catalog_service
+        data_root = Path(args.data_root) if args.data_root else None
+        if args.subcommand == "list":
+            runs = run_catalog_service.list_runs(stage=args.stage, data_root=data_root)
+            print(f"{'Run ID':<40} | {'Stage':<10} | {'Created At':<25}")
+            print("-" * 80)
+            for r in runs:
+                print(f"{r['run_id']:<40} | {r['stage']:<10} | {r['created_at']:<25}")
+            return 0
+        if args.subcommand == "compare":
+            diff = run_catalog_service.compare_manifests(
+                args.run_id_a, args.run_id_b, stage=args.stage, data_root=data_root
+            )
+            print(json.dumps(diff, indent=2, sort_keys=True))
+            return 0
 
     parser.print_help()
     return 1

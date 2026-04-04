@@ -64,9 +64,10 @@ def issue_proposal(
     plan_only: bool = True,
     dry_run: bool = False,
     check: bool = False,
+    legacy_compatibility: bool = False,
 ) -> Dict[str, Any]:
     resolved_data_root = Path(data_root) if data_root is not None else get_data_root()
-    proposal = load_operator_proposal(proposal_path)
+    proposal = load_operator_proposal(proposal_path, legacy_compatibility=legacy_compatibility)
     bounded_validation = validate_bounded_proposal(proposal, data_root=resolved_data_root)
     proposal_payload = proposal.to_dict()
     resolved_run_id = (

@@ -24,12 +24,12 @@ from project.research.agent_io.hypothesis_contract import (
 from project.research.context_labels import canonicalize_contexts
 from project.research.knowledge.knobs import build_agent_knob_rows
 
-LEGACY_AGENT_PROPOSAL_FIELDS = (
-    "trigger_space",
-    "templates",
-    "horizons_bars",
-    "directions",
-    "entry_lags",
+from project.research.agent_io.compatibility import (
+    AgentProposal,
+    SingleHypothesisProposal,
+    SingleHypothesisSpec,
+    TriggerSpec,
+    LEGACY_AGENT_PROPOSAL_FIELDS,
 )
 
 
@@ -779,9 +779,16 @@ def compile_single_hypothesis_to_agent_proposal(
     return compiled
 
 
-def load_operator_proposal(path_or_payload: str | Path | Dict[str, Any]) -> AgentProposal:
+def load_operator_proposal(path_or_payload: str | Path | Dict[str, Any], legacy_compatibility: bool = True) -> AgentProposal:
     raw = _load_proposal_payload(path_or_payload)
     fmt = detect_operator_proposal_format(raw)
+    
+    if not legacy_compatibility and fmt != "structured_hypothesis":
+        raise ValueError(
+            f"Proposal format '{fmt}' is legacy and not allowed when legacy_compatibility=False. "
+            "Please migrate to StructuredHypothesis format (with anchor/filters/sampling_policy)."
+        )
+
     if fmt == "structured_hypothesis":
         proposal, _ = normalize_structured_proposal(raw)
         return compile_structured_proposal_to_agent_proposal(proposal)

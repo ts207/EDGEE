@@ -565,6 +565,26 @@ def execute_candidate_discovery(config: CandidateDiscoveryConfig) -> CandidateDi
 
         reg_hash = hyp_registry.write_artifacts(out_dir)
         manifest["hypothesis_registry_hash"] = reg_hash
+        
+        # Sprint 7: Artifact manifest
+        try:
+            from project.research.validation.manifest import RunArtifactManifest
+            from datetime import datetime, timezone
+            
+            artifact_manifest = RunArtifactManifest(
+                run_id=config.run_id,
+                stage="discover",
+                created_at=datetime.now(timezone.utc).isoformat(),
+                upstream_run_ids=[],
+                artifacts={
+                    "phase2_candidates": "phase2_candidates.parquet",
+                    "phase2_diagnostics": "phase2_diagnostics.json",
+                }
+            )
+            artifact_manifest.persist(out_dir)
+        except Exception as exc:
+            logging.warning("Failed to persist artifact manifest: %s", exc)
+
         finalize_manifest(manifest, "success")
         return CandidateDiscoveryResult(0, out_dir, combined, symbol_candidates, manifest)
     except Exception as exc:

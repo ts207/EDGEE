@@ -213,8 +213,29 @@ class ValidationService:
             write_validation_bundle,
             write_validated_candidate_tables
         )
-        write_validation_bundle(bundle, base_dir=self.data_root / "reports" / "validation" / run_id)
-        write_validated_candidate_tables(bundle, base_dir=self.data_root / "reports" / "validation" / run_id)
+        base_dir = self.data_root / "reports" / "validation" / run_id
+        write_validation_bundle(bundle, base_dir=base_dir)
+        write_validated_candidate_tables(bundle, base_dir=base_dir)
+        
+        # Sprint 7: Artifact manifest
+        from project.research.validation.manifest import RunArtifactManifest
+        from datetime import datetime, timezone
+        
+        manifest = RunArtifactManifest(
+            run_id=run_id,
+            stage="validate",
+            created_at=datetime.now(timezone.utc).isoformat(),
+            upstream_run_ids=[run_id], # Discovery run_id is usually same as validation run_id for now
+            artifacts={
+                "validation_bundle": "validation_bundle.json",
+                "validated_candidates": "validated_candidates.parquet",
+                "rejection_reasons": "rejection_reasons.parquet",
+                "validation_report": "validation_report.json",
+                "effect_stability_report": "effect_stability_report.json",
+            }
+        )
+        manifest.persist(base_dir)
+        
         return bundle
 
     def build_validation_bundle_from_legacy_run(

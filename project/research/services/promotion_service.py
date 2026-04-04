@@ -1094,6 +1094,28 @@ def execute_promotion(config: PromotionConfig) -> PromotionServiceResult:
             promoted_df=promoted_df,
             live_export_diagnostics=diagnostics.get("live_thesis_export"),
         )
+        
+        # Sprint 7: Artifact manifest
+        try:
+            from project.research.validation.manifest import RunArtifactManifest
+            from datetime import datetime, timezone
+            
+            artifact_manifest = RunArtifactManifest(
+                run_id=config.run_id,
+                stage="promote",
+                created_at=datetime.now(timezone.utc).isoformat(),
+                upstream_run_ids=[config.run_id],
+                artifacts={
+                    "promotion_audit": "promotion_audit.parquet",
+                    "promoted_candidates": "promoted_candidates.parquet",
+                    "promotion_summary": "promotion_summary.csv",
+                    "promotion_diagnostics": "promotion_diagnostics.json",
+                }
+            )
+            artifact_manifest.persist(out_dir)
+        except Exception as exc:
+            logging.warning("Failed to persist artifact manifest: %s", exc)
+
         finalize_manifest(manifest, "success", stats=diagnostics)
         return PromotionServiceResult(0, out_dir, audit_df, promoted_df, diagnostics)
     except Exception as exc:
