@@ -103,6 +103,31 @@ def _build_parser() -> argparse.ArgumentParser:
     payload_parser.add_argument("--candidate_id", required=True)
     payload_parser.add_argument("--proposal_dir", required=True)
 
+    # Governance Control Plane
+    list_parser = triggers_sub.add_parser("list", help="List all generated trigger proposals and their adoption states.")
+    list_parser.add_argument("--proposal_dir", default="data/trigger_proposals")
+
+    inspect_parser = triggers_sub.add_parser("inspect", help="Inspect a specific trigger proposal's details.")
+    inspect_parser.add_argument("--candidate_id", required=True)
+    inspect_parser.add_argument("--proposal_dir", default="data/trigger_proposals")
+
+    review_parser = triggers_sub.add_parser("review", help="Mark a trigger proposal as under_review.")
+    review_parser.add_argument("--candidate_id", required=True)
+    review_parser.add_argument("--proposal_dir", default="data/trigger_proposals")
+
+    approve_parser = triggers_sub.add_parser("approve", help="Approve a trigger proposal.")
+    approve_parser.add_argument("--candidate_id", required=True)
+    approve_parser.add_argument("--proposal_dir", default="data/trigger_proposals")
+
+    reject_parser = triggers_sub.add_parser("reject", help="Reject a trigger proposal.")
+    reject_parser.add_argument("--candidate_id", required=True)
+    reject_parser.add_argument("--reason", required=True)
+    reject_parser.add_argument("--proposal_dir", default="data/trigger_proposals")
+
+    adopt_parser = triggers_sub.add_parser("mark-adopted", help="Mark an approved trigger proposal as formally adopted.")
+    adopt_parser.add_argument("--candidate_id", required=True)
+    adopt_parser.add_argument("--proposal_dir", default="data/trigger_proposals")
+
     # 2. VALIDATE
     validate_parser = subparsers.add_parser("validate", help="Stage 2: Truth-testing and robustness.")
     validate_sub = validate_parser.add_subparsers(dest="subcommand")
@@ -360,6 +385,47 @@ def main() -> int:
                 import yaml
                 print(yaml.dump(payload, sort_keys=False))
                 return 0
+
+            if args.trigger_command in ["list", "inspect", "review", "approve", "reject", "mark-adopted"]:
+                from project.research.trigger_discovery import adoption_store
+                out_dir = Path(args.proposal_dir)
+                
+                if args.trigger_command == "list":
+                    proposals = adoption_store.list_proposals(out_dir)
+                    if not proposals:
+                        print("No proposals found.")
+                        return 0
+                    print(f"{'CANDIDATE ID':<45} | {'STATUS':<15} | {'LANE'}")
+                    print("-" * 80)
+                    for p in proposals:
+                        print(f"{p['candidate_id']:<45} | {p['status']:<15} | {p['source_lane']}")
+                    return 0
+                    
+                if args.trigger_command == "inspect":
+                    p = adoption_store.get_proposal(args.candidate_id, out_dir)
+                    if not p:
+                        print(f"Proposal {args.candidate_id} not found.")
+                        return 1
+                    import yaml
+                    print(yaml.dump(p, sort_keys=False))
+                    return 0
+                    
+                status_map = {
+                    "review": "under_review",
+                    "approve": "approved",
+                    "reject": "rejected",
+                    "mark-adopted": "adopted"
+                }
+                new_status = status_map[args.trigger_command]
+                reason = getattr(args, "reason", None)
+                
+                success = adoption_store.transition_state(
+                    args.candidate_id, 
+                    new_status, 
+                    out_dir,
+                    reason=reason
+                )
+                return 0 if success else 1
 
             # Normal discovery dispatch
             sys.argv = [sys.argv[0]]

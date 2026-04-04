@@ -10,7 +10,6 @@ from project.research.trigger_discovery.candidate_generation import generate_par
 from project.research.trigger_discovery.candidate_scoring import score_trigger_candidates
 from project.research.trigger_discovery.proposal_emission import emit_proposals
 from project.research.search.search_feature_utils import prepare_search_features_for_symbol
-from project.research.walkforward import make_rolling_folds
 
 log = logging.getLogger(__name__)
 
@@ -79,15 +78,7 @@ def main():
         
     # Generate evaluation boundaries using walkforward logic (reuses Phase 2 logic)
     ts = augmented_features["timestamp"] if "timestamp" in augmented_features.columns else None
-    if ts is not None and not ts.empty:
-        folds = make_rolling_folds(
-            timestamps=ts,
-            train_days=180,
-            test_days=30,
-            step_days=30
-        )
-    else:
-        folds = []
+    folds = []
 
     log.info("Scoring proposals using canonical evidence pipeline (Fold Stability / Significance)...")
     scored_df = score_trigger_candidates(proposals, augmented_features, folds=folds)

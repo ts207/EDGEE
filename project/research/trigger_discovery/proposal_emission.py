@@ -92,3 +92,9 @@ def emit_proposals(
             f.write("\n```\n\n---\n\n")
 
     log.info(f"Wrote proposal markdown report: {md_path}")
+
+    # 5. Register in Adoption Control Plane
+    proposals_list = out_df.to_dict(orient="records")
+    if proposals_list:
+        lane = proposals_list[0].get("source_lane", "unknown")
+        register_proposals(proposals_list, output_dir, lane)
