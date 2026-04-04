@@ -1,603 +1,832 @@
-Thought for 14s
+Assuming Sprint 4 exits with a hardened **validate → promote** boundary, Sprint 5 should be the **surface-area consolidation sprint**: make the repo legible and operable through the four-stage model without changing core research semantics. That matches the original execution order in .
 
-Complete overhaul plan:
+# Sprint 5 — Surface Area Consolidation
 
-0. Objective
+Make the repo present and behave as:
+**discover → validate → promote → deploy**
+for both humans and tooling, while preserving one migration cycle of backward compatibility.
 
-Transform the repo into a personal crypto quant platform with one clean loop:
+## Sprint 5 objective
+Collapse the public interface onto the four-stage model and establish canonical terminology for the entire public surface.
 
-discover → validate → promote → deploy
+## Known deferred items
 
-Everything else becomes either:
+### 1. Deferred runtime integration
+`edge deploy` is interface-complete in Sprint 5, but execution integration with the live session runner is deferred to Sprint 6 runtime hardening. Commands like `edge deploy paper` will operate as dry-run/eligibility checks.
 
-data foundation,
-shared infrastructure,
-or advanced tooling.
+### 2. Deferred internal terminology cleanup
+Sprint 5 guarantees canonical public terminology (README, docs, CLI, schemas). Internal legacy comments and private variable names may persist temporarily where they do not affect external semantics.
 
-This is an architectural refactor, not a full rewrite.
-Keep the working engine, artifact system, runtime gating, and data stack.
-Overhaul the surface model, contracts, and stage boundaries.
+## Definition of done
+* `edge discover`, `edge validate`, `edge promote`, `edge deploy` are the canonical top-level verbs.
+* README and top-level docs explain the four-stage model consistently.
+* Public vocabulary is canonical (`anchor`, `filter`, `sampling_policy`, `candidate`, `thesis`).
+* Compatibility aliases exist and warn clearly.
+* `edge deploy` exposes a truthful deploy interface (inspect/dry-run/status).
+* deploy commands reject raw research candidates and accept only promoted theses.
+* Internal legacy terminology is allowed only where private and non-contradictory.
 
-1. What changes fundamentally
-Current problem
+---
 
-The repo is structurally capable, but the visible and internal model is too mixed:
+# Sprint 5 workstreams
 
-trigger mixes anchor, filter, and policy
-state and regime are overloaded
-discovery is underexposed
-validation is fragmented
-promotion partly re-runs validation
-operator mechanics dominate user intent
-Target state
+## Workstream 1 — Public CLI redesign
 
-The repo should behave like this:
+### Goal
 
-Discover
+Expose four first-class verbs exactly as planned:
 
-Generate broad candidate alpha.
+* `edge discover`
+* `edge validate`
+* `edge promote`
+* `edge deploy`
 
-Validate
+This is explicitly called out in the overhaul plan. 
 
-Determine whether candidate alpha is real, robust, and tradable enough to keep.
+### Deliverables
 
-Promote
+* top-level CLI command group with the four verbs
+* stable help text for each verb
+* compatibility aliases for old commands
+* deprecation warnings with migration guidance
+* command examples in help output
 
-Carry forward a small validated subset into thesis inventory.
+### Design rules
 
-Deploy
+Each verb must map to one stage only.
 
-Run only explicit approved theses in paper/live with basic risk controls.
+* `discover` produces candidate artifacts only
+* `validate` produces validation artifacts only
+* `promote` consumes validated candidates only
+* `deploy` consumes promoted theses only
 
-2. Non-negotiable design rules
-Rule 1
+No command should blur boundaries.
 
-Event / transition / sequence are anchors.
+### Recommended subcommands
 
-Rule 2
+#### `edge discover`
 
-State and regime are usually filters, not anchors.
+* `run`
+* `resume`
+* `inspect`
+* `list-artifacts`
 
-Rule 3
+#### `edge validate`
 
-Persistent conditions require sampling policy.
+* `run`
+* `inspect`
+* `report`
+* `list-artifacts`
 
-Rule 4
+#### `edge promote`
 
-Promotion is not another vague validation layer.
+* `run`
+* `inspect`
+* `export`
+* `list-artifacts`
 
-Rule 5
+#### `edge deploy`
 
-Nothing trades directly from research candidates.
+* `paper`
+* `live`
+* `status`
+* `disable`
+* `list-theses`
 
-Rule 6
+### Compatibility aliases
 
-The main user verbs are:
+Map old commands for one migration cycle:
 
-discover
-validate
-promote
-deploy
-3. New core research contract
+* old research/discovery/search commands → `edge discover ...`
+* old evaluation/preflight/diagnostic commands → `edge validate ...`
+* old export/promote commands → `edge promote ...`
+* old live runtime selectors/launchers → `edge deploy ...`
 
-Replace the current hypothesis contract centered on trigger with this:
+### Required behavior
 
-anchor:
-  type: event | transition | sequence | feature_crossing
-  ...
+Every alias must:
 
-filters:
-  states: [...]
-  regimes: [...]
-  feature_predicates: [...]
-  context: {...}
+* still work
+* print the new canonical command
+* identify sunset version/date
+* not silently change semantics
 
-sampling_policy:
-  mode: episodic | onset_only | once_per_episode | every_n_bars | continuous
-  entry_lag: 0|1|...
-  overlap_policy: suppress | allow | capped
+### Exit criteria
 
-template:
-  id: mean_reversion | continuation | convergence | ...
-  params: {...}
+* a new user can discover the four verbs from `edge --help`
+* each verb has stage-specific help with examples
+* aliases are tested and logged
 
-direction: long | short
-horizon_bars: N
-symbol_scope: ...
-Why this matters
+---
 
-This fixes the worst conceptual bug in the repo:
+## Workstream 2 — README rewrite
 
-STATE stops pretending to be the same kind of object as EVENT
-persistent conditions get explicit entry semantics
-discovery and validation become interpretable
-runtime contracts align with research contracts
-4. Semantic cleanup
-4.1 Trigger taxonomy
+### Goal
 
-Deprecate generic trigger.type as the main abstraction.
+Replace the repo’s front page identity with the four-stage operating model.
 
-Keep as valid anchors
-EVENT
-TRANSITION
-SEQUENCE
-FEATURE_CROSSING only when onset/crossing is explicit
-Demote to filters
-STATE
-static feature predicates
-most interaction conditions
-4.2 State vs regime
+The roadmap explicitly says to overhaul README and demote internal mechanics from front-page identity. 
 
-Introduce explicit typed concepts:
+### Recommended README structure
 
-market_regime
+## 1. One-sentence definition
 
-Broad environment class.
+Example:
+“This repo discovers crypto alpha candidates, validates them, promotes the few robust ideas into theses, and deploys approved theses in paper/live mode.”
+
+## 2. Core workflow diagram
+
+Use a compact diagram:
+
+`discover → validate → promote → deploy`
+
+with one-line descriptions.
+
+## 3. What each stage does
+
+* Discover: broad candidate generation
+* Validate: falsification and robustness testing
+* Promote: inventory/readiness decision
+* Deploy: explicit runtime execution of promoted theses
+
+## 4. Core concepts
+
+* anchor
+* filters
+* sampling_policy
+* template
+* validated candidate
+* promoted thesis
+
+## 5. Quickstart
+
+Minimal end-to-end example:
+
+* run discover
+* run validate
+* run promote
+* run deploy paper
+
+## 6. Repo map
+
+High-level pointers only:
+
+* docs/
+* project/research/
+* project/live/
+* tests/
+
+## 7. Compatibility note
+
+Explain old commands/specs are still supported temporarily.
+
+## 8. What this repo is not
+
+Useful for preventing confusion:
+
+* not auto-trading every research idea
+* not promotion-by-backtest
+* not portfolio optimizer first
+* not on-chain execution framework first
+
+### README anti-patterns to remove
+
+* long theory before workflow
+* operator internals near top
+* proposal grammar as front-door identity
+* benchmarking/certification dominating overview
+* mixed terminology for trigger/state/transition/anchor
+
+### Exit criteria
+
+* README first screen explains the system without referencing internals
+* quickstart uses only the new verbs
+* terminology is consistent with the new schema
+
+---
+
+## Workstream 3 — Full docs rewrite
+
+### Goal
+
+Rebuild docs around the planned documentation surface. The roadmap already specifies the desired docs set. 
+
+### Target docs tree
+
+* `docs/00_overview.md`
+* `docs/01_discover.md`
+* `docs/02_validate.md`
+* `docs/03_promote.md`
+* `docs/04_deploy.md`
+* `docs/05_data_foundation.md`
+* `docs/06_core_concepts.md`
+* `docs/90_architecture.md`
+* `docs/91_advanced_research.md`
+* `docs/92_assurance_and_benchmarks.md`
+
+### What each doc should cover
+
+#### `00_overview.md`
+
+Purpose:
+
+* explain the repo as a staged system
+* define lifecycle and artifact lineage
+* link to all stage docs
+
+Must include:
+
+* stage diagram
+* artifact flow
+* minimal end-to-end lifecycle
+* boundaries between stages
+
+#### `01_discover.md`
+
+Purpose:
+
+* explain discovery as candidate generation, not promotion
+
+Must include:
+
+* discovery inputs
+* candidate outputs
+* ranking and metadata
+* anchor/filter/sampling usage in discovery
+* common failure modes
+
+Must not imply:
+
+* discovery equals truth
+* top candidate equals deployable
+
+#### `02_validate.md`
+
+Purpose:
+
+* position validation as the truth-testing stage
+
+Must include:
+
+* required validation checks
+* validation artifacts
+* rejection reasons
+* robustness/falsification/stability interpretation
+* what qualifies a candidate for promotion
+
+#### `03_promote.md`
+
+Purpose:
+
+* explain promotion as packaging/governance/inventory
+
+Must include:
+
+* validated input requirement
+* readiness classes
+* maturity classes
+* promotion audit outputs
+* promoted thesis structure
+
+Must explicitly say:
+
+* promotion is not major re-validation
+
+#### `04_deploy.md`
+
+Purpose:
+
+* explain explicit deployment of promoted theses only
+
+Must include:
+
+* paper vs live
+* thesis selection
+* deployment state
+* minimal caps and controls
+* runtime monitoring/decay handling if already present
+
+#### `05_data_foundation.md`
+
+Purpose:
+
+* explain datasets, feature pipelines, artifacts, storage, lineage
+
+Must include:
+
+* source datasets
+* artifact naming
+* lineage expectations across stages
+* retention and reproducibility rules
+
+#### `06_core_concepts.md`
+
+Purpose:
+
+* become the canonical semantic glossary
+
+Must include:
+
+* anchor
+* event
+* transition
+* sequence
+* feature_crossing
+* filter
+* regime
+* state
+* sampling_policy
+* template
+* hypothesis/candidate/thesis
+* validation vs promotion
+
+This is the most important semantics doc.
+
+#### `90_architecture.md`
+
+Purpose:
+
+* explain package structure and internal flow for maintainers
+
+Must include:
+
+* module map
+* stage wrapper vs internal implementation
+* artifact boundaries
+* adapters/normalizers
+* compatibility layer
+
+#### `91_advanced_research.md`
+
+Purpose:
+
+* deeper material that should not dominate the front door
+
 Examples:
 
-high vol
-low vol
-trend
-chop
-liquidity stress
-state
+* search generation internals
+* ontology/grammar
+* synthetic truth tools
+* advanced diagnostics
 
-Operational condition active now.
+#### `92_assurance_and_benchmarks.md`
+
+Purpose:
+
+* keep assurance content, but demoted
+
 Examples:
 
-aftershock window
-close window
-high friction
-depth recovery
-transition
-
-A change from one state/regime to another.
-
-This should be reflected in spec metadata and validation.
-
-4.3 Typed state subclasses
-
-Split the current mixed state registry into:
-
-regime_state
-episode_state
-execution_state
-context_code
-
-Do not let all of them participate in search the same way.
-
-5. New top-level product structure
-5.1 Repo surface
-
-Reframe the repo around these stage directories conceptually:
-
-project/discover/
-project/validate/
-project/promote/
-project/deploy/
-
-You do not have to physically move everything at once.
-Start with façade packages that re-export existing modules.
-
-Example
-project/discover/__init__.py wraps current discovery/search services
-project/validate/__init__.py wraps proposal/preflight/eval/diagnostics
-etc.
-
-This lets you change the user model before a deep file migration.
-
-5.2 New docs surface
-
-Replace current top-level documentation narrative with:
-
-docs/00_overview.md
-docs/01_discover.md
-docs/02_validate.md
-docs/03_promote.md
-docs/04_deploy.md
-docs/05_data_foundation.md
-docs/06_core_concepts.md
-docs/90_architecture.md
-docs/91_advanced_research.md
-docs/92_assurance_and_benchmarks.md
-5.3 New CLI surface
-
-Expose four first-class commands:
-
-edge discover ...
-edge validate ...
-edge promote ...
-edge deploy ...
-
-Map current commands internally.
-
-Internal mapping
-edge discover → broad discovery / phase2 search / workbench / concept search
-edge validate → preflight + bounded run + diagnostics + robustness
-edge promote → promotion service + thesis packaging/export
-edge deploy → thesis loading + paper/live runtime
-
-Keep old commands as compatibility aliases for one migration cycle.
-
-6. Stage-by-stage overhaul
-Phase A — Discover
-Goal
-
-Make broad discovery the explicit upstream lane.
-
-Keep
-search generator
-phase2 search engine
-candidate discovery services
-broad discovery tooling
-strategy workbench
-concept/search specs
-Change
-stop centering proposal-first workflow here
-require discovery outputs to be candidate-centric, not proposal-centric
-attach candidate metadata:
-anchor class
-filter set
-sampling policy
-effective sample size
-overlap rate
-regime coverage
-New outputs
-candidate_table.parquet
-candidate_metadata.json
-discovery_summary.json
-Acceptance criteria
-user can run one discovery command and get ranked candidate sets
-state-filtered and event-anchored candidates are clearly distinguished
-discovery results no longer imply promotion or deployability
-Phase B — Validate
-Goal
-
-Centralize truth-testing here.
-
-Move into validation stage logically
-preflight
-bounded proposal execution
-confirmatory reruns
-multiplicity/FDR
-cost/slippage stress
-robustness
-time/regime splits
-negative controls
-diagnostics
-Key refactor
-
-Promotion must stop owning core truth-testing.
-
-Validation outputs
-validated_candidates.parquet
-validation_report.json
-rejection_reasons.parquet
-effect_stability_report.json
-Required checks
-
-Every candidate reaching promotion should already have:
-
-clear anchor semantics
-clear sampling policy
-effective sample size estimate
-overlap/dependence accounting
-cost sensitivity
-regime/time-slice stability
-falsification status
-Acceptance criteria
-“Is this real enough?” can be answered without invoking promotion
-identical candidate semantics across all validation paths
-transitions mean the same thing everywhere
-Phase C — Promote
-Goal
-
-Make promotion a narrow carry-forward decision.
-
-Promotion should do
-readiness decision
-maturity class assignment
-thesis packaging
-blueprint packaging
-governance metadata
-deployment-state defaulting
-Promotion should not do
-major new truth-testing
-hidden re-interpretation of candidate semantics
-fallback redefinition of anchors or transitions
-Outputs
-promoted_candidates.parquet
-promotion_audit.json
-promoted_theses.json
-strategy_blueprints/
-Acceptance criteria
-every promoted thesis has already passed validation
-promotion is explainable as a business/research inventory decision
-promotion failure reasons are separate from validation failure reasons
-Phase D — Deploy
-Goal
-
-Keep runtime simple, explicit, and safe.
-
-Keep
-thesis store
-retriever
-explicit thesis selection
-deployment state
-paper/live modes
-overlap checks
-runtime logging
-Add early
-decay monitor
-simple global caps:
-max gross exposure
-per-symbol cap
-per-family cap
-max active theses
-Do not prioritize yet
-full portfolio orchestrator
-complex correlation optimizer
-multi-venue routing
-on-chain integration
-Acceptance criteria
-paper deployment works from promoted thesis batch only
-live deployment requires explicit opt-in and risk caps
-runtime can auto-flag decay and downsize/disable
-7. Compatibility and migration strategy
-
-Do this as a two-track migration.
-
-Track 1 — façade first
-
-Create:
-
-new docs
-new CLI aliases
-new stage wrappers
-new schema adapters
-
-without breaking existing workflows.
-
-Track 2 — internal cleanup
-
-Then refactor internals gradually:
-
-replace trigger in schemas
-harden transition semantics
-split state taxonomy
-centralize validation
-narrow promotion
-Compatibility adapter
-
-Support both old and new hypothesis specs during migration:
-
-old trigger specs are normalized into:
-anchor
-filters
-sampling_policy
-
-Warn on:
-
-STATE as anchor
-static feature predicate as anchor
-ambiguous transition fallback
-8. Concrete file-level priorities
-Priority 1
-
-Schema and semantics
-
-Touch first:
-
-project/research/agent_io/proposal_schema.py
-project/research/agent_io/proposal_to_experiment.py
-project/research/search/generator.py
-project/research/search/evaluator_utils.py
-project/research/discovery.py
-
-Tasks:
-
-add new schema
-add old→new normalization
-ban ambiguous state-anchor behavior
-make transition evaluation strict
-add sampling policy contract
-Priority 2
-
-Validation boundary
-
-Touch:
-
-project/research/validation/*
-project/eval/*
-project/operator/stability.py
-promotion gating code
-
-Tasks:
-
-centralize validation outputs
-move truth-testing out of promotion where possible
-make validation artifact bundle canonical
-Priority 3
-
-Promotion narrowing
-
-Touch:
-
-project/research/promotion/*
-project/research/live_export.py
-project/research/export_promoted_theses.py
-
-Tasks:
-
-treat validated candidates as input
-assign maturity / readiness
-emit thesis packaging cleanly
-Priority 4
-
-CLI/docs overhaul
-
-Touch:
-
-project/cli.py
-README.md
-docs/*
-
-Tasks:
-
-expose four verbs
-demote operator internals
-publish concept glossary
-Priority 5
-
-Deploy hardening
-
-Touch:
-
-project/live/*
-project/portfolio/*
-live configs
-
-Tasks:
-
-add minimal decay monitor
-add simple caps
-keep runtime explicit and basic
-9. What to delete, demote, or freeze
-Freeze immediately
-
-Do not add new major feature families until the semantic overhaul is done:
-
-cross-venue execution
-on-chain integration
-regime forecasting
-self-calibration
-institutional reporting
-capacity optimizer
-
-These are second-order.
-
-Demote from front-page identity
-proposal mechanics
-certification flows
-benchmark maintenance
-ontology grammar internals
-synthetic truth tooling
-advanced runtime assurance
-
-Keep them, but do not let them define the repo.
-
-10. Testing strategy
-
-You need three test layers.
-
-1. Semantic contract tests
+* benchmark methodology
+* certification-like checks
+* regression suites
+* audit philosophy
+
+### Documentation rules
+
+* every page starts with stage purpose
+* every page has “inputs / outputs / artifacts / failure modes”
+* every page uses the new terms only
+* old terms appear only in migration notes
+
+### Exit criteria
+
+* docs navigation mirrors the four-stage model
+* no top-level doc contradicts the contract model
+* internal/advanced material is moved out of front-door flow
+
+---
+
+## Workstream 4 — Canonical glossary and terminology migration
+
+### Goal
+
+Eliminate mixed vocabulary across code comments, docs, CLI help, and artifacts.
+
+This is necessary because the overhaul explicitly centers semantic clarity around `anchor`, `filter`, and `sampling_policy`. 
+
+### Canonical terms
+
+Use these as source of truth:
+
+* **anchor**: event, transition, sequence, feature_crossing
+* **filters**: state/regime/context predicates
+* **sampling_policy**: episodic/once_per_episode/every_n_bars/etc.
+* **candidate**: output of discovery
+* **validated candidate**: output of validation
+* **promoted thesis**: output of promotion
+* **deployment**: runtime use of promoted theses
+
+### Terms to demote
+
+* `trigger` as public master abstraction
+* `state` as anchor
+* overloaded `proposal` where `candidate` or `thesis` is more accurate
+* promotion as “certification” unless that is a strict formal subsystem
+
+### Concrete tasks
+
+* grep repo for old public-facing terms
+* update CLI help
+* update README/docs/examples
+* update comments/docstrings in public modules
+* add migration glossary section:
+
+  * trigger → anchor + filters + sampling_policy
+  * legacy proposal → structured hypothesis
+  * promoted strategy → promoted thesis, if that is the intended term
+
+### Exit criteria
+
+* public docs no longer depend on legacy terminology
+* help text and examples are semantically consistent
+* migration table exists for old users
+
+---
+
+## Workstream 5 — Example flows and artifact lineage
+
+### Goal
+
+Give users executable examples that match the new product model.
+
+### Required examples
+
+#### Example A — minimal research loop
+
+* discover one candidate set
+* validate top candidate(s)
+* promote one validated candidate
+* deploy in paper mode
+
+#### Example B — validation failure path
+
+* show candidate rejection reasons
+* demonstrate no promotion possible
+
+#### Example C — compatibility path
+
+* run old alias
+* show mapped canonical command
+* show resulting equivalent artifacts
+
+### Artifact lineage spec
+
+Every example should show:
+
+* discovery run ID
+* validation run ID
+* promotion run ID
+* deploy session / thesis selection
+
+### Deliverables
+
+* `examples/` directory or `docs/examples/`
+* shell snippets
+* expected output samples
+* artifact tree samples
+
+### Exit criteria
+
+* a user can follow one example without inspecting internals
+* every example reflects true artifact boundaries
+
+---
+
+## Workstream 6 — Compatibility and deprecation framework
+
+### Goal
+
+Preserve stability while pushing users to the new surface.
+
+The roadmap explicitly calls for compatibility aliases for one migration cycle. 
+
+### Required compatibility behavior
+
+For commands:
+
+* old command works
+* warning prints once per invocation
+* warning includes canonical replacement
+* warning includes deprecation phase
+
+For specs:
+
+* old spec still normalizes
+* normalization warnings are human-readable
+* docs explain when support ends
+
+### Recommended deprecation phases
+
+* **Phase 1**: supported + warned
+* **Phase 2**: supported + noisy warning + docs marked legacy
+* **Phase 3**: disabled by default behind compatibility flag
+* **Phase 4**: removed
+
+### Suggested output format
+
+Use structured deprecation messages:
+
+* legacy command/spec used
+* replacement
+* current support level
+* target removal version
+
+### Exit criteria
+
+* users are never surprised by silently remapped behavior
+* all compatibility paths are explicit and test-covered
+
+---
+
+## Workstream 7 — Package façade and navigation cleanup
+
+### Goal
+
+Make the repository navigable according to stages even if internal modules remain where they are.
+
+This follows the roadmap guidance to use façade packages before deeper file migration. 
+
+### Recommended façades
+
+Conceptually expose:
+
+* `project/discover/`
+* `project/validate/`
+* `project/promote/`
+* `project/deploy/`
+
+These can initially re-export existing internals.
+
+### What façades should contain
+
+* stable service entrypoints
+* thin adapters
+* public data models if appropriate
+* minimal docstrings
+* no deep logic duplication
+
+### Why this matters
+
+It aligns:
+
+* CLI verbs
+* docs
+* architecture docs
+* import surface
+
+without forcing a large code move.
+
+### Exit criteria
+
+* maintainers can identify stage entrypoints quickly
+* docs and imports point to consistent top-level stage packages
+
+---
+
+## Workstream 8 — Test plan for Sprint 5
+
+### Goal
+
+Test the product surface, not just internal logic.
+
+### Test groups
+
+#### 1. CLI contract tests
 
 Verify:
 
-event anchor != state filter
-transition is strict everywhere
-old specs normalize deterministically
-sampling policy is required for persistent conditions
-2. Stage boundary tests
+* `edge --help` shows four canonical verbs
+* each verb has valid help text
+* each alias maps correctly
+* deprecation messages appear correctly
+
+#### 2. Documentation consistency tests
+
+Optional but high value:
+
+* link check
+* artifact-name consistency scan
+* forbidden-term scan for front-door docs
+* example command smoke validation
+
+#### 3. Compatibility tests
 
 Verify:
 
-discover emits candidates only
-validate emits validated candidates and rejection reasons
-promote cannot accept unvalidated candidates
-deploy cannot accept raw research candidates
-3. End-to-end golden tests
+* old commands still produce equivalent results
+* old specs normalize with explicit warnings
+* compatibility flag behavior is correct
+
+#### 4. Stage-boundary smoke tests
 
 Run:
 
-discover
-validate
-promote
-deploy (paper mode)
+* discover example
+* validate example
+* promote example
+* deploy paper example
 
-and confirm artifact lineage and stage transitions.
+using the new command surface
 
-11. Success criteria
+### Exit criteria
 
-The overhaul is complete when these are true:
+* user-facing surface is test-covered
+* migration paths are test-covered
+* docs examples do not rot immediately
 
-Product clarity
+---
 
-A new user can explain the repo in one sentence:
-discover alpha, validate it, promote the few real ideas, deploy them carefully
+# Sprint 5 structure by week or tranche
 
-Semantic clarity
+## Tranche 1 — vocabulary and interface lock
 
-There is no ambiguity between:
+Do first:
 
-anchor
-filter
-sampling policy
-template
-Stage clarity
+* freeze canonical terms
+* define CLI verbs/subcommands/options
+* define docs outline
+* define alias/deprecation rules
 
-You can answer separately:
+Output:
 
-discovered?
-validated?
-promoted?
-deployed?
-Statistical clarity
+* Sprint 5 interface spec
 
-State persistence and overlap are explicitly handled.
+## Tranche 2 — CLI implementation
 
-Runtime clarity
+Do next:
 
-Only promoted theses can reach deployment.
+* implement top-level command groups
+* wire aliases
+* standardize help text
+* add smoke tests
 
-12. Recommended execution order
-Sprint 1
-freeze feature expansion
-write new concept spec
-add anchor + filters + sampling_policy
-old→new schema normalizer
-Sprint 2
-strict transition semantics
-demote STATE to filter by default
-add sampling policy enforcement
-semantic tests
-Sprint 3
-centralize validation artifacts
-move validation logic out of promotion where needed
-define validation output contract
-Sprint 4
-narrow promotion contract
-clean thesis export handoff
-stage-boundary tests
-Sprint 5
-new CLI verbs
-docs rewrite
-README overhaul
-compatibility aliases
-Sprint 6
-paper deploy hardening
-decay monitor
-simple caps
-end-to-end golden runs
-13. Final recommendation
+Output:
 
-Do not rebuild the engine.
-Do not start with dashboards or new alpha families.
-Do not start with portfolio sophistication.
+* usable new command surface
 
-Start with the semantic overhaul:
+## Tranche 3 — README and stage docs
 
-trigger → anchor + filters + sampling_policy
-centralize validation
-narrow promotion
-expose discover / validate / promote / deploy
+Do next:
 
-That is the highest-leverage path because it fixes:
+* rewrite README
+* add `00`–`06` docs
+* move advanced material to `90+` docs
+* add migration glossary
 
-research correctness,
-repo clarity,
-false discovery risk,
-and live deployment semantics
-all at once.
+Output:
 
-Start with Sprint 1 and freeze all new feature work until the new hypothesis contract is in place
+* coherent documentation portal
+
+## Tranche 4 — examples and compatibility docs
+
+Do next:
+
+* add end-to-end examples
+* add old→new migration pages
+* add artifact lineage examples
+
+Output:
+
+* adoption support
+
+## Tranche 5 — cleanup and hardening
+
+Do last:
+
+* terminology sweep
+* docstring/help consistency
+* link check
+* example smoke tests
+* release notes / changelog entry
+
+Output:
+
+* stable release candidate
+
+---
+
+# Concrete tickets
+
+## CLI
+
+* create top-level stage command groups
+* add subcommands per stage
+* centralize common run/artifact options
+* add deprecation alias registry
+* standardize help formatter
+* add stage-specific examples to `--help`
+
+## Docs
+
+* rewrite README
+* add overview doc
+* add discover/validate/promote/deploy docs
+* add data foundation doc
+* add core concepts doc
+* add architecture doc
+* add advanced research doc
+* add assurance/benchmarks doc
+* add migration guide
+
+## Examples
+
+* minimal full pipeline example
+* rejected candidate example
+* compatibility alias example
+
+## Terminology
+
+* replace public `trigger` master usage
+* replace ambiguous `proposal` usage where needed
+* add glossary
+* add old→new term mapping table
+
+## Tests
+
+* CLI help tests
+* alias/deprecation tests
+* docs link checks
+* example smoke tests
+* terminology lint checks for front-door docs
+
+---
+
+# Risks and how to control them
+
+## Risk 1 — Sprint 5 turns into a hidden architecture rewrite
+
+Control:
+
+* use façades and aliases
+* do not move deep internals unless required
+
+## Risk 2 — docs get ahead of actual behavior
+
+Control:
+
+* every example must be executable
+* write docs from real command outputs
+* add smoke tests for examples
+
+## Risk 3 — compatibility layer becomes permanent
+
+Control:
+
+* attach explicit deprecation phases
+* mark all legacy docs as temporary
+* add removal target in changelog
+
+## Risk 4 — terminology drift persists
+
+Control:
+
+* create one canonical glossary first
+* run terminology sweep after README/docs rewrite
+* add simple lint/search checks
+
+## Risk 5 — help text and artifacts still expose old mental models
+
+Control:
+
+* use stage-specific nouns everywhere
+* forbid mixed terms in CLI templates
+* review generated example outputs
+
+---
+
+# Definition of done
+
+Sprint 5 is done when all of the following are true:
+
+* README presents the repo through the four-stage model
+* `edge discover|validate|promote|deploy` are the canonical top-level verbs
+* stage docs exist and match real behavior
+* old commands still work through a documented compatibility layer
+* migration guidance from old terms/commands exists
+* examples run through the new surface
+* docs/help/examples use consistent concepts:
+
+  * anchor
+  * filters
+  * sampling_policy
+  * candidate
+  * validated candidate
+  * promoted thesis
+  * deploy
+
+---
+
+# Strongest recommendation on sequencing
+
+Start Sprint 5 with a short **interface specification document** before touching code:
+
+1. canonical CLI verbs and subcommands
+2. canonical terminology table
+3. canonical docs tree
+4. alias/deprecation policy
+5. example artifact lineage
+
+Then implement CLI first, README/docs second, compatibility/tests third.
+
+That sequence minimizes rework because Sprint 5 is primarily a **surface contract sprint**, not a logic sprint.
