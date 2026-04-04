@@ -531,6 +531,18 @@ class TestControllerMiIntegration:
 
     def test_no_mi_file_falls_back_to_static(self, tmp_path):
         ctrl = _make_ctrl(tmp_path)
+        
+        # Mock search space with static predicates
+        search_space_path = tmp_path / "search_space.yaml"
+        search_space_path.write_text("""
+triggers:
+  feature_predicates:
+    - feature: static_feature
+      operator: ">="
+      threshold: 0.5
+        """, encoding="utf-8")
+        ctrl._search_space_path = search_space_path
+
         mem = {
             "belief_state": {}, "next_actions": {}, "latest_reflection": {},
             "avoid_region_keys": set(), "avoid_event_types": set(),

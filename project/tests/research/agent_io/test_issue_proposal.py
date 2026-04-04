@@ -121,6 +121,7 @@ def test_issue_proposal_writes_program_memory_audit(monkeypatch, tmp_path):
         registry_root=registry_root,
         data_root=data_root,
         plan_only=True,
+        legacy_compatibility=True,
     )
 
     proposals_path = (

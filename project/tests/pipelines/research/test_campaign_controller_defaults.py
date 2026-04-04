@@ -33,8 +33,10 @@ def test_execute_pipeline_includes_memory_update(monkeypatch):
     config = CampaignConfig(program_id="test")
     # Use dummy paths for testing
     ctrl = CampaignController(config, Path("/tmp"), Path("/tmp"))
+    cfg_path = Path("/tmp/cfg.yaml")
+    cfg_path.write_text("instrument_scope: {}", encoding="utf-8")
     try:
-        ctrl._execute_pipeline(Path("/tmp/cfg.yaml"), "run_test_1")
+        ctrl._execute_pipeline(cfg_path, "run_test_1")
     except Exception:
         pass
     assert calls, "subprocess.run was not called"

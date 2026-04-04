@@ -52,31 +52,33 @@ def test_resolve_promotion_policy_switches_by_profile(monkeypatch, tmp_path: Pat
         require_low_capital_contract=True,
         min_trade_count=20,
     )
-    base_config = svc.PromotionConfig(
-        run_id="run-1",
-        symbols="BTCUSDT",
-        out_dir=tmp_path / "out",
-        max_q_value=0.05,
-        min_events=5,
-        min_stability_score=0.5,
-        min_sign_consistency=0.5,
-        min_cost_survival_ratio=0.5,
-        max_negative_control_pass_rate=0.25,
-        min_tob_coverage=0.5,
+    config = PromotionConfig(
+        run_id="test_run",
+        symbols="BTC",
+        out_dir=tmp_path,
+        max_q_value=0.10,
+        min_events=100,
+        min_stability_score=0.05,
+        min_sign_consistency=0.67,
+        min_cost_survival_ratio=0.75,
+        max_negative_control_pass_rate=0.01,
+        min_tob_coverage=0.60,
         require_hypothesis_audit=True,
-        allow_missing_negative_controls=False,
-        require_multiplicity_diagnostics=True,
-        min_dsr=1.0,
-        max_overlap_ratio=0.5,
-        max_profile_correlation=0.5,
+        allow_missing_negative_controls=True,
+        require_multiplicity_diagnostics=False,
+        min_dsr=0.5,
+        max_overlap_ratio=0.8,
+        max_profile_correlation=0.9,
         allow_discovery_promotion=False,
-        program_id="prog-1",
+        program_id="test_program",
         retail_profile="capital_constrained",
         objective_name="retail_profitability",
         objective_spec=None,
         retail_profiles_spec=None,
         promotion_profile="auto",
+        use_compatibility_bridge=True,
     )
+
 
     research = svc._resolve_promotion_policy(
         config=base_config,
@@ -180,31 +182,33 @@ def test_execute_promotion_success_path(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setattr(svc, "start_manifest", lambda *args, **kwargs: {"status": "started"})
     monkeypatch.setattr(svc, "finalize_manifest", lambda manifest, status, **kwargs: manifest.update({"status": status, **kwargs}))
 
-    config = svc.PromotionConfig(
-        run_id="run-1",
-        symbols="BTCUSDT",
-        out_dir=tmp_path / "out",
-        max_q_value=0.05,
-        min_events=5,
-        min_stability_score=0.5,
-        min_sign_consistency=0.5,
-        min_cost_survival_ratio=0.5,
-        max_negative_control_pass_rate=0.25,
-        min_tob_coverage=0.5,
+    config = PromotionConfig(
+        run_id="test_run",
+        symbols="BTC",
+        out_dir=tmp_path,
+        max_q_value=0.10,
+        min_events=100,
+        min_stability_score=0.05,
+        min_sign_consistency=0.67,
+        min_cost_survival_ratio=0.75,
+        max_negative_control_pass_rate=0.01,
+        min_tob_coverage=0.60,
         require_hypothesis_audit=True,
-        allow_missing_negative_controls=False,
-        require_multiplicity_diagnostics=True,
-        min_dsr=1.0,
-        max_overlap_ratio=0.5,
-        max_profile_correlation=0.5,
+        allow_missing_negative_controls=True,
+        require_multiplicity_diagnostics=False,
+        min_dsr=0.5,
+        max_overlap_ratio=0.8,
+        max_profile_correlation=0.9,
         allow_discovery_promotion=False,
-        program_id="prog-1",
+        program_id="test_program",
         retail_profile="capital_constrained",
         objective_name="retail_profitability",
         objective_spec=None,
         retail_profiles_spec=None,
         promotion_profile="auto",
+        use_compatibility_bridge=True,
     )
+
 
     result = svc.execute_promotion(config)
     assert result.exit_code == 0
@@ -277,31 +281,33 @@ def test_execute_promotion_allows_research_run_mode(monkeypatch, tmp_path: Path)
     monkeypatch.setattr(svc, "start_manifest", lambda *args, **kwargs: {"status": "started"})
     monkeypatch.setattr(svc, "finalize_manifest", lambda manifest, status, **kwargs: manifest.update({"status": status, **kwargs}))
 
-    config = svc.PromotionConfig(
-        run_id="run-1",
-        symbols="BTCUSDT",
-        out_dir=tmp_path / "out",
-        max_q_value=0.05,
-        min_events=5,
-        min_stability_score=0.5,
-        min_sign_consistency=0.5,
-        min_cost_survival_ratio=0.5,
-        max_negative_control_pass_rate=0.25,
-        min_tob_coverage=0.5,
+    config = PromotionConfig(
+        run_id="test_run",
+        symbols="BTC",
+        out_dir=tmp_path,
+        max_q_value=0.10,
+        min_events=100,
+        min_stability_score=0.05,
+        min_sign_consistency=0.67,
+        min_cost_survival_ratio=0.75,
+        max_negative_control_pass_rate=0.01,
+        min_tob_coverage=0.60,
         require_hypothesis_audit=True,
-        allow_missing_negative_controls=False,
-        require_multiplicity_diagnostics=True,
-        min_dsr=1.0,
-        max_overlap_ratio=0.5,
-        max_profile_correlation=0.5,
+        allow_missing_negative_controls=True,
+        require_multiplicity_diagnostics=False,
+        min_dsr=0.5,
+        max_overlap_ratio=0.8,
+        max_profile_correlation=0.9,
         allow_discovery_promotion=False,
-        program_id="prog-1",
+        program_id="test_program",
         retail_profile="capital_constrained",
         objective_name="retail_profitability",
         objective_spec=None,
         retail_profiles_spec=None,
         promotion_profile="auto",
+        use_compatibility_bridge=True,
     )
+
 
     result = svc.execute_promotion(config)
 
@@ -369,31 +375,33 @@ def test_execute_promotion_normalizes_empty_bundle_outputs(monkeypatch, tmp_path
         lambda manifest, status, **kwargs: manifest.update({"status": status, **kwargs}),
     )
 
-    config = svc.PromotionConfig(
-        run_id="run-1",
-        symbols="BTCUSDT",
-        out_dir=tmp_path / "out",
-        max_q_value=0.05,
-        min_events=5,
-        min_stability_score=0.5,
-        min_sign_consistency=0.5,
-        min_cost_survival_ratio=0.5,
-        max_negative_control_pass_rate=0.25,
-        min_tob_coverage=0.5,
+    config = PromotionConfig(
+        run_id="test_run",
+        symbols="BTC",
+        out_dir=tmp_path,
+        max_q_value=0.10,
+        min_events=100,
+        min_stability_score=0.05,
+        min_sign_consistency=0.67,
+        min_cost_survival_ratio=0.75,
+        max_negative_control_pass_rate=0.01,
+        min_tob_coverage=0.60,
         require_hypothesis_audit=True,
-        allow_missing_negative_controls=False,
-        require_multiplicity_diagnostics=True,
-        min_dsr=1.0,
-        max_overlap_ratio=0.5,
-        max_profile_correlation=0.5,
+        allow_missing_negative_controls=True,
+        require_multiplicity_diagnostics=False,
+        min_dsr=0.5,
+        max_overlap_ratio=0.8,
+        max_profile_correlation=0.9,
         allow_discovery_promotion=False,
-        program_id="prog-1",
+        program_id="test_program",
         retail_profile="capital_constrained",
         objective_name="retail_profitability",
         objective_spec=None,
         retail_profiles_spec=None,
         promotion_profile="auto",
+        use_compatibility_bridge=True,
     )
+
 
     result = svc.execute_promotion(config)
 

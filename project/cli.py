@@ -8,7 +8,18 @@ from pathlib import Path
 from project.pipelines import run_all
 
 
+def _log_legacy_usage(context: str):
+    log_dir = Path("data/logs")
+    log_dir.mkdir(parents=True, exist_ok=True)
+    log_path = log_dir / "legacy_usage.log"
+    import datetime
+    timestamp = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    with log_path.open("a", encoding="utf-8") as f:
+        f.write(f"[{timestamp}] LEGACY USAGE: {context}\n")
+
+
 def _deprecation_warning(old_cmd: str, new_cmd: str):
+    _log_legacy_usage(f"Command: {old_cmd}")
     print(
         f"WARNING: '{old_cmd}' is deprecated and will be removed in a future version.\n"
         f"Please use canonical verb: '{new_cmd}'\n",
@@ -219,6 +230,9 @@ def _build_parser() -> argparse.ArgumentParser:
     catalog_compare.add_argument("--stage", required=True, choices=["discover", "validate", "promote"])
     catalog_compare.add_argument("--data_root", default=None)
 
+    subparsers.required = True
+    return parser
+
 
 def _default_out_dir(proposal_path: str | Path, run_id: str | None) -> Path:
     proposal_name = Path(proposal_path).stem or "proposal"
@@ -365,12 +379,13 @@ def main() -> int:
 
             if args.subcommand == "paper":
                 print(f"Launching Paper Deployment for {args.run_id}...")
-                from project.live.runner import LiveEngineRunner
+                from project.live import runner as live_runner
                 import asyncio
-                
+
                 # Configure for paper mode
                 symbols = ["BTCUSDT"] # Should ideally come from thesis store scope
-                runner = LiveEngineRunner(
+                runner_instance = live_runner.LiveEngineRunner(
+
                     symbols=symbols,
                     runtime_mode="monitor_only", # Paper mode is monitor_only in this engine
                     strategy_runtime={

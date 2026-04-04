@@ -779,17 +779,35 @@ def compile_single_hypothesis_to_agent_proposal(
     return compiled
 
 
+def _log_legacy_usage(context: str):
+    log_dir = Path("data/logs")
+    log_dir.mkdir(parents=True, exist_ok=True)
+    log_path = log_dir / "legacy_usage.log"
+    import datetime
+    timestamp = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    try:
+        with log_path.open("a", encoding="utf-8") as f:
+            f.write(f"[{timestamp}] LEGACY USAGE: {context}\n")
+    except Exception:
+        pass
+
+
 def load_operator_proposal(path_or_payload: str | Path | Dict[str, Any], legacy_compatibility: bool = True) -> AgentProposal:
     raw = _load_proposal_payload(path_or_payload)
     fmt = detect_operator_proposal_format(raw)
-    
+
     if not legacy_compatibility and fmt != "structured_hypothesis":
         raise ValueError(
             f"Proposal format '{fmt}' is legacy and not allowed when legacy_compatibility=False. "
             "Please migrate to StructuredHypothesis format (with anchor/filters/sampling_policy)."
         )
 
+    if fmt != "structured_hypothesis":
+        source_name = getattr(path_or_payload, "name", str(path_or_payload)) if isinstance(path_or_payload, Path) else "payload"
+        _log_legacy_usage(f"Schema format '{fmt}' loaded from {source_name}")
+
     if fmt == "structured_hypothesis":
+
         proposal, _ = normalize_structured_proposal(raw)
         return compile_structured_proposal_to_agent_proposal(proposal)
     if fmt == "single_hypothesis":

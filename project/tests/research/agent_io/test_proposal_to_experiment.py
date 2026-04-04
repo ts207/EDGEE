@@ -24,6 +24,7 @@ def test_translate_and_validate_proposal_keeps_bundle_artifacts_in_sync(tmp_path
         registry_root=registry_root,
         out_dir=out_dir,
         config_path=config_path,
+        legacy_compatibility=True,
     )
 
     assert result["experiment_config_path"] == str(config_path)

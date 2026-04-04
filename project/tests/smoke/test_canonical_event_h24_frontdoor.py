@@ -100,6 +100,7 @@ def test_canonical_event_h24_frontdoor_runs_end_to_end_without_runtime_side_effe
         registry_root=Path("project/configs/registries"),
         data_root=data_root,
         plan_only=True,
+        legacy_compatibility=True,
     )
 
     assert result["program_id"] == "volshock_btc_long_12b"
