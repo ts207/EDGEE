@@ -1,0 +1,43 @@
+benchmark_modes:
+  baseline_flat:
+    discovery_search:
+      mode: flat
+    discovery_scoring:
+      version: v1
+  folds_only:
+    discovery_validation:
+      repeated_walkforward:
+        enabled: true
+    discovery_scoring:
+      version: v2
+  folds_plus_ledger:
+    discovery_validation:
+      repeated_walkforward:
+        enabled: true
+    discovery_scoring:
+      version: v3
+  hierarchical_v1:
+    discovery_validation:
+      repeated_walkforward:
+        enabled: true
+    discovery_scoring:
+      version: v3
+    discovery_search:
+      mode: hierarchical
+  hierarchical_plus_diversified:
+    discovery_validation:
+      repeated_walkforward:
+        enabled: true
+    discovery_scoring:
+      version: v3
+    discovery_search:
+      mode: hierarchical
+    discovery_selection:
+      mode: diversified
+
+slices:
+  - m0_strong_event.yaml
+  - m1_noisy_event.yaml
+  - m2_regime_shift.yaml
+  - m3_microstructure_stress.yaml
+  - m4_neutral_baseline.yaml

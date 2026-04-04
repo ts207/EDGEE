@@ -1,0 +1,7 @@
+slice_id: m1_noisy_event
+symbols: [ETH-USD]
+timeframe: 1m
+date_range: [2022-05-01, 2022-05-15]
+expected_benchmark_family: noisy_event
+trigger_discovery_included: false
+benchmark_mode_tags: [noise, event]

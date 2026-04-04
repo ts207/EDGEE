@@ -1,0 +1,7 @@
+slice_id: m4_neutral_baseline
+symbols: [ADA-USD]
+timeframe: 1h
+date_range: [2023-01-01, 2023-06-01]
+expected_benchmark_family: neutral_baseline
+trigger_discovery_included: false
+benchmark_mode_tags: [neutral, baseline]

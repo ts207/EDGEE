@@ -1,0 +1,13 @@
+thresholds:
+  max_candidate_growth_ratio: 1.50
+  min_final_candidates: 5
+  min_top10_median_fold_sign_consistency: 0.60
+  min_top10_after_cost_expectancy_bps: 0.0
+  min_top10_promotion_survival_rate: 0.20
+  max_shortlist_avg_similarity: 0.75
+  min_shortlist_distinct_lineage_count: 5
+
+trigger_discovery:
+  min_mean_registry_novelty_score: 0.20
+  max_redundant_trigger_ratio: 0.70
+  min_trigger_candidate_quality_score: 0.10

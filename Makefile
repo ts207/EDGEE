@@ -365,3 +365,13 @@ check-hygiene:
 
 clean-hygiene:
 	$(CLEAN_SCRIPT) hygiene
+
+benchmark-core:
+	$(PYTHON) -m project.scripts.run_benchmark_matrix --preset core_v1
+
+benchmark-review:
+	$(PYTHON) -m project.scripts.show_benchmark_review --latest
+
+benchmark-certify:
+	$(PYTHON) -m project.scripts.run_benchmark_maintenance_cycle --preset core_v1
+

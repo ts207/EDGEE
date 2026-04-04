@@ -1,0 +1,7 @@
+slice_id: m2_regime_shift
+symbols: [SOL-USD]
+timeframe: 1h
+date_range: [2022-10-01, 2022-12-01]
+expected_benchmark_family: regime_shift
+trigger_discovery_included: false
+benchmark_mode_tags: [shift, medium]

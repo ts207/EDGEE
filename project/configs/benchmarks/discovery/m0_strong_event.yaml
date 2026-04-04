@@ -1,0 +1,7 @@
+slice_id: m0_strong_event
+symbols: [BTC-USD]
+timeframe: 1h
+date_range: [2021-01-01, 2021-03-01]
+expected_benchmark_family: strong_trend
+trigger_discovery_included: false
+benchmark_mode_tags: [trend, strong]
