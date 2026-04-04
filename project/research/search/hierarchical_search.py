@@ -135,14 +135,22 @@ def _evaluate_hypotheses(
         return pd.DataFrame()
 
 
-def _apply_v2_scoring(candidates: pd.DataFrame) -> pd.DataFrame:
+def _apply_v2_scoring(
+    candidates: pd.DataFrame, 
+    *, 
+    data_root: Path | None = None, 
+    run_id: str | None = None
+) -> pd.DataFrame:
     """Apply v2/v3 discovery scoring if possible (non-fatal)."""
     if candidates.empty:
         return candidates
     try:
         import yaml
         from project import PROJECT_ROOT
-        from project.research.services.candidate_discovery_scoring import annotate_discovery_v2_scores
+        from project.research.services.candidate_discovery_scoring import (
+            annotate_discovery_v2_scores,
+            apply_ledger_multiplicity_correction
+        )
 
         config = {
             "default_turnover_penalty_thresh": 0.8,
@@ -156,9 +164,15 @@ def _apply_v2_scoring(candidates: pd.DataFrame) -> pd.DataFrame:
                 if yaml_data and "v2_scoring" in yaml_data:
                     config.update(yaml_data["v2_scoring"])
 
-        return annotate_discovery_v2_scores(candidates, config)
+        out = annotate_discovery_v2_scores(candidates, config)
+        
+        # Apply ledger correction (v3) if data_root/run_id are available
+        if data_root and run_id:
+            out = apply_ledger_multiplicity_correction(out, data_root=data_root, current_run_id=run_id)
+            
+        return out
     except Exception as exc:
-        log.debug("V2 scoring skipped in hierarchical stage: %s", exc)
+        log.debug("V2 scoring failed/skipped in hierarchical stage: %s", exc)
         return candidates
 
 
@@ -296,6 +310,8 @@ def _run_stage_a(
     min_t_stat: float,
     symbol: str,
     bridge_gates: dict,
+    data_root: Path | None = None,
+    run_id: str | None = None,
 ) -> tuple[pd.DataFrame, list]:
     """Stage A — Trigger viability probes.
 
@@ -331,7 +347,7 @@ def _run_stage_a(
         symbol=symbol,
         bridge_gates=bridge_gates,
     )
-    candidates = _apply_v2_scoring(candidates)
+    candidates = _apply_v2_scoring(candidates, data_root=data_root, run_id=run_id)
     candidates = _annotate_lineage(candidates, stage=STAGE_TRIGGER_VIABILITY)
 
     if candidates.empty:
@@ -371,6 +387,8 @@ def _run_stage_b(
     min_t_stat: float,
     symbol: str,
     bridge_gates: dict,
+    data_root: Path | None = None,
+    run_id: str | None = None,
 ) -> tuple[pd.DataFrame, list]:
     """Stage B — Template refinement for surviving triggers."""
     from project.research.search.generator import generate_template_refinement_candidates
@@ -410,7 +428,7 @@ def _run_stage_b(
         symbol=symbol,
         bridge_gates=bridge_gates,
     )
-    candidates = _apply_v2_scoring(candidates)
+    candidates = _apply_v2_scoring(candidates, data_root=data_root, run_id=run_id)
 
     # Build root_trigger_id map from event_type → existing Stage A candidate_id
     event_col = "canonical_event_type" if "canonical_event_type" in survivors_a.columns else "event_type"
@@ -463,6 +481,8 @@ def _run_stage_c(
     min_t_stat: float,
     symbol: str,
     bridge_gates: dict,
+    data_root: Path | None = None,
+    run_id: str | None = None,
 ) -> tuple[pd.DataFrame, list]:
     """Stage C — Execution shape (direction × lag) refinement."""
     from project.research.search.generator import generate_execution_refinement_candidates
@@ -502,7 +522,7 @@ def _run_stage_c(
         symbol=symbol,
         bridge_gates=bridge_gates,
     )
-    candidates = _apply_v2_scoring(candidates)
+    candidates = _apply_v2_scoring(candidates, data_root=data_root, run_id=run_id)
 
     # Parent map: (event_type, template) → Stage B candidate_id
     event_col = "canonical_event_type" if "canonical_event_type" in survivors_b.columns else "event_type"
@@ -574,6 +594,8 @@ def _run_stage_d(
     min_t_stat: float,
     symbol: str,
     bridge_gates: dict,
+    data_root: Path | None = None,
+    run_id: str | None = None,
 ) -> pd.DataFrame:
     """Stage D — Sparse context refinement with unconditional baseline.
 
@@ -624,7 +646,7 @@ def _run_stage_d(
         symbol=symbol,
         bridge_gates=bridge_gates,
     )
-    all_candidates = _apply_v2_scoring(all_candidates)
+    all_candidates = _apply_v2_scoring(all_candidates, data_root=data_root, run_id=run_id)
     all_candidates = _annotate_lineage(all_candidates, stage=STAGE_CONTEXT_REFINEMENT)
 
     if all_candidates.empty:
@@ -748,6 +770,8 @@ def run_hierarchical_search(
         min_t_stat=min_t_stat,
         symbol=symbol,
         bridge_gates=bridge_gates,
+        data_root=data_root,
+        run_id=run_id,
     )
     total_evaluated += len(probe_specs)
     result.stage_artifacts[STAGE_TRIGGER_VIABILITY] = stage_a_df
@@ -781,6 +805,8 @@ def run_hierarchical_search(
         min_t_stat=min_t_stat,
         symbol=symbol,
         bridge_gates=bridge_gates,
+        data_root=data_root,
+        run_id=run_id,
     )
     total_evaluated += len(stage_b_specs)
     result.stage_artifacts[STAGE_TEMPLATE_REFINEMENT] = stage_b_df
@@ -813,6 +839,8 @@ def run_hierarchical_search(
         min_t_stat=min_t_stat,
         symbol=symbol,
         bridge_gates=bridge_gates,
+        data_root=data_root,
+        run_id=run_id,
     )
     total_evaluated += len(stage_c_specs)
     result.stage_artifacts[STAGE_EXECUTION_REFINEMENT] = stage_c_df
@@ -847,6 +875,8 @@ def run_hierarchical_search(
         min_t_stat=min_t_stat,
         symbol=symbol,
         bridge_gates=bridge_gates,
+        data_root=data_root,
+        run_id=run_id,
     )
     result.stage_artifacts[STAGE_CONTEXT_REFINEMENT] = final_candidates
     result.stage_stats[STAGE_CONTEXT_REFINEMENT] = _stage_stats(

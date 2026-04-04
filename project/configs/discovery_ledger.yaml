@@ -9,7 +9,9 @@
 discovery_scoring:
   version: v3
   ledger_adjustment:
-    # Master switch. False = legacy scoring only; ledger still written.
+    # [STATUS: EXPERIMENTAL] - Ledger-adjusted multiplicity burden.
+    # Controls the concept-lineage correction layer.
+    # Set enabled: true to activate the v3 score component.
     enabled: false
 
     # How far back to look for prior test counts.

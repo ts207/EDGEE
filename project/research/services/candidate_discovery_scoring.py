@@ -1137,6 +1137,8 @@ def build_discovery_quality_score(row: pd.Series, overlap_context: dict, config:
         "novelty_component": novelty_score,
         "support_component": support_score,
         "significance_component": significance_score,
+        "fold_stability_bonus": fold_bonus,
+        "fold_stability_penalty": fold_penalty,
         "overlap_penalty": overlap_penalty,
         "fragility_penalty": fragility_penalty,
         "discovery_quality_score": float(combined_score),

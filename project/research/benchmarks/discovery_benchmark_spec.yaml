@@ -1,0 +1,47 @@
+version: 1
+kind: discovery_benchmark_spec
+cases:
+  - id: simple_event
+    description: "One simple event-driven case"
+    symbol: "BTCUSDT"
+    search_spec:
+      events: ["LONG_WIKI_BREAKOUT"]
+      horizons: ["1h", "4h"]
+      expression_templates: ["continuation"]
+      max_candidates_per_run: 50
+
+  - id: medium_complexity
+    description: "One medium-complexity case"
+    symbol: "ETHUSDT"
+    search_spec:
+      events: ["RSI_OVERSOLD", "MACD_CROSSOVER"]
+      horizons: ["15m", "1h"]
+      expression_templates: ["reversal", "continuation"]
+      max_candidates_per_run: 100
+
+  - id: high_candidate_noise
+    description: "One noisy/high-candidate case"
+    symbol: "SOLUSDT"
+    search_spec:
+      events: ["VOL_SPIKE"]
+      horizons: ["5m", "15m", "1h"]
+      expression_templates: ["trend_following", "mean_reversion"]
+      max_candidates_per_run: 500
+
+  - id: historically_promotable
+    description: "One historically promotable case"
+    symbol: "BTCUSDT"
+    search_spec:
+      events: ["EMA_CROSS_20_50"]
+      horizons: ["4h", "1d"]
+      expression_templates: ["continuation"]
+      max_candidates_per_run: 20
+
+  - id: historically_weak
+    description: "One historically weak case"
+    symbol: "LTCUSDT"
+    search_spec:
+      events: ["RANDOM_NOISE_EVENT"]
+      horizons: ["1m", "5m"]
+      expression_templates: ["continuation"]
+      max_candidates_per_run: 50

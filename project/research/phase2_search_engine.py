@@ -511,7 +511,11 @@ def _build_gate_funnel(
     min_n: int,
 ) -> dict[str, int]:
     valid_mask = _bool_mask(metrics, "valid")
-    n_values = pd.to_numeric(metrics.get("n", 0), errors="coerce").fillna(0)
+    # TICKET-012: Ensure n_values is a series even if 'n' column is missing to avoid .fillna AttributeError
+    if "n" in metrics.columns:
+        n_values = pd.to_numeric(metrics["n"], errors="coerce").fillna(0)
+    else:
+        n_values = pd.Series(0.0, index=metrics.index)
     pass_min_n = valid_mask & (n_values >= int(min_n))
 
     funnel: dict[str, int] = {
@@ -871,8 +875,22 @@ def run(
     phase2_event_type: str = "",
 ) -> int:
     """
+    Discovery v2 Search Engine Orchestrator. [STATUS: STABLE]
+
+    FEATURE CLASSIFICATION:
+    -----------------------
+    - STABLE:
+        * Phase 1 Event Generation
+        * Phase 2 Legacy (t-stat) Ranking
+        * Gating Funnels
+    - STABLE-INTERNAL:
+        * Discovery v2 Scoring (Significance, Tradability, Novelty, Falsification)
+        * Decomposition Diagnostics
+    - EXPERIMENTAL:
+        * Concept Ledger (v3) Multiplicity Correction
+        * Fold-based Stability Folds
+
     Core logic. Returns exit code (0=success, 1=failure).
-    Separated from main() for testability.
     """
     log.info(
         "Starting Phase 2 Search Engine (run_id=%s, search_spec=%s, experiment_config=%s)",
@@ -1480,10 +1498,13 @@ def run(
     final_df = _attach_candidate_run_lineage(final_df, run_id=run_id)
     final_df = _annotate_promotion_gate_fields(final_df)
 
-    if not final_df.empty and enable_discovery_v2_scoring:
+    if not final_df.empty:
         try:
             import yaml
-            from project.research.services.candidate_discovery_scoring import annotate_discovery_v2_scores
+            from project.research.services.candidate_discovery_scoring import (
+                annotate_discovery_v2_scores,
+                apply_ledger_multiplicity_correction
+            )
             config = {
                 "default_turnover_penalty_thresh": 0.8,
                 "default_coverage_thresh": 0.01,
@@ -1499,17 +1520,38 @@ def run(
                 except Exception as e:
                     log.warning(f"Failed to load V2 scoring config: {e}")
                     
+            # TICKET-015: Decomposition components are now ALWAYS computed for diagnostics
             final_df = annotate_discovery_v2_scores(final_df, config)
-            if "discovery_quality_score" in final_df.columns:
+            
+            # Phase 3: Ledger-adjusted scoring (v3) — also ALWAYS computed (if enabled in yaml)
+            final_df = apply_ledger_multiplicity_correction(final_df, data_root=data_root, current_run_id=run_id)
+
+            if enable_discovery_v2_scoring:
+                # Rank by V3 if available, otherwise V2, otherwise legacy
+                if "discovery_quality_score_v3" in final_df.columns:
+                    rank_col = "discovery_quality_score_v3"
+                elif "discovery_quality_score" in final_df.columns:
+                    rank_col = "discovery_quality_score"
+                else:
+                    rank_col = "t_stat" # fallback
+
                 if "is_discovery" in final_df.columns:
                     final_df = final_df.sort_values(
-                        ["is_discovery", "discovery_quality_score"], ascending=[False, False]
+                        ["is_discovery", rank_col], ascending=[False, False]
                     ).reset_index(drop=True)
                 else:
-                    final_df = final_df.sort_values("discovery_quality_score", ascending=False).reset_index(drop=True)
-            log.info("Applied Discovery V2 candidate scoring components")
+                    final_df = final_df.sort_values(rank_col, ascending=False).reset_index(drop=True)
+                log.info("Sorted candidates by %s (V2 stabilization)", rank_col)
+            else:
+                # Default legacy sorting (abs(t_stat))
+                if "is_discovery" in final_df.columns:
+                    final_df = final_df.sort_values(
+                        ["is_discovery", "t_stat" if "t_stat" in final_df.columns else "discovery_quality_score"], # fallback
+                        ascending=[False, False]
+                    ).reset_index(drop=True)
+
         except Exception as e:
-            log.error("Failed to apply Discovery V2 scoring: %s", e)
+            log.error("Failed to apply stabilization scoring: %s", e)
 
     # Phase 3 — Write concept ledger records (unconditional; always accumulates history)
     if not final_df.empty:

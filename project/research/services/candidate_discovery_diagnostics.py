@@ -17,9 +17,9 @@ def sample_quality_summary(df: pd.DataFrame) -> dict[str, Any]:
             "median_test_n_obs": 0.0,
             "median_n_obs": 0.0,
         }
-    validation = pd.to_numeric(df.get("validation_n_obs", 0), errors="coerce").fillna(0)
-    test = pd.to_numeric(df.get("test_n_obs", 0), errors="coerce").fillna(0)
-    n_obs = pd.to_numeric(df.get("n_obs", 0), errors="coerce").fillna(0)
+    validation = pd.to_numeric(df["validation_n_obs"] if "validation_n_obs" in df.columns else pd.Series(0, index=df.index), errors="coerce").fillna(0)
+    test = pd.to_numeric(df["test_n_obs"] if "test_n_obs" in df.columns else pd.Series(0, index=df.index), errors="coerce").fillna(0)
+    n_obs = pd.to_numeric(df["n_obs"] if "n_obs" in df.columns else pd.Series(0, index=df.index), errors="coerce").fillna(0)
     return {
         "candidates_total": int(len(df)),
         "zero_validation_rows": int((validation <= 0).sum()),
@@ -57,19 +57,25 @@ def survivor_quality_summary(df: pd.DataFrame) -> dict[str, Any]:
             "v2_demotion_reasons": {},
             "families_with_survivors": 0,
         }
+    # Family concentration
+    family_counts = {}
+    if "event_family" in survivors.columns or "family_id" in survivors.columns:
+        fam_col = "event_family" if "event_family" in survivors.columns else "family_id"
+        family_counts = {str(k): int(v) for k, v in survivors[fam_col].value_counts().head(10).to_dict().items()}
+
     return {
         "survivors_total": int(len(survivors)),
         "median_q_value": float(
-            pd.to_numeric(survivors.get("q_value", 1.0), errors="coerce").fillna(1.0).median()
+            pd.to_numeric(survivors["q_value"] if "q_value" in survivors.columns else pd.Series(1.0, index=survivors.index), errors="coerce").fillna(1.0).median()
         ),
         "median_q_value_by": float(
-            pd.to_numeric(survivors.get("q_value_by", 1.0), errors="coerce").fillna(1.0).median()
+            pd.to_numeric(survivors["q_value_by"] if "q_value_by" in survivors.columns else pd.Series(1.0, index=survivors.index), errors="coerce").fillna(1.0).median()
         ),
         "median_estimate_bps": float(
-            pd.to_numeric(survivors.get("estimate_bps", 0.0), errors="coerce").fillna(0.0).median()
+            pd.to_numeric(survivors["estimate_bps"] if "estimate_bps" in survivors.columns else pd.Series(0.0, index=survivors.index), errors="coerce").fillna(0.0).median()
         ),
         "median_cost_bps": float(
-            pd.to_numeric(survivors.get("resolved_cost_bps", 0.0), errors="coerce")
+            pd.to_numeric(survivors["resolved_cost_bps"] if "resolved_cost_bps" in survivors.columns else pd.Series(0.0, index=survivors.index), errors="coerce")
             .fillna(0.0)
             .median()
         ),
@@ -85,6 +91,7 @@ def survivor_quality_summary(df: pd.DataFrame) -> dict[str, Any]:
         "families_with_survivors": int(survivors["family_id"].nunique())
         if "family_id" in survivors.columns
         else 0,
+        "family_concentration": family_counts,
     }
 
 
@@ -219,8 +226,66 @@ def build_false_discovery_diagnostics(combined: pd.DataFrame) -> dict[str, Any]:
             },
         },
         "survivor_quality": survivor_quality_summary(combined),
+        "v2_scoring_diagnostics": build_v2_scoring_diagnostics(combined),
         "ledger_diagnostics": build_ledger_diagnostics(combined),
         "by_symbol": by_symbol,
+    }
+
+
+def build_v2_scoring_diagnostics(df: pd.DataFrame) -> dict[str, Any]:
+    """Summary of V2 quality score components and rank movers."""
+    if df.empty or "discovery_quality_score" not in df.columns:
+        return {
+            "v2_scoring_enabled": False,
+            "rank_movers_v1_v2": [],
+            "rank_movers_v2_v3": [],
+            "penalty_counts": {},
+        }
+
+    # Helper to compute rank movers
+    def get_movers(df_sub, col_old, col_new):
+        if col_old not in df_sub.columns or col_new not in df_sub.columns:
+            return []
+        old_scores = pd.to_numeric(df_sub[col_old], errors="coerce").fillna(-999)
+        new_scores = pd.to_numeric(df_sub[col_new], errors="coerce").fillna(-999)
+        old_rank = old_scores.rank(ascending=False, method="min").astype(int)
+        new_rank = new_scores.rank(ascending=False, method="min").astype(int)
+        delta = old_rank - new_rank
+        movers_idx = delta.nlargest(10).index
+        return [
+            {
+                "candidate_id": str(df_sub.loc[i].get("candidate_id", i)),
+                "old_rank": int(old_rank.loc[i]),
+                "new_rank": int(new_rank.loc[i]),
+                "delta": int(delta.loc[i]),
+            }
+            for i in movers_idx if delta.loc[i] > 0
+        ]
+
+    # V1 vs V2 (t-stat vs discovery_quality_score)
+    movers_v1_v2 = []
+    if "t_stat" in df.columns:
+        # Use abs(t_stat) as V1 equivalent
+        df_tmp = df.copy()
+        df_tmp["abs_t_stat"] = df_tmp["t_stat"].abs()
+        movers_v1_v2 = get_movers(df_tmp, "abs_t_stat", "discovery_quality_score")
+
+    # V2 vs V3 (discovery_quality_score vs discovery_quality_score_v3)
+    movers_v2_v3 = get_movers(df, "discovery_quality_score", "discovery_quality_score_v3")
+
+    # Penalty counts (from reason codes)
+    penalty_counts = {}
+    if "demotion_reason_codes" in df.columns:
+        all_codes = []
+        for codes in df["demotion_reason_codes"].fillna("").astype(str):
+            all_codes.extend([c.strip() for c in codes.split("|") if c.strip()])
+        penalty_counts = {str(k): int(v) for k, v in pd.Series(all_codes).value_counts().to_dict().items()}
+
+    return {
+        "v2_scoring_enabled": True,
+        "rank_movers_v1_v2": movers_v1_v2,
+        "rank_movers_v2_v3": movers_v2_v3,
+        "penalty_counts": penalty_counts,
     }
 
 
