@@ -68,11 +68,11 @@ execution_templates: []
 include_sequences: false
 include_interactions: false
 
-# Phase 4 — Hierarchical discovery mode
-# Set mode: hierarchical to enable staged candidate refinement.
-# Flat mode is the default and is unchanged by this block.
+# Discovery Search Strategy — [STATUS: STABLE]
+# Flat mode is the canonical operator path.
+# Hierarchical mode is EXPERIMENTAL for multi-stage refinement research.
 discovery_search:
-  mode: flat   # "flat" | "hierarchical"
+  mode: flat   # "flat" (STABLE) | "hierarchical" (EXPERIMENTAL)
 
   trigger_viability:
     enabled: true

@@ -1,5 +1,6 @@
 # Discovery v2 Scoring — [STATUS: STABLE-INTERNAL]
 #
+# Stable internal default scoring config for canonical discovery path.
 # Canonical quality-score components used to rank discovery candidates.
 # Significance, Tradability, Novelty, and Falsification are the core pillars.
 version: 1

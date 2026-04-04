@@ -1,3 +1,6 @@
+# Discovery Validation Configuration
+# [STATUS: STABLE]
+# Defines the canonical repeated-walkforward validation path.
 version: 1
 kind: discovery_validation
 

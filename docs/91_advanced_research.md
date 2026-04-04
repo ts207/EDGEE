@@ -1,6 +1,12 @@
 # Advanced Research
 
-This document covers internal research tools and methodologies that are not part of the standard four-stage workflow.
+This document covers internal research tools and methodologies that are not part of the standard four-stage workflow. These features are generally considered **EXPERIMENTAL** and are not part of the canonical operator discovery path.
+
+## Experimental Features
+- **Hierarchical Search**: Multi-stage (A-D) refinement to prune search space efficiently.
+- **Ledger Scoring (v3)**: Merit-based multiplicity correction using historical evidence burden.
+- **Diversified Shortlist**: Greedy selection to maximize signal diversity in top candidates.
+- **Trigger Discovery**: Lane for mining new proposal-generating market anchors.
 
 ## Search Generation
 Edge includes tools for automated hypothesis generation using a grammar-based approach.

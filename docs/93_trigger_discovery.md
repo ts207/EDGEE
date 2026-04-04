@@ -1,5 +1,8 @@
 # Advanced Trigger Discovery (Internal Research Lane)
 
+> [!IMPORTANT]
+> **Status: Experimental / research-only.** Not part of the canonical operator discovery path. This lane is for proposal-generating research and requires manual review/approval before any runtime adoption.
+
 > [!WARNING]
 > **Internal Research Lane Only**
 > This module is designed for proposing new trigger candidate definitions. It is **PROPOSAL-GENERATING ONLY** and has exactly zero effect on the canonical runtime or live trading paths until a maintainer manually adopts the output.

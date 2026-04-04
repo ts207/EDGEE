@@ -19,6 +19,22 @@ In discovery, we define:
 ## Key Outputs
 * `phase2_candidates.parquet`: All candidates generated during the discovery run.
 * `phase2_diagnostics.json`: Metadata and coverage statistics for the run.
+## Discovery mode maturity
+
+### Stable default
+- flat search
+- discovery v2 scoring
+- current repeated walk-forward validation path
+- standard diagnostics
+
+### Experimental / opt-in
+- hierarchical search
+- ledger-adjusted ranking
+- diversified shortlist
+- trigger discovery lane
+
+### Compatibility-only
+- legacy proposal shapes and deprecated operator/pipeline surfaces where still supported internally
 
 ## Failure Modes
 * **Low Signal**: No candidates with positive expectancy found.

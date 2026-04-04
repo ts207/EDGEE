@@ -47,6 +47,34 @@ def test_benchmark_output_contract(tmp_path):
     assert "legacy_rank" in merged.columns
     assert "v2_rank" in merged.columns
 
+def test_decomposition_artifact_contract(tmp_path):
+    from project.research.benchmarks import discovery_benchmark
+    import pandas as pd
+    
+    # Mock data
+    merged = pd.DataFrame({
+        "comp_key": ["K1", "K2"],
+        "legacy_rank": [1, 2],
+        "v2_rank": [2, 1],
+        "rank_delta_v2": [-1, 1],
+        "discovery_quality_score": [0.5, 0.8],
+        "significance_component": [0.6, 0.9],
+        "falsification_component": [1.0, 1.0],
+        "rank_primary_reason": ["stable", "stable"]
+    })
+    
+    discovery_benchmark._write_score_decomposition("test_case", merged, tmp_path)
+    
+    assert (tmp_path / "score_decomposition.parquet").exists()
+    assert (tmp_path / "score_decomposition.csv").exists()
+    assert (tmp_path / "score_decomposition.md").exists()
+    
+    md_content = (tmp_path / "score_decomposition.md").read_text()
+    assert "# Score Decomposition" in md_content
+    assert "## Biggest Positive Movers" in md_content
+    assert "## Biggest Negative Movers" in md_content
+    assert "## Most Common Penalty Types" in md_content
+
 def test_hierarchical_search_contract():
     # Verify signature alignment
     from project.research.search import hierarchical_search

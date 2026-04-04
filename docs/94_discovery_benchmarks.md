@@ -3,6 +3,23 @@
 ## Overview
 This document explains the benchmark configurations, thresholds, and review processes for the discovery layer.
 
+## Ownership model
+
+The benchmark stack has two layers:
+
+- `project/research/benchmarks/discovery_benchmark.py`: The **execution adapter** for discovery benchmark comparison runs.
+- `project/research/services/benchmark_matrix_service.py`, `benchmark_governance_service.py`, and `benchmark_review_service.py`: The **benchmark control plane**.
+
+The execution adapter runs benchmark cases. The control plane defines, classifies, reviews, and governs them.
+
+## Discovery mode maturity
+
+| Mode | Status | Purpose |
+| --- | --- | --- |
+| `legacy` | **STABLE** | Abs t-stat ranking baseline. |
+| `v2` | **STABLE-INTERNAL** | Canonical quality score (Significance + Tradability). |
+| `ledger` | **EXPERIMENTAL** | V3 concept burden adjustment (Multiplicity). |
+
 ## Benchmark Presets
 Presets are fixed combinations of slices and discovery modes.
 - **core_v1**: The canonical preset evaluating multiple modes across 5 benchmark slices (`m0` to `m4`).

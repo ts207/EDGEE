@@ -1,4 +1,7 @@
-# Discovery ledger configuration — Phase 3
+# Discovery ledger configuration — [STATUS: EXPERIMENTAL]
+# experimental / opt-in
+# not enabled by default
+# used for research burden experiments, not canonical ranking by default
 #
 # Controls the concept-lineage correction layer. Set enabled: true to
 # activate the ledger-adjusted multiplicity burden in discovery scoring.
