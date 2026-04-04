@@ -1,0 +1,13 @@
+{
+  "mode": "ledger",
+  "search": {
+    "search": "flat"
+  },
+  "scoring_v2": {
+    "v2": true,
+    "enable_discovery_v2_scoring": true
+  },
+  "ledger": {
+    "enabled": true
+  }
+}

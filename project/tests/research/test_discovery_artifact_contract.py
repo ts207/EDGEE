@@ -33,8 +33,8 @@ def test_diagnostics_json_contract():
 def test_benchmark_output_contract(tmp_path):
     from project.research.benchmarks.discovery_benchmark import summarize_case_comparison
     
-    legacy_df = pd.DataFrame([{"event_type": "E1", "horizon": "1h", "direction": "long", "t_stat": 2.0}])
-    v2_df = pd.DataFrame([{"event_type": "E1", "horizon": "1h", "direction": "long", "t_stat": 2.0, "discovery_quality_score": 1.5}])
+    legacy_df = pd.DataFrame([{"event_type": "E1", "horizon": "1h", "direction": "long", "t_stat": 2.0, "is_discovery": True}])
+    v2_df = pd.DataFrame([{"event_type": "E1", "horizon": "1h", "direction": "long", "t_stat": 2.0, "discovery_quality_score": 1.5, "is_discovery": True}])
     
     case_results = {"legacy": legacy_df, "v2": v2_df}
     summarize_case_comparison("test_case", case_results, tmp_path)
@@ -51,29 +51,53 @@ def test_decomposition_artifact_contract(tmp_path):
     from project.research.benchmarks import discovery_benchmark
     import pandas as pd
     
-    # Mock data
+    # Mock data with minimal required columns for Patch 2
     merged = pd.DataFrame({
+        "candidate_id": ["c1", "c2"],
         "comp_key": ["K1", "K2"],
         "legacy_rank": [1, 2],
         "v2_rank": [2, 1],
-        "rank_delta_v2": [-1, 1],
         "discovery_quality_score": [0.5, 0.8],
         "significance_component": [0.6, 0.9],
+        "support_component": [1.0, 1.0],
         "falsification_component": [1.0, 1.0],
+        "tradability_component": [1.0, 1.0],
+        "novelty_component": [1.0, 1.0],
+        "fold_stability_component": [1.0, 1.0],
         "rank_primary_reason": ["stable", "stable"]
     })
     
     discovery_benchmark._write_score_decomposition("test_case", merged, tmp_path)
     
+    # TABULAR CONTRACT
     assert (tmp_path / "score_decomposition.parquet").exists()
     assert (tmp_path / "score_decomposition.csv").exists()
-    assert (tmp_path / "score_decomposition.md").exists()
     
+    df = pd.read_csv(tmp_path / "score_decomposition.csv")
+    cols = df.columns.tolist()
+    expected_cols = [
+        "legacy_rank", "v2_rank", "rank_delta_legacy_to_v2",
+        "significance_component", "support_component", "falsification_component",
+        "tradability_component", "novelty_component", "fold_stability_component",
+        "discovery_quality_score", "rank_primary_reason"
+    ]
+    for c in expected_cols:
+        assert c in cols, f"Tabular artifact missing column: {c}"
+    
+    # MARKDOWN CONTRACT
+    assert (tmp_path / "score_decomposition.md").exists()
     md_content = (tmp_path / "score_decomposition.md").read_text()
-    assert "# Score Decomposition" in md_content
-    assert "## Biggest Positive Movers" in md_content
-    assert "## Biggest Negative Movers" in md_content
-    assert "## Most Common Penalty Types" in md_content
+    
+    headers = [
+        "# Score Decomposition",
+        "## Biggest Positive Movers",
+        "## Biggest Negative Movers",
+        "## Most Common Penalty Types",
+        "## Highest Legacy-to-V2 Promotions",
+        "## Highest Legacy-to-V2 Demotions",
+    ]
+    for h in headers:
+        assert h in md_content, f"Markdown artifact missing header: {h}"
 
 def test_hierarchical_search_contract():
     # Verify signature alignment

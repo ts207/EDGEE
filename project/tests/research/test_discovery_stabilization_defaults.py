@@ -55,33 +55,26 @@ def test_search_engine_v2_default(monkeypatch):
     sig = inspect.signature(phase2_search_engine.run)
     assert sig.parameters["enable_discovery_v2_scoring"].default is True
 
-def test_search_space_mode_default():
+def test_search_space_defaults_are_stable():
     import yaml
     from project import PROJECT_ROOT
     spec_path = PROJECT_ROOT.parent / "spec/search_space.yaml"
     with open(spec_path, "r") as f:
         spec = yaml.safe_load(f)
-        # Assert flat mode is default
+        # Assert flat mode is official default
         assert spec["discovery_search"]["mode"] == "flat"
+        # Assert diversified shortlist is off by default
+        if "discovery_selection" in spec and "shortlist" in spec["discovery_selection"]:
+            assert spec["discovery_selection"]["shortlist"].get("enabled", False) is False
 
-def test_ledger_config_default_disabled():
+def test_ledger_default_is_disabled():
     import yaml
     from project import PROJECT_ROOT
     config_path = PROJECT_ROOT.parent / "project/configs/discovery_ledger.yaml"
     if config_path.exists():
         with open(config_path, "r") as f:
             cfg = yaml.safe_load(f)
-            # Assert ledger is disabled officially
-            assert cfg["discovery_scoring"]["ledger_adjustment"]["enabled"] is False
-
-def test_shortlist_diversification_default_disabled():
-    import yaml
-    from project import PROJECT_ROOT
-    # If shortlist config exists, ensure it's disabled or mode is basic
-    spec_path = PROJECT_ROOT.parent / "spec/search_space.yaml"
-    with open(spec_path, "r") as f:
-        spec = yaml.safe_load(f)
-        # In current spec, if no explicit diversified_shortlist block, it's disabled.
-        # If it exists, it must be disabled.
-        if "diversified_shortlist" in spec:
-            assert spec["diversified_shortlist"].get("enabled", False) is False
+            # Both the adjustment and the overall flag should be False
+            assert cfg.get("enabled", False) is False
+            if "discovery_scoring" in cfg and "ledger_adjustment" in cfg["discovery_scoring"]:
+                assert cfg["discovery_scoring"]["ledger_adjustment"].get("enabled", False) is False

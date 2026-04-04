@@ -19,22 +19,48 @@ In discovery, we define:
 ## Key Outputs
 * `phase2_candidates.parquet`: All candidates generated during the discovery run.
 * `phase2_diagnostics.json`: Metadata and coverage statistics for the run.
-## Discovery mode maturity
+## What stable default discovery currently includes
 
-### Stable default
-- flat search
+The canonical discovery path currently uses:
+
+- a single-hypothesis operator proposal
+- flat search expansion
 - discovery v2 scoring
-- current repeated walk-forward validation path
-- standard diagnostics
+- repeated walk-forward validation support
+- standard candidate diagnostics
 
-### Experimental / opt-in
+Discovery ranking in the stable default path considers:
+
+- statistical significance
+- support / sample quality
+- cheap falsification prechecks
+- tradability prechecks
+- overlap / novelty penalties
+- fold stability
+
+The canonical discovery path does **not** enable these by default:
+
 - hierarchical search
 - ledger-adjusted ranking
 - diversified shortlist
 - trigger discovery lane
 
+## Discovery mode maturity levels
+
+### Stable
+- flat search
+- discovery v2 scoring
+- current validation path
+- explicit runtime lineage and deployment-state permission model
+
+### Experimental
+- hierarchical search
+- ledger-adjusted discovery ranking
+- diversified shortlist
+- trigger discovery
+
 ### Compatibility-only
-- legacy proposal shapes and deprecated operator/pipeline surfaces where still supported internally
+- legacy proposal/operator surfaces retained for migration or internal support
 
 ## Failure Modes
 * **Low Signal**: No candidates with positive expectancy found.

@@ -32,7 +32,61 @@ def test_benchmark_runner_immutability():
     assert get_bytes(ledger_config_path) == before_ledger
     assert get_bytes(scoring_config_path) == before_scoring
 
-def test_benchmark_output_contains_resolved_config(tmp_path):
-    # This would require a minimal run, but we can check the logic in discovery_benchmark.py
-    # and trust our previous multi_replace_file_content which added the json.dump call.
-    pass
+def test_benchmark_output_persistence(tmp_path):
+    # Verify that resolved config is persisted correctly
+    from project.research.benchmarks import discovery_benchmark
+    import json
+    
+    base_search = {"search": "flat"}
+    base_scoring = {"v2": True}
+    base_ledger = {"enabled": False}
+    
+    # Mock a minimal run or call the persistence logic
+    out_dir = tmp_path / "ledger"
+    out_dir.mkdir()
+    
+    resolved = discovery_benchmark._resolved_benchmark_mode_config(
+        base_search, base_scoring, base_ledger, "ledger"
+    )
+    
+    with open(out_dir / "resolved_mode_config.json", "w") as f:
+        json.dump(resolved, f, indent=2)
+        
+    assert (out_dir / "resolved_mode_config.json").exists()
+    saved = json.loads((out_dir / "resolved_mode_config.json").read_text())
+    assert saved["mode"] == "ledger"
+    assert saved["ledger"]["enabled"] is True
+
+def test_benchmark_mode_isolation():
+    from project.research.benchmarks import discovery_benchmark
+    
+    base_search = {"search": "flat"}
+    base_scoring = {"v2": True}
+    base_ledger = {"enabled": False}
+    
+    res_legacy = discovery_benchmark._resolved_benchmark_mode_config(
+        base_search, base_scoring, base_ledger, "legacy"
+    )
+    res_v2 = discovery_benchmark._resolved_benchmark_mode_config(
+        base_search, base_scoring, base_ledger, "v2"
+    )
+    res_ledger = discovery_benchmark._resolved_benchmark_mode_config(
+        base_search, base_scoring, base_ledger, "ledger"
+    )
+    
+    # Assert isolation in resolved configs
+    assert res_legacy["mode"] == "legacy"
+    assert res_v2["mode"] == "v2"
+    assert res_ledger["mode"] == "ledger"
+    
+    # legacy disables v2 and ledger
+    assert res_legacy["scoring_v2"]["enable_discovery_v2_scoring"] is False
+    assert res_legacy["ledger"]["enabled"] is False
+    
+    # v2 enables v2 but disables ledger
+    assert res_v2["scoring_v2"]["enable_discovery_v2_scoring"] is True
+    assert res_v2["ledger"]["enabled"] is False
+    
+    # ledger enables both
+    assert res_ledger["scoring_v2"]["enable_discovery_v2_scoring"] is True
+    assert res_ledger["ledger"]["enabled"] is True

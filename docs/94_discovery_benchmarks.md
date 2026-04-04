@@ -20,6 +20,17 @@ The execution adapter runs benchmark cases. The control plane defines, classifie
 | `v2` | **STABLE-INTERNAL** | Canonical quality score (Significance + Tradability). |
 | `ledger` | **EXPERIMENTAL** | V3 concept burden adjustment (Multiplicity). |
 
+## What benchmark evidence is expected to prove
+
+The discovery benchmark layer is used to answer:
+
+- whether discovery v2 improves promotion density near the top of the ranking
+- whether discovery v2 reduces placebo-like top candidates
+- whether discovery v2 improves top-rank tradability
+- whether discovery v2 improves diversity and reduces structural overlap
+
+Benchmark results do not automatically justify enabling experimental modes by default.
+
 ## Benchmark Presets
 Presets are fixed combinations of slices and discovery modes.
 - **core_v1**: The canonical preset evaluating multiple modes across 5 benchmark slices (`m0` to `m4`).
