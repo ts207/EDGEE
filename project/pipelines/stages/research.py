@@ -486,6 +486,8 @@ def build_research_stages(
             "--promotion_profile",
             promotion_profile,
         ]
+        if active_program_id:
+            promote_args.extend(["--program_id", active_program_id])
         promote_args.extend(["--max_q_value", str(float(promotion_thresholds["max_q_value"]))])
 
         promote_args.extend(
@@ -506,6 +508,8 @@ def build_research_stages(
                 str(int(args.candidate_promotion_require_hypothesis_audit)),
                 "--allow_missing_negative_controls",
                 str(int(args.candidate_promotion_allow_missing_negative_controls)),
+                "--min_dsr",
+                "0" if promotion_profile == "research" else "0.5",
             ]
         )
 

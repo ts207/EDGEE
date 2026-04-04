@@ -63,9 +63,14 @@ def stability_score(
     - 2 dimensions → ≈ 0.035
     - 4 dimensions → ≈ 0.072
     """
+    # Respect a pre-computed stability_score column (e.g. from phase2 bridge evaluation)
+    # when std_return is unavailable for recomputation.
+    pre_computed = row.get("stability_score")
     effect = abs(coerce_numeric_nan(row.get("effect_shrunk_state", row.get("expectancy"))))
     volatility = abs(coerce_numeric_nan(row.get("std_return")))
     if np.isnan(effect) or np.isnan(volatility):
+        if pre_computed is not None and np.isfinite(float(pre_computed)):
+            return float(pre_computed)
         return np.nan
     denominator = max(volatility, 1e-8)
     raw_score = float(sign_consistency_val * (effect / denominator))

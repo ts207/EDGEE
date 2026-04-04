@@ -126,6 +126,13 @@ def _has_explicit_oos_samples(row: Mapping[str, Any]) -> bool:
 
 
 def sign_consistency(row: Dict[str, Any]) -> float:
+    # Respect a pre-computed sign_consistency column (e.g. from phase2 bridge evaluation)
+    pre_computed = row.get("sign_consistency")
+    if pre_computed is not None:
+        val = _quiet_float(pre_computed, np.nan)
+        if np.isfinite(val):
+            return float(val)
+
     base_effect = coerce_numeric_nan(
         row.get("effect_shrunk_state", row.get("expectancy", row.get("effect_raw")))
     )

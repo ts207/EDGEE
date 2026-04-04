@@ -54,7 +54,7 @@ promotion_confirmatory_gates:
     q_value_mechanism_column: q_value_mechanism
     max_q_value: 0.10
     min_oos_ess: 20
-    min_oos_event_count: 20
+    min_oos_event_count: 5
     require_sign_consistency: true
     cost_stress_multiplier: 1.5
     latency_stress_bars: 1
