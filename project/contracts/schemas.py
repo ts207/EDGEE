@@ -48,6 +48,10 @@ _SCHEMA_REGISTRY: Dict[str, DataFrameSchemaContract] = {
             "recommended_bucket",
             "regime_bucket",
             "routing_profile_id",
+            "promotion_class",
+            "readiness_status",
+            "inventory_reason_code",
+            "deployment_state_default",
         ),
     ),
     "promoted_candidates": DataFrameSchemaContract(
@@ -66,6 +70,10 @@ _SCHEMA_REGISTRY: Dict[str, DataFrameSchemaContract] = {
             "recommended_bucket",
             "regime_bucket",
             "routing_profile_id",
+            "promotion_class",
+            "readiness_status",
+            "inventory_reason_code",
+            "deployment_state_default",
         ),
     ),
     "evidence_bundle_summary": DataFrameSchemaContract(

@@ -732,10 +732,19 @@ def _build_thesis(
                 validation_artifacts = {a.artifact_type: a.path for a in c.artifact_refs}
                 break
 
+    # Sprint 4: Extract explicit promotion fields
+    promo_class = str(promoted_row.get("promotion_class") or "paper_promoted").lower()
+    if promo_class not in {"seed_promoted", "paper_promoted", "production_promoted"}:
+        promo_class = "paper_promoted"
+        
+    deploy_state = str(promoted_row.get("deployment_state_default") or promoted_row.get("deployment_state") or "paper_only").lower()
+    if deploy_state not in {"monitor_only", "paper_only", "live_enabled", "retired"}:
+        deploy_state = "paper_only"
+
     thesis = PromotedThesis(
         thesis_id=f"thesis::{run_id}::{candidate_id}",
-        promotion_class="paper_promoted",
-        deployment_state="paper_only",
+        promotion_class=promo_class,
+        deployment_state=deploy_state,
         evidence_gaps=[],
         status=status,
         symbol_scope=_coerce_symbol_scope(symbol, blueprint),
@@ -792,7 +801,10 @@ def _build_thesis(
             validation_reason_codes=validation_reasons,
             validation_artifact_paths=validation_artifacts,
         ),
-        governance=ThesisGovernance(),
+        governance=ThesisGovernance(
+            readiness_status=str(promoted_row.get("readiness_status", "")),
+            inventory_reason_code=str(promoted_row.get("inventory_reason_code", "")),
+        ),
         requirements=_build_requirements_from_contract(
             bundle=bundle,
             promoted_row=promoted_row,

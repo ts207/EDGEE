@@ -108,7 +108,14 @@ class ValidationService:
                 rejected.append(record)
             else:
                 inconclusive.append(record)
-                
+        
+        # Sprint 4: Add effect stability report
+        try:
+            from project.operator.stability import build_regime_split_report
+            effect_stability_report = build_regime_split_report(run_id=run_id, data_root=self.data_root)
+        except Exception:
+            effect_stability_report = {}
+
         bundle = ValidationBundle(
             run_id=run_id,
             program_id=program_id,
@@ -121,7 +128,8 @@ class ValidationService:
                 "validated": len(validated),
                 "rejected": len(rejected),
                 "inconclusive": len(inconclusive),
-            }
+            },
+            effect_stability_report=effect_stability_report
         )
         return bundle
 
@@ -200,8 +208,13 @@ class ValidationService:
         program_id: Optional[str] = None
     ) -> ValidationBundle:
         bundle = self.create_validation_bundle(run_id, candidates_df, program_id)
-        write_validation_bundle(bundle)
-        write_validated_candidate_tables(bundle)
+        # Sprint 4: Use canonical names via result_writer
+        from project.research.validation.result_writer import (
+            write_validation_bundle,
+            write_validated_candidate_tables
+        )
+        write_validation_bundle(bundle, base_dir=self.data_root / "reports" / "validation" / run_id)
+        write_validated_candidate_tables(bundle, base_dir=self.data_root / "reports" / "validation" / run_id)
         return bundle
 
     def build_validation_bundle_from_legacy_run(

@@ -26,11 +26,16 @@ def write_validation_bundle(bundle: ValidationBundle, base_dir: Optional[Path] =
     with bundle_path.open("w", encoding="utf-8") as f:
         json.dump(bundle.to_dict(), f, indent=2)
     
-    # Also write summary
-    summary_path = base_dir / "validation_summary.json"
+    # Canonical: validation_report.json
+    summary_path = base_dir / "validation_report.json"
     with summary_path.open("w", encoding="utf-8") as f:
         json.dump(bundle.summary_stats, f, indent=2)
         
+    # Canonical: effect_stability_report.json
+    stability_path = base_dir / "effect_stability_report.json"
+    with stability_path.open("w", encoding="utf-8") as f:
+        json.dump(bundle.effect_stability_report, f, indent=2)
+
     return bundle_path
 
 
@@ -42,42 +47,42 @@ def write_validated_candidate_tables(bundle: ValidationBundle, base_dir: Optiona
     
     paths = {}
     
+    # Canonical Groups
+    # 1. validated_candidates.parquet
+    # 2. rejection_reasons.parquet (rejected + inconclusive)
+    
     groups = {
         "validated_candidates": bundle.validated_candidates,
-        "rejected_candidates": bundle.rejected_candidates,
-        "inconclusive_candidates": bundle.inconclusive_candidates,
+        "rejection_reasons": bundle.rejected_candidates + bundle.inconclusive_candidates,
     }
     
     for name, candidates in groups.items():
         if not candidates:
-            continue
+            # Still write an empty file if it's the canonical name? 
+            # Usually better to have the file exist.
+            flat_df = pd.DataFrame()
+        else:
+            flat_data = []
+            for c in candidates:
+                row = {
+                    "candidate_id": c.candidate_id,
+                    "anchor_summary": c.anchor_summary,
+                    "template_id": c.template_id,
+                    "direction": c.direction,
+                    "horizon_bars": c.horizon_bars,
+                    "validation_stage_version": c.validation_stage_version,
+                    "status": c.decision.status,
+                    "run_id": c.decision.run_id,
+                    "program_id": c.decision.program_id,
+                    "reason_codes": "|".join(c.decision.reason_codes),
+                }
+                # Add metrics
+                metrics_dict = c.metrics.to_dict()
+                for k, v in metrics_dict.items():
+                    row[f"metric_{k}"] = v
+                flat_data.append(row)
+            flat_df = pd.DataFrame(flat_data)
             
-        df = pd.DataFrame([c.to_dict() for c in candidates])
-        # Flatten the nested dicts for tabular output if needed, 
-        # but for now let's just write as is or parquet might handle it.
-        # Actually, flattening is better for parquet/csv.
-        
-        flat_data = []
-        for c in candidates:
-            row = {
-                "candidate_id": c.candidate_id,
-                "anchor_summary": c.anchor_summary,
-                "template_id": c.template_id,
-                "direction": c.direction,
-                "horizon_bars": c.horizon_bars,
-                "validation_stage_version": c.validation_stage_version,
-                "status": c.decision.status,
-                "run_id": c.decision.run_id,
-                "program_id": c.decision.program_id,
-                "reason_codes": "|".join(c.decision.reason_codes),
-            }
-            # Add metrics
-            metrics_dict = c.metrics.to_dict()
-            for k, v in metrics_dict.items():
-                row[f"metric_{k}"] = v
-            flat_data.append(row)
-            
-        flat_df = pd.DataFrame(flat_data)
         path = base_dir / f"{name}.parquet"
         flat_df.to_parquet(path)
         paths[name] = path

@@ -57,6 +57,7 @@ class PromotionConfig:
     objective_spec: Optional[str]
     retail_profiles_spec: Optional[str]
     promotion_profile: str = "auto"
+    use_compatibility_bridge: bool = False
 
     def resolved_out_dir(self) -> Path:
         data_root = get_data_root()
@@ -91,6 +92,7 @@ class PromotionConfig:
             "objective_spec": self.objective_spec,
             "retail_profiles_spec": self.retail_profiles_spec,
             "promotion_profile": self.promotion_profile,
+            "use_compatibility_bridge": int(self.use_compatibility_bridge),
         }
 
 
@@ -780,6 +782,31 @@ def execute_promotion(config: PromotionConfig) -> PromotionServiceResult:
     diagnostics: Dict[str, Any] = {}
 
     try:
+        # Sprint 4: Require validation bundle or use compatibility bridge
+        # We do this FIRST to fail fast.
+        from project.research.validation.result_writer import load_validation_bundle
+        from project.research.services.evaluation_service import ValidationService
+        from project.research.validation.contracts import PromotionReasonCodes
+        
+        val_bundle = load_validation_bundle(config.run_id)
+        if val_bundle is None:
+            if config.use_compatibility_bridge:
+                # Fallback to compatibility bridge only if explicitly requested
+                val_svc = ValidationService(data_root=data_root)
+                val_bundle = val_svc.build_validation_bundle_from_legacy_run(config.run_id)
+                if val_bundle:
+                    logging.info(
+                        "Using compatibility bridge for validation bundle for run %s", 
+                        config.run_id
+                    )
+            
+            if val_bundle is None:
+                raise ValueError(
+                    f"Promotion rejected for {config.run_id}: "
+                    f"missing validation bundle. {PromotionReasonCodes.NOT_VALIDATED}. "
+                    "Canonical validation is mandatory in Sprint 4."
+                )
+
         source_manifest = load_run_manifest(config.run_id)
         source_run_mode = str(source_manifest.get("run_mode", "")).strip().lower()
         source_profile = str(source_manifest.get("discovery_profile", "")).strip().lower()
@@ -815,27 +842,6 @@ def execute_promotion(config: PromotionConfig) -> PromotionServiceResult:
             retail_profiles_spec_path=config.retail_profiles_spec,
             required=True,
         )
-
-        # New Requirement: Require validation bundle or use compatibility bridge
-        from project.research.validation.result_writer import load_validation_bundle
-        from project.research.services.evaluation_service import ValidationService
-        from project.research.validation.contracts import PromotionReasonCodes
-        
-        val_bundle = load_validation_bundle(config.run_id)
-        if val_bundle is None:
-            # Fallback to compatibility bridge
-            val_svc = ValidationService(data_root=data_root)
-            val_bundle = val_svc.build_validation_bundle_from_legacy_run(config.run_id)
-            if val_bundle:
-                logging.info(
-                    "Using compatibility bridge for validation bundle for run %s", 
-                    config.run_id
-                )
-            else:
-                raise ValueError(
-                    f"Promotion rejected for {config.run_id}: "
-                    f"missing validation bundle. {PromotionReasonCodes.NOT_VALIDATED}"
-                )
         
         # Reconstruct candidates_df from bundle for promotion processing
         # We need all columns that promote_candidates might use.
@@ -1093,4 +1099,5 @@ def execute_promotion(config: PromotionConfig) -> PromotionServiceResult:
     except Exception as exc:
         logging.exception("Promotion failed: %s", exc)
         finalize_manifest(manifest, "failed", error=str(exc))
+        diagnostics["error"] = str(exc)
         return PromotionServiceResult(1, out_dir, audit_df, promoted_df, diagnostics)

@@ -101,7 +101,11 @@ def _load_promoted_candidate_metrics(
 ) -> Dict[tuple[str, str], Dict[str, Any]]:
     base = data_root / "reports" / "promotions" / run_id
     df = pd.DataFrame()
-    for path in (base / "promoted_candidates.parquet", base / "promoted_candidates.csv"):
+    for path in (
+        base / "promoted_candidates.parquet", 
+        base / "promoted_candidates.csv",
+        base / "promotion_audit.parquet",
+    ):
         df = _read_optional_table(path)
         if not df.empty:
             break

@@ -130,10 +130,41 @@ def _assemble_promotion_result(
     fallback_used = promotion_track != "standard"
     fallback_reason = "" if not fallback_used else (primary_promo_fail or "non_standard_track")
 
+    # Sprint 4: Explicit Promotion Layer Fields
+    # Suggested classes: seed_promoted, paper_promoted, production_promoted
+    # Suggested readiness: research_inventory, paper_ready, live_review_required, live_ready
+
+    promo_class = "paper_promoted"
+    if promotion_profile == "deploy":
+        promo_class = "production_promoted"
+    elif is_reduced_evidence:
+        promo_class = "seed_promoted"
+
+    readiness = "research_inventory"
+    if promoted:
+        if promo_class == "production_promoted":
+            readiness = "live_review_required" # Still needs human/governance review
+        else:
+            readiness = "paper_ready"
+
+    deploy_state_default = "paper_only"
+    if promo_class == "production_promoted" and promoted:
+        deploy_state_default = "live_enabled"
+    elif promo_class == "seed_promoted":
+        deploy_state_default = "monitor_only"
+
+    inventory_reason_code = ""
+    if not promoted:
+        inventory_reason_code = f"failed_{primary_promo_fail}" if primary_promo_fail else "below_promotion_threshold"
+
     return {
         "promotion_decision": promotion_decision,
         "promotion_profile": str(promotion_profile),
         "promotion_track": promotion_track,
+        "promotion_class": promo_class,
+        "readiness_status": readiness,
+        "inventory_reason_code": inventory_reason_code,
+        "deployment_state_default": deploy_state_default,
         "fallback_used": bool(fallback_used),
         "fallback_reason": str(fallback_reason),
         "promotion_score": float(promotion_score),

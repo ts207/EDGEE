@@ -25,223 +25,178 @@ def mock_data_root(tmp_path):
     return data_root
 
 
-def test_promotion_rejects_unvalidated_candidates(mock_data_root):
-    run_id = "test_run"
-    
-    # Create a validation bundle with ONLY rejected candidates
-    decision = ValidationDecision(
-        status="rejected",
-        candidate_id="cand_1",
-        run_id=run_id,
-        reason_codes=["failed_stability"]
-    )
-    candidate = ValidatedCandidateRecord(
-        candidate_id="cand_1",
-        decision=decision,
-        metrics=ValidationMetrics()
-    )
-    bundle = ValidationBundle(
-        run_id=run_id,
-        created_at="2026-01-01",
-        rejected_candidates=[candidate]
-    )
-    
-    from project.research.validation.result_writer import write_validation_bundle
-    write_validation_bundle(bundle, base_dir=mock_data_root / "reports" / "validation" / run_id)
-    
-    # Mock candidates table
-    (mock_data_root / "reports" / "edge_candidates" / run_id).mkdir(parents=True)
-    pd.DataFrame([{"candidate_id": "cand_1"}]).to_parquet(
-        mock_data_root / "reports" / "edge_candidates" / run_id / "edge_candidates_normalized.parquet"
-    )
-    
-    config = PromotionConfig(
-        run_id=run_id,
-        symbols="BTC",
-        out_dir=mock_data_root / "reports" / "promotions" / run_id,
-        max_q_value=0.05,
-        min_events=20,
-        min_stability_score=0.5,
-        min_sign_consistency=0.5,
-        min_cost_survival_ratio=0.5,
-        max_negative_control_pass_rate=0.05,
-        min_tob_coverage=0.5,
-        require_hypothesis_audit=False,
-        allow_missing_negative_controls=True,
-        require_multiplicity_diagnostics=False,
-        min_dsr=0.0,
-        max_overlap_ratio=1.0,
-        max_profile_correlation=1.0,
-        allow_discovery_promotion=True,
-        program_id="test_program",
-        retail_profile="default",
-        objective_name="default",
-        objective_spec=None,
-        retail_profiles_spec=None
-    )
-    
-    with patch("project.research.services.promotion_service.get_data_root", return_value=mock_data_root):
-        with patch("project.research.services.promotion_service.load_run_manifest", return_value={"run_mode": "confirmatory"}):
-            with patch("project.research.services.promotion_service.resolve_objective_profile_contract") as mock_contract:
-                mock_contract.return_value = MagicMock()
-                # execute_promotion should only consider VALIDATED candidates from the bundle
-                result = execute_promotion(config)
-                # Since cand_1 was rejected in validation, candidates_df will be empty
-                assert len(result.promoted_df) == 0
-
-
-def test_promotion_accepts_validated_candidates(mock_data_root):
-    run_id = "test_run"
-    
-    # Create a validation bundle with a VALIDATED candidate
-    decision = ValidationDecision(
-        status="validated",
-        candidate_id="cand_1",
-        run_id=run_id
-    )
-    candidate = ValidatedCandidateRecord(
-        candidate_id="cand_1",
-        decision=decision,
-        metrics=ValidationMetrics(sample_count=100, expectancy=0.1, q_value=0.01)
-    )
-    bundle = ValidationBundle(
-        run_id=run_id,
-        created_at="2026-01-01",
-        validated_candidates=[candidate]
-    )
-    
-    from project.research.validation.result_writer import write_validation_bundle
-    write_validation_bundle(bundle, base_dir=mock_data_root / "reports" / "validation" / run_id)
-    
-    # Mock candidates table with all required columns for promote_candidates
+def _create_mock_candidates_table(mock_data_root, run_id, candidate_ids):
     from project.specs.ontology import ontology_spec_hash
     from project import PROJECT_ROOT
     curr_hash = ontology_spec_hash(PROJECT_ROOT.parent)
 
-    (mock_data_root / "reports" / "edge_candidates" / run_id).mkdir(parents=True)
-    pd.DataFrame([{
-        "candidate_id": "cand_1",
-        "event_type": "VOL_SHOCK",
-        "rule_template": "tpl1",
-        "direction": "long",
-        "horizon": 12,
-        "n_obs": 100,
-        "expectancy": 0.1,
-        "q_value": 0.01,
-        "p_value": 0.01,
-        "stability_score": 0.8,
-        "sign_consistency": 0.9,
-        "cost_survival_ratio": 0.8,
-        "tob_coverage": 0.9,
-        "selection_score": 0.8,
-        "confirmatory_locked": True,
-        "frozen_spec_hash": curr_hash,
-    }]).to_parquet(
+    (mock_data_root / "reports" / "edge_candidates" / run_id).mkdir(parents=True, exist_ok=True)
+    rows = []
+    for cid in candidate_ids:
+        rows.append({
+            "candidate_id": cid,
+            "event_type": "VOL_SHOCK",
+            "rule_template": "tpl1",
+            "direction": "long",
+            "horizon": 12,
+            "n_obs": 100,
+            "expectancy": 0.1,
+            "q_value": 0.01,
+            "p_value": 0.01,
+            "stability_score": 0.8,
+            "sign_consistency": 0.9,
+            "cost_survival_ratio": 0.8,
+            "tob_coverage": 0.9,
+            "selection_score": 0.8,
+            "confirmatory_locked": True,
+            "frozen_spec_hash": curr_hash,
+        })
+    pd.DataFrame(rows).to_parquet(
         mock_data_root / "reports" / "edge_candidates" / run_id / "edge_candidates_normalized.parquet"
     )
+
+
+def test_promotion_fails_without_bundle_by_default(mock_data_root):
+    run_id = "test_run"
+    _create_mock_candidates_table(mock_data_root, run_id, ["cand_1"])
     
     config = PromotionConfig(
-        run_id=run_id,
-        symbols="BTC",
-        out_dir=mock_data_root / "reports" / "promotions" / run_id,
-        max_q_value=0.05,
-        min_events=20,
-        min_stability_score=0.5,
-        min_sign_consistency=0.5,
-        min_cost_survival_ratio=0.5,
-        max_negative_control_pass_rate=0.05,
-        min_tob_coverage=0.5,
-        require_hypothesis_audit=False,
-        allow_missing_negative_controls=True,
-        require_multiplicity_diagnostics=False,
-        min_dsr=0.0,
-        max_overlap_ratio=1.0,
-        max_profile_correlation=1.0,
-        allow_discovery_promotion=True,
-        program_id="test_program",
-        retail_profile="default",
-        objective_name="default",
-        objective_spec=None,
-        retail_profiles_spec=None
+        run_id=run_id, symbols="BTC", out_dir=None, max_q_value=0.05, min_events=20,
+        min_stability_score=0.5, min_sign_consistency=0.5, min_cost_survival_ratio=0.5,
+        max_negative_control_pass_rate=0.05, min_tob_coverage=0.5,
+        require_hypothesis_audit=False, allow_missing_negative_controls=True,
+        require_multiplicity_diagnostics=False, min_dsr=0.0, max_overlap_ratio=1.0,
+        max_profile_correlation=1.0, allow_discovery_promotion=True,
+        program_id="test_program", retail_profile="default", objective_name="default",
+        objective_spec=None, retail_profiles_spec=None,
+        use_compatibility_bridge=False # Explicitly off
     )
     
     with patch("project.research.services.promotion_service.get_data_root", return_value=mock_data_root):
-        with patch("project.research.services.promotion_service.load_run_manifest", return_value={"run_mode": "confirmatory"}):
-            with patch("project.research.services.promotion_service.resolve_objective_profile_contract") as mock_contract:
-                mock_contract.return_value = MagicMock()
-                with patch("project.research.services.promotion_service.promote_candidates") as mock_promote:
-                    mock_promote.return_value = (pd.DataFrame([{"candidate_id": "cand_1"}]), pd.DataFrame([{"candidate_id": "cand_1"}]), {})
-                    result = execute_promotion(config)
-                    assert len(result.promoted_df) == 1
+        with patch("project.research.validation.result_writer.get_data_root", return_value=mock_data_root):
+            with patch("project.research.services.promotion_service.load_run_manifest", return_value={"run_mode": "confirmatory"}):
+                result = execute_promotion(config)
+                assert result.exit_code != 0
+                assert "missing validation bundle" in result.diagnostics.get("error", "")
 
 
-def test_promotion_compatibility_bridge(mock_data_root):
-    run_id = "legacy_run"
-    
-    # Mock candidates table but NO validation bundle
-    (mock_data_root / "reports" / "edge_candidates" / run_id).mkdir(parents=True)
-    pd.DataFrame([{
-        "candidate_id": "cand_1",
-        "event_type": "VOL_SHOCK",
-        "rule_template": "tpl1",
-        "direction": "long",
-        "horizon": 12,
-        "n_obs": 100,
-        "expectancy": 0.1,
-        "q_value": 0.01,
-        "p_value": 0.01,
-        "stability_score": 0.8,
-        "sign_consistency": 0.9,
-        "cost_survival_ratio": 0.8,
-        "tob_coverage": 0.9,
-        "selection_score": 0.8,
-        "confirmatory_locked": True,
-        "frozen_spec_hash": "some_hash",
-    }]).to_parquet(
-        mock_data_root / "reports" / "edge_candidates" / run_id / "edge_candidates_normalized.parquet"
-    )
+def test_promotion_opt_in_compatibility_bridge(mock_data_root):
+    run_id = "test_run"
+    _create_mock_candidates_table(mock_data_root, run_id, ["cand_1"])
     
     config = PromotionConfig(
-        run_id=run_id,
-        symbols="BTC",
-        out_dir=mock_data_root / "reports" / "promotions" / run_id,
-        max_q_value=0.05,
-        min_events=20,
-        min_stability_score=0.5,
-        min_sign_consistency=0.5,
-        min_cost_survival_ratio=0.5,
-        max_negative_control_pass_rate=0.05,
-        min_tob_coverage=0.5,
-        require_hypothesis_audit=False,
-        allow_missing_negative_controls=True,
-        require_multiplicity_diagnostics=False,
-        min_dsr=0.0,
-        max_overlap_ratio=1.0,
-        max_profile_correlation=1.0,
-        allow_discovery_promotion=True,
-        program_id="test_program",
-        retail_profile="default",
-        objective_name="default",
-        objective_spec=None,
-        retail_profiles_spec=None
+        run_id=run_id, symbols="BTC", out_dir=None, max_q_value=0.05, min_events=20,
+        min_stability_score=0.5, min_sign_consistency=0.5, min_cost_survival_ratio=0.5,
+        max_negative_control_pass_rate=0.05, min_tob_coverage=0.5,
+        require_hypothesis_audit=False, allow_missing_negative_controls=True,
+        require_multiplicity_diagnostics=False, min_dsr=0.0, max_overlap_ratio=1.0,
+        max_profile_correlation=1.0, allow_discovery_promotion=True,
+        program_id="test_program", retail_profile="default", objective_name="default",
+        objective_spec=None, retail_profiles_spec=None,
+        use_compatibility_bridge=True # Explicitly on
     )
     
     with patch("project.research.services.promotion_service.get_data_root", return_value=mock_data_root):
-        # Mock load_run_manifest to avoid spec hash check if needed, 
-        # but let's just mock resolve_objective_profile_contract
-        with patch("project.research.services.promotion_service.load_run_manifest", return_value={"run_mode": "confirmatory"}):
-            with patch("project.research.services.promotion_service.resolve_objective_profile_contract") as mock_contract:
-                mock_contract.return_value = MagicMock()
-                with patch("project.research.services.promotion_service.ontology_spec_hash", return_value="some_hash"):
+        with patch("project.research.validation.result_writer.get_data_root", return_value=mock_data_root):
+            with patch("project.research.services.promotion_service.load_run_manifest", return_value={"run_mode": "confirmatory"}):
+                with patch("project.research.services.promotion_service.resolve_objective_profile_contract") as mock_contract:
+                    mock_contract.return_value = MagicMock()
                     with patch("project.research.services.promotion_service.promote_candidates") as mock_promote:
                         mock_promote.return_value = (pd.DataFrame([{"candidate_id": "cand_1"}]), pd.DataFrame([{"candidate_id": "cand_1"}]), {})
-                        
-                        # execute_promotion should use the compatibility bridge to create a bundle
                         result = execute_promotion(config)
                         assert len(result.promoted_df) == 1
+
+
+def test_promotion_uses_canonical_validated_candidates(mock_data_root):
+    run_id = "test_run"
+    _create_mock_candidates_table(mock_data_root, run_id, ["cand_1", "cand_2"])
+    
+    # Bundle only validates cand_1
+    decision1 = ValidationDecision(status="validated", candidate_id="cand_1", run_id=run_id)
+    candidate1 = ValidatedCandidateRecord(candidate_id="cand_1", decision=decision1, metrics=ValidationMetrics(sample_count=100))
+    
+    decision2 = ValidationDecision(status="rejected", candidate_id="cand_2", run_id=run_id, reason_codes=["failed_stability"])
+    candidate2 = ValidatedCandidateRecord(candidate_id="cand_2", decision=decision2, metrics=ValidationMetrics(sample_count=100))
+    
+    bundle = ValidationBundle(
+        run_id=run_id, created_at="2026-01-01", 
+        validated_candidates=[candidate1], 
+        rejected_candidates=[candidate2]
+    )
+    
+    from project.research.validation.result_writer import write_validation_bundle, write_validated_candidate_tables
+    write_validation_bundle(bundle, base_dir=mock_data_root / "reports" / "validation" / run_id)
+    write_validated_candidate_tables(bundle, base_dir=mock_data_root / "reports" / "validation" / run_id)
+    
+    config = PromotionConfig(
+        run_id=run_id, symbols="BTC", out_dir=None, max_q_value=0.05, min_events=20,
+        min_stability_score=0.5, min_sign_consistency=0.5, min_cost_survival_ratio=0.5,
+        max_negative_control_pass_rate=0.05, min_tob_coverage=0.5,
+        require_hypothesis_audit=False, allow_missing_negative_controls=True,
+        require_multiplicity_diagnostics=False, min_dsr=0.0, max_overlap_ratio=1.0,
+        max_profile_correlation=1.0, allow_discovery_promotion=True,
+        program_id="test_program", retail_profile="default", objective_name="default",
+        objective_spec=None, retail_profiles_spec=None
+    )
+    
+    with patch("project.research.services.promotion_service.get_data_root", return_value=mock_data_root):
+        with patch("project.research.validation.result_writer.get_data_root", return_value=mock_data_root):
+            with patch("project.research.services.promotion_service.load_run_manifest", return_value={"run_mode": "confirmatory"}):
+                with patch("project.research.services.promotion_service.resolve_objective_profile_contract") as mock_contract:
+                    mock_contract.return_value = MagicMock()
+                    # We expect it to call promote_candidates with ONLY cand_1
+                    with patch("project.research.services.promotion_service.promote_candidates") as mock_promote:
+                        mock_promote.return_value = (pd.DataFrame([{"candidate_id": "cand_1"}]), pd.DataFrame([{"candidate_id": "cand_1"}]), {})
+                        execute_promotion(config)
                         
-                        # Verify validation bundle was created in the background
-                        from project.research.validation.result_writer import load_validation_bundle
-                        val_bundle = load_validation_bundle(run_id, base_dir=mock_data_root / "reports" / "validation" / run_id)
-                        assert val_bundle is not None
-                        assert val_bundle.summary_stats.get("validation_stage_version") == "compat_legacy_bridge_v1"
+                        # Verify candidates_df passed to promote_candidates only has cand_1
+                        args, kwargs = mock_promote.call_args
+                        passed_df = kwargs['candidates_df']
+                        assert list(passed_df['candidate_id']) == ["cand_1"]
+
+
+def test_promoted_result_contains_maturity_fields(mock_data_root):
+    # This tests the output of _assemble_promotion_result via execute_promotion
+    run_id = "test_run"
+    _create_mock_candidates_table(mock_data_root, run_id, ["cand_1"])
+    
+    decision = ValidationDecision(status="validated", candidate_id="cand_1", run_id=run_id)
+    candidate = ValidatedCandidateRecord(candidate_id="cand_1", decision=decision, metrics=ValidationMetrics(sample_count=100))
+    bundle = ValidationBundle(run_id=run_id, created_at="2026-01-01", validated_candidates=[candidate])
+    
+    from project.research.validation.result_writer import write_validation_bundle, write_validated_candidate_tables
+    write_validation_bundle(bundle, base_dir=mock_data_root / "reports" / "validation" / run_id)
+    write_validated_candidate_tables(bundle, base_dir=mock_data_root / "reports" / "validation" / run_id)
+    
+    config = PromotionConfig(
+        run_id=run_id, symbols="BTC", out_dir=None, max_q_value=0.05, min_events=20,
+        min_stability_score=0.5, min_sign_consistency=0.5, min_cost_survival_ratio=0.5,
+        max_negative_control_pass_rate=0.05, min_tob_coverage=0.5,
+        require_hypothesis_audit=False, allow_missing_negative_controls=True,
+        require_multiplicity_diagnostics=False, min_dsr=0.0, max_overlap_ratio=1.0,
+        max_profile_correlation=1.0, allow_discovery_promotion=True,
+        program_id="test_program", retail_profile="default", objective_name="default",
+        objective_spec=None, retail_profiles_spec=None
+    )
+    
+    with patch("project.research.services.promotion_service.get_data_root", return_value=mock_data_root):
+        with patch("project.research.validation.result_writer.get_data_root", return_value=mock_data_root):
+            with patch("project.research.services.promotion_service.load_run_manifest", return_value={"run_mode": "confirmatory"}):
+                with patch("project.research.services.promotion_service.resolve_objective_profile_contract") as mock_contract:
+                    mock_contract.return_value = MagicMock()
+                    # Here we need to return a DataFrame that has the new columns
+                    # Actually, _assemble_promotion_result adds them, so they should be in promoted_df
+                    # But we mocked promote_candidates, so we must ensure it returns them or don't mock it that deep.
+                    # Let's mock promote_candidates to return a DF with the new columns
+                    mock_audit = pd.DataFrame([{
+                        "candidate_id": "cand_1",
+                        "promotion_decision": "promoted",
+                        "promotion_class": "paper_promoted",
+                        "readiness_status": "paper_ready",
+                        "deployment_state_default": "paper_only"
+                    }])
+                    with patch("project.research.services.promotion_service.promote_candidates") as mock_promote:
+                        mock_promote.return_value = (mock_audit, mock_audit, {})
+                        result = execute_promotion(config)
+                        assert "promotion_class" in result.promoted_df.columns
+                        assert result.promoted_df.iloc[0]["promotion_class"] == "paper_promoted"

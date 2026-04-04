@@ -112,7 +112,7 @@ def write_promotion_reports(
     outputs = {
         "promotion_audit": (
             audit_df,
-            out_dir / "promotion_statistical_audit.parquet",
+            out_dir / "promotion_audit.parquet",
             "promotion_audit",
         ),
         "promoted_candidates": (

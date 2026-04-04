@@ -48,6 +48,8 @@ class ThesisGovernance(BaseModel):
     overlap_group_id: str = ""
     trade_trigger_eligible: bool = False
     requires_stronger_evidence: bool = False
+    readiness_status: str = ""
+    inventory_reason_code: str = ""
 
 
 class ThesisRequirements(BaseModel):
