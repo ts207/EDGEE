@@ -99,3 +99,26 @@ discovery_search:
     top_k_contexts_per_candidate: 2
     require_unconditional_baseline: true
     min_context_gain: 0.0      # Context must not hurt baseline score
+
+# Phase 5 — Portfolio-aware discovery selection
+# Shortlist is opt-in (enabled: false). Overlap metadata is always computed
+# and appended to the full candidate table when mode != "off".
+discovery_selection:
+  mode: greedy   # "greedy" | "off"
+
+  overlap:
+    enabled: true
+    structural_weight: 0.5
+    fold_weight: 0.3
+    lineage_weight: 0.2
+    edge_threshold: 0.65   # Minimum similarity to draw an overlap graph edge
+
+  shortlist:
+    enabled: false          # Set to true to write phase2_diversified_shortlist.parquet
+    size: 20
+    lambda_quality: 0.7
+    lambda_overlap: 0.2
+    lambda_crowding: 0.1
+    max_per_overlap_cluster: 2
+    max_per_trigger_family: 3
+    max_per_lineage: 2

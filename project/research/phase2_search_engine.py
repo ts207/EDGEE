@@ -844,6 +844,11 @@ def _write_hierarchical_stage_artifacts(
         except Exception as exc:
             log.warning("Stage artifact write failed (%s / %s): %s", stage, symbol, exc)
 
+def _load_diversification_config(search_spec_doc: dict) -> dict:
+    """Return the discovery_selection config block or empty dict."""
+    block = (search_spec_doc or {}).get("discovery_selection", {})
+    return block if isinstance(block, dict) else {}
+
 
 def run(
     run_id: str,
@@ -1572,6 +1577,48 @@ def run(
     # Clean up function-level accumulator
     if hasattr(run, "_h_stage_artifacts"):
         del run._h_stage_artifacts  # type: ignore[attr-defined]
+
+    # Phase 5 — Discovery-time diversification
+    # Appends overlap/novelty columns to final_df and optionally writes
+    # phase2_diversified_shortlist.parquet and phase2_candidate_overlap_metrics.parquet.
+    # This block is non-fatal; any exception is logged and skipped.
+    if not final_df.empty:
+        try:
+            from project.research.services.candidate_diversification import (
+                annotate_candidates_with_diversification,
+            )
+
+            # Reuse the spec doc already loaded for Phase 4 config
+            _div_spec_doc: dict = {}
+            try:
+                _div_spec_doc = _load_search_spec_doc(resolved_search_spec)
+            except Exception:
+                pass
+            _div_config = _load_diversification_config(_div_spec_doc)
+
+            final_df, _shortlist_df = annotate_candidates_with_diversification(
+                final_df, _div_config
+            )
+
+            # Write overlap metrics artifact (always, if overlap ran)
+            _overlap_cols = [
+                "candidate_id", "overlap_cluster_id", "cluster_size", "cluster_density",
+                "is_duplicate_like", "novelty_score", "crowding_penalty", "cluster_rank",
+                "selected_into_diversified_shortlist", "shortlist_rank",
+            ]
+            _present_overlap_cols = [c for c in _overlap_cols if c in final_df.columns]
+            if _present_overlap_cols and "overlap_cluster_id" in final_df.columns:
+                _overlap_metrics = final_df[_present_overlap_cols].dropna(subset=["candidate_id"]) if "candidate_id" in _present_overlap_cols else final_df[_present_overlap_cols]
+                write_parquet(_overlap_metrics, out_dir / "phase2_candidate_overlap_metrics.parquet")
+                log.info("Phase 5: wrote overlap metrics (%d rows)", len(_overlap_metrics))
+
+            # Write shortlist artifact (only if shortlist selection ran)
+            if _shortlist_df is not None and not _shortlist_df.empty:
+                write_parquet(_shortlist_df, out_dir / "phase2_diversified_shortlist.parquet")
+                log.info("Phase 5: wrote diversified shortlist (%d rows)", len(_shortlist_df))
+
+        except Exception as _div_exc:
+            log.warning("Phase 5 diversification failed (non-fatal): %s", _div_exc)
 
     main_diag = build_search_engine_diagnostics(
         run_id=run_id,

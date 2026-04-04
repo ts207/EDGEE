@@ -561,3 +561,164 @@ def build_hierarchical_stage_diagnostics(
         "pruning_efficiency": pruning_efficiency,
         "pruned_by_stage": pruned_by_stage,
     }
+
+
+# ---------------------------------------------------------------------------
+# Phase 5 — Diversification diagnostics
+# ---------------------------------------------------------------------------
+
+def build_diversification_diagnostics(
+    candidates: "pd.DataFrame",
+    shortlist: "pd.DataFrame | None" = None,
+    diversification_config: "dict | None" = None,
+) -> "dict[str, Any]":
+    """Build a diagnostics dict explaining the Phase 5 diversification output.
+
+    Args:
+        candidates:             Full annotated candidate table (post Phase 5).
+        shortlist:              Diversified shortlist DataFrame (may be empty/None).
+        diversification_config: ``discovery_selection`` config block.
+
+    Returns a dict suitable for inclusion in the main diagnostics JSON report.
+    """
+    config = diversification_config or {}
+    shortlist_cfg = config.get("shortlist", {})
+    shortlist_enabled = bool(shortlist_cfg.get("enabled", False))
+    shortlist_size = int(shortlist_cfg.get("size", 20))
+
+    if candidates is None or candidates.empty:
+        return {
+            "diversification_mode": str(config.get("mode", "greedy")),
+            "shortlist_enabled": shortlist_enabled,
+            "shortlist_size": shortlist_size,
+            "total_candidates": 0,
+            "overlap_cluster_count": 0,
+            "duplicate_like_count": 0,
+            "shortlist_actual_size": 0,
+            "trigger_family_concentration": {},
+            "lineage_concentration": {},
+            "top_crowded_clusters": [],
+            "strongest_excluded": [],
+            "shortlist_vs_raw_top_n": {},
+        }
+
+    # Cluster counts
+    cluster_col = candidates.get(
+        "overlap_cluster_id", pd.Series("c0000", index=candidates.index)
+    ).fillna("c0000")
+    n_clusters = int(cluster_col.nunique())
+
+    dup_col = candidates.get("is_duplicate_like", pd.Series(False, index=candidates.index))
+    n_dup = int(dup_col.fillna(False).astype(bool).sum())
+
+    # Trigger family concentration
+    event_col = (
+        "event_family" if "event_family" in candidates.columns
+        else "canonical_event_type" if "canonical_event_type" in candidates.columns
+        else "event_type"
+    )
+    trig_counts: dict[str, int] = {}
+    if event_col in candidates.columns:
+        for v in candidates[event_col].fillna("unknown").astype(str):
+            trig_counts[v.upper()] = trig_counts.get(v.upper(), 0) + 1
+    top_trig = dict(
+        sorted(trig_counts.items(), key=lambda kv: -kv[1])[:10]
+    )
+
+    # Lineage concentration
+    lineage_col = candidates.get("concept_lineage_key", pd.Series("", index=candidates.index)).fillna("")
+    lin_counts: dict[str, int] = {}
+    for key in lineage_col.astype(str):
+        if key:
+            lin_counts[key] = lin_counts.get(key, 0) + 1
+    top_lin = dict(sorted(lin_counts.items(), key=lambda kv: -kv[1])[:5])
+
+    # Top crowded clusters
+    cluster_size_col = candidates.get("cluster_size", pd.Series(1, index=candidates.index)).fillna(1)
+    cluster_density_col = candidates.get("cluster_density", pd.Series(0.0, index=candidates.index)).fillna(0.0)
+    quality_col_name = _best_quality_col_diag(candidates)
+    quality_col = pd.to_numeric(candidates.get(quality_col_name, 0), errors="coerce").fillna(0.0)
+    cid_col = candidates.get("candidate_id", pd.Series("", index=candidates.index)).fillna("").astype(str)
+
+    cluster_summaries: list[dict] = []
+    seen_clusters: set[str] = set()
+    for _, row in candidates[cluster_size_col > 1].iterrows():
+        clu = str(cluster_col.loc[row.name] if row.name in cluster_col.index else "c0000")
+        if clu in seen_clusters:
+            continue
+        seen_clusters.add(clu)
+        clu_members = candidates[cluster_col == clu]
+        top_q = pd.to_numeric(clu_members.get(quality_col_name, 0), errors="coerce").fillna(0.0).max()
+        top_member = str(
+            clu_members.loc[clu_members.get(quality_col_name, pd.Series(0)).idxmax(), :]
+            .get("candidate_id", "")
+            if not clu_members.empty else ""
+        )
+        cluster_summaries.append({
+            "cluster_id": clu,
+            "size": int(clu_members["cluster_size"].iloc[0])
+            if "cluster_size" in clu_members.columns else len(clu_members),
+            "density": float(clu_members["cluster_density"].iloc[0])
+            if "cluster_density" in clu_members.columns else 0.0,
+            "top_member": top_member,
+            "top_quality": round(float(top_q), 4),
+        })
+    top_crowded = sorted(cluster_summaries, key=lambda d: -d["size"])[:10]
+
+    # Strongest excluded (selected_into_diversified_shortlist == False, sorted by quality)
+    shortlist_actual_size = 0
+    strongest_excluded: list[dict] = []
+    if shortlist_enabled and "selected_into_diversified_shortlist" in candidates.columns:
+        selected_mask = candidates["selected_into_diversified_shortlist"].fillna(False).astype(bool)
+        excluded = candidates[~selected_mask].copy()
+        shortlist_actual_size = int(selected_mask.sum())
+        exc_quality = pd.to_numeric(excluded.get(quality_col_name, 0), errors="coerce").fillna(0.0)
+        exc_sorted = excluded.assign(_q=exc_quality).sort_values("_q", ascending=False).head(10)
+        reason_col = candidates.get("selection_reason", pd.Series("", index=candidates.index)).fillna("")
+        for _, r in exc_sorted.iterrows():
+            strongest_excluded.append({
+                "candidate_id": str(r.get("candidate_id", "")),
+                "quality_score": round(float(r.get("_q", 0.0)), 4),
+                "cluster_id": str(cluster_col.get(r.name, "")),
+                "exclusion_reason": str(reason_col.get(r.name, "not_selected")),
+            })
+    elif shortlist is not None and not shortlist.empty:
+        shortlist_actual_size = len(shortlist)
+
+    # Shortlist vs raw top-N comparison
+    shortlist_vs_top_n: dict[str, Any] = {}
+    shortlist_df = shortlist or pd.DataFrame()
+    if not shortlist_df.empty and not candidates.empty:
+        top_n = candidates.head(int(shortlist_size)).copy()
+        top_n_q = pd.to_numeric(top_n.get(quality_col_name, 0), errors="coerce").fillna(0.0)
+        sl_q = pd.to_numeric(shortlist_df.get(quality_col_name, 0), errors="coerce").fillna(0.0)
+        top_n_clusters = top_n.get("overlap_cluster_id", pd.Series("c0", index=top_n.index)).nunique()
+        sl_clusters = shortlist_df.get("overlap_cluster_id", pd.Series("c0", index=shortlist_df.index)).nunique()
+        shortlist_vs_top_n = {
+            "raw_top_n_quality_mean": round(float(top_n_q.mean()), 4) if not top_n_q.empty else 0.0,
+            "shortlist_quality_mean": round(float(sl_q.mean()), 4) if not sl_q.empty else 0.0,
+            "raw_top_n_cluster_count": int(top_n_clusters),
+            "shortlist_cluster_count": int(sl_clusters),
+        }
+
+    return {
+        "diversification_mode": str(config.get("mode", "greedy")),
+        "shortlist_enabled": shortlist_enabled,
+        "shortlist_size": shortlist_size,
+        "shortlist_actual_size": shortlist_actual_size,
+        "total_candidates": len(candidates),
+        "overlap_cluster_count": n_clusters,
+        "duplicate_like_count": n_dup,
+        "trigger_family_concentration": top_trig,
+        "lineage_concentration": top_lin,
+        "top_crowded_clusters": top_crowded,
+        "strongest_excluded": strongest_excluded,
+        "shortlist_vs_raw_top_n": shortlist_vs_top_n,
+    }
+
+
+def _best_quality_col_diag(df: "pd.DataFrame") -> str:
+    for col in ("discovery_quality_score_v3", "discovery_quality_score", "t_stat"):
+        if col in df.columns:
+            return col
+    return "t_stat"
