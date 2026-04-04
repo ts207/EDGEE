@@ -181,6 +181,32 @@ def test_translate_and_validate_proposal_keeps_legacy_compatibility(tmp_path: Pa
     assert result["proposal"]["trigger_space"]["events"]["include"] == ["BASIS_DISLOC"]
 
 
+def test_load_operator_proposal_accepts_structured_hypothesis_format() -> None:
+    payload = {
+        "program_id": "structured_campaign",
+        "start": "2026-01-01",
+        "end": "2026-01-31",
+        "symbols": ["BTCUSDT"],
+        "timeframe": "1h",
+        "hypothesis": {
+            "anchor": {"type": "event", "event_id": "BASIS_DISLOC"},
+            "template": {"id": "continuation"},
+            "direction": "long",
+            "horizon_bars": 12,
+            "sampling_policy": {"entry_lag_bars": 1},
+        },
+    }
+
+    proposal = load_operator_proposal(payload)
+
+    assert proposal.templates == ["continuation"]
+    assert proposal.trigger_space["allowed_trigger_types"] == ["EVENT"]
+    assert proposal.trigger_space["events"]["include"] == ["BASIS_DISLOC"]
+    assert proposal.horizons_bars == [12]
+    assert proposal.directions == ["long"]
+    assert proposal.entry_lags == [1]
+
+
 def test_canonical_event_h24_example_loads_as_single_hypothesis_front_door() -> None:
     proposal = load_operator_proposal(Path("spec/proposals/canonical_event_hypothesis_h24.yaml"))
 

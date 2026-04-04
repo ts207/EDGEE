@@ -146,10 +146,26 @@ def trigger_mask(spec: HypothesisSpec, features: pd.DataFrame) -> pd.Series:
         to_col = next((c for c in to_cols if c in features.columns), None)
         if from_col and to_col:
             was_from_vals = pd.to_numeric(features[from_col], errors="coerce")
-            was_from = was_from_vals.where(was_from_vals.notna(), 0).shift(1) == 1
             is_to_vals = pd.to_numeric(features[to_col], errors="coerce")
-            is_to = is_to_vals.where(is_to_vals.notna(), 0) == 1
-            return was_from & is_to
+            
+            # Sprint 2: Strict transition semantics.
+            # Require both previous and current state data to exist (no implicit fallback).
+            # was_from.shift(1) will have NaN at index 0. 
+            # We must ensure we don't treat NaN as "not from_state" or anything else.
+            
+            was_from_raw = (was_from_vals == 1)
+            is_to_raw = (is_to_vals == 1)
+            
+            # shift(1) makes the first element NaN. 
+            # In Sprint 2, we must NOT fire at index 0 because history is missing.
+            # .fillna(False) on the result of & with shifted values is okay IF 
+            # we are sure shift(1) correctly represents the lack of history.
+            
+            was_from_shifted = was_from_raw.shift(1)
+            
+            # Explicitly require history: first bar can never be a transition onset.
+            return (was_from_shifted == True) & (is_to_raw == True)
+        
         log.debug(
             "Transition columns for %r→%r not found in features",
             t.from_state,

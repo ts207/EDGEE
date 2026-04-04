@@ -3,10 +3,24 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 
 import yaml
 
+from project.research.agent_io.hypothesis_contract import (
+    AnchorSpec,
+    FilterSpec,
+    NormalizationWarning,
+    SamplingPolicySpec,
+    StructuredHypothesisSpec,
+    StructuredProposal,
+    TemplateSpec,
+    normalize_structured_proposal,
+    validate_structured_hypothesis_for_execution,
+    UNSUPPORTED_STATE_ANCHOR_EXECUTION,
+    UNSUPPORTED_SAMPLING_POLICY_EXECUTION,
+    STATE_ANCHOR_LEGACY_EXECUTION_ONLY,
+)
 from project.research.context_labels import canonicalize_contexts
 from project.research.knowledge.knobs import build_agent_knob_rows
 
@@ -767,7 +781,11 @@ def compile_single_hypothesis_to_agent_proposal(
 
 def load_operator_proposal(path_or_payload: str | Path | Dict[str, Any]) -> AgentProposal:
     raw = _load_proposal_payload(path_or_payload)
-    if "hypothesis" in raw:
+    fmt = detect_operator_proposal_format(raw)
+    if fmt == "structured_hypothesis":
+        proposal, _ = normalize_structured_proposal(raw)
+        return compile_structured_proposal_to_agent_proposal(proposal)
+    if fmt == "single_hypothesis":
         return compile_single_hypothesis_to_agent_proposal(
             _load_single_hypothesis_proposal(raw)
         )
@@ -776,7 +794,359 @@ def load_operator_proposal(path_or_payload: str | Path | Dict[str, Any]) -> Agen
 
 def detect_operator_proposal_format(path_or_payload: str | Path | Dict[str, Any]) -> str:
     raw = _load_proposal_payload(path_or_payload)
-    return "single_hypothesis" if "hypothesis" in raw else "legacy"
+    if "hypothesis" in raw:
+        hypo = raw.get("hypothesis")
+        if isinstance(hypo, dict) and "anchor" in hypo:
+            return "structured_hypothesis"
+        return "single_hypothesis"
+    return "legacy"
+
+
+def load_normalized_operator_proposal(
+    path_or_payload: str | Path | Dict[str, Any],
+) -> StructuredProposal:
+    proposal, _ = normalize_operator_proposal_with_warnings(path_or_payload)
+    return proposal
+
+
+def normalize_operator_proposal_with_warnings(
+    path_or_payload: str | Path | Dict[str, Any],
+) -> Tuple[StructuredProposal, List[NormalizationWarning]]:
+    raw = _load_proposal_payload(path_or_payload)
+    fmt = detect_operator_proposal_format(raw)
+
+    if fmt == "structured_hypothesis":
+        return normalize_structured_proposal(raw)
+
+    if fmt == "single_hypothesis":
+        single = _load_single_hypothesis_proposal(raw)
+        return _translate_single_hypothesis_to_structured(single)
+
+    legacy = load_agent_proposal(raw)
+    return _translate_legacy_to_structured(legacy)
+
+
+def _translate_single_hypothesis_to_structured(
+    single: SingleHypothesisProposal,
+) -> Tuple[StructuredProposal, List[NormalizationWarning]]:
+    warnings: List[NormalizationWarning] = []
+
+    # Map TriggerSpec to AnchorSpec
+    trigger = single.hypothesis.trigger
+    anchor_type = trigger.type
+    if anchor_type == "feature_predicate":
+        anchor_type = "feature_crossing"
+
+    anchor = AnchorSpec(
+        type=anchor_type,
+        event_id=trigger.event_id if trigger.event_id else None,
+        state_id=trigger.state_id if trigger.state_id else None,
+        from_state=trigger.from_state if trigger.from_state else None,
+        to_state=trigger.to_state if trigger.to_state else None,
+        events=list(trigger.events) if trigger.events else None,
+        max_gap_bars=trigger.max_gap_bars,
+        feature=trigger.feature if trigger.feature else None,
+        operator=trigger.operator if trigger.operator else None,
+        threshold=trigger.threshold,
+    )
+
+    if anchor.type == "state":
+        warnings.append(
+            NormalizationWarning(
+                code="DEPRECATED_ANCHOR",
+                field_path="hypothesis.anchor.type",
+                message="'state' as anchor is deprecated. Use filters instead.",
+            )
+        )
+
+    # SingleHypothesis doesn't have explicit filters, but some fields might map
+    filters = FilterSpec()
+
+    sampling_policy = SamplingPolicySpec(
+        entry_lag_bars=single.hypothesis.entry_lag_bars,
+    )
+
+    template = TemplateSpec(
+        id=single.hypothesis.template,
+    )
+
+    hypothesis = StructuredHypothesisSpec(
+        anchor=anchor,
+        filters=filters,
+        sampling_policy=sampling_policy,
+        template=template,
+        direction=single.hypothesis.direction,
+        horizon_bars=single.hypothesis.horizon_bars,
+    )
+
+    # Bounded handling
+    bounded_raw = None
+    if single.bounded:
+        bounded_raw = single.bounded.to_dict()
+
+    proposal = StructuredProposal(
+        program_id=single.program_id,
+        start=single.start,
+        end=single.end,
+        symbols=list(single.symbols),
+        timeframe=single.timeframe,
+        hypothesis=hypothesis,
+        instrument_classes=list(single.instrument_classes),
+        objective_name=single.objective_name,
+        promotion_profile=single.promotion_profile,
+        search_spec={"path": single.search_spec},
+        bounded=bounded_raw,
+        knobs=[{"name": k, "value": v} for k, v in single.knobs.items()],
+        artifacts=dict(single.artifacts),
+    )
+
+    return proposal, warnings
+
+
+def _translate_legacy_to_structured(
+    legacy: AgentProposal,
+) -> Tuple[StructuredProposal, List[NormalizationWarning]]:
+    # Legacy can have multiple values. For normalization to structured,
+    # we take the first item if it exists and is a single-hypothesis shape.
+    if (
+        len(legacy.templates) != 1
+        or len(legacy.horizons_bars) != 1
+        or len(legacy.directions) != 1
+        or len(legacy.entry_lags) != 1
+        or len(legacy.symbols) != 1
+    ):
+        raise ValueError(
+            "Legacy proposal has multiple hypotheses and cannot be normalized to StructuredProposal"
+        )
+
+    warnings: List[NormalizationWarning] = []
+
+    # Infer anchor from trigger_space
+    allowed = legacy.trigger_space.get("allowed_trigger_types", [])
+    if not allowed:
+        raise ValueError("Legacy trigger_space has no allowed_trigger_types")
+
+    main_type = allowed[0].lower()
+    anchor_params: Dict[str, Any] = {"type": main_type}
+
+    if main_type == "event":
+        events = legacy.trigger_space.get("events", {}).get("include", [])
+        if not events or len(events) != 1:
+            raise ValueError("Legacy EVENT proposal must have exactly 1 event for normalization")
+        anchor_params["event_id"] = events[0]
+    elif main_type == "state":
+        states = legacy.trigger_space.get("states", {}).get("include", [])
+        if not states or len(states) != 1:
+            raise ValueError("Legacy STATE proposal must have exactly 1 state for normalization")
+        anchor_params["state_id"] = states[0]
+        warnings.append(
+            NormalizationWarning(
+                code="DEPRECATED_ANCHOR",
+                field_path="hypothesis.anchor.type",
+                message="'state' as anchor is deprecated. Use filters instead.",
+            )
+        )
+    elif main_type == "transition":
+        transitions = legacy.trigger_space.get("transitions", {}).get("include", [])
+        if not transitions or len(transitions) != 1:
+            raise ValueError(
+                "Legacy TRANSITION proposal must have exactly 1 transition for normalization"
+            )
+        anchor_params["from_state"] = transitions[0].get("from_state")
+        anchor_params["to_state"] = transitions[0].get("to_state")
+    elif main_type == "sequence":
+        sequences = legacy.trigger_space.get("sequences", {}).get("include", [])
+        if not sequences or len(sequences) != 1:
+            raise ValueError(
+                "Legacy SEQUENCE proposal must have exactly 1 sequence for normalization"
+            )
+        anchor_params["events"] = sequences[0]
+        gaps = legacy.trigger_space.get("sequences", {}).get("max_gaps_bars", [])
+        if gaps:
+            anchor_params["max_gap_bars"] = gaps[0]
+    elif main_type == "feature_predicate":
+        anchor_params["type"] = "feature_crossing"
+        fps = legacy.trigger_space.get("feature_predicates", {}).get("include", [])
+        if not fps or len(fps) != 1:
+            raise ValueError(
+                "Legacy FEATURE_PREDICATE proposal must have exactly 1 predicate for normalization"
+            )
+        anchor_params["feature"] = fps[0].get("feature")
+        anchor_params["operator"] = fps[0].get("operator")
+        anchor_params["threshold"] = fps[0].get("threshold")
+
+    anchor = AnchorSpec(**anchor_params)
+
+    # Filters
+    filters = FilterSpec(
+        states=legacy.trigger_space.get("states", {}).get("include", []),
+        regimes=legacy.trigger_space.get("canonical_regimes", []),
+    )
+    # If it was a state anchor, we already warned.
+
+    sampling_policy = SamplingPolicySpec(
+        entry_lag_bars=legacy.entry_lags[0],
+    )
+
+    template = TemplateSpec(
+        id=legacy.templates[0],
+    )
+
+    hypothesis = StructuredHypothesisSpec(
+        anchor=anchor,
+        filters=filters,
+        sampling_policy=sampling_policy,
+        template=template,
+        direction=legacy.directions[0],
+        horizon_bars=legacy.horizons_bars[0],
+    )
+
+    bounded_raw = None
+    if legacy.bounded:
+        bounded_raw = legacy.bounded.to_dict()
+
+    proposal = StructuredProposal(
+        program_id=legacy.program_id,
+        start=legacy.start,
+        end=legacy.end,
+        symbols=list(legacy.symbols),
+        timeframe=legacy.timeframe,
+        hypothesis=hypothesis,
+        instrument_classes=list(legacy.instrument_classes),
+        objective_name=legacy.objective_name,
+        promotion_profile=legacy.promotion_profile,
+        search_spec={"path": legacy.search_spec},
+        bounded=bounded_raw,
+        knobs=[{"name": k, "value": v} for k, v in legacy.knobs.items()],
+        artifacts=dict(legacy.artifacts),
+    )
+
+    return proposal, warnings
+
+
+from dataclasses import replace as dataclass_replace
+
+
+def compile_structured_proposal_to_agent_proposal(
+    proposal: StructuredProposal,
+) -> AgentProposal:
+    # Sprint 2 strict enforcement
+    validate_structured_hypothesis_for_execution(proposal.hypothesis)
+
+    # Anchor to trigger_space
+    trigger_space = _compile_anchor_to_trigger_space(proposal.hypothesis.anchor)
+
+    # Filters to trigger_space
+    if proposal.hypothesis.filters.states:
+        trigger_space.setdefault("states", {})["include"] = [
+            s.upper() for s in proposal.hypothesis.filters.states
+        ]
+    if proposal.hypothesis.filters.regimes:
+        trigger_space["canonical_regimes"] = [
+            r.upper() for r in proposal.hypothesis.filters.regimes
+        ]
+
+    if proposal.hypothesis.filters.feature_predicates:
+        trigger_space.setdefault("feature_predicates", {})["include"] = [
+            fp.to_dict() for fp in proposal.hypothesis.filters.feature_predicates
+        ]
+
+    # Contexts
+    contexts = {}
+    if proposal.hypothesis.filters.contexts:
+        contexts = _normalize_contexts(proposal.hypothesis.filters.contexts)
+
+    # Knobs
+    knobs = {}
+    # Existing knobs in proposal level
+    for knob_entry in proposal.knobs:
+        if isinstance(knob_entry, dict) and "name" in knob_entry and "value" in knob_entry:
+            knobs[str(knob_entry["name"])] = knob_entry["value"]
+
+    agent_proposal = AgentProposal(
+        program_id=proposal.program_id,
+        start=proposal.start,
+        end=proposal.end,
+        symbols=list(proposal.symbols),
+        trigger_space=trigger_space,
+        templates=[proposal.hypothesis.template.id],
+        timeframe=proposal.timeframe,
+        instrument_classes=list(proposal.instrument_classes),
+        horizons_bars=[int(proposal.hypothesis.horizon_bars)],
+        directions=[proposal.hypothesis.direction],
+        entry_lags=[int(proposal.hypothesis.sampling_policy.entry_lag_bars)],
+        objective_name=proposal.objective_name,
+        promotion_profile=proposal.promotion_profile,
+        contexts=contexts,
+        knobs=knobs,
+        artifacts=dict(proposal.artifacts),
+        search_spec=str(proposal.search_spec.get("path", "spec/search_space.yaml")),
+    )
+    if proposal.bounded:
+        # Assuming bounded is already a dict or BoundedProposalSpec
+        if isinstance(proposal.bounded, dict):
+            agent_proposal = dataclass_replace(
+                agent_proposal, bounded=_normalize_bounded_spec(proposal.bounded)
+            )
+        elif isinstance(proposal.bounded, BoundedProposalSpec):
+            agent_proposal = dataclass_replace(agent_proposal, bounded=proposal.bounded)
+
+    _validate_proposal(agent_proposal)
+    return agent_proposal
+
+
+def _compile_anchor_to_trigger_space(anchor: AnchorSpec) -> Dict[str, Any]:
+    if anchor.type == "event":
+        return _normalize_trigger_space(
+            {
+                "allowed_trigger_types": ["EVENT"],
+                "events": {"include": [anchor.event_id]},
+            }
+        )
+    if anchor.type == "state":
+        return _normalize_trigger_space(
+            {
+                "allowed_trigger_types": ["STATE"],
+                "states": {"include": [anchor.state_id]},
+            }
+        )
+    if anchor.type == "transition":
+        return _normalize_trigger_space(
+            {
+                "allowed_trigger_types": ["TRANSITION"],
+                "transitions": {
+                    "include": [
+                        {"from_state": anchor.from_state, "to_state": anchor.to_state}
+                    ]
+                },
+            }
+        )
+    if anchor.type == "sequence":
+        sequences: Dict[str, Any] = {"include": [list(anchor.events or [])]}
+        if anchor.max_gap_bars is not None:
+            sequences["max_gaps_bars"] = [int(anchor.max_gap_bars)]
+        return _normalize_trigger_space(
+            {
+                "allowed_trigger_types": ["SEQUENCE"],
+                "sequences": sequences,
+            }
+        )
+    if anchor.type == "feature_crossing":
+        return _normalize_trigger_space(
+            {
+                "allowed_trigger_types": ["FEATURE_PREDICATE"],
+                "feature_predicates": {
+                    "include": [
+                        {
+                            "feature": anchor.feature,
+                            "operator": anchor.operator,
+                            "threshold": anchor.threshold,
+                        }
+                    ]
+                },
+            }
+        )
+    raise ValueError(f"Unsupported anchor type for compilation: {anchor.type}")
 
 
 def _validate_proposal(proposal: AgentProposal) -> None:

@@ -406,24 +406,15 @@ def _synthesize_experiment_hypotheses(
             from_col = f"state_{t.from_state}"
             to_col = f"state_{t.to_state}"
             prev_from_col = f"prev_state_{t.from_state}"
-            prev_to_col = f"prev_state_{t.to_state}"
 
-            if to_col in working.columns:
-                # Standard definition: transitioned INTO to_state
-                # Ideally we were in from_state before.
-                if from_col in working.columns and prev_from_col in working.columns:
-                    trigger_mask &= bool_mask_from_series(
-                        working[prev_from_col]
-                    ) & bool_mask_from_series(working[to_col])
-                elif prev_to_col in working.columns:
-                    # If we don't know from_state, at least check we WERENT in to_state before
-                    trigger_mask &= bool_mask_from_series(working[to_col]) & ~bool_mask_from_series(
-                        working[prev_to_col]
-                    )
-                else:
-                    # If no prev state info, we check if it is active now (weak)
-                    trigger_mask &= bool_mask_from_series(working[to_col])
+            if to_col in working.columns and prev_from_col in working.columns:
+                # Sprint 2: Strict transition meaning ONLY.
+                # Must have previously been in from_state and currently in to_state.
+                trigger_mask &= bool_mask_from_series(
+                    working[prev_from_col]
+                ) & bool_mask_from_series(working[to_col])
             else:
+                # Refuse execution if history is missing or column not found.
                 trigger_mask &= False
 
         elif t.trigger_type == "feature_predicate":

@@ -66,3 +66,57 @@ def test_bounded_validation_normalizes_single_hypothesis_proposals(tmp_path: Pat
 
     assert result is not None
     assert result.changed_fields == ["end"]
+
+
+def test_bounded_validation_normalizes_structured_proposals(tmp_path: Path) -> None:
+    data_root = tmp_path / "data"
+    paths = ensure_memory_store("prog_structured", data_root=data_root)
+    baseline_path = paths.proposals_dir / "base_run" / "proposal.yaml"
+    baseline_path.parent.mkdir(parents=True, exist_ok=True)
+    baseline_payload = {
+        "program_id": "prog_structured",
+        "start": "2021-01-01",
+        "end": "2021-12-31",
+        "symbols": ["BTCUSDT"],
+        "timeframe": "1h",
+        "hypothesis": {
+            "anchor": {"type": "event", "event_id": "VOL_SHOCK"},
+            "template": {"id": "mean_reversion"},
+            "direction": "short",
+            "horizon_bars": 12,
+            "sampling_policy": {"entry_lag_bars": 1},
+        },
+    }
+    baseline_path.write_text(yaml.safe_dump(baseline_payload, sort_keys=False), encoding="utf-8")
+
+    write_memory_table(
+        "prog_structured",
+        "proposals",
+        pd.DataFrame(
+            [
+                {
+                    "proposal_id": "proposal::base_run",
+                    "program_id": "prog_structured",
+                    "run_id": "base_run",
+                    "proposal_path": str(baseline_path),
+                }
+            ]
+        ),
+        data_root=data_root,
+    )
+
+    current_payload = dict(baseline_payload)
+    current_payload["end"] = "2022-12-31"
+    current_payload["bounded"] = {
+        "baseline_run_id": "base_run",
+        "experiment_type": "confirmation",
+        "allowed_change_field": "end",
+        "change_reason": "2022 confirm",
+        "compare_to_baseline": True,
+    }
+
+    current = load_operator_proposal(current_payload)
+    result = validate_bounded_proposal(current, data_root=data_root)
+
+    assert result is not None
+    assert result.changed_fields == ["end"]
