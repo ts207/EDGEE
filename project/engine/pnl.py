@@ -54,13 +54,31 @@ def compute_returns_next_open(
     return blended
 
 
+# Venue-specific funding schedules (UTC hours).
+# Binance UM perpetuals: 3 events/day at 00:00, 08:00, 16:00.
+# Bybit Linear 8-hour contracts: same as Binance.
+# Bybit Linear 4-hour contracts: 6 events/day at 00:00, 04:00, 08:00, 12:00, 16:00, 20:00.
+# Callers must select the correct schedule for the instrument — passing the Binance
+# schedule (default) to a Bybit 4-hour contract understates carry by 50%.
+FUNDING_HOURS_BINANCE = (0, 8, 16)
+FUNDING_HOURS_BYBIT_8H = (0, 8, 16)
+FUNDING_HOURS_BYBIT_4H = (0, 4, 8, 12, 16, 20)
+
+
 def compute_funding_pnl_event_aligned(
     pos: pd.Series,
     funding_rate: pd.Series,
-    funding_hours: tuple[int, ...] = (0, 8, 16),
+    funding_hours: tuple[int, ...] = FUNDING_HOURS_BINANCE,
 ) -> pd.Series:
     """
-    Apply funding only on bars whose timestamp falls on a funding event hour (0, 8, 16 UTC).
+    Apply funding only on bars whose timestamp falls on a funding event hour (UTC).
+
+    ``funding_hours`` must match the actual funding schedule of the instrument.
+    Use ``FUNDING_HOURS_BINANCE`` (0, 8, 16) for Binance UM perpetuals and
+    Bybit 8-hour contracts, or ``FUNDING_HOURS_BYBIT_4H`` (0, 4, 8, 12, 16, 20)
+    for Bybit 4-hour contracts. Using the wrong schedule silently understates or
+    overstates the funding carry for affected positions.
+
     Position is the prior-bar position (signal held going into the event timestamp).
     """
     if not (hasattr(pos.index, "tz") and pos.index.tz is not None and str(pos.index.tz) == "UTC"):
@@ -242,6 +260,7 @@ def compute_pnl_ledger(
     borrow_rate: pd.Series | None = None,
     capital_base: float | pd.Series = 1.0,
     use_event_aligned_funding: bool = True,
+    funding_hours: tuple[int, ...] = FUNDING_HOURS_BINANCE,
 ) -> pd.DataFrame:
     """Compute an explicit per-bar execution and PnL ledger."""
     # Guard against funding overcount on sub-hourly frequencies
@@ -273,7 +292,7 @@ def compute_pnl_ledger(
     if funding_rate is None:
         funding_pnl = pd.Series(0.0, index=state.index, dtype=float)
     elif use_event_aligned_funding:
-        funding_pnl = compute_funding_pnl_event_aligned(executed, funding_rate_aligned)
+        funding_pnl = compute_funding_pnl_event_aligned(executed, funding_rate_aligned, funding_hours=funding_hours)
     else:
         funding_pnl = -executed * funding_rate_aligned
 
@@ -328,6 +347,7 @@ def compute_pnl_components(
     borrow_rate: pd.Series | None = None,
     use_event_aligned_funding: bool = True,
     execution_mode: str = "close",
+    funding_hours: tuple[int, ...] = FUNDING_HOURS_BINANCE,
     ) -> pd.DataFrame:
     """
     Legacy per-bar PnL component calculation.
@@ -398,6 +418,7 @@ def compute_pnl_components(
         funding_pnl = compute_funding_pnl_event_aligned(
             pos=pos.reindex(ret.index).fillna(0.0).astype(float),
             funding_rate=funding_rate_aligned,
+            funding_hours=funding_hours,
         )
     else:
         funding_pnl = -prior_pos * funding_rate_aligned

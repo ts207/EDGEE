@@ -34,6 +34,44 @@ class ThesisHealthSnapshot:
     reason_codes: List[str] = field(default_factory=list)
 
 
+def default_decay_rules() -> List[DecayRule]:
+    """
+    Conservative default decay rules applied when the operator provides none.
+
+    - edge_decay: downsize to 50% when realized edge falls below 50% of expected
+      for 10+ samples.  Protects against gradual alpha erosion.
+    - slippage_spike: downsize when realized slippage exceeds 2× research
+      calibration (20 bps) for 5+ samples.  Catches execution regime change.
+    - hit_rate_decay: emit warning when hit rate falls below 40% for 10+ samples.
+      Early signal of regime incompatibility.
+    """
+    return [
+        DecayRule(
+            rule_id="edge_decay_default",
+            metric="edge",
+            threshold=0.50,
+            window_samples=10,
+            action="downsize",
+            downsize_factor=0.50,
+        ),
+        DecayRule(
+            rule_id="slippage_spike_default",
+            metric="slippage",
+            threshold=20.0,
+            window_samples=5,
+            action="downsize",
+            downsize_factor=0.50,
+        ),
+        DecayRule(
+            rule_id="hit_rate_decay_default",
+            metric="hit_rate",
+            threshold=0.40,
+            window_samples=10,
+            action="warn",
+        ),
+    ]
+
+
 class DecayMonitor:
     def __init__(self, rules: List[DecayRule]):
         self.rules = rules

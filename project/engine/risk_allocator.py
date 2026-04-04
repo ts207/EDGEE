@@ -41,7 +41,15 @@ class RiskLimits:
     # NEW: stress-conditional correlation limit — tighter limit applied when
     # regime_series contains a value in stressed_regime_values
     stressed_max_pairwise_correlation: float | None = None
-    stressed_regime_values: frozenset[str] = frozenset({"stress", "crisis", "high_vol"})
+    stressed_regime_values: frozenset[str] = frozenset({
+        # Canonical labels
+        "stress", "crisis", "high_vol",
+        # Uppercase registry variants
+        "STRESS", "CRISIS", "HIGH_VOL",
+        # Additional regime-registry naming conventions
+        "SHOCK", "HIGH_VOL_REGIME", "high_vol_shock", "vol_shock",
+        "crisis_regime", "CRISIS_REGIME",
+    })
     portfolio_max_drawdown: float | None = None
     symbol_max_exposure: float | None = None
     portfolio_max_exposure: float | None = None
@@ -66,7 +74,7 @@ class RiskLimits:
 
 @dataclass(frozen=True)
 class AllocationPolicy:
-    mode: str = "heuristic"
+    mode: str = "deterministic_optimizer"
     deterministic: bool = True
     turnover_penalty: float = 0.0
     strategy_risk_budgets: Dict[str, float] = field(default_factory=dict)

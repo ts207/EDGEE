@@ -61,15 +61,20 @@ def two_sided_p_from_t(t_stat: float, df: int) -> float:
     DEPRECATED: Now aliased to one_sided_p_from_t to ensure all directional hypotheses
     are gated correctly in the research pipeline. Large negative t-stats will now
     receive high p-values (approaching 1.0) rather than low p-values.
+
+    This function will be removed in a future release. Callers must migrate to
+    one_sided_p_from_t. In production environments where DeprecationWarnings are
+    suppressed, an ERROR-level log is also emitted to ensure visibility.
     """
+    import logging as _logging
     import warnings
-    warnings.warn(
+    _msg = (
         "two_sided_p_from_t is deprecated; use one_sided_p_from_t for directional hypotheses. "
         "Results produced before this function was aliased may have incorrectly passed gating "
-        "on strongly negative t-stats.",
-        DeprecationWarning,
-        stacklevel=2,
+        "on strongly negative t-stats."
     )
+    warnings.warn(_msg, DeprecationWarning, stacklevel=2)
+    _logging.getLogger(__name__).error("DEPRECATED CALL: %s", _msg)
     return one_sided_p_from_t(t_stat, df=df)
 
 
@@ -852,21 +857,36 @@ def calculate_expectancy_stats(
         else float(returns_series.std())
     )
     
-    # Match the significance test to the estimator used for mean_return.
+    event_split_list = extracted["splits"]
+
+    # B1: gate t-statistic is computed on train+validation only — the test split is a
+    # pure holdout and must not participate in gate decisions.
+    gate_mask = np.array([s != "test" for s in event_split_list], dtype=bool)
+    if gate_mask.any():
+        gate_returns = returns_series[gate_mask]
+        gate_weights = weights[gate_mask]
+    else:
+        gate_returns = returns_series
+        gate_weights = weights
+    n_gate = int(len(gate_returns))
+
+    # B8: use observation count (not ESS) as degrees of freedom for the NW t-test.
+    # The weighted NW SE already adjusts for weight concentration; using ESS as df
+    # double-penalises inference, making hypothesis comparisons incoherent across
+    # equally-weighted and time-decayed estimation paths.
     nw = newey_west_t_stat_for_mean(
-        returns_series,
-        weights=weights if bool(time_decay_enabled) else None,
+        gate_returns,
+        weights=gate_weights if bool(time_decay_enabled) else None,
     )
     t_stat = (
-        float(nw.t_stat) if np.isfinite(nw.t_stat) 
-        else float(mean_ret / (std_ret / np.sqrt(max(n_eff, 1.0)))) if std_ret > 0 and n_eff > 1 
+        float(nw.t_stat) if np.isfinite(nw.t_stat)
+        else float(mean_ret / (std_ret / np.sqrt(max(float(n_gate), 1.0)))) if std_ret > 0 and n_gate > 1
         else 0.0
     )
-    p_value = one_sided_p_from_t(t_stat, int(max(n_eff - 1, 1)))
+    p_value = one_sided_p_from_t(t_stat, int(max(n_gate - 1, 1)))
 
     # Drawdown and results assembly
     dd_result = max_drawdown_gate(event_returns)
-    event_split_list = extracted["splits"]
 
     return {
         "mean_return": mean_ret,

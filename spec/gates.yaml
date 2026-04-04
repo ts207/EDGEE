@@ -5,15 +5,15 @@ gate_e1:
   max_clustering_5b: 0.20
 gate_v1_phase2:
   q_value_mechanism_column: q_value_mechanism  # Operative FDR gate (mechanism-group BH)
-  min_t_stat: 1.5
+  min_t_stat: 2.0
   max_q_value: 0.05
   min_after_cost_expectancy_bps: 0.1
   conservative_cost_multiplier: 1.5
   require_sign_stability: true
   min_sample_size: 50
-  # Regime-stratified ESS gate (HP-102). Recommended stricter config: min_regimes=3.
+  # Regime-stratified ESS gate (HP-102).
   regime_ess_min_per_regime: 1.0
-  regime_ess_min_regimes: 2
+  regime_ess_min_regimes: 3
   # Multi-timeframe expectancy consensus gate (HP-104).
   timeframe_consensus_timeframes: ["1m", "5m", "15m"]
   timeframe_consensus_min_ratio: 0.0
@@ -23,7 +23,7 @@ gate_v1_phase2:
   multiplicity_cluster_threshold: 0.85
   multiplicity_enable_by_diagnostic: true
   # Hard floor for conditioned-bucket candidate stats (e.g., severity_bucket_extreme_5pct).
-  conditioned_bucket_hard_floor: 30
+  conditioned_bucket_hard_floor: 75
   # Optional explicit override (audited in phase2 report + generation diagnostics).
   conditioned_bucket_min_samples_override: null
   # Lowering the conditioned bucket floor is only honored in research mode when true.
@@ -47,7 +47,7 @@ promotion_confirmatory_gates:
     latency_stress_bars: 2
     max_overlap_concentration: 0.50
     # G1: Regime thresholds
-    min_regimes_supported: 2
+    min_regimes_supported: 3
     min_ess_per_regime: 20
     require_regime_stability: true
   shadow:
@@ -103,7 +103,7 @@ gate_v1_phase2_profiles:
   promotion:
     event_overrides: {}
   synthetic:
-    min_t_stat: 0.25
+    min_t_stat: 1.0
     max_q_value: 0.35
     min_after_cost_expectancy_bps: -2.0
     conservative_cost_multiplier: 1.0
@@ -136,7 +136,7 @@ gate_v1_bridge:
   edge_cost_k: 2.0
   stressed_cost_multiplier: 1.5
   min_validation_trades: 20
-  search_bridge_min_t_stat: 1.5
+  search_bridge_min_t_stat: 2.0
   search_bridge_min_robustness_score: 0.7
   search_bridge_min_regime_stability_score: 0.6
   search_bridge_min_stress_survival: 0.5

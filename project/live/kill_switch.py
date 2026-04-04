@@ -53,9 +53,16 @@ class KillSwitchStatus:
 
 
 class KillSwitchManager:
-    TIER1_FEATURES = ["vol_regime", "ms_spread_state", "funding_abs_pct"]
-    PSI_ERROR_THRESHOLD = 0.50
-    PSI_WARN_THRESHOLD = 0.25
+    TIER1_FEATURES = [
+        "vol_regime",
+        "ms_spread_state",
+        "funding_abs_pct",
+        "basis_zscore",
+        "oi_delta_1h",
+        "spread_bps",
+    ]
+    PSI_ERROR_THRESHOLD = 0.25
+    PSI_WARN_THRESHOLD = 0.10
 
     def __init__(
         self,
@@ -423,12 +430,13 @@ class KillSwitchManager:
         self,
         research_features: pd.DataFrame,
         live_features: pd.DataFrame,
-        threshold: float = 0.50,
+        threshold: float | None = None,
     ) -> Dict[str, Any]:
         """
         Check for feature drift between research baseline and live features.
-        Triggers kill-switch if PSI exceeds threshold on any tier-1 feature.
+        Triggers kill-switch if PSI exceeds PSI_ERROR_THRESHOLD on any tier-1 feature.
         """
+        error_threshold = self.PSI_ERROR_THRESHOLD if threshold is None else threshold
         drift_results: Dict[str, Any] = {
             "drifted_features": [],
             "psi_scores": {},
@@ -456,7 +464,7 @@ class KillSwitchManager:
             psi = drift.get("psi", 0.0)
             drift_results["psi_scores"][feature] = psi
 
-            if psi > threshold:
+            if psi > error_threshold:
                 drift_results["drifted_features"].append(feature)
 
         if drift_results["drifted_features"]:

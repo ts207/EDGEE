@@ -84,6 +84,24 @@ def build_decision_score(match: ThesisMatch, context: LiveTradeContext) -> Decis
     reasons_for.extend(exec_for)
     reasons_against.extend(exec_against)
 
+    # Hard gate: setup match is the triggering condition. Non-zero execution quality
+    # and thesis strength must not compensate for a missing event match.
+    # Without this floor, a thesis with zero setup match can reach 0.90 total score
+    # (0 + 0.30 + 0.50 + 0.10) and cross the trade_normal threshold of 0.75.
+    MIN_SETUP_MATCH = 0.20
+    if setup_match_score < MIN_SETUP_MATCH:
+        reasons_against.append("setup_match_below_floor")
+        return DecisionScore(
+            total_score=0.0,
+            setup_match_score=setup_match_score,
+            execution_quality_score=execution_quality_score,
+            thesis_strength_score=thesis_strength_score,
+            regime_alignment_score=regime_alignment_score,
+            contradiction_penalty=contradiction_penalty,
+            reasons_for=reasons_for,
+            reasons_against=reasons_against,
+        )
+
     total_score = (
         (0.45 * setup_match_score)
         + execution_quality_score

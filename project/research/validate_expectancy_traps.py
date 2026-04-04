@@ -33,6 +33,7 @@ from project.research.stats.expectancy import (
     tail_report,
     capacity_diagnostics,
 )
+from project.research.gating import one_sided_p_from_t
 from project.research.expectancy_traps_support import (
     load_expectancy_payload,
     parse_horizons,
@@ -86,7 +87,7 @@ ROBUST_GATE_PROFILES: Dict[str, Dict[str, float | int]] = {
         "robust_bootstrap_alpha": 0.20,
         "robust_fdr_q": 0.20,
         "robust_hac_max_lag": 8,
-        "robust_bootstrap_iters": 400,
+        "robust_bootstrap_iters": 2000,
         "robust_bootstrap_block_size": 8,
         "robust_bootstrap_seed": 7,
         "oos_min_samples": 20,
@@ -100,7 +101,7 @@ ROBUST_GATE_PROFILES: Dict[str, Dict[str, float | int]] = {
         "robust_bootstrap_alpha": 0.40,
         "robust_fdr_q": 0.40,
         "robust_hac_max_lag": 4,
-        "robust_bootstrap_iters": 100,
+        "robust_bootstrap_iters": 500,
         "robust_bootstrap_block_size": 4,
         "robust_bootstrap_seed": 7,
         "oos_min_samples": 4,
@@ -114,7 +115,7 @@ ROBUST_GATE_PROFILES: Dict[str, Dict[str, float | int]] = {
         "robust_bootstrap_alpha": 0.10,
         "robust_fdr_q": 0.10,
         "robust_hac_max_lag": 12,
-        "robust_bootstrap_iters": 800,
+        "robust_bootstrap_iters": 2000,
         "robust_bootstrap_block_size": 8,
         "robust_bootstrap_seed": 7,
         "oos_min_samples": 40,
@@ -190,13 +191,7 @@ def _robust_row_fields(
     )
     hac_res = newey_west_t_stat_for_mean(series.to_numpy(), max_lag=hac_max_lag)
 
-    # P-value from T-stat using normal approximation if student-t is not available
-    def _p_from_t(t: float) -> float:
-        if not np.isfinite(t):
-            return 1.0
-        return 2.0 * (1.0 - 0.5 * (1.0 + math.erf(abs(t) / math.sqrt(2.0))))
-
-    hac_p = _p_from_t(hac_res.t_stat)
+    hac_p = one_sided_p_from_t(hac_res.t_stat, df=max(hac_res.n - 1, 1))
 
     boot_seed = stable_row_seed(condition=condition, horizon=horizon, base_seed=bootstrap_seed)
     bootstrap_p = circular_block_bootstrap_pvalue(

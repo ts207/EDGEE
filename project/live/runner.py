@@ -17,7 +17,7 @@ from project.live.audit_log import (
 from project.live.binance_client import BinanceFuturesClient
 from project.live.bybit_client import BybitDerivativesClient
 from project.live.context_builder import build_live_trade_context
-from project.live.decay import DecayMonitor, DecayRule
+from project.live.decay import DecayMonitor, DecayRule, default_decay_rules as _default_decay_rules
 from project.live.decision import DecisionOutcome, decide_trade_intent
 from project.live.event_detector import detect_live_event
 from project.live.execution_attribution import summarize_execution_attribution_by
@@ -178,7 +178,7 @@ class LiveEngineRunner:
 
         # Sprint 6: Risk and Decay components
         self.risk_enforcer = RiskEnforcer(risk_caps or RuntimeRiskCaps())
-        self.decay_monitor = DecayMonitor(decay_rules or [])
+        self.decay_monitor = DecayMonitor(decay_rules or _default_decay_rules())
         self.thesis_manager = ThesisStateManager()
 
         # Workstream 1: Deploy admission control

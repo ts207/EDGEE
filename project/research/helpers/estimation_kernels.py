@@ -231,8 +231,10 @@ def _compute_loso_stability(
     # Iterate over pooling groups
     for keys, group in df.groupby(group_cols, dropna=False):
         if len(group[symbol_col].unique()) <= 1:
-            # If group has only one symbol, LOSO is impossible or trivial.
-            # We mark as potentially unstable if effect is small.
+            # LOSO cannot validate single-symbol groups — there is no out-of-sample
+            # symbol to leave out. Mark as unstable so these are restricted to
+            # shadow-only promotion until cross-symbol evidence is available.
+            out_stable.loc[group.index] = False
             continue
 
         total_n = group[n_col].sum()
@@ -280,11 +282,23 @@ def _apply_hierarchical_shrinkage(
     lambda_smoothing_alpha: float = 0.1,
     lambda_shock_cap_pct: float = 0.5,
     lambda_decay_factor: float = 0.05,
+    elapsed_days: Optional[float] = None,
+    lambda_decay_halflife_days: float = 90.0,
     train_only_lambda: bool = False,
     split_col: Optional[str] = None,
     run_mode: str = "exploratory",  # Added run_mode
 ) -> pd.DataFrame:
     """Empirical-Bayes partial pooling across family -> event -> state."""
+
+    # A7: When elapsed_days is provided, derive lambda_decay_factor from elapsed
+    # time rather than using a fixed per-session rate.  This prevents cross-session
+    # continuity from collapsing when sessions are infrequent.
+    # Decay model: factor = 1 - exp(-elapsed_days / halflife), so after one
+    # halflife the previous lambda contributes ~63% of the blended estimate.
+    if elapsed_days is not None and float(elapsed_days) >= 0.0:
+        import math as _math
+        _halflife = max(1.0, float(lambda_decay_halflife_days))
+        lambda_decay_factor = float(1.0 - _math.exp(-float(elapsed_days) / _halflife))
 
     # S1: Enforce train-only estimation if split is available
     is_confirmatory = str(run_mode).lower() in {

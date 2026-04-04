@@ -32,3 +32,20 @@ A candidate appearing in Discovery is merely an idea. Validation turns it into a
 * `failed_stability`: The effect is inconsistent across time or regimes.
 * `failed_cost_survival`: The edge is too thin to cover trading costs.
 * `insufficient_sample_support`: Not enough occurrences to trust the statistical result.
+* `loso_unstable`: Single-symbol hypothesis — LOSO cannot validate cross-symbol stability. Shadow promotion only until cross-symbol evidence is available.
+* `setup_match_below_floor`: Live decision score — setup match below the minimum threshold required for any trade to proceed.
+
+## Statistical Gates (current defaults)
+
+Gates are defined in `spec/gates.yaml`. Key thresholds for standard promotion:
+
+| Gate | Value |
+|------|-------|
+| Min t-statistic | 2.0 |
+| Max q-value (BH-adjusted) | 0.05 |
+| Min after-cost expectancy | 0.1 bps |
+| Min regime ESS coverage | 3 regimes |
+| Conditioned bucket floor | 75 observations |
+| Min sample size | 50 events |
+
+The gate p-value is computed on **train + validation observations only**. Test-split observations are excluded from gate decisions and reported separately as `mean_test_return`.

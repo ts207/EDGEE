@@ -62,15 +62,20 @@ def two_sided_p_from_t(t_stat: float, df: int) -> float:
     DEPRECATED: Now aliased to one_sided_p_from_t to ensure all directional hypotheses
     are gated correctly in the research pipeline. Large negative t-stats will now
     receive high p-values (approaching 1.0) rather than low p-values.
+
+    This function will be removed in a future release. Callers must migrate to
+    one_sided_p_from_t. In production environments where DeprecationWarnings are
+    suppressed, an ERROR-level log is also emitted to ensure visibility.
     """
+    import logging as _logging
     import warnings
-    warnings.warn(
+    _msg = (
         "two_sided_p_from_t is deprecated; use one_sided_p_from_t for directional hypotheses. "
         "Results produced before this function was aliased may have incorrectly passed gating "
-        "on strongly negative t-stats.",
-        DeprecationWarning,
-        stacklevel=2,
+        "on strongly negative t-stats."
     )
+    warnings.warn(_msg, DeprecationWarning, stacklevel=2)
+    _logging.getLogger(__name__).error("DEPRECATED CALL: %s", _msg)
     return one_sided_p_from_t(t_stat, df=df)
 
 
