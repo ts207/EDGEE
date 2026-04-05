@@ -86,7 +86,8 @@ class RegimeReportInput(BaseModel):
 class CompareRunsInput(BaseModel):
     run_ids: list[str] = Field(
         min_length=2,
-        description="Two or more run identifiers to compare across slices.",
+        max_length=6,
+        description="Two or more run identifiers to compare across slices. Max 6.",
     )
     program_id: str | None = Field(
         default=None,
@@ -96,6 +97,92 @@ class CompareRunsInput(BaseModel):
         default=None,
         description="Optional data root override.",
     )
+
+
+class DiscoverRunInput(BaseModel):
+    proposal: str = Field(
+        description=(
+            "Repo-relative or absolute path to a proposal YAML or JSON file "
+            "(e.g. project/configs/proposals/my_proposal.yaml). "
+            "The file must already exist on disk. Use edge_preview_plan to validate inline YAML."
+        )
+    )
+    registry_root: str = Field(
+        default="project/configs/registries",
+        description="Registry root used to resolve search and spec defaults.",
+    )
+    run_id: str | None = Field(
+        default=None,
+        description="Optional explicit run identifier. Edge generates one if omitted.",
+    )
+    data_root: str | None = Field(
+        default=None,
+        description="Optional data root override. Falls back to BACKTEST_DATA_ROOT or repo-local data.",
+    )
+    check: bool = Field(
+        default=False,
+        description="If true, run the bounded proposal check path before executing.",
+    )
+
+
+class ValidateRunInput(BaseModel):
+    run_id: str = Field(description="Run identifier from a completed Stage 1 discovery run.")
+    data_root: str | None = Field(
+        default=None,
+        description="Optional data root override.",
+    )
+    timeout_sec: int = Field(
+        default=600,
+        ge=30,
+        le=3600,
+        description="Maximum seconds to wait for the validation pipeline before returning a timeout result.",
+    )
+
+
+class PromoteRunInput(BaseModel):
+    run_id: str = Field(description="Run identifier from a completed Stage 2 validation run.")
+    symbols: str = Field(
+        description="Comma-separated symbol list for the promotion bundle (e.g. BTCUSDT,ETHUSDT).",
+    )
+    retail_profile: str = Field(
+        default="capital_constrained",
+        description="Promotion profile key. Typical values: capital_constrained, research.",
+    )
+    data_root: str | None = Field(
+        default=None,
+        description="Optional data root override.",
+    )
+    timeout_sec: int = Field(
+        default=300,
+        ge=30,
+        le=3600,
+        description="Maximum seconds to wait for the promotion pipeline.",
+    )
+
+
+class ListThesesInput(BaseModel):
+    data_root: str | None = Field(
+        default=None,
+        description="Optional data root override. Falls back to BACKTEST_DATA_ROOT or repo-local data.",
+    )
+
+
+class CatalogListRunsInput(BaseModel):
+    stage: str | None = Field(
+        default=None,
+        description="Optional stage filter: discover, validate, promote, or deploy.",
+    )
+    data_root: str | None = Field(
+        default=None,
+        description="Optional data root override.",
+    )
+    limit: int = Field(
+        default=20,
+        ge=1,
+        le=100,
+        description="Maximum number of runs to return.",
+    )
+
 
 
 class CodexOperatorInvokeInput(BaseModel):
@@ -145,6 +232,23 @@ class OperatorDashboardInput(BaseModel):
         ge=1,
         le=24,
         description="Maximum number of recent runs, proposals, reflections, and evidence rows to include per section.",
+    )
+
+
+class MemorySummaryInput(BaseModel):
+    program_id: str | None = Field(
+        default=None,
+        description="Optional program identifier. If omitted, the tool picks the active program.",
+    )
+    data_root: str | None = Field(
+        default=None,
+        description="Optional data root override.",
+    )
+    limit: int = Field(
+        default=8,
+        ge=1,
+        le=24,
+        description="Maximum number of reflections and evidence rows to include.",
     )
 
 

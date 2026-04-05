@@ -67,6 +67,24 @@ def clustered_t_stat(estimate: float, stderr: float) -> float:
 
 
 def p_value_from_t(t_stat: float, dof: int) -> float:
+    """One-sided right-tail p-value for a directional t-statistic.
+
+    E-MISC-001: the previous formula was 2*(1-CDF(|t|)) — two-sided — which inflated
+    p-values for directional hypotheses by exactly 2×.  All callers in the candidate
+    evaluation path test directional (long/short) hypotheses and require the one-sided form.
+    """
     if dof <= 0:
         return 1.0
-    return float(2.0 * (1.0 - stats.t.cdf(abs(float(t_stat)), df=int(dof))))
+    return float(stats.t.sf(float(t_stat), df=int(dof)))
+
+
+def two_sided_p_value_from_t(t_stat: float, dof: int) -> float:
+    """Two-sided p-value for symmetric / non-directional tests.
+
+    Use this only when you are testing H0: μ = 0 against H1: μ ≠ 0 (no directional prior).
+    For directional hypotheses use p_value_from_t (one-sided).
+    """
+    if dof <= 0:
+        return 1.0
+    return float(2.0 * stats.t.sf(abs(float(t_stat)), df=int(dof)))
+

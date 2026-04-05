@@ -605,6 +605,23 @@ def select_diversified_shortlist(
         return pd.DataFrame()
 
     qcol = quality_col or _best_quality_col(candidates)
+
+    # Enforce deterministic candidate ordering before MMR selection.
+    # When candidates arrive from run_distributed_search the DataFrame index
+    # reflects thread-completion order, which is non-deterministic.  Sorting
+    # here ensures the lexicographic tie-breaking in pool_order (below) is
+    # reproducible across runs with the same proposal set.
+    _cid_for_sort = (
+        candidates["candidate_id"].astype(str)
+        if "candidate_id" in candidates.columns
+        else pd.Series(range(len(candidates)), index=candidates.index).astype(str)
+    )
+    _sort_key = pd.to_numeric(candidates.get(qcol, 0), errors="coerce").fillna(0.0)
+    candidates = candidates.assign(_sort_cid=_cid_for_sort, _sort_q=_sort_key)
+    candidates = candidates.sort_values(
+        ["_sort_q", "_sort_cid"], ascending=[False, True], na_position="last"
+    ).drop(columns=["_sort_q", "_sort_cid"]).reset_index(drop=True)
+
     quality_raw = pd.to_numeric(candidates.get(qcol, 0), errors="coerce").fillna(0.0)
     q_min, q_max = float(quality_raw.min()), float(quality_raw.max())
     q_range = q_max - q_min

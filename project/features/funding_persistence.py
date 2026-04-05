@@ -177,3 +177,5 @@ def load_funding_features(data_root: Path, run_id: str, symbol: str) -> pd.DataF
 from project.core.feature_capabilities import register_feature_loader
 
 register_feature_loader("funding", load_funding_features)
+register_feature_loader("oi", load_funding_features)
+register_feature_loader("liquidation", load_funding_features)

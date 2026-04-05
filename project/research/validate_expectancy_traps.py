@@ -138,12 +138,22 @@ def _apply_gate_profile_defaults(args: argparse.Namespace) -> argparse.Namespace
 
 
 def _newey_west_t_stat(series: pd.Series, max_lag: int) -> Tuple[float, float, int]:
+    """Compute HAC t-stat and one-sided p-value for a directional series.
+
+    E-MISC-002: the previous formula used a two-sided normal approximation
+    (2*(1 - Phi(|t|))) which inflated p-values for directional hypotheses.
+    All callers here test a directional edge (compression return > 0), so the
+    correct form is the one-sided right-tail p-value consistent with the rest
+    of the gate chain.  See also _robust_row_fields() which already uses
+    one_sided_p_from_t for the primary robust path.
+    """
     result = newey_west_t_stat_for_mean(series.to_numpy(), max_lag=max_lag)
     t_stat = float(result.t_stat)
     if not np.isfinite(t_stat):
         return 0.0, 1.0, int(result.lag)
-    p_value = float(2.0 * (1.0 - 0.5 * (1.0 + math.erf(abs(t_stat) / math.sqrt(2.0)))))
+    p_value = one_sided_p_from_t(t_stat, df=max(int(result.n) - 1, 1))
     return t_stat, p_value, int(result.lag)
+
 
 
 def _circular_block_bootstrap_pvalue(

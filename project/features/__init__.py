@@ -9,6 +9,7 @@ from project.features.event_scoring import (
     split_feature_columns,
 )
 from project.features.vol_regime import calculate_rv_percentile_24h
+import project.features.funding_persistence
 
 __all__ = [
     "calculate_funding_rate_bps",

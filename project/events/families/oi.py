@@ -19,7 +19,14 @@ from project.events.detectors.base import MarketEventDetector
 class BaseOIShockDetector(ThresholdDetector, MarketEventDetector):
     """Base logic for Open Interest (OI) shock detectors."""
 
-    required_columns = ("timestamp", "oi_notional", "close")
+    required_columns = (
+        "timestamp",
+        "oi_notional",
+        "close",
+        "ms_oi_state",
+        "ms_oi_confidence",
+        "ms_oi_entropy",
+    )
 
     def _compute_oi_z(
         self, df: pd.DataFrame, **params: Any

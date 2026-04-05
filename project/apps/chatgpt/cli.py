@@ -19,6 +19,8 @@ def _build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("backlog", help="Print the current implementation backlog as JSON.")
     subparsers.add_parser("blueprint", help="Print the current server blueprint as JSON.")
     subparsers.add_parser("widget", help="Print the widget resource payload as JSON.")
+    subparsers.add_parser("tools", help="Print a summary table of all registered tools.")
+    subparsers.add_parser("status", help="Print a lightweight status summary of the project data.")
 
     serve_parser = subparsers.add_parser("serve", help="Attempt to start the live MCP server scaffold.")
     serve_parser.add_argument("--host", default="127.0.0.1")
@@ -43,6 +45,25 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "widget":
         print(json.dumps(build_widget_resource(), indent=2, sort_keys=True))
+        return 0
+
+    if args.command == "tools":
+        from project.apps.chatgpt.tool_catalog import TOOL_CATALOG
+        print(f"{'NAME':<34} | {'CATEGORY':<8} | {'READ':<4} | {'SYNC':<4} | {'TITLE'}")
+        print("-" * 100)
+        for tool in TOOL_CATALOG:
+            props = tool.hints
+            print(f"{tool.name:<34} | {tool.category:<8} | {'R' if props.read_only else 'W':<4} | {'Sync' if not props.open_world else 'Open':<4} | {tool.title}")
+        return 0
+
+    if args.command == "status":
+        from project.apps.chatgpt.handlers import _resolve_data_root, _project_program_ids, _recent_run_summaries
+        data_root = _resolve_data_root(None)
+        recent_runs = _recent_run_summaries(data_root, limit=100)
+        program_ids = _project_program_ids(data_root, recent_runs)
+        print(f"Data root: {data_root}")
+        print(f"Programs found: {len(program_ids)}")
+        print(f"Runs found: {len(recent_runs)} (recent sample)")
         return 0
 
     if args.command == "serve":

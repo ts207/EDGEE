@@ -426,7 +426,17 @@ def _apply_hierarchical_shrinkage(
     if effective_train_only and split_col and split_col in out.columns:
         _lambda_src = out[out[split_col].astype(str).str.strip().str.lower() == "train"].copy()
         if _lambda_src.empty:
-            _lambda_src = out  # Fall back to all data if no train rows
+            # E-SHRK-002: train-only mode requested but no rows carry split_label='train'.
+            # Falling back to all data to avoid a completely empty shrinkage estimate, but
+            # this means lambda estimation uses holdout data — flag it explicitly.
+            log.warning(
+                "_apply_hierarchical_shrinkage: train_only_lambda=True but no rows with "
+                "split_label='train' found. Falling back to all-data lambda estimation. "
+                "Set 'shrinkage_scope' will be suffixed with '_FALLBACK' in the output."
+            )
+            _lambda_src = out
+            # Mark the fallback in the scope column so it is visible in audit outputs.
+            out["shrinkage_scope"] = "train_only_FALLBACK_all_data"
     elif (
         effective_train_only
         and aggregate_train_count_col
@@ -786,9 +796,13 @@ def _apply_hierarchical_shrinkage(
         _scipy_t = _stats_compat.t
 
     _df_vals = (out.loc[valid_se, "_n"].astype(float) - 1.0).clip(lower=1.0)
-    _t_abs = t_shrunk.loc[valid_se].astype(float).abs()
-    if not _t_abs.empty:
-        p_shrunk.loc[valid_se] = (2.0 * _scipy_t.sf(_t_abs, df=_df_vals)).clip(0.0, 1.0)
+    # E-SHRK-001: use one-sided right-tail sf on the SIGNED t-stat.
+    # Previous code took abs(t) then multiplied by 2 — that is a two-sided p-value.
+    # For directional hypotheses a negative shrunk t-stat (sign flip post-shrinkage)
+    # should receive a high p-value (close to 1.0), not a low one.
+    _t_signed = t_shrunk.loc[valid_se].astype(float)
+    if not _t_signed.empty:
+        p_shrunk.loc[valid_se] = _scipy_t.sf(_t_signed, df=_df_vals).clip(0.0, 1.0)
     out["p_value_shrunk"] = (
         pd.to_numeric(p_shrunk, errors="coerce").fillna(out["p_value_raw"]).clip(0.0, 1.0)
     )

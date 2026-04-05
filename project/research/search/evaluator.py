@@ -108,9 +108,13 @@ _EVALUATION_SPLIT_LABELS = {"train", "validation", "test"}
 
 
 def _normal_p_value(stat: float) -> float:
+    # E-EVAL-001: one-sided right-tail p-value for directional hypotheses.
+    # erfc(t/√2)/2 == P(Z > t) for Z ~ N(0,1).
+    # The previous formula erfc(|t|/√2) was two-sided and inflated p-values by 2×.
     if not np.isfinite(stat):
         return 1.0
-    return float(math.erfc(abs(float(stat)) / math.sqrt(2.0)))
+    return float(math.erfc(float(stat) / math.sqrt(2.0)) / 2.0)
+
 
 
 def evaluated_records_from_metrics(metrics_df: pd.DataFrame) -> pd.DataFrame:
@@ -670,7 +674,14 @@ def evaluate_candidate_across_folds(
         test_start = fold.test_split.start
         test_end = fold.test_split.end
         
-        mask = (signed_returns.index >= test_start) & (signed_returns.index <= test_end)
+        if pd.api.types.is_integer_dtype(signed_returns.index):
+            t_start = int(pd.Timestamp(test_start).value // 10**6)
+            t_end = int(pd.Timestamp(test_end).value // 10**6)
+        else:
+            t_start = test_start
+            t_end = test_end
+            
+        mask = (signed_returns.index >= t_start) & (signed_returns.index <= t_end)
         
         fold_n = mask.sum()
         if fold_n < 3:

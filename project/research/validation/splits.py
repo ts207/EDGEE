@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import re
 from datetime import timedelta
-from typing import Iterable, List, Optional
+from typing import Any, Iterable, List, Optional
 
 import pandas as pd
 
@@ -11,6 +11,7 @@ from project.research.validation.schemas import ValidationSplit
 
 
 DEFAULT_BAR_DURATION_MINUTES = 5
+log = logging.getLogger(__name__)
 _DEFAULT_SPLIT_SCHEME_ID = "WF_60_20_20"
 _SPLIT_SCHEME_ALIASES = {
     "SMOKE_TVT": (0.6, 0.2),
@@ -217,7 +218,30 @@ def build_repeated_walkforward_splits(
     purge_bars: int = 0,
     embargo_bars: int = 0,
     bar_duration_minutes: int = DEFAULT_BAR_DURATION_MINUTES,
-) -> List[Any]: # using List[Any] temporarily, FoldDefinition fetched inside
+) -> List[Any]:
+    """Build a list of FoldDefinition objects for repeated walk-forward evaluation.
+
+    Returns an empty list when fewer than *min_folds* valid folds can be
+    constructed.  **Callers must check for an empty return** — a hypothesis
+    evaluated against an empty fold list will produce NaN fold-stability scores
+    with no other diagnostic, which can cause it to fail the fold-stability gate
+    silently.  A WARNING is emitted here so the log trace is available.
+
+    Purge/embargo implementation note
+    -----------------------------------
+    Purge and embargo are applied as *calendar-time deltas* (via
+    ``bars_to_timedelta``), not as *row counts*.  In continuously-trading
+    24/7 crypto markets this is approximately equivalent.  However, if the
+    data contains gaps (exchange maintenance, collection outages), the actual
+    number of rows excluded from training may be fewer than *purge_bars*,
+    which can allow information leakage from near-event-time bars into the
+    validation window.
+
+    # TODO(purge-row-count): Implement an alternative row-index-based purge
+    # mode (purge_mode='rows') that removes exactly *purge_bars* rows rather
+    # than *purge_bars × bar_duration_minutes* of calendar time.  This is
+    # the correct approach for data with irregular or sparse bar density.
+    """
     ts = pd.to_datetime(timestamps).sort_values()
     if len(ts) == 0:
         return []
@@ -305,6 +329,22 @@ def build_repeated_walkforward_splits(
             break
             
     if len(folds) < min_folds:
+        log.warning(
+            "build_repeated_walkforward_splits: could not satisfy min_folds=%d. "
+            "Built %d valid fold(s) from %d total bars "
+            "(fold_size=%d = train_bars=%d + validation_bars=%d + test_bars=%d, "
+            "step_bars=%d). "
+            "Increase the data window or reduce min_folds / fold_size. "
+            "Returning empty fold list — hypothesis fold-stability scores will be NaN.",
+            min_folds,
+            len(folds),
+            total_bars,
+            train_bars + validation_bars + test_bars,
+            train_bars,
+            validation_bars,
+            test_bars,
+            step_bars,
+        )
         return []
         
     return folds

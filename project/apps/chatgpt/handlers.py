@@ -456,8 +456,22 @@ def _recent_run_summaries(data_root: Path, *, program_id: str | None = None, lim
     runs_root = data_root / "runs"
     if not runs_root.exists():
         return []
+
+    # Fast glob + limit early if we don't have a program filter
+    # If we HAVE a program filter, we must scan more to find matching runs
     records: list[dict[str, Any]] = []
-    for manifest_path in sorted(runs_root.glob("*/run_manifest.json")):
+
+    # Sort manifest paths by mtime to get recent ones first without reading all
+    try:
+        manifest_paths = sorted(
+            runs_root.glob("*/run_manifest.json"),
+            key=lambda p: p.stat().st_mtime,
+            reverse=True,
+        )
+    except Exception:
+        manifest_paths = list(runs_root.glob("*/run_manifest.json"))
+
+    for manifest_path in manifest_paths[:100]:  # Hard cap on total scan
         manifest = _read_json_dict(manifest_path)
         if not manifest:
             continue
@@ -465,7 +479,10 @@ def _recent_run_summaries(data_root: Path, *, program_id: str | None = None, lim
         if program_id and str(summary.get("program_id") or "").strip() != str(program_id).strip():
             continue
         records.append(summary)
-    return _sort_records(records, "finished_at", "started_at", "run_id")[:limit]
+        if len(records) >= limit:
+            break
+
+    return _sort_records(records, "finished_at", "started_at", "run_id")
 
 
 def _selected_run_snapshot(run_id: str | None, data_root: Path) -> dict[str, Any]:
@@ -627,6 +644,20 @@ def _run_candidate_snapshot(run_summary: dict[str, Any], data_root: Path) -> dic
     if not run_id:
         return {}
     paths = _candidate_paths(run_id, data_root)
+
+    # Performance: only attempt to read parquets if at least one exists
+    # Checking file existence is much faster than failing parquet open/reads
+    if not any(p.exists() for p in paths.values()):
+        return _clean_value(
+            {
+                "run_id": run_id,
+                "program_id": run_summary.get("program_id"),
+                "run_status": run_summary.get("status"),
+                "pipeline_status": "no_artifacts",
+                "pipeline_note": "No candidate artifacts found for this run.",
+            }
+        )
+
     phase2 = _read_table(paths["phase2"])
     edge = _read_table(paths["edge"])
     promotion_summary = _read_table(paths["promotion_summary"])
@@ -693,6 +724,7 @@ def _candidate_board(
     data_root: Path,
     limit: int,
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    # Only compute snapshots for the subset of runs actually shown in the board
     board = [_run_candidate_snapshot(run_summary, data_root) for run_summary in run_summaries[:limit]]
     status_counts = Counter(str(row.get("pipeline_status") or "") for row in board)
     return (
@@ -767,9 +799,10 @@ async def _run_codex_mcp_tool(
 
 
 def _snapshot_operator_state(data_root: Path) -> dict[str, Any]:
-    recent_runs = _recent_run_summaries(data_root, limit=50)
+    # Faster snapshot: only look at the most recent 20 runs
+    recent_runs = _recent_run_summaries(data_root, limit=20)
     proposal_counts: dict[str, int] = {}
-    for program_id in _project_program_ids(data_root, recent_runs):
+    for program_id in list(_project_program_ids(data_root, recent_runs))[:15]:
         proposal_count, _ = _proposal_records(program_id, data_root, limit=1)
         proposal_counts[str(program_id)] = int(proposal_count)
     return {
@@ -921,7 +954,7 @@ def get_operator_dashboard(
 ) -> dict[str, Any]:
     resolved_data_root = _resolve_data_root(data_root)
     normalized_limit = _normalize_limit(limit)
-    initial_runs = _recent_run_summaries(resolved_data_root, limit=200)
+    initial_runs = _recent_run_summaries(resolved_data_root, limit=40)
     selected_run = _selected_run_snapshot(run_id, resolved_data_root)
 
     requested_program = str(program_id or "").strip() or str(selected_run.get("program_id") or "").strip()
@@ -1160,11 +1193,286 @@ def compare_runs(
     program_id: str | None = None,
     data_root: str | None = None,
 ) -> dict[str, Any]:
+    # Constraint: max 6 runs to avoid massive parquet scan latencies
+    clamped_run_ids = list(run_ids)[:6]
     return build_time_slice_report(
-        run_ids=run_ids,
+        run_ids=clamped_run_ids,
         program_id=program_id,
         data_root=_path_or_none(data_root),
     )
+
+
+def get_memory_summary(
+    *,
+    program_id: str | None = None,
+    data_root: str | None = None,
+    limit: int = 8,
+) -> dict[str, Any]:
+    resolved_data_root = _resolve_data_root(data_root)
+    normalized_limit = _normalize_limit(limit)
+
+    # Use the same project resolution logic to find the active program if not given
+    if not program_id:
+        recent_runs = _recent_run_summaries(resolved_data_root, limit=1)
+        if recent_runs:
+            program_id = str(recent_runs[0].get("program_id") or "").strip()
+        if not program_id:
+            program_ids = _project_program_ids(resolved_data_root, [])
+            if program_ids:
+                program_id = program_ids[0]
+
+    if not program_id:
+        return {
+            "available": False,
+            "program_id": None,
+            "message": "No active program found to summarize.",
+        }
+
+    memory = _memory_snapshot(program_id, resolved_data_root, limit=normalized_limit)
+    proposal_count, recent_proposals = _proposal_records(program_id, resolved_data_root, limit=normalized_limit)
+
+    return {
+        "title": f"{program_id} Memory Summary",
+        "subtitle": f"Belief state and recent evidence from {resolved_data_root}",
+        "available": memory.get("available", False),
+        "program_id": program_id,
+        "memory": memory,
+        "proposal_count": proposal_count,
+        "recent_proposals": recent_proposals,
+        "widget": "operator_dashboard",
+    }
+
+
+def discover_run(
+    *,
+    proposal: str,
+    registry_root: str = "project/configs/registries",
+    run_id: str | None = None,
+    data_root: str | None = None,
+    check: bool = False,
+) -> dict[str, Any]:
+    """Execute Stage 1 discovery for a proposal YAML file."""
+    from project import discover  # lazy import — heavy pipeline deps
+
+    resolved_data_root = _path_or_none(data_root)
+    result = discover.run(
+        proposal,
+        registry_root=Path(registry_root),
+        data_root=resolved_data_root,
+        run_id=run_id,
+        plan_only=False,
+        dry_run=False,
+        check=check,
+        legacy_compatibility=False,
+    )
+    return _clean_value(result)
+
+
+def validate_run(
+    *,
+    run_id: str,
+    data_root: str | None = None,
+    timeout_sec: int = 600,
+) -> dict[str, Any]:
+    """Execute Stage 2 validation for an existing discovery run."""
+    import concurrent.futures
+
+    from project import validate  # lazy import
+
+    resolved_data_root = _path_or_none(data_root)
+    normalized_timeout = min(max(int(timeout_sec), 30), 3600)
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+        future = pool.submit(validate.run, run_id, data_root=resolved_data_root)
+        try:
+            result = future.result(timeout=normalized_timeout)
+            return _clean_value(result) if isinstance(result, dict) else {"status": "complete", "raw": str(result)}
+        except concurrent.futures.TimeoutError:
+            return {
+                "status": "timeout",
+                "run_id": run_id,
+                "timeout_sec": normalized_timeout,
+                "message": f"Validation did not complete within {normalized_timeout}s. The run may still be in progress.",
+            }
+        except Exception as exc:
+            return {
+                "status": "error",
+                "run_id": run_id,
+                "error": str(exc),
+                "message": "Validation raised an exception. Check run artifacts for details.",
+            }
+
+
+def promote_run(
+    *,
+    run_id: str,
+    symbols: str,
+    retail_profile: str = "capital_constrained",
+    data_root: str | None = None,
+    timeout_sec: int = 300,
+) -> dict[str, Any]:
+    """Execute Stage 3 promotion for a validated discovery run."""
+    import concurrent.futures
+
+    from project import promote  # lazy import
+
+    normalized_timeout = min(max(int(timeout_sec), 30), 3600)
+
+    def _run() -> dict[str, Any]:
+        result = promote.run(
+            run_id=run_id,
+            symbols=symbols,
+            retail_profile=retail_profile,
+            out_dir=None,
+            use_compatibility_bridge=False,
+        )
+        exit_code = getattr(result, "exit_code", 0) or 0
+        thesis_count = getattr(result, "thesis_count", None)
+        output_path = getattr(result, "output_path", None)
+        diagnostics = _clean_value(getattr(result, "diagnostics", {}) or {})
+        return {
+            "status": "promoted" if exit_code == 0 else "failed",
+            "run_id": run_id,
+            "exit_code": exit_code,
+            "thesis_count": thesis_count,
+            "output_path": str(output_path) if output_path else None,
+            "diagnostics": diagnostics,
+        }
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+        future = pool.submit(_run)
+        try:
+            return future.result(timeout=normalized_timeout)
+        except concurrent.futures.TimeoutError:
+            return {
+                "status": "timeout",
+                "run_id": run_id,
+                "timeout_sec": normalized_timeout,
+                "message": f"Promotion did not complete within {normalized_timeout}s.",
+            }
+        except Exception as exc:
+            return {
+                "status": "error",
+                "run_id": run_id,
+                "error": str(exc),
+                "message": "Promotion raised an exception. Check run artifacts for details.",
+            }
+
+
+def list_theses(
+    *,
+    data_root: str | None = None,
+) -> dict[str, Any]:
+    """List available promoted thesis batches from Stage 3/4 output."""
+    resolved_data_root = _resolve_data_root(data_root)
+    theses_dir = resolved_data_root / "live" / "theses"
+    batches: list[dict[str, Any]] = []
+
+    if theses_dir.exists():
+        for batch_dir in sorted(theses_dir.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True):
+            if not batch_dir.is_dir():
+                continue
+            thesis_file = batch_dir / "promoted_theses.json"
+            manifest_file = batch_dir / "promotion_manifest.json"
+            thesis_count: int | None = None
+            run_id: str | None = batch_dir.name
+            promoted_at: str | None = None
+            if thesis_file.exists():
+                try:
+                    raw = json.loads(thesis_file.read_text(encoding="utf-8"))
+                    if isinstance(raw, list):
+                        thesis_count = len(raw)
+                    elif isinstance(raw, dict):
+                        thesis_count = len(raw.get("theses", raw.get("items", [])))
+                except Exception:
+                    pass
+            if manifest_file.exists():
+                manifest_data = _read_json_dict(manifest_file)
+                promoted_at = str(manifest_data.get("promoted_at") or "")
+                run_id = str(manifest_data.get("run_id") or run_id)
+            batches.append(
+                _clean_value(
+                    {
+                        "run_id": run_id,
+                        "thesis_count": thesis_count,
+                        "promoted_at": promoted_at,
+                        "path": str(batch_dir.relative_to(resolved_data_root)),
+                    }
+                )
+            )
+
+    return {
+        "title": "Promoted Thesis Inventory",
+        "data_root": str(resolved_data_root),
+        "total_batches": len(batches),
+        "batches": batches,
+    }
+
+
+def catalog_list_runs(
+    *,
+    stage: str | None = None,
+    data_root: str | None = None,
+    limit: int = 20,
+) -> dict[str, Any]:
+    """List runs with manifests from the artifact catalog."""
+    resolved_data_root = _resolve_data_root(data_root)
+    normalized_limit = min(max(int(limit), 1), 100)
+    normalized_stage = str(stage or "").strip().lower() or None
+
+    # Discover all run manifests sorted by recency
+    try:
+        manifest_paths = sorted(
+            (resolved_data_root / "runs").glob("*/run_manifest.json"),
+            key=lambda p: p.stat().st_mtime,
+            reverse=True,
+        )
+    except Exception:
+        manifest_paths = []
+
+    records: list[dict[str, Any]] = []
+    for manifest_path in manifest_paths[:normalized_limit * 3]:
+        manifest = _read_json_dict(manifest_path)
+        if not manifest:
+            continue
+        run_id = str(manifest.get("run_id") or manifest_path.parent.name)
+        summary = _run_summary(manifest, run_id)
+
+        # Stage-filter: check presence of stage-specific artifact directories
+        if normalized_stage:
+            stage_dirs = {
+                "discover": resolved_data_root / "reports" / "phase2" / run_id,
+                "validate": resolved_data_root / "reports" / "validation" / run_id,
+                "promote": resolved_data_root / "reports" / "promotions" / run_id,
+                "deploy": resolved_data_root / "live" / "theses" / run_id,
+            }
+            check_path = stage_dirs.get(normalized_stage)
+            if check_path is None or not check_path.exists():
+                continue
+
+        # Annotate which stages have artifacts present
+        stages_present: list[str] = []
+        for sname, sdir in [
+            ("discover", resolved_data_root / "reports" / "phase2" / run_id),
+            ("validate", resolved_data_root / "reports" / "validation" / run_id),
+            ("promote", resolved_data_root / "reports" / "promotions" / run_id),
+            ("deploy", resolved_data_root / "live" / "theses" / run_id),
+        ]:
+            if sdir.exists():
+                stages_present.append(sname)
+
+        summary["stages_present"] = stages_present
+        records.append(_clean_value(summary))
+        if len(records) >= normalized_limit:
+            break
+
+    return {
+        "title": "Run Catalog",
+        "data_root": str(resolved_data_root),
+        "stage_filter": normalized_stage,
+        "total_returned": len(records),
+        "runs": records,
+    }
 
 
 def render_operator_summary(

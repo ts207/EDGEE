@@ -27,10 +27,10 @@ def check_event_prerequisites(
         required_features = ["funding_rate", "funding_rate_scaled"]
         feature_family = "funding"
     elif "oi" in event_type.lower() or "open_interest" in event_type.lower():
-        required_features = ["oi_notional", "oi_change"]
+        required_features = ["oi_notional", "oi_delta_1h"]
         feature_family = "oi"
     elif "liquidation" in event_type.lower():
-        required_features = ["liquidations_notional", "liquidations_count"]
+        required_features = ["liquidation_notional", "liquidation_count"]
         feature_family = "liquidation"
 
     if not required_features:

@@ -789,9 +789,24 @@ def _annotate_promotion_gate_fields(df: pd.DataFrame) -> pd.DataFrame:
     # gate_bridge_microstructure: 5m OHLCV on liquid perp markets passes microstructure
     if "gate_bridge_microstructure" not in df.columns:
         df["gate_bridge_microstructure"] = True
-    # sign_consistency: use robustness_score as proxy (fraction of regimes agreeing on direction)
-    if "sign_consistency" not in df.columns and "robustness_score" in df.columns:
-        df["sign_consistency"] = df["robustness_score"].clip(0.0, 1.0)
+    # E-GATE-001: sign_consistency is the fraction of trades whose return has the same
+    # sign as the directional hypothesis (== hit_rate for long strategies).
+    # The previous proxy (robustness_score = fraction of regime slabs agreeing on direction)
+    # is a related but distinct metric; using it causes the promotion gate threshold to
+    # be applied to a semantically wrong value.
+    if "sign_consistency" not in df.columns:
+        if "hit_rate" in df.columns:
+            df["sign_consistency"] = pd.to_numeric(df["hit_rate"], errors="coerce").clip(0.0, 1.0)
+        elif "robustness_score" in df.columns:
+            import logging as _logging
+            _logging.getLogger(__name__).warning(
+                "_populate_bridge_compatible_fields: neither sign_consistency nor hit_rate "
+                "available; falling back to robustness_score proxy. sign_consistency gate "
+                "may be inaccurate for this candidate."
+            )
+            df["sign_consistency"] = pd.to_numeric(
+                df["robustness_score"], errors="coerce"
+            ).clip(0.0, 1.0)
     # stability_score: robustness_score already measures fold-level direction consistency
     if "stability_score" not in df.columns and "robustness_score" in df.columns:
         df["stability_score"] = df["robustness_score"].clip(0.0, 1.0)
@@ -1167,7 +1182,6 @@ def run(
             log.info(
                 "Phase 4 hierarchical search mode active for %s", symbol
             )
-            from project.research.search.bridge_adapter import hypotheses_to_bridge_candidates
             from project.research.search.hierarchical_search import run_hierarchical_search
             from project.spec_validation import expand_triggers
 

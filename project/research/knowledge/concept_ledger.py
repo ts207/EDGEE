@@ -44,6 +44,7 @@ CONCEPT_LEDGER_COLUMNS: list[str] = [
     "direction",
     "timeframe",
     "horizon_bars",
+    "primary_symbol",       # NEW: specific symbol tested (not just scope type)
     "symbol_scope_type",
     "context_dim_count",
     "tested_at",
@@ -146,7 +147,7 @@ def build_concept_lineage_key(candidate_row: dict) -> str:
     Key format::
 
         EVENT:<family>|TMPL:<template_family>|DIR:<direction>|TF:<timeframe>
-        |H:<horizon_bucket>|SYM:<scope>|CTX:<dim_count>
+        |H:<horizon_bucket>|SYM:<scope>|SYM_ID:<symbol>|CTX:<dim_count>
 
     Parameters
     ----------
@@ -158,6 +159,14 @@ def build_concept_lineage_key(candidate_row: dict) -> str:
     -------
     str
         A pipe-delimited, human-readable lineage key.
+
+    Note on SYM_ID
+    --------------
+    ``SYM_ID`` encodes the specific symbol tested (e.g. ``BTCUSDT``,
+    ``ETHUSDT``).  This prevents test history for BTC from penalising
+    ETH investigations of the same hypothesis family.  BTC and ETH have
+    different microstructure, funding dynamics, and institutional ownership;
+    an edge confirmed on one should not count as evidence against the other.
     """
     row = dict(candidate_row)
 
@@ -186,6 +195,12 @@ def build_concept_lineage_key(candidate_row: dict) -> str:
 
     h_bucket = _horizon_bucket(horizon_bars)
     sym_scope = _symbol_scope_type(row.get("symbol") or row.get("symbol_scope"))
+    # SYM_ID: the specific symbol tested.  Falls back to 'any' for multi-symbol
+    # or unknown contexts so the key remains stable.
+    primary_symbol = (
+        str(row.get("symbol") or row.get("primary_symbol") or "").strip().upper()
+        or "any"
+    )
     ctx_count = _context_dim_count(row)
 
     key = (
@@ -195,6 +210,7 @@ def build_concept_lineage_key(candidate_row: dict) -> str:
         f"|TF:{timeframe}"
         f"|H:{h_bucket}"
         f"|SYM:{sym_scope}"
+        f"|SYM_ID:{primary_symbol}"
         f"|CTX:{ctx_count}"
     )
     return key
@@ -500,6 +516,8 @@ def build_ledger_records(
         # Detect symbol scope type
         sym = row_dict.get("symbol") or row_dict.get("symbol_scope") or ""
         sym_scope = _symbol_scope_type(sym)
+        # Store the specific symbol for per-symbol lineage isolation
+        primary_sym = str(sym).strip().upper() or "any"
         ctx_count = _context_dim_count(row_dict)
 
         is_disc = bool(
@@ -536,6 +554,7 @@ def build_ledger_records(
                 "timeframe": resolved_timeframe,
                 "horizon_bars": horizon_bars,
                 "symbol_scope_type": sym_scope,
+                "primary_symbol": primary_sym,
                 "context_dim_count": ctx_count,
                 "tested_at": now_str,
                 "is_discovery": is_disc,

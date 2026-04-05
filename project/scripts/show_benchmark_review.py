@@ -1,9 +1,66 @@
 import argparse
 import json
 import logging
+import os
 from pathlib import Path
+from typing import List, Optional
+
+from project import PROJECT_ROOT
 
 logger = logging.getLogger(__name__)
+
+
+def get_data_root() -> Path:
+    """Return the canonical data root from environment or default."""
+    return Path(os.getenv("BACKTEST_DATA_ROOT", PROJECT_ROOT.parent / "data"))
+
+
+DATA_ROOT: Path = get_data_root()
+
+
+def find_latest_review(data_root: Path | None = None) -> Path | None:
+    """Find the most recently modified benchmark review file, preferring canonical."""
+    root = data_root or get_data_root()
+    
+    # Priority 1: Canonical 'benchmarks'
+    canonical_path = root / "reports" / "benchmarks" / "history"
+    if canonical_path.exists():
+        reviews = list(canonical_path.glob("**/benchmark_review.json"))
+        if reviews:
+            return max(reviews, key=lambda x: x.stat().st_mtime)
+            
+    # Priority 2: Legacy 'perf_benchmarks'
+    legacy_path = root / "reports" / "perf_benchmarks" / "history"
+    if legacy_path.exists():
+        reviews = list(legacy_path.glob("**/benchmark_review.json"))
+        if reviews:
+            return max(reviews, key=lambda x: x.stat().st_mtime)
+ 
+    return None
+
+
+def find_historical_reviews(matrix_id: str, limit: int = 5) -> list[Path]:
+    """Return the N latest review paths for a specific matrix_id."""
+    root = get_data_root()
+    search_paths = [
+        root / "reports" / "benchmarks" / "history",
+        root / "reports" / "perf_benchmarks" / "history",
+    ]
+ 
+    matches: list[Path] = []
+    for p in search_paths:
+        if p.exists():
+            # Look for directories starting with matrix_id
+            for d in p.iterdir():
+                if d.is_dir() and d.name.startswith(f"{matrix_id}_"):
+                    review_file = d / "benchmark_review.json"
+                    if review_file.exists():
+                        matches.append(review_file)
+ 
+    # Sort by mtime descending
+    matches.sort(key=lambda x: x.stat().st_mtime, reverse=True)
+    return matches[:limit]
+
 
 def main():
     parser = argparse.ArgumentParser()

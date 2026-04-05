@@ -27,6 +27,10 @@ from project.core.timeframes import (
 from project.features.microstructure import (
     calculate_imbalance,
 )
+from project.features.context_states import (
+    calculate_ms_oi_probabilities,
+    calculate_ms_oi_state,
+)
 from project.io.utils import (
     ensure_dir,
     read_parquet,
@@ -750,8 +754,15 @@ def build_features(
     if "oi_notional" in out.columns:
         oi_delta_window = _duration_to_bars(minutes=60, timeframe=tf, min_bars=1)
         out["oi_delta_1h"] = out["oi_notional"].diff(oi_delta_window).shift(1).fillna(0.0)
+        oi_probs = calculate_ms_oi_probabilities(out["oi_delta_1h"])
+        # Concat the specific columns we need for guards
+        oi_cols = ["ms_oi_state", "ms_oi_confidence", "ms_oi_entropy"]
+        out = pd.concat([out, oi_probs[oi_cols]], axis=1)
     else:
         out["oi_delta_1h"] = 0.0
+        out["ms_oi_state"] = 1.0
+        out["ms_oi_confidence"] = 1.0
+        out["ms_oi_entropy"] = 0.0
 
     # Normalize funding magnitude inputs before deriving downstream features.
     funding_scaled = pd.to_numeric(

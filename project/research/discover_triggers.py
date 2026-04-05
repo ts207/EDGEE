@@ -6,7 +6,11 @@ import pandas as pd
 
 from project import PROJECT_ROOT
 from project.research.search.evaluator import evaluate_hypothesis_batch
-from project.research.trigger_discovery.candidate_generation import generate_parameter_sweep, generate_feature_clusters
+from project.research.trigger_discovery.candidate_generation import (
+    generate_parameter_sweep,
+    generate_feature_clusters,
+    TriggerFeatureColumns,
+)
 from project.research.trigger_discovery.candidate_scoring import score_trigger_candidates
 from project.research.trigger_discovery.proposal_emission import emit_proposals
 from project.research.search.search_feature_utils import prepare_search_features_for_symbol
@@ -49,11 +53,11 @@ def main():
         log.info(f"Running parameter sweep over family: {args.family}")
         # Build grid (in real system, would parse from registry boundaries)
         grid = {
-            "z_threshold": [1.5, 2.0, 2.5, 3.0], 
+            "z_threshold": [1.5, 2.0, 2.5, 3.0],
             "lookback_bars": [48, 96, 288]
         }
-        proposals, augmented_features = generate_parameter_sweep(
-            features, 
+        proposals, trigger_cols = generate_parameter_sweep(
+            features,
             family_grid={args.family: grid}
         )
     elif args.mode == "feature_cluster":
@@ -61,17 +65,22 @@ def main():
         target_cols = [c for c in features.columns if "vol" in c.lower() or "liq" in c.lower() or "spread" in c.lower()]
         if not target_cols:
             log.warning("No target continuous columns detected. Using dummies.")
-            
-        proposals, augmented_features = generate_feature_clusters(
-            features, 
+
+        proposals, trigger_cols = generate_feature_clusters(
+            features,
             target_columns=target_cols,
             min_support=10
         )
     else:
-        proposals, augmented_features = [], features
+        proposals, trigger_cols = [], TriggerFeatureColumns()
 
     log.info(f"Generated {len(proposals)} candidate trigger proposals.")
-    
+
+    # Reconstruct augmented features explicitly within the trigger-discovery path.
+    # This prevents synthetic trigger columns from reaching the main discovery pipeline
+    # even if this function's return value is accidentally passed upstream.
+    augmented_features = trigger_cols.apply_to_features(features)
+
     if augmented_features.empty or not proposals:
         log.warning("No proposals generated or features empty. Ending discovery.")
         return

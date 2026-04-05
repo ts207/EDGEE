@@ -114,7 +114,7 @@ discovery_selection:
     edge_threshold: 0.65   # Minimum similarity to draw an overlap graph edge
 
   shortlist:
-    enabled: false          # Set to true to write phase2_diversified_shortlist.parquet
+    enabled: true           # C3: enabled from Sprint 67 onwards. Writes phase2_diversified_shortlist.parquet.
     size: 20
     lambda_quality: 0.7
     lambda_overlap: 0.2

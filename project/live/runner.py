@@ -184,6 +184,9 @@ class LiveEngineRunner:
         # Workstream 1: Deploy admission control
         self._thesis_store = self._load_thesis_store()
         self._register_theses_in_manager()
+        # B3: Inject per-thesis decay rules calibrated from evidence at startup.
+        # These supplement (not replace) operator-provided rules.
+        self._inject_per_thesis_decay_rules()
 
         self._thesis_memory_root = self._resolve_memory_root()
 
@@ -423,7 +426,65 @@ class LiveEngineRunner:
         # (This is a simplified version for Sprint 6)
         return out_path
 
+    def _inject_per_thesis_decay_rules(self) -> None:
+        """B3: Add per-thesis DecayRules calibrated from each thesis's promotion evidence.
+
+        Edge decay threshold: fires downsize when realized edge < 50% of expected.
+        Hit rate decay threshold: fires warn when realized hit_rate < 70% of expected.
+        Window samples scale with evidence size so data-rich theses require more
+        evidence before a rule triggers.
+        """
+        if not self._thesis_store:
+            return
+        existing_rule_ids = {r.rule_id for r in self.decay_monitor.rules}
+        new_rules: List[DecayRule] = []
+        for t in self._thesis_store.all():
+            tid = t.thesis_id
+            ev = t.evidence
+            expected_bps = float(getattr(ev, "net_expectancy_bps", None) or 0.0)
+            expected_hr = float(getattr(ev, "hit_rate", None) or 0.5)
+            sample_size = int(getattr(ev, "sample_size", None) or 0)
+            window = max(10, min(50, sample_size // 40))
+
+            edge_rule_id = f"edge_decay_{tid}"
+            hr_rule_id = f"hit_rate_decay_{tid}"
+
+            if expected_bps > 0.0 and edge_rule_id not in existing_rule_ids:
+                new_rules.append(DecayRule(
+                    rule_id=edge_rule_id,
+                    metric="edge",
+                    threshold=0.50,          # fire when realized < 50% of expected
+                    window_samples=window,
+                    action="downsize",
+                    downsize_factor=0.50,
+                ))
+                _LOG.info(
+                    "Registered per-thesis edge decay rule for %s: threshold=50%% of %.1f bps, "
+                    "window=%d samples.",
+                    tid, expected_bps, window,
+                )
+
+            if hr_rule_id not in existing_rule_ids:
+                hr_threshold = max(0.30, expected_hr * 0.70)  # 70% of expected hit rate
+                new_rules.append(DecayRule(
+                    rule_id=hr_rule_id,
+                    metric="hit_rate",
+                    threshold=hr_threshold,
+                    window_samples=window,
+                    action="warn",
+                ))
+                _LOG.info(
+                    "Registered per-thesis hit_rate decay rule for %s: threshold=%.2f, "
+                    "window=%d samples.",
+                    tid, hr_threshold, window,
+                )
+
+        if new_rules:
+            self.decay_monitor.rules = list(self.decay_monitor.rules) + new_rules
+            _LOG.info("Injected %d per-thesis decay rules from thesis store.", len(new_rules))
+
     def _register_theses_in_manager(self):
+
         if self._thesis_store:
             for t in self._thesis_store.all():
                 self.thesis_manager.register_thesis(
@@ -1175,12 +1236,17 @@ class LiveEngineRunner:
         # Sprint 6: Decay Monitor check
         if outcome.ranked_matches:
             top_thesis = outcome.ranked_matches[0].thesis
-            # We would need real-time performance metrics for the thesis here
-            # For now, we'll use empty realized metrics or look up from attribution
             realized = self._get_realized_metrics_for_thesis(top_thesis.thesis_id)
+            # Expected metrics at promotion time. hit_rate comes from the thesis evidence
+            # if available; falls back to 0.5 only when no empirical value was recorded.
+            expected_hit_rate = float(
+                getattr(top_thesis.evidence, "hit_rate", None)
+                or (top_thesis.evidence.net_expectancy_bps > 0 and 0.55)  # directional prior
+                or 0.5
+            )
             expected = {
-                "net_expectancy_bps": top_thesis.evidence.net_expectancy_bps or 0.0,
-                "hit_rate": 0.5,  # Placeholder
+                "net_expectancy_bps": float(top_thesis.evidence.net_expectancy_bps or 0.0),
+                "hit_rate": expected_hit_rate,
             }
             health = self.decay_monitor.assess_thesis_health(
                 top_thesis.thesis_id, realized, expected

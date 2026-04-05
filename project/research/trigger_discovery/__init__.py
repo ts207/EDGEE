@@ -11,4 +11,9 @@ These triggers are output as *proposals*. They do not advance into
 promotion or live registry paths automatically.
 """
 
-__all__ = []
+from project.research.trigger_discovery.candidate_generation import (
+    TriggerFeatureColumns,
+    TriggerProposal,
+)
+
+__all__ = ["TriggerFeatureColumns", "TriggerProposal"]

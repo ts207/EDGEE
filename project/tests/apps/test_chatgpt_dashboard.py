@@ -228,3 +228,43 @@ def test_render_operator_summary_accepts_stringified_dashboard_payload() -> None
     assert rendered["layout"] == "dashboard"
     assert rendered["summary"] == {"items": ["known program"]}
     assert rendered["sections"] == [{"heading": "Memory", "body": "Loaded"}]
+
+
+def test_get_memory_summary_returns_belief_and_proposals(tmp_path) -> None:
+    program_id = "MEM_TEST"
+    memory_root = tmp_path / "artifacts" / "experiments" / program_id / "memory"
+    memory_root.mkdir(parents=True)
+
+    (memory_root / "belief_state.json").write_text(
+        json.dumps({"current_focus": "test focus", "available": True}),
+        encoding="utf-8",
+    )
+    pd.DataFrame([{"run_id": "run_1", "status": "success"}]).to_csv(memory_root / "proposals.csv", index=False)
+
+    from project.apps.chatgpt.handlers import get_memory_summary
+
+    res = get_memory_summary(program_id=program_id, data_root=str(tmp_path), limit=5)
+
+    assert res["program_id"] == program_id
+    assert res["available"] is True
+    assert res["memory"]["belief_state"]["current_focus"] == "test focus"
+    assert len(res["recent_proposals"]) == 1
+    assert res["widget"] == "operator_dashboard"
+
+
+def test_compare_runs_clams_to_six_runs(monkeypatch) -> None:
+    captured_run_ids = []
+
+    def fake_build_report(run_ids, **kwargs):
+        captured_run_ids.extend(run_ids)
+        return {"report": "done"}
+
+    monkeypatch.setattr("project.apps.chatgpt.handlers.build_time_slice_report", fake_build_report)
+
+    from project.apps.chatgpt.handlers import compare_runs
+
+    run_ids = [f"run_{i}" for i in range(10)]
+    compare_runs(run_ids=run_ids)
+
+    assert len(captured_run_ids) == 6
+    assert captured_run_ids[-1] == "run_5"

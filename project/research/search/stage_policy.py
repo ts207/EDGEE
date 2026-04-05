@@ -28,6 +28,13 @@ STAGE_TEMPLATE_REFINEMENT = "template_refinement"
 STAGE_EXECUTION_REFINEMENT = "execution_refinement"
 STAGE_CONTEXT_REFINEMENT = "context_refinement"
 
+# Minimum t-statistic gate threshold, matching the discovery pipeline minimum.
+# Used to rescale t_norm so that t=_T_MIN_GATE maps to 0.0 (minimum viable)
+# and t=3.0 maps to 1.0 (maximum), rather than the old 0.0 / 3.0 mapping that
+# created a structural soft floor prematurely pruning near-threshold triggers
+# before template or context conditioning could amplify the effect.
+_T_MIN_GATE: float = 1.5
+
 ALL_STAGES = [
     STAGE_TRIGGER_VIABILITY,
     STAGE_TEMPLATE_REFINEMENT,
@@ -76,8 +83,12 @@ def _compute_stage_score(row: dict | pd.Series, *, stage: str) -> float:
     t_raw = _safe_float(
         row.get("t_stat", row.get("t_statistic", 0.0)), 0.0
     )
-    # Normalize t to [0, 1] using a soft cap at 3.0
-    t_norm = _clamp(abs(t_raw) / 3.0, 0.0, 1.0)
+    # Normalize t to [0, 1] using a gate-relative scale: [_T_MIN_GATE, 3.0] → [0, 1].
+    # This maps t=1.5 (minimum viable) to 0.0 and t=3.0 to 1.0.
+    # The old division by 3.0 mapped t=1.5 to 0.5, creating a structural soft
+    # floor that discarded near-threshold triggers before template conditioning
+    # could strengthen them (the flat path evaluates all combinations;).
+    t_norm = _clamp((abs(t_raw) - _T_MIN_GATE) / (3.0 - _T_MIN_GATE), 0.0, 1.0)
 
     rob = _clamp(
         _safe_float(row.get("robustness_score", 0.0), 0.0), 0.0, 1.0

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from typing import Any, Dict, List
 
 import numpy as np
@@ -25,6 +26,9 @@ from project.research.utils.decision_safety import (
     finite_ge,
 )
 from project.research.utils.returns_oos import normalize_returns_oos_combined
+
+
+log = logging.getLogger(__name__)
 
 
 def _quiet_float(value: Any, default: float) -> float:
@@ -390,7 +394,20 @@ def _evaluate_control_audit_and_dsr(
     dsr_pass = True
     if float(min_dsr) > 0.0:
         returns_oos = _parse_returns_oos(row.get("returns_oos_combined"))
-        n_trials = max(1, _quiet_int(row.get("num_tests_event_family", 1), 1))
+        raw_n_trials = _quiet_int(row.get("num_tests_event_family", 0), 0)
+        if raw_n_trials < 1:
+            # num_tests_event_family is 0 — multiplicity layer has not populated this
+            # column yet (e.g. single-candidate research run, or pre-multiplicity eval).
+            # Falling back to n_trials=1 means DSR == PSR, which *underestimates* the
+            # selection penalty.  Log a WARNING so the analyst knows DSR is not deflated.
+            log.warning(
+                "_evaluate_control_audit_and_dsr: num_tests_event_family=0 for candidate."
+                " DSR will use n_trials=1 (PSR equivalence). If this run tested multiple"
+                " hypotheses in the same event family, the true DSR is lower than reported."
+                " Populate num_tests_event_family via apply_multiplicity_controls() before"
+                " calling the promotion gate to get a correctly deflated DSR."
+            )
+        n_trials = max(1, raw_n_trials)
         if len(returns_oos) >= 10:
             dsr_value = float(_deflated_sharpe_ratio(pd.Series(returns_oos), n_trials=n_trials))
         else:

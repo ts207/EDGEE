@@ -859,8 +859,9 @@ def calculate_expectancy_stats(
     
     event_split_list = extracted["splits"]
 
-    # B1: gate t-statistic is computed on train+validation only — the test split is a
-    # pure holdout and must not participate in gate decisions.
+    # B1: gate t-statistic and p-value are computed on train+validation only.
+    # The test split is a pure holdout and must not participate in gate decisions.
+    # Events with no split_label default to 'train' (conservative: included in gate).
     gate_mask = np.array([s != "test" for s in event_split_list], dtype=bool)
     if gate_mask.any():
         gate_returns = returns_series[gate_mask]
@@ -869,6 +870,32 @@ def calculate_expectancy_stats(
         gate_returns = returns_series
         gate_weights = weights
     n_gate = int(len(gate_returns))
+
+    # Per-split t-statistics for audit and OOS reporting.
+    # These are always unweighted (raw t-test) so they are consistent regardless
+    # of whether time-decay weighting is enabled in the main gate path.
+    def _split_t(
+        split_name: str,
+    ) -> tuple[float, int]:
+        """Return (t_stat, n_events) for the named split."""
+        split_returns = [
+            r for r, s in zip(event_returns, event_split_list) if s == split_name
+        ]
+        if len(split_returns) < 2:
+            return 0.0, len(split_returns)
+        arr = np.asarray(split_returns, dtype=float)
+        arr = arr[np.isfinite(arr)]
+        if len(arr) < 2 or np.std(arr, ddof=1) < 1e-12:
+            return 0.0, len(split_returns)
+        nw_s = newey_west_t_stat_for_mean(arr)
+        t = float(nw_s.t_stat) if np.isfinite(nw_s.t_stat) else float(
+            np.mean(arr) / (np.std(arr, ddof=1) / np.sqrt(len(arr)))
+        )
+        return t, len(split_returns)
+
+    t_train_val, train_samples = _split_t("train")
+    t_val_val, val_samples = _split_t("validation")
+    t_test_val, test_samples_n = _split_t("test")
 
     # B8: use observation count (not ESS) as degrees of freedom for the NW t-test.
     # The weighted NW SE already adjusts for weight concentration; using ESS as df
@@ -896,9 +923,12 @@ def calculate_expectancy_stats(
         "stability_pass": bool(dd_result["gate_max_drawdown"]),
         "std_return": std_ret,
         "t_stat": t_stat,
+        "time_weight_sum": float(w_sum),
+        "mean_weight_age_days": 0.0,   # populated by tau diagnostics if enabled
         "max_drawdown": dd_result["max_drawdown"],
         "gate_max_drawdown": dd_result["gate_max_drawdown"],
         **tau_diagnostics,
+        # Per-split means (for OOS direction-match checks in the promotion gate)
         "mean_train_return": float(
             np.mean([r for r, s in zip(event_returns, event_split_list) if s == "train"])
         )
@@ -914,6 +944,13 @@ def calculate_expectancy_stats(
         )
         if "test" in event_split_list
         else 0.0,
+        # Per-split t-statistics and sample counts (S2: audit + DSR evidence quality)
+        "t_train": t_train_val,
+        "t_validation": t_val_val,
+        "t_test": t_test_val,
+        "train_samples": train_samples,
+        "validation_samples": val_samples,
+        "test_samples": test_samples_n,
     }
 
 
