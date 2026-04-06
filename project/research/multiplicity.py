@@ -253,16 +253,13 @@ def apply_cross_campaign_fdr(
     p_col_candidate: str = "p_value_for_fdr"
 ) -> pd.DataFrame:
     """
-    Apply BH correction across multiple campaigns/runs for a global FDR adjustment.
-    Takes a list of dataframes, concatenates them, resolves the true p-value column,
-    computes global test weights (accounting for two-sided tests), and adjusts.
+    [DEPRECATED] Use apply_canonical_cross_campaign_multiplicity instead.
     
-    NOTE: This function is OPTIONAL/EXPERIMENTAL and NOT YET WIRED INTO THE CANONICAL
-    DISCOVERY WORKFLOW. It is provided as infrastructure for cross-run/cross-campaign
-    FDR correction at researcher discretion. To use, call this function explicitly
-    on a list of candidate dataframes from multiple campaigns before final selection.
+    Legacy batch cross-campaign FDR helper. Kept for backward compatibility.
+    Prefer apply_canonical_cross_campaign_multiplicity for new code.
     
-    See docs/92_assurance_and_benchmarks.md for status.
+    NOTE: This function applies a simple BH across concatenated dataframes.
+    For campaign-lineage scope control, use the canonical function.
     """
     if not dataframes:
         return pd.DataFrame()
@@ -300,6 +297,39 @@ def apply_canonical_cross_campaign_multiplicity(
     p_col_candidate: str = "p_value_for_fdr",
     scope_version: str = "phase1_v1",
 ) -> pd.DataFrame:
+    """
+    Canonical cross-campaign / campaign-lineage multiplicity adjustment.
+    
+    This is THE standard API for scope-level FDR correction in promotions.
+    It adds scope-aware multiplicity fields alongside existing family-level fields.
+    
+    This function MUST be called before promotion gates. All promoted candidates
+    will have effective_q_value computed as max(q_value, q_value_scope, q_value_program).
+    
+    Phase 1 invariant:
+        No promoted candidate may lack effective_q_value.
+    
+    Inputs:
+        - frame: DataFrame with at least run_id, p_value columns
+        - max_q: FDR threshold
+        - scope_mode: "run", "campaign", "program", "campaign_lineage"
+        - eligible_col: column indicating multiplicity eligibility
+        - p_col_candidate: column name for p-value
+        - scope_version: version string for this contract
+    
+    Outputs (added to frame):
+        - num_tests_scope
+        - q_value_scope
+        - is_discovery_scope
+        - effective_q_value (canonical q-value for promotion decisions)
+        - multiplicity_scope_mode
+        - multiplicity_scope_key
+        - multiplicity_scope_version
+        - multiplicity_scope_degraded (if historical data missing)
+    
+    See:
+        - docs/92_assurance_and_benchmarks.md for status
+        - project/research/contracts/multiplicity_scope.py for contract
     """
     Canonical cross-campaign / campaign-lineage multiplicity adjustment.
     

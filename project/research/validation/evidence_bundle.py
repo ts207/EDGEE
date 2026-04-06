@@ -231,6 +231,13 @@ def build_evidence_bundle(
                 row.get("p_value_adj_holm", row.get("q_value_cluster", np.nan)), np.nan
             ),
             "q_value_program": safe_float(row.get("q_value_program", np.nan), np.nan),
+            "q_value_scope": safe_float(row.get("q_value_scope", np.nan), np.nan),
+            "effective_q_value": safe_float(row.get("effective_q_value", np.nan), np.nan),
+            "num_tests_scope": safe_int(row.get("num_tests_scope", 0), 0),
+            "multiplicity_scope_mode": str(row.get("multiplicity_scope_mode", "")),
+            "multiplicity_scope_key": str(row.get("multiplicity_scope_key", "")),
+            "multiplicity_scope_version": str(row.get("multiplicity_scope_version", "")),
+            "multiplicity_scope_degraded": bool(as_bool(row.get("multiplicity_scope_degraded", False))),
         },
         metadata={
             "hypothesis_id": str(row.get("hypothesis_id", "")).strip(),
@@ -343,9 +350,17 @@ def evaluate_promotion_bundle(bundle: Dict[str, Any], policy: PromotionPolicy) -
     q_value_program = safe_float(
         bundle.get("multiplicity_adjustment", {}).get("q_value_program", np.nan), np.nan
     )
+    q_value_scope = safe_float(
+        bundle.get("multiplicity_adjustment", {}).get("q_value_scope", np.nan), np.nan
+    )
     q_value_by = safe_float(uncertainty.get("q_value_by", np.nan), np.nan)
     q_value_cluster = safe_float(uncertainty.get("q_value_cluster", np.nan), np.nan)
-    effective_q_value = max(q_value, q_value_program) if np.isfinite(q_value_program) else q_value
+    
+    values_for_effective_q = [v for v in [q_value, q_value_program, q_value_scope] if np.isfinite(v)]
+    if values_for_effective_q:
+        effective_q_value = max(values_for_effective_q)
+    else:
+        effective_q_value = q_value
     tob_coverage = safe_float(cost.get("tob_coverage", meta.get("tob_coverage", np.nan)), np.nan)
     if not np.isfinite(tob_coverage):
         tob_coverage = safe_float(bundle.get("tob_coverage", np.nan), np.nan)

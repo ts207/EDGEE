@@ -109,6 +109,10 @@ class ResolvedPromotionPolicy:
     enforce_baseline_beats_complexity: bool
     enforce_placebo_controls: bool
     enforce_timeframe_consensus: bool
+    multiplicity_scope_mode: str = "campaign_lineage"
+    require_scope_level_multiplicity: bool = True
+    allow_multiplicity_scope_degraded: bool = True
+    use_effective_q_value: bool = True
 
 
 PROMOTION_CLASSES: tuple[str, ...] = ("seed_promoted", "paper_promoted", "production_promoted")
@@ -772,6 +776,31 @@ def _write_promotion_lineage_audit(
     md_path.write_text("\n".join(md_lines) + "\n", encoding="utf-8")
     return {"json_path": str(json_path), "md_path": str(md_path)}
 
+
+def _write_multiplicity_scope_diagnostics(out_dir: Path, diag: Dict[str, Any]) -> Dict[str, str]:
+    """Write multiplicity scope diagnostics as JSON and Markdown."""
+    json_path = out_dir / "multiplicity_scope_diagnostics.json"
+    md_path = out_dir / "multiplicity_scope_diagnostics.md"
+    
+    json_path.write_text(json.dumps(diag, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    
+    md_lines = [
+        "# Multiplicity Scope Diagnostics",
+        "",
+        f"- scope_mode: `{diag.get('scope_mode', 'unknown')}`",
+        f"- scope_version: `{diag.get('scope_version', 'unknown')}`",
+        f"- candidates_total: `{diag.get('candidates_total', 0)}`",
+        f"- scope_keys_unique: `{diag.get('scope_keys_unique', 0)}`",
+        f"- num_tests_scope_avg: `{diag.get('num_tests_scope_avg', 0.0):.2f}`",
+        f"- effective_q_value_avg: `{diag.get('effective_q_value_avg', 0.0):.4f}`",
+        f"- scope_degraded_count: `{diag.get('scope_degraded_count', 0)}`",
+        "",
+    ]
+    md_path.write_text("\n".join(md_lines) + "\n", encoding="utf-8")
+    
+    return {"json_path": str(json_path), "md_path": str(md_path)}
+
+
 def execute_promotion(config: PromotionConfig) -> PromotionServiceResult:
     data_root = get_data_root()
     out_dir = config.resolved_out_dir()
@@ -933,8 +962,17 @@ def execute_promotion(config: PromotionConfig) -> PromotionServiceResult:
             enforce_baseline_beats_complexity=resolved_policy.enforce_baseline_beats_complexity,
             enforce_placebo_controls=resolved_policy.enforce_placebo_controls,
             enforce_timeframe_consensus=resolved_policy.enforce_timeframe_consensus,
+            multiplicity_scope_mode=getattr(resolved_policy, 'multiplicity_scope_mode', 'campaign_lineage'),
+            require_scope_level_multiplicity=getattr(resolved_policy, 'require_scope_level_multiplicity', True),
+            allow_multiplicity_scope_degraded=getattr(resolved_policy, 'allow_multiplicity_scope_degraded', True),
+            use_effective_q_value=getattr(resolved_policy, 'use_effective_q_value', True),
         )
         diagnostics["promotion_profile"] = resolved_policy.promotion_profile
+        
+        # Write multiplicity scope diagnostics
+        multiplicity_scope_diag = diagnostics.get("multiplicity_scope_diagnostics", {})
+        if multiplicity_scope_diag:
+            _write_multiplicity_scope_diagnostics(out_dir, multiplicity_scope_diag)
         audit_statistical_df = build_promotion_statistical_audit(
             audit_df=audit_df,
             max_q_value=config.max_q_value,
