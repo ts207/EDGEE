@@ -11,19 +11,26 @@ from project.apps.chatgpt.resources import (
     build_widget_resource,
     load_widget_html,
 )
-from project.apps.chatgpt.tool_catalog import TOOL_CATALOG
+from project.apps.chatgpt.tool_catalog import get_profile_metadata, get_tool_catalog
 
 
-def build_server_blueprint() -> dict[str, Any]:
-    return {
+def build_server_blueprint(*, profile: str = "operator", repo_root: str | None = None) -> dict[str, Any]:
+    metadata = get_profile_metadata(profile)
+    tool_catalog = get_tool_catalog(profile)
+    resources = [build_widget_resource()] if metadata["profile"] == "operator" else []
+    blueprint: dict[str, Any] = {
         "app": {
-            "name": "Edge Operator",
-            "version": "0.1.0",
-            "description": "ChatGPT app scaffolding for Edge operator workflows.",
+            "name": metadata["app_name"],
+            "version": metadata["version"],
+            "description": metadata["description"],
+            "profile": metadata["profile"],
         },
-        "tools": [tool.model_dump() for tool in TOOL_CATALOG],
-        "resources": [build_widget_resource()],
+        "tools": [tool.model_dump() for tool in tool_catalog],
+        "resources": resources,
     }
+    if repo_root is not None:
+        blueprint["app"]["repo_root"] = repo_root
+    return blueprint
 
 
 def _import_optional(module_name: str) -> Any:
@@ -81,36 +88,26 @@ def _build_tool_descriptor_meta(definition: Any) -> dict[str, Any]:
 def _build_runtime_wrapper(handler: Any, definition: Any) -> Any:
     input_model = _load_symbol(definition.input_model)
     fields = getattr(input_model, "model_fields", {})
-    signature_parts: list[str] = []
-    defaults: dict[str, Any] = {}
     parameters: list[inspect.Parameter] = []
 
     for field_name, field in fields.items():
-        if field.is_required():
-            signature_parts.append(f"{field_name}")
-            default = inspect.Signature.empty
-        else:
-            defaults[field_name] = field.get_default(call_default_factory=True)
-            signature_parts.append(f"{field_name}=__defaults[{field_name!r}]")
-            default = defaults[field_name]
+        default = inspect.Signature.empty
+        if not field.is_required():
+            default = field.get_default(call_default_factory=True)
         parameters.append(
             inspect.Parameter(
                 field_name,
-                kind=inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                kind=inspect.Parameter.KEYWORD_ONLY,
                 default=default,
                 annotation=field.annotation,
             )
         )
 
-    signature_source = ", ".join(signature_parts)
-    source = (
-        f"def _wrapped({signature_source}):\n"
-        f"    payload = __input_model.model_validate({{{', '.join(f'{field_name!r}: {field_name}' for field_name in fields)}}})\n"
-        f"    return __handler(**payload.model_dump())\n"
-    )
-    namespace = {"__handler": handler, "__defaults": defaults, "__input_model": input_model}
-    exec(source, namespace)
-    wrapped = namespace["_wrapped"]
+    def _wrapped(**kwargs: Any) -> Any:
+        payload = input_model.model_validate(kwargs)
+        return handler(**payload.model_dump())
+
+    wrapped = _wrapped
     wrapped.__name__ = str(definition.name)
     wrapped.__doc__ = handler.__doc__ or definition.description
     wrapped.__module__ = handler.__module__
@@ -118,13 +115,15 @@ def _build_runtime_wrapper(handler: Any, definition: Any) -> Any:
     return wrapped
 
 
-def build_mcp_server() -> Any:
+def build_mcp_server(*, profile: str = "operator", repo_root: str | None = None) -> Any:
     _import_mcp_runtime()
     FastMCP = _load_symbol("mcp.server.fastmcp.FastMCP")
     TextResourceContents = _load_symbol("mcp.types.TextResourceContents")
     MCPTool = _load_symbol("mcp.types.Tool")
 
-    tool_definitions = {tool.name: tool for tool in TOOL_CATALOG}
+    metadata = get_profile_metadata(profile)
+    tool_catalog = get_tool_catalog(profile)
+    tool_definitions = {tool.name: tool for tool in tool_catalog}
 
     class EdgeFastMCP(FastMCP):
         async def list_tools(self) -> list[Any]:
@@ -143,26 +142,24 @@ def build_mcp_server() -> Any:
             ]
 
     mcp_server = EdgeFastMCP(
-        "Edge Operator",
-        instructions=(
-            "Edge is a bounded crypto research operator surface. Use the proposal tools to inspect or issue bounded runs. "
-            "Prefer report tools for existing runs, and use the render tool only after a data tool has returned compact structured content."
-        ),
+        metadata["app_name"],
+        instructions=metadata["instructions"],
         stateless_http=True,
         json_response=True,
         streamable_http_path="/",
     )
 
-    @mcp_server.resource(WIDGET_URI)
-    def edge_operator_widget() -> Any:
-        return TextResourceContents(
-            uri=WIDGET_URI,
-            mimeType=WIDGET_MIME_TYPE,
-            text=load_widget_html(),
-            _meta=build_widget_resource().get("_meta", {}),
-        )
+    if metadata["profile"] == "operator":
+        @mcp_server.resource(WIDGET_URI)
+        def edge_operator_widget() -> Any:
+            return TextResourceContents(
+                uri=WIDGET_URI,
+                mimeType=WIDGET_MIME_TYPE,
+                text=load_widget_html(),
+                _meta=build_widget_resource().get("_meta", {}),
+            )
 
-    for tool in TOOL_CATALOG:
+    for tool in tool_catalog:
         handler = _load_symbol(tool.handler)
         runtime_handler = _build_runtime_wrapper(handler, tool)
         mcp_server.add_tool(
@@ -176,7 +173,7 @@ def build_mcp_server() -> Any:
     return mcp_server
 
 
-def build_asgi_app() -> Any:
+def build_asgi_app(*, profile: str = "operator", repo_root: str | None = None) -> Any:
     _import_mcp_runtime()
     Starlette = _load_symbol("starlette.applications.Starlette")
     JSONResponse = _load_symbol("starlette.responses.JSONResponse")
@@ -185,13 +182,15 @@ def build_asgi_app() -> Any:
     Mount = _load_symbol("starlette.routing.Mount")
     CORSMiddleware = _load_symbol("starlette.middleware.cors.CORSMiddleware")
 
-    mcp_server = build_mcp_server()
+    mcp_server = build_mcp_server(profile=profile, repo_root=repo_root)
+    metadata = get_profile_metadata(profile)
 
     async def healthcheck(_request: Any) -> Any:
         return JSONResponse(
             {
                 "ok": True,
                 "app": "edge-chatgpt-app",
+                "profile": metadata["profile"],
                 "transport": "streamable-http",
                 "mcp_endpoint": "/mcp",
             }
@@ -223,7 +222,7 @@ def build_asgi_app() -> Any:
     )
 
 
-def serve_streamable_http(*, host: str = "127.0.0.1", port: int = 8000, path: str = "/mcp") -> None:
+def serve_streamable_http(*, host: str = "127.0.0.1", port: int = 8000, path: str = "/mcp", profile: str = "operator", repo_root: str | None = None) -> None:
     if path != "/mcp":
         raise ValueError("The current server scaffold expects path='/mcp'. Adjust build_asgi_app() before changing it.")
 
@@ -233,4 +232,4 @@ def serve_streamable_http(*, host: str = "127.0.0.1", port: int = 8000, path: st
         raise RuntimeError(
             "uvicorn is not installed. Install `mcp[cli]` or add `uvicorn` explicitly before running the Edge ChatGPT app server."
         )
-    uvicorn.run(build_asgi_app(), host=host, port=port)
+    uvicorn.run(build_asgi_app(profile=profile, repo_root=repo_root), host=host, port=port)

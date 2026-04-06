@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from project.apps.chatgpt.repo_only import REPO_TOOL_CATALOG
 from project.apps.chatgpt.resources import WIDGET_URI
 from project.apps.chatgpt.schemas import (
     CatalogListRunsInput,
@@ -346,8 +347,44 @@ TOOL_CATALOG: tuple[ToolDefinition, ...] = (
 )
 
 
-def get_tool_definition(name: str) -> ToolDefinition:
-    for tool in TOOL_CATALOG:
+def get_tool_definition(name: str, *, profile: str = "operator") -> ToolDefinition:
+    for tool in get_tool_catalog(profile):
         if tool.name == name:
             return tool
     raise KeyError(name)
+
+
+def get_tool_catalog(profile: str = "operator") -> tuple[ToolDefinition, ...]:
+    normalized = str(profile or "operator").strip().lower()
+    if normalized == "operator":
+        return TOOL_CATALOG
+    if normalized == "repo":
+        return REPO_TOOL_CATALOG
+    raise ValueError(f"Unknown ChatGPT app profile: {profile}")
+
+
+def get_profile_metadata(profile: str = "operator") -> dict[str, str]:
+    normalized = str(profile or "operator").strip().lower()
+    if normalized == "operator":
+        return {
+            "profile": "operator",
+            "app_name": "Edge Operator",
+            "version": "0.1.0",
+            "description": "ChatGPT app scaffolding for Edge operator workflows.",
+            "instructions": (
+                "Edge is a bounded crypto research operator surface. Use the proposal tools to inspect or issue bounded runs. "
+                "Prefer report tools for existing runs, and use the render tool only after a data tool has returned compact structured content."
+            ),
+        }
+    if normalized == "repo":
+        return {
+            "profile": "repo",
+            "app_name": "Edge Repository",
+            "version": "0.1.0",
+            "description": "Read-only repository inspection surface for ChatGPT.",
+            "instructions": (
+                "This profile exposes read-only repository inspection tools only. Use it to read files, inspect diffs, and search the repo root. "
+                "Do not assume mutation or workflow-issuing tools exist in this profile."
+            ),
+        }
+    raise ValueError(f"Unknown ChatGPT app profile: {profile}")
