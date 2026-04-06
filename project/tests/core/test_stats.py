@@ -56,7 +56,7 @@ class TestBHAdjustWithExplicitNTests:
         adj_smaller = core_stats.bh_adjust(p_vals, n_tests=1)
         assert adj_smaller[0] < adj_default[0], "Smaller n_tests should be less conservative"
         assert np.isclose(adj_smaller[0], 0.01)
-        assert np.isclose(adj_smaller[2], 0.013)
+        assert np.isclose(adj_smaller[2], 0.01333, atol=1e-5)
 
     def test_bh_adjust_empty_array(self):
         adj = core_stats.bh_adjust(np.array([]))
@@ -72,3 +72,10 @@ class TestBHAdjustWithExplicitNTests:
         adj_doubled = core_stats.bh_adjust(p_vals, n_tests=4)
         assert adj_doubled[0] > adj_default[0], "More tests should yield larger (more conservative) q-values"
         assert adj_doubled[1] > adj_default[1], "More tests should yield larger (more conservative) q-values"
+
+    def test_bh_adjust_monotonic_conservatism(self):
+        p_vals = np.array([0.01, 0.02, 0.03, 0.04, 0.05])
+        baseline = core_stats.bh_adjust(p_vals, n_tests=5)
+        larger = core_stats.bh_adjust(p_vals, n_tests=10)
+        for i in range(len(p_vals)):
+            assert larger[i] >= baseline[i], f"Larger n_tests must yield >= baseline at index {i}"

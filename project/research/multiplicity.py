@@ -256,6 +256,13 @@ def apply_cross_campaign_fdr(
     Apply BH correction across multiple campaigns/runs for a global FDR adjustment.
     Takes a list of dataframes, concatenates them, resolves the true p-value column,
     computes global test weights (accounting for two-sided tests), and adjusts.
+    
+    NOTE: This function is OPTIONAL/EXPERIMENTAL and NOT YET WIRED INTO THE CANONICAL
+    DISCOVERY WORKFLOW. It is provided as infrastructure for cross-run/cross-campaign
+    FDR correction at researcher discretion. To use, call this function explicitly
+    on a list of candidate dataframes from multiple campaigns before final selection.
+    
+    See docs/92_assurance_and_benchmarks.md for status.
     """
     if not dataframes:
         return pd.DataFrame()

@@ -34,6 +34,7 @@ from project.live.oms import (
 from project.live.order_planner import build_order_plan
 from project.live.risk import RiskEnforcer, RuntimeRiskCaps
 from project.live.state import LiveStateStore
+from project.live.thesis_reconciliation import reconcile_thesis_batch
 from project.live.thesis_state import ThesisStateManager
 from project.live.thesis_store import ThesisStore
 from project.portfolio.incubation import IncubationLedger
@@ -185,6 +186,11 @@ class LiveEngineRunner:
 
         # Workstream 1: Deploy admission control
         self._thesis_store = self._load_thesis_store()
+        
+        # P0: Thesis-batch reconciliation on startup
+        if self._thesis_store and self.reconcile_at_startup:
+            self._reconcile_thesis_batch()
+        
         self._register_theses_in_manager()
         # B3: Inject per-thesis decay rules calibrated from evidence at startup.
         # These supplement (not replace) operator-provided rules.
@@ -528,6 +534,59 @@ class LiveEngineRunner:
             _LOG.warning("Configured thesis store is unavailable for live runtime.")
             return None
         return None
+
+    def _reconcile_thesis_batch(self) -> None:
+        """P0: Reconcile current thesis batch against previous batch on startup.
+        
+        Detects added/removed/superseded/downgraded theses and enforces
+        fail-safe rules before live trading can proceed.
+        """
+        if not self._thesis_store:
+            return
+        
+        persist_dir = Path(self.strategy_runtime.get("persist_dir", "live/persist"))
+        audit_log_path = persist_dir / "thesis_reconciliation.json"
+        thesis_manager_state = {
+            thesis_id: state.state
+            for thesis_id, state in self.thesis_manager.states.items()
+        }
+        
+        try:
+            result = reconcile_thesis_batch(
+                current_store=self._thesis_store,
+                persist_dir=persist_dir,
+                thesis_manager_state=thesis_manager_state,
+                audit_log_path=audit_log_path,
+            )
+            
+            if not result.safe_to_proceed:
+                _LOG.error(
+                    "Thesis batch reconciliation failed with %d safety violations. "
+                    "Live trading is BLOCKED. Violations: %s",
+                    len(result.blocked_reasons),
+                    "; ".join(result.blocked_reasons),
+                )
+                # Record unsafe state for operator review
+                self.state_store.set_kill_switch_snapshot({
+                    "is_active": True,
+                    "reason": "thesis_batch_reconciliation_failure",
+                    "triggered_at": datetime.now(timezone.utc).isoformat(),
+                    "message": f"Batch reconciliation blocked: {'; '.join(result.blocked_reasons)}",
+                })
+            else:
+                _LOG.info(
+                    "Thesis batch reconciliation succeeded: %d added, %d unchanged, "
+                    "%d removed, %d superseded, %d downgraded",
+                    len(result.diff.added),
+                    len(result.diff.unchanged),
+                    len(result.diff.removed),
+                    len(result.diff.superseded),
+                    len(result.diff.downgraded),
+                )
+        except Exception as exc:
+            _LOG.exception("Thesis batch reconciliation failed with unexpected error: %s", exc)
+            if bool(self.strategy_runtime.get("implemented", False)):
+                raise RuntimeError("Thesis batch reconciliation is required for live trading") from exc
 
     def _strategy_runtime_enabled(self) -> bool:
         return (

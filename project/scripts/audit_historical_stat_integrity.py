@@ -5,6 +5,19 @@ This script is READ-ONLY. It scans Parquet files and reports issues without modi
 any artifacts. Labels runs that may have been affected by legacy p-value behavior, 
 missing multiplicity fields, or non-split-aware gate calculations.
 
+SCOPE: This is a FIRST-PASS AUDIT TOOL, NOT A FULL VERIFIER. It uses heuristics to:
+  - Detect missing multiplicity fields
+  - Flag legacy p-value column usage
+  - Identify missing split sample counts
+
+It does NOT verify:
+  - Correct DSR n_trials calculations
+  - Proper BH/FDR adjustment methodology
+  - Cross-campaign multiplicity handling
+
+Output distinguishes "flagged for review" from confirmed contamination.
+See docs/92_assurance_and_benchmarks.md for audit status and follow-up actions.
+
 Typical usage:
     python -m project.scripts.audit_historical_stat_integrity --dir data/reports
 """
