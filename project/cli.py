@@ -311,6 +311,13 @@ def _build_parser() -> argparse.ArgumentParser:
     catalog_compare.add_argument("--stage", required=True, choices=["discover", "validate", "promote"])
     catalog_compare.add_argument("--data_root", default=None)
 
+    catalog_audit = catalog_sub.add_parser("audit-artifacts", help="Scan historical artifacts for audit inventory.")
+    catalog_audit.add_argument("--run_id", default=None, help="Filter to specific run ID")
+    catalog_audit.add_argument("--since", default=None, help="ISO timestamp to filter artifacts since")
+    catalog_audit.add_argument("--data_root", default=None)
+    catalog_audit.add_argument("--emit_inventory", type=int, default=1, help="Write inventory outputs (parquet/json/md)")
+    catalog_audit.add_argument("--rewrite_stamps", type=int, default=0, help="Write sidecar audit stamps (non-destructive)")
+
     subparsers.required = True
     return parser
 
@@ -762,6 +769,33 @@ def main() -> int:
                 args.run_id_a, args.run_id_b, stage=args.stage, data_root=data_root
             )
             print(json.dumps(diff, indent=2, sort_keys=True))
+            return 0
+        if args.subcommand == "audit-artifacts":
+            from project.research.audit_historical_artifacts import (
+                scan_historical_artifacts,
+                write_audit_inventory,
+            )
+            result = scan_historical_artifacts(
+                data_root=data_root,
+                run_id=args.run_id,
+                since=args.since,
+            )
+            print(f"Scanned {len(result.scanned_artifact_paths)} artifacts")
+            print(f"Total rows: {len(result.rows)}")
+            print(f"Stat regimes: {dict(result.stat_regime_counts)}")
+            print(f"Audit statuses: {dict(result.audit_status_counts)}")
+            print(f"Requires repromotion: {result.requires_repromotion_count}")
+            print(f"Requires manual review: {result.requires_manual_review_count}")
+            if bool(args.emit_inventory) and result.rows:
+                output_dir = (data_root or Path("data")) / "reports" / "audit"
+                paths = write_audit_inventory(result, output_dir)
+                print(f"Inventory written:")
+                for name, path in paths.items():
+                    print(f"  - {name}: {path}")
+            if result.errors:
+                print(f"Errors: {len(result.errors)}")
+                for err in result.errors[:5]:
+                    print(f"  - {err}")
             return 0
 
     parser.print_help()

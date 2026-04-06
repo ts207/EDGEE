@@ -331,32 +331,6 @@ def apply_canonical_cross_campaign_multiplicity(
         - docs/92_assurance_and_benchmarks.md for status
         - project/research/contracts/multiplicity_scope.py for contract
     """
-    Canonical cross-campaign / campaign-lineage multiplicity adjustment.
-    
-    This is the standard API for scope-level FDR correction in promotions.
-    It adds scope-aware multiplicity fields alongside existing family-level fields.
-    
-    Inputs:
-        - frame: DataFrame with at least run_id, p_value columns
-        - max_q: FDR threshold
-        - scope_mode: "run", "campaign", "program", "campaign_lineage"
-        - eligible_col: column indicating multiplicity eligibility
-        - p_col_candidate: column name for p-value
-        - scope_version: version string for this contract
-    
-    Outputs (added to frame):
-        - num_tests_scope
-        - q_value_scope
-        - is_discovery_scope
-        - effective_q_value (max of q_value, q_value_scope)
-        - multiplicity_scope_mode
-        - multiplicity_scope_key
-        - multiplicity_scope_version
-        - multiplicity_scope_degraded (if historical data missing)
-    
-    Phase 1 invariant:
-        No promoted candidate may lack effective_q_value.
-    """
     from project.research.contracts.multiplicity_scope import resolve_effective_scope_key
     
     if frame.empty:

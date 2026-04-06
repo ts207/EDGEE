@@ -27,6 +27,13 @@ from project.research.validation.evidence_bundle import (
     serialize_evidence_bundles,
     validate_evidence_bundle,
 )
+from project.research.contracts.stat_regime import (
+    STAT_REGIME_POST_AUDIT,
+    AUDIT_STATUS_CURRENT,
+    AUDIT_STATUS_DEGRADED,
+    ARTIFACT_AUDIT_VERSION_PHASE1_V1,
+    default_audit_stamp,
+)
 from project.specs.gates import load_gates_spec as _load_gates_spec
 from project.specs.manifest import finalize_manifest, load_run_manifest, start_manifest
 from project.specs.objective import resolve_objective_profile_contract
@@ -312,6 +319,26 @@ def _annotate_promotion_audit_decisions(audit_df: pd.DataFrame) -> pd.DataFrame:
             }
         )
     return pd.DataFrame(rows)
+
+
+def _apply_artifact_audit_stamp(df: pd.DataFrame) -> pd.DataFrame:
+    if df.empty:
+        out = df.copy()
+        out["stat_regime"] = pd.Series(dtype="object")
+        out["audit_status"] = pd.Series(dtype="object")
+        out["artifact_audit_version"] = pd.Series(dtype="object")
+        return out
+    out = df.copy()
+    multiplicity_degraded = out.get("multiplicity_scope_degraded", pd.Series(False, index=out.index))
+    if not isinstance(multiplicity_degraded, pd.Series):
+        multiplicity_degraded = pd.Series(multiplicity_degraded, index=out.index)
+    audit_status = multiplicity_degraded.astype(bool).apply(
+        lambda x: AUDIT_STATUS_DEGRADED if x else AUDIT_STATUS_CURRENT
+    )
+    out["stat_regime"] = STAT_REGIME_POST_AUDIT
+    out["audit_status"] = audit_status
+    out["artifact_audit_version"] = ARTIFACT_AUDIT_VERSION_PHASE1_V1
+    return out
 
 
 def _build_promotion_decision_diagnostics(audit_df: pd.DataFrame) -> Dict[str, Any]:
@@ -1045,6 +1072,7 @@ def execute_promotion(config: PromotionConfig) -> PromotionServiceResult:
         audit_statistical_df["promotion_profile"] = resolved_policy.promotion_profile
         audit_statistical_df["confirmatory_rerun_run_id"] = confirmatory_rerun_run_id
         audit_df = _annotate_promotion_audit_decisions(audit_statistical_df.copy())
+        audit_df = _apply_artifact_audit_stamp(audit_df)
         audit_df = annotate_regime_metadata(audit_df)
         diagnostics["decision_summary"] = _build_promotion_decision_diagnostics(audit_df)
         promoted_df = stabilize_promoted_output_schema(

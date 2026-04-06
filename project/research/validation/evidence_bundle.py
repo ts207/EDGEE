@@ -598,6 +598,7 @@ def bundle_to_flat_record(bundle: Dict[str, Any]) -> Dict[str, Any]:
     uncertainty = bundle.get("uncertainty_estimates", {})
     decision = bundle.get("promotion_decision", {})
     meta = bundle.get("metadata", {})
+    search_burden = bundle.get("search_burden", {}) or {}
     return {
         "candidate_id": bundle.get("candidate_id", ""),
         "event_type": bundle.get("event_type", ""),
@@ -648,14 +649,14 @@ def bundle_to_flat_record(bundle: Dict[str, Any]) -> Dict[str, Any]:
         "rejection_reasons": "|".join(map(str, decision.get("rejection_reasons", []))),
         "policy_version": bundle.get("policy_version", ""),
         "bundle_version": bundle.get("bundle_version", ""),
-        "search_proposals_attempted": safe_int(bundle.get("search_proposals_attempted", 0), 0),
-        "search_candidates_generated": safe_int(bundle.get("search_candidates_generated", 0), 0),
-        "search_candidates_eligible": safe_int(bundle.get("search_candidates_eligible", 0), 0),
-        "search_mutations_attempted": safe_int(bundle.get("search_mutations_attempted", 0), 0),
-        "search_family_count": safe_int(bundle.get("search_family_count", 0), 0),
-        "search_lineage_count": safe_int(bundle.get("search_lineage_count", 0), 0),
-        "search_burden_estimated": bool(as_bool(bundle.get("search_burden_estimated", False))),
-        "search_scope_version": str(bundle.get("search_scope_version", "phase1_v1")),
+        "search_proposals_attempted": safe_int(search_burden.get("search_proposals_attempted", 0), 0),
+        "search_candidates_generated": safe_int(search_burden.get("search_candidates_generated", 0), 0),
+        "search_candidates_eligible": safe_int(search_burden.get("search_candidates_eligible", 0), 0),
+        "search_mutations_attempted": safe_int(search_burden.get("search_mutations_attempted", 0), 0),
+        "search_family_count": safe_int(search_burden.get("search_family_count", 0), 0),
+        "search_lineage_count": safe_int(search_burden.get("search_lineage_count", 0), 0),
+        "search_burden_estimated": bool(as_bool(search_burden.get("search_burden_estimated", False))),
+        "search_scope_version": str(search_burden.get("search_scope_version", "phase1_v1")),
     }
 
 
