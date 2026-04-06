@@ -93,17 +93,41 @@ def promote_candidates(
     enforce_baseline_beats_complexity: bool,
     enforce_placebo_controls: bool,
     enforce_timeframe_consensus: bool,
+    multiplicity_scope_mode: str = "campaign_lineage",
+    require_scope_level_multiplicity: bool = True,
+    allow_multiplicity_scope_degraded: bool = True,
+    use_effective_q_value: bool = True,
 ) -> tuple[pd.DataFrame, pd.DataFrame, dict[str, Any]]:
     from project.eval.multiplicity import (
         apply_program_multiplicity_control,
         formalize_ids,
         update_program_hypothesis_log,
     )
+    from project.research.multiplicity import apply_canonical_cross_campaign_multiplicity
 
     df = formalize_ids(candidates_df)
     program_id = str(promotion_spec.get("program_id", "default_program")).strip()
     data_root = _current_data_root()
     update_program_hypothesis_log(program_id, data_root, df)
+    
+    # Phase 1: Apply canonical cross-campaign multiplicity
+    scope_version = promotion_spec.get("artifact_audit_version", "phase1_v1")
+    df = apply_canonical_cross_campaign_multiplicity(
+        df,
+        max_q=max_q_value,
+        scope_mode=multiplicity_scope_mode,
+        scope_version=scope_version,
+    )
+    
+    # Record scope diagnostics
+    multiplicity_scope_diagnostics = {
+        "scope_mode": multiplicity_scope_mode,
+        "scope_version": scope_version,
+        "num_tests_scope_avg": float(df["num_tests_scope"].mean()) if "num_tests_scope" in df.columns else 0.0,
+        "effective_q_value_avg": float(df["effective_q_value"].mean()) if "effective_q_value" in df.columns else 0.0,
+        "scope_degraded_count": int(df.get("multiplicity_scope_degraded", pd.Series([False])).sum()) if not df.empty else 0,
+    }
+    
     df = apply_program_multiplicity_control(df, program_id, data_root, alpha=max_q_value)
 
     audit_rows, promoted_rows = [], []

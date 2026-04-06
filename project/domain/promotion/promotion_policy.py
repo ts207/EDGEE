@@ -25,6 +25,11 @@ class PromotionPolicy:
     enforce_regime_stability: bool = True
     policy_version: str = "phase4_pr5_v1"
     bundle_version: str = "phase4_bundle_v1"
+    multiplicity_scope_mode: str = "campaign_lineage"
+    require_scope_level_multiplicity: bool = True
+    allow_multiplicity_scope_degraded: bool = True
+    artifact_audit_version: str = "phase1_v1"
+    use_effective_q_value: bool = True
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)

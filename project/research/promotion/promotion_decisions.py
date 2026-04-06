@@ -126,10 +126,28 @@ def evaluate_row(
 
         q_value_available = bool(np.isfinite(q_value))
         program_q_value_available = bool(np.isfinite(q_value_program))
-        effective_q_value = max(q_value, q_value_program) if program_q_value_available else q_value
+        q_value_scope = coerce_numeric_nan(row.get("q_value_scope"))
+        scope_q_value_available = bool(np.isfinite(q_value_scope))
+        
+        scope_level_multiplicity_pass = True
+        multiplicity_scope_degraded = as_bool(row.get("multiplicity_scope_degraded", False))
+        use_effective_q = as_bool(row.get("use_effective_q_value", True))
+        
+        values_for_effective_q = [v for v in [q_value, q_value_program, q_value_scope] if np.isfinite(v)]
+        if values_for_effective_q:
+            effective_q_value = max(values_for_effective_q)
+        else:
+            effective_q_value = q_value
+        
+        if use_effective_q:
+            effective_q_value_for_check = effective_q_value
+        else:
+            effective_q_value_for_check = q_value if q_value_available else effective_q_value
+        
         statistical_pass = (
-            q_value_available and finite_le(effective_q_value, max_q_value) and (n_events >= int(min_events))
+            q_value_available and finite_le(effective_q_value_for_check, max_q_value) and (n_events >= int(min_events))
         )
+        
         if not statistical_pass:
             if not q_value_available:
                 reasons.add_pair(
@@ -143,11 +161,35 @@ def evaluate_row(
                     promo_fail_reason="gate_promo_statistical_program_q_value",
                     category="statistical_significance",
                 )
+            elif scope_q_value_available and not finite_le(q_value_scope, max_q_value):
+                reasons.add_pair(
+                    reject_reason="statistical_scope_q_value",
+                    promo_fail_reason="gate_promo_multiplicity_scope",
+                    category="statistical_significance",
+                )
             reasons.add_pair(
                 reject_reason="statistical_significance",
                 promo_fail_reason="gate_promo_statistical",
                 category="statistical_significance",
             )
+        
+        require_scope_multiplicity = as_bool(row.get("require_scope_level_multiplicity", True))
+        allow_degraded = as_bool(row.get("allow_multiplicity_scope_degraded", True))
+        
+        if require_scope_multiplicity and not scope_q_value_available and not multiplicity_scope_degraded:
+            reasons.add_pair(
+                reject_reason="multiplicity_scope_missing",
+                promo_fail_reason="gate_promo_multiplicity_scope",
+                category="multiplicity_scope",
+            )
+            scope_level_multiplicity_pass = False
+        elif require_scope_multiplicity and multiplicity_scope_degraded and not allow_degraded:
+            reasons.add_pair(
+                reject_reason="multiplicity_scope_degraded_not_allowed",
+                promo_fail_reason="gate_promo_multiplicity_scope",
+                category="multiplicity_scope",
+            )
+            scope_level_multiplicity_pass = False
 
         market_eval = _evaluate_market_execution_and_stability(
             row=row,
