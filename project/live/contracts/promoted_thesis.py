@@ -111,6 +111,12 @@ class ThesisLineage(BaseModel):
     validation_reason_codes: List[str] = Field(default_factory=list)
     validation_artifact_paths: Dict[str, str] = Field(default_factory=dict)
 
+    # Batch Identity Fields
+    export_batch_id: str = ""
+    export_generated_at: str = ""
+    source_run_id: str = ""
+    thesis_version: str = "1.0.0"
+
 
 class ThesisGovernance(BaseModel):
     model_config = ConfigDict(frozen=True)

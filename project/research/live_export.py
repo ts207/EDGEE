@@ -741,6 +741,10 @@ def _build_thesis(
     if deploy_state not in {"monitor_only", "paper_only", "live_enabled", "retired"}:
         deploy_state = "paper_only"
 
+    # Compute batch timestamp once for consistency
+    generated_at = _utc_now()
+    batch_id = f"batch::{run_id}::{generated_at}"
+
     thesis = PromotedThesis(
         thesis_id=f"thesis::{run_id}::{candidate_id}",
         promotion_class=promo_class,
@@ -800,6 +804,11 @@ def _build_thesis(
             validation_status=validation_status,
             validation_reason_codes=validation_reasons,
             validation_artifact_paths=validation_artifacts,
+            # Batch Identity
+            export_batch_id=batch_id,
+            export_generated_at=generated_at,
+            source_run_id=run_id,
+            thesis_version="1.0.0",
         ),
         governance=ThesisGovernance(
             readiness_status=str(promoted_row.get("readiness_status", "")),
