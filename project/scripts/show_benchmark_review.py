@@ -95,19 +95,47 @@ def main():
         return 1
         
     with open(summary_path, "r", encoding="utf-8") as f:
-        summaries = json.load(f)
+        summary_data = json.load(f)
         
     print(f"=== Benchmark Review: {run_dir.name} ===")
     
-    # Process summaries
-    for s in summaries:
-        print(f"\nSlice: {s.get('slice_id')} | Mode: {s.get('mode_name')}")
-        status = "PASS" if s.get("benchmark_pass") else "FAIL"
-        print(f"  Status: {status}")
-        if s.get("failed_thresholds"):
-            print(f"  Failed: {', '.join(s.get('failed_thresholds', []))}")
-        print(f"  Expectancy BPS: {s.get('top_n_median_after_cost_expectancy_bps', 0):.2f} (Delta: {s.get('delta_after_cost_expectancy_vs_baseline', 0):.2f})")
-        print(f"  Fold Sign Consistency: {s.get('top_n_median_fold_sign_consistency', 0):.2f}")
+    # Process summaries - handle both legacy and new schemas
+    slices = summary_data.get("slices", [])
+    if not slices:
+        # Legacy schema: single summary object
+        if "run_id" in summary_data or "slice_id" in summary_data:
+            slices = [summary_data]
+        else:
+            print("No valid summary data found.")
+            return 1
+    
+    for s in slices:
+        slice_id = s.get("run_id") or s.get("slice_id") or "unknown"
+        status = s.get("status") or ("PASS" if s.get("benchmark_pass") else "FAIL")
+        print(f"\nSlice: {slice_id} | Status: {status}")
+        
+        # Show key metrics if available
+        expectancy = s.get("top_n_median_after_cost_expectancy_bps")
+        delta = s.get("delta_after_cost_expectancy_vs_baseline")
+        fold_consistency = s.get("top_n_median_fold_sign_consistency")
+        
+        if expectancy is not None:
+            print(f"  Expectancy BPS: {expectancy:.2f}")
+        if delta is not None:
+            print(f"  Delta vs Baseline: {delta:.2f}")
+        if fold_consistency is not None:
+            print(f"  Fold Sign Consistency: {fold_consistency:.2f}")
+        
+        # Show failed thresholds if any
+        failed = s.get("failed_thresholds") or s.get("failed_checks") or []
+        if failed:
+            print(f"  Failed: {', '.join(str(f) for f in failed)}")
+        
+        # Show pass/fail gate status
+        benchmark_pass = s.get("benchmark_pass")
+        if benchmark_pass is not None:
+            gate_status = "PASS" if benchmark_pass else "FAIL"
+            print(f"  Gate: {gate_status}")
         
 if __name__ == "__main__":
     main()
