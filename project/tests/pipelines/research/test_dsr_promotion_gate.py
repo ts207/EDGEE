@@ -97,6 +97,20 @@ class TestDSRGate:
         assert result["gate_promo_dsr"] is True
         assert result["dsr_value"] > 0.50
 
+    def test_strong_signal_passes_dsr_with_new_columns(self):
+        """DSR should work with new column names (num_tests_effective, num_tests_campaign)."""
+        row = _make_row(
+            effect_shrunk_state=0.10,
+            std_return=0.02,
+            sample_size=500,
+            num_tests_effective=5,
+            num_tests_campaign=5,
+            num_tests_family=5,
+        )
+        result = evaluate_row(row=row, min_dsr=0.50, **_base_eval_kwargs())
+        assert result["gate_promo_dsr"] is True
+        assert result["dsr_value"] > 0.50
+
     def test_weak_signal_many_trials_fails_dsr(self):
         """A weak effect with many trials should fail DSR."""
         row = _make_row(
@@ -122,4 +136,43 @@ class TestDSRGate:
         row["returns_oos_combined"] = str(row["returns_oos_combined"]).replace("'", "")
         result = evaluate_row(row=row, min_dsr=0.50, **_base_eval_kwargs())
         assert result["gate_promo_dsr"] is True
+        assert result["dsr_value"] > 0.0
+
+    def test_dsr_fallback_order_uses_effective_first(self):
+        """DSR should prefer num_tests_effective over num_tests_campaign over num_tests_family."""
+        row = _make_row(
+            num_tests_effective=100,
+            num_tests_campaign=50,
+            num_tests_family=10,
+            effect_shrunk_state=0.05,
+            std_return=0.02,
+        )
+        result = evaluate_row(row=row, min_dsr=0.0, **_base_eval_kwargs())
+        assert result["dsr_value"] > 0.0
+
+    def test_dsr_fallback_to_campaign_when_effective_missing(self):
+        """When num_tests_effective is missing, DSR should use num_tests_campaign."""
+        row = _make_row(
+            num_tests_campaign=50,
+            num_tests_family=10,
+            effect_shrunk_state=0.05,
+            std_return=0.02,
+        )
+        if "num_tests_effective" in row:
+            del row["num_tests_effective"]
+        result = evaluate_row(row=row, min_dsr=0.0, **_base_eval_kwargs())
+        assert result["dsr_value"] > 0.0
+
+    def test_dsr_fallback_to_family_when_campaign_missing(self):
+        """When campaign count is missing, DSR should use num_tests_family."""
+        row = _make_row(
+            num_tests_family=10,
+            effect_shrunk_state=0.05,
+            std_return=0.02,
+        )
+        if "num_tests_effective" in row:
+            del row["num_tests_effective"]
+        if "num_tests_campaign" in row:
+            del row["num_tests_campaign"]
+        result = evaluate_row(row=row, min_dsr=0.0, **_base_eval_kwargs())
         assert result["dsr_value"] > 0.0

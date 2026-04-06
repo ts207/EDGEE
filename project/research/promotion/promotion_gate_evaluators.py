@@ -394,19 +394,28 @@ def _evaluate_control_audit_and_dsr(
     dsr_pass = True
     if float(min_dsr) > 0.0:
         returns_oos = _parse_returns_oos(row.get("returns_oos_combined"))
-        raw_n_trials = _quiet_int(row.get("num_tests_event_family", 0), 0)
+        # Fallback order for DSR trials: broader effective multiplicity count
+        raw_n_trials = 0
+        used_col = "none"
+        for col in ["num_tests_effective", "num_tests_campaign", "num_tests_family"]:
+            val = _quiet_int(row.get(col, 0), 0)
+            if val >= 1:
+                raw_n_trials = val
+                used_col = col
+                break
+
         if raw_n_trials < 1:
-            # num_tests_event_family is 0 — multiplicity layer has not populated this
-            # column yet (e.g. single-candidate research run, or pre-multiplicity eval).
-            # Falling back to n_trials=1 means DSR == PSR, which *underestimates* the
-            # selection penalty.  Log a WARNING so the analyst knows DSR is not deflated.
+            # No multiplicity columns found - fallback to 1 (PSR equivalence)
             log.warning(
-                "_evaluate_control_audit_and_dsr: num_tests_event_family=0 for candidate."
-                " DSR will use n_trials=1 (PSR equivalence). If this run tested multiple"
-                " hypotheses in the same event family, the true DSR is lower than reported."
-                " Populate num_tests_event_family via apply_multiplicity_controls() before"
-                " calling the promotion gate to get a correctly deflated DSR."
+                "_evaluate_control_audit_and_dsr: No multiplicity test-count columns found (effective, campaign, family)."
+                " DSR will use n_trials=1 (PSR equivalence). Selection penalty will be underestimated."
             )
+        else:
+            log.info(
+                "_evaluate_control_audit_and_dsr: DSR using n_trials=%d from '%s'",
+                raw_n_trials, used_col
+            )
+        
         n_trials = max(1, raw_n_trials)
         if len(returns_oos) >= 10:
             dsr_value = float(_deflated_sharpe_ratio(pd.Series(returns_oos), n_trials=n_trials))

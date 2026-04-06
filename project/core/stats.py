@@ -524,20 +524,21 @@ def newey_west_t_stat_for_mean(
     return NeweyWestMeanResult(t_stat=t_stat, se=float(se), mean=mean, n=n, max_lag=max_lag)
 
 
-def bh_adjust(p_values: np.ndarray) -> np.ndarray:
+def bh_adjust(p_values: np.ndarray, n_tests: int | None = None) -> np.ndarray:
     """
     Benjamini-Hochberg FDR adjustment. Returns adjusted p-values clipped to [0, 1].
     Canonical implementation.
     """
     arr = np.asarray(p_values, dtype=float)
-    n = len(arr)
-    if n == 0:
+    m = len(arr)
+    n = n_tests if n_tests is not None else m
+    if m == 0:
         return arr
     idx = np.argsort(arr)
     sorted_p = arr[idx]
-    adj = np.zeros(n)
+    adj = np.zeros(m)
     min_p = 1.0
-    for i in range(n - 1, -1, -1):
+    for i in range(m - 1, -1, -1):
         q = sorted_p[i] * n / (i + 1)
         min_p = min(min_p, q)
         adj[idx[i]] = min_p

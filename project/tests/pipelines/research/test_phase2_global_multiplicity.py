@@ -36,8 +36,9 @@ def test_hierarchical_fdr_simes_and_within_family_bh():
     assert bool(noise["is_discovery"]) is False
     assert bool(strong["gate_multiplicity"]) is True
     assert bool(strong["gate_multiplicity_strict"]) is True
-    assert int(strong["num_tests_primary_event_id"]) == 2
-    assert int(strong["num_tests_event_family"]) == 2
+    assert int(strong["num_tests_family"]) == 2
+    assert int(strong["num_tests_effective"]) == 2
+    assert int(strong["num_tests_campaign"]) == 10
 
 
 def test_apply_multiplicity_controls_research_excludes_low_sample_rows():
@@ -69,8 +70,8 @@ def test_apply_multiplicity_controls_research_excludes_low_sample_rows():
     assert bool(eligible["is_discovery"]) is True
     assert bool(low["multiplicity_pool_eligible"]) is False
     assert bool(eligible["multiplicity_pool_eligible"]) is True
-    assert int(eligible["num_tests_primary_event_id"]) == 1
-    assert int(eligible["num_tests_event_family"]) == 1
+    assert int(eligible["num_tests_family"]) == 1
+    assert int(eligible["num_tests_effective"]) == 1
 
 
 def test_apply_multiplicity_controls_falls_back_to_raw_p_value_column() -> None:
@@ -85,3 +86,33 @@ def test_apply_multiplicity_controls_falls_back_to_raw_p_value_column() -> None:
 
     assert "q_value" in out.columns
     assert float(out.loc[out["candidate_id"] == "cand_1", "q_value"].iloc[0]) <= 0.05
+
+
+def test_side_policy_both_counts_as_two_effective_tests():
+    rows = [
+        {"candidate_id": "long_a", "family_id": "fam_a", "p_value": 0.01, "side_policy": "long"},
+        {"candidate_id": "short_a", "family_id": "fam_a", "p_value": 0.02, "side_policy": "short"},
+        {"candidate_id": "both_a", "family_id": "fam_a", "p_value": 0.03, "side_policy": "both"},
+    ]
+    raw_df = pd.DataFrame(rows)
+    out = apply_multiplicity_controls(raw_df=raw_df, max_q=0.05)
+
+    fam_a_rows = out[out["family_id"] == "fam_a"]
+    assert int(fam_a_rows.iloc[0]["num_tests_family"]) == 3
+    assert int(fam_a_rows.iloc[0]["num_tests_effective"]) == 4
+    assert int(fam_a_rows.iloc[0]["num_tests_campaign"]) == 4
+
+
+def test_backward_compatibility_aliases():
+    rows = [{"candidate_id": "test_1", "family_id": "fam_x", "p_value": 0.01}]
+    raw_df = pd.DataFrame(rows)
+    out = apply_multiplicity_controls(raw_df=raw_df, max_q=0.05)
+
+    row = out.iloc[0]
+    assert "num_tests_family" in out.columns
+    assert "num_tests_effective" in out.columns
+    assert "num_tests_campaign" in out.columns
+    assert "num_tests_primary_event_id" in out.columns
+    assert "num_tests_event_family" in out.columns
+    assert int(row["num_tests_primary_event_id"]) == int(row["num_tests_family"])
+    assert int(row["num_tests_event_family"]) == int(row["num_tests_family"])

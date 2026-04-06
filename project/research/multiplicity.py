@@ -75,30 +75,32 @@ def resolve_state_context_column(columns: pd.Index, state_id: Optional[str]) -> 
     return None
 
 
-def simes_p_value(p_vals: pd.Series) -> float:
+def simes_p_value(p_vals: pd.Series, n_tests: int | None = None) -> float:
     p = p_vals.dropna().sort_values()
     m = len(p)
-    if m == 0:
+    n = n_tests if n_tests is not None else m
+    if n == 0 or m == 0:
         return 1.0
-    return float((p * m / np.arange(1, m + 1)).min())
+    return float((p * n / np.arange(1, m + 1)).min())
 
 
-def by_adjust(p_values: np.ndarray) -> np.ndarray:
+def by_adjust(p_values: np.ndarray, n_tests: int | None = None) -> np.ndarray:
     """Benjamini-Yekutieli FDR adjustment."""
     if len(p_values) == 0:
         return p_values
-    n = len(p_values)
+    m = len(p_values)
+    n = n_tests if n_tests is not None else m
     idx = np.argsort(p_values)
     sorted_p = np.asarray(p_values, dtype=float)[idx]
     harmonic = float(np.sum(1.0 / np.arange(1, n + 1)))
-    adj = np.zeros(n, dtype=float)
+    adj = np.zeros(m, dtype=float)
     min_p = 1.0
-    for i in range(n - 1, -1, -1):
+    for i in range(m - 1, -1, -1):
         q = sorted_p[i] * n * harmonic / float(i + 1)
         min_p = min(min_p, q)
         adj[i] = min_p
-    rev_idx = np.zeros(n, dtype=int)
-    rev_idx[idx] = np.arange(n)
+    rev_idx = np.zeros(m, dtype=int)
+    rev_idx[idx] = np.arange(m)
     return np.clip(adj[rev_idx], 0.0, 1.0)
 
 
@@ -136,8 +138,9 @@ def apply_multiplicity_controls(
     ]:
         out[col] = False
     out["family_cluster_id"] = ""
-    out["num_tests_primary_event_id"] = 0
-    out["num_tests_event_family"] = 0
+    out["num_tests_family"] = 0
+    out["num_tests_campaign"] = 0
+    out["num_tests_effective"] = 0
 
     eligible_mask = pd.Series(True, index=out.index)
     if mode == "research" and min_sample_size > 0:
@@ -150,26 +153,33 @@ def apply_multiplicity_controls(
 
     p_col = _resolve_multiplicity_p_value_column(eligible)
 
-    # 1. Family Simes p-values
-    family_simes = (
-        eligible.groupby("family_id")[p_col]
-        .apply(simes_p_value)
-        .rename("p_value_family")
-        .reset_index()
-    )
-    family_simes["q_value_family"] = bh_adjust(family_simes["p_value_family"].values)
-    family_simes["is_discovery_family"] = family_simes["q_value_family"] <= float(max_q)
+    test_weights = pd.Series(1, index=out.index)
+    if "side_policy" in out.columns:
+        test_weights[out["side_policy"].astype(str).str.lower() == "both"] = 2
 
-    # Map family metrics back to out
-    for col in ["p_value_family", "q_value_family", "is_discovery_family"]:
-        mapping = dict(zip(family_simes["family_id"], family_simes[col]))
-        out[col] = out["family_id"].map(mapping)
+    # 1. Family Simes p-values
+    family_simes_list = []
+    for fid, group in eligible.groupby("family_id"):
+        n_family_tests = test_weights.loc[group.index].sum()
+        p_val = simes_p_value(group[p_col], n_tests=int(n_family_tests))
+        family_simes_list.append({"family_id": fid, "p_value_family": p_val})
+    
+    if family_simes_list:
+        family_simes = pd.DataFrame(family_simes_list)
+        family_simes["q_value_family"] = bh_adjust(family_simes["p_value_family"].values)
+        family_simes["is_discovery_family"] = family_simes["q_value_family"] <= float(max_q)
+
+        # Map family metrics back to out
+        for col in ["p_value_family", "q_value_family", "is_discovery_family"]:
+            mapping = dict(zip(family_simes["family_id"], family_simes[col]))
+            out[col] = out["family_id"].map(mapping)
 
     # 2. Within-family BH for rows in discovered families
     out["q_value"] = 1.0
     for fid, group in out[out["multiplicity_pool_eligible"]].groupby("family_id"):
         if group["is_discovery_family"].any():
-            qvals = bh_adjust(group[p_col].fillna(1.0).to_numpy())
+            n_family_tests = int(test_weights.loc[group.index].sum())
+            qvals = bh_adjust(group[p_col].fillna(1.0).to_numpy(), n_tests=n_family_tests)
             out.loc[group.index, "q_value"] = qvals
 
     out["is_discovery"] = out["is_discovery_family"].astype("boolean").fillna(False).astype(
@@ -178,10 +188,12 @@ def apply_multiplicity_controls(
 
     # 3. BY Adjustment (Optional Diagnostic)
     if enable_by_diagnostic:
-        p_vals_all = out.loc[out["multiplicity_pool_eligible"], p_col].fillna(1.0).to_numpy()
+        eligible_idx = out["multiplicity_pool_eligible"]
+        p_vals_all = out.loc[eligible_idx, p_col].fillna(1.0).to_numpy()
+        n_total_tests = int(test_weights.loc[eligible_idx].sum())
         if len(p_vals_all) > 0:
-            q_by = by_adjust(p_vals_all)
-            out.loc[out["multiplicity_pool_eligible"], "q_value_by"] = q_by
+            q_by = by_adjust(p_vals_all, n_tests=n_total_tests)
+            out.loc[eligible_idx, "q_value_by"] = q_by
             out["is_discovery_by"] = out["q_value_by"] <= float(max_q)
 
     # 4. Cluster Logic
@@ -199,31 +211,77 @@ def apply_multiplicity_controls(
     out["family_cluster_id"] = out.apply(_cluster_key, axis=1)
 
     if enable_cluster_adjusted and not out[out["multiplicity_pool_eligible"]].empty:
-        cluster_simes = (
-            out[out["multiplicity_pool_eligible"]]
-            .groupby("family_cluster_id")[p_col]
-            .apply(simes_p_value)
-            .rename("p_value_cluster")
-            .reset_index()
-        )
-        cluster_simes["q_value_cluster"] = bh_adjust(cluster_simes["p_value_cluster"].values)
+        cluster_simes_list = []
+        for cid, group in out[out["multiplicity_pool_eligible"]].groupby("family_cluster_id"):
+            n_cluster_tests = test_weights.loc[group.index].sum()
+            p_val = simes_p_value(group[p_col], n_tests=int(n_cluster_tests))
+            cluster_simes_list.append({"family_cluster_id": cid, "p_value_cluster": p_val})
+        
+        if cluster_simes_list:
+            cluster_simes = pd.DataFrame(cluster_simes_list)
+            cluster_simes["q_value_cluster"] = bh_adjust(cluster_simes["p_value_cluster"].values)
 
-        for col in ["p_value_cluster", "q_value_cluster"]:
-            mapping = dict(zip(cluster_simes["family_cluster_id"], cluster_simes[col]))
-            out[col] = out["family_cluster_id"].map(mapping)
+            for col in ["p_value_cluster", "q_value_cluster"]:
+                mapping = dict(zip(cluster_simes["family_cluster_id"], cluster_simes[col]))
+                out[col] = out["family_cluster_id"].map(mapping)
 
-        out["is_discovery_cluster"] = out["q_value_cluster"] <= float(max_q)
+            out["is_discovery_cluster"] = out["q_value_cluster"] <= float(max_q)
 
     # 5. Metadata
-    family_counts = out.groupby("family_id").size().to_dict()
-    out["num_tests_primary_event_id"] = out["family_id"].map(family_counts).fillna(0).astype(int)
-    out["num_tests_event_family"] = out["family_id"].map(family_counts).fillna(0).astype(int)
+    family_row_counts = out.groupby("family_id").size().to_dict()
+    family_effective_counts = out.groupby("family_id").apply(lambda g: test_weights.loc[g.index].sum()).to_dict()
+    
+    out["num_tests_family"] = out["family_id"].map(family_row_counts).fillna(0).astype(int)
+    out["num_tests_effective"] = out["family_id"].map(family_effective_counts).fillna(0).astype(int)
+    out["num_tests_campaign"] = int(test_weights.sum())
+
+    # Backward compatibility aliases for legacy column names
+    out["num_tests_primary_event_id"] = out["num_tests_family"]
+    out["num_tests_event_family"] = out["num_tests_family"]
 
     out["gate_multiplicity"] = out["is_discovery"].astype(bool)
     out["gate_multiplicity_strict"] = out["is_discovery"].astype(bool) & out[
         "is_discovery_by"
     ].astype("boolean").fillna(False).astype(bool)
     return out
+
+
+def apply_cross_campaign_fdr(
+    dataframes: List[pd.DataFrame],
+    max_q: float,
+    *,
+    p_col_candidate: str = "p_value_for_fdr"
+) -> pd.DataFrame:
+    """
+    Apply BH correction across multiple campaigns/runs for a global FDR adjustment.
+    Takes a list of dataframes, concatenates them, resolves the true p-value column,
+    computes global test weights (accounting for two-sided tests), and adjusts.
+    """
+    if not dataframes:
+        return pd.DataFrame()
+    
+    combined = pd.concat(dataframes, ignore_index=True)
+    if combined.empty:
+        return combined
+    
+    p_col = _resolve_multiplicity_p_value_column(combined)
+    test_weights = pd.Series(1, index=combined.index)
+    if "side_policy" in combined.columns:
+        test_weights[combined["side_policy"].astype(str).str.lower() == "both"] = 2
+        
+    eligible_idx = combined.get("multiplicity_pool_eligible", pd.Series(True, index=combined.index))
+    n_total_tests = int(test_weights.loc[eligible_idx].sum())
+    
+    combined["q_value_global"] = 1.0
+    combined["is_discovery_global"] = False
+    
+    if n_total_tests > 0 and not combined[eligible_idx].empty:
+        p_vals = combined.loc[eligible_idx, p_col].fillna(1.0).to_numpy()
+        q_vals = bh_adjust(p_vals, n_tests=n_total_tests)
+        combined.loc[eligible_idx, "q_value_global"] = q_vals
+        combined["is_discovery_global"] = combined["q_value_global"] <= float(max_q)
+        
+    return combined
 
 
 def build_multiplicity_diagnostics(
