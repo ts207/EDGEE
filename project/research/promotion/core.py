@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 import numpy as np
 import pandas as pd
+
+_LOG = logging.getLogger(__name__)
 
 from project.research.promotion.promotion_eligibility import (
     _ReasonRecorder,
