@@ -4,7 +4,7 @@ from dataclasses import asdict, is_dataclass
 from typing import Any, Dict, List, Literal, Optional
 
 import pandas as pd
-from pydantic import BaseModel, ConfigDict, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 def _coerce(value: Any) -> Any:
@@ -100,7 +100,7 @@ class StabilityResult(BaseModel):
     rolling_instability_score: float = 0.0
     worst_regime_estimate: float = 0.0
     worst_symbol_estimate: float = 0.0
-    details: Dict[str, Any] = {}
+    details: Dict[str, Any] = Field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
         return _coerce(self.model_dump())
@@ -116,7 +116,7 @@ class FalsificationResult(BaseModel):
     null_mean: Optional[float] = None
     null_p95: Optional[float] = None
     passes_control: bool = False
-    details: Dict[str, Any] = {}
+    details: Dict[str, Any] = Field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
         return _coerce(self.model_dump())
@@ -266,8 +266,8 @@ class PromotionDecision(BaseModel):
     promotion_status: str
     promotion_track: str
     rank_score: float
-    rejection_reasons: List[str] = []
-    gate_results: Dict[str, Literal["pass", "fail", "missing_evidence"]] = {}
+    rejection_reasons: List[str] = Field(default_factory=list)
+    gate_results: Dict[str, Literal["pass", "fail", "missing_evidence"]] = Field(default_factory=dict)
     policy_version: str = "phase4_pr5_v1"
     bundle_version: str = "phase4_bundle_v1"
 
@@ -307,10 +307,10 @@ class EvidenceBundle(BaseModel):
     cost_robustness: CostRobustness
     multiplicity_adjustment: MultiplicityAdjustment
     metadata: EvidenceMetadata
-    promotion_decision: Dict[str, Any] = {}
-    rejection_reasons: List[str] = []
-    artifacts: Dict[str, Any] = {}
-    search_burden: SearchBurden = SearchBurden()
+    promotion_decision: Dict[str, Any] = Field(default_factory=dict)
+    rejection_reasons: List[str] = Field(default_factory=list)
+    artifacts: Dict[str, Any] = Field(default_factory=dict)
+    search_burden: SearchBurden = Field(default_factory=SearchBurden)
     policy_version: str = "phase4_pr5_v1"
     bundle_version: str = "phase4_bundle_v1"
 

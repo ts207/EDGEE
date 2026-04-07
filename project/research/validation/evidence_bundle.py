@@ -13,7 +13,7 @@ from project.domain.promotion.promotion_policy import PromotionPolicy
 from project.research.utils.returns_oos import normalize_returns_oos_combined
 from project.research.validation.falsification import evaluate_negative_controls
 from project.research.validation.regime_tests import build_stability_result_from_row
-from project.research.validation.schemas import EvidenceBundle, PromotionDecision
+from project.research.validation.schemas import EvidenceBundle, PromotionDecision, SearchBurden
 from project.research.contracts.search_burden import (
     SEARCH_BURDEN_FIELDS,
     default_search_burden_dict,
@@ -97,10 +97,10 @@ def _optional_bool_gate(row: Dict[str, Any], *keys: str) -> bool | None:
     return bool(as_bool(value))
 
 
-def _set_optional_bool(target: Dict[str, Any], row: Dict[str, Any], key: str, *aliases: str) -> None:
+def _set_optional_bool(target: Any, row: Dict[str, Any], key: str, *aliases: str) -> None:
     value = _optional_bool_gate(row, key, *aliases)
     if value is not None:
-        target[key] = value
+        setattr(target, key, value)
 
 
 def _normalize_returns_oos_combined(value: Any) -> list[float]:
@@ -294,42 +294,42 @@ def build_evidence_bundle(
     _set_optional_bool(bundle.metadata, row, "gate_promo_regime")
     _set_optional_bool(bundle.metadata, row, "gate_promo_multiplicity_confirmatory")
     if gate_delay_robustness is not None:
-        bundle.metadata["gate_delay_robustness"] = gate_delay_robustness
+        bundle.metadata.gate_delay_robustness = gate_delay_robustness
     else:
-        bundle.metadata.pop("gate_delay_robustness", None)
+        bundle.metadata.__dict__.pop("gate_delay_robustness", None)
     if gate_timeframe_consensus is not None:
-        bundle.metadata["gate_timeframe_consensus"] = gate_timeframe_consensus
+        bundle.metadata.gate_timeframe_consensus = gate_timeframe_consensus
     else:
-        bundle.metadata.pop("gate_timeframe_consensus", None)
+        bundle.metadata.__dict__.pop("gate_timeframe_consensus", None)
     if gate_bridge_microstructure is not None:
-        bundle.metadata["gate_bridge_microstructure"] = gate_bridge_microstructure
+        bundle.metadata.gate_bridge_microstructure = gate_bridge_microstructure
     else:
-        bundle.metadata.pop("gate_bridge_microstructure", None)
+        bundle.metadata.__dict__.pop("gate_bridge_microstructure", None)
     if gate_regime_stability is not None:
-        bundle.metadata["gate_regime_stability"] = gate_regime_stability
+        bundle.metadata.gate_regime_stability = gate_regime_stability
     else:
-        bundle.metadata.pop("gate_regime_stability", None)
+        bundle.metadata.__dict__.pop("gate_regime_stability", None)
     if gate_structural_break is not None:
-        bundle.metadata["gate_structural_break"] = gate_structural_break
+        bundle.metadata.gate_structural_break = gate_structural_break
     else:
-        bundle.metadata.pop("gate_structural_break", None)
+        bundle.metadata.__dict__.pop("gate_structural_break", None)
     
     # Workstream B: Add search burden to bundle
-    bundle.search_burden = {
-        "search_proposals_attempted": safe_int(row.get("search_proposals_attempted", 0), 0),
-        "search_candidates_generated": safe_int(row.get("search_candidates_generated", 0), 0),
-        "search_candidates_scored": safe_int(row.get("search_candidates_scored", 0), 0),
-        "search_candidates_eligible": safe_int(row.get("search_candidates_eligible", 0), 0),
-        "search_parameterizations_attempted": safe_int(row.get("search_parameterizations_attempted", 0), 0),
-        "search_mutations_attempted": safe_int(row.get("search_mutations_attempted", 0), 0),
-        "search_directions_tested": safe_int(row.get("search_directions_tested", 0), 0),
-        "search_confirmations_attempted": safe_int(row.get("search_confirmations_attempted", 0), 0),
-        "search_trigger_variants_attempted": safe_int(row.get("search_trigger_variants_attempted", 0), 0),
-        "search_family_count": safe_int(row.get("search_family_count", 0), 0),
-        "search_lineage_count": safe_int(row.get("search_lineage_count", 0), 0),
-        "search_scope_version": str(row.get("search_scope_version", "phase1_v1")),
-        "search_burden_estimated": bool(as_bool(row.get("search_burden_estimated", False))),
-    }
+    bundle.search_burden = SearchBurden(
+        search_proposals_attempted=safe_int(row.get("search_proposals_attempted", 0), 0),
+        search_candidates_generated=safe_int(row.get("search_candidates_generated", 0), 0),
+        search_candidates_scored=safe_int(row.get("search_candidates_scored", 0), 0),
+        search_candidates_eligible=safe_int(row.get("search_candidates_eligible", 0), 0),
+        search_parameterizations_attempted=safe_int(row.get("search_parameterizations_attempted", 0), 0),
+        search_mutations_attempted=safe_int(row.get("search_mutations_attempted", 0), 0),
+        search_directions_tested=safe_int(row.get("search_directions_tested", 0), 0),
+        search_confirmations_attempted=safe_int(row.get("search_confirmations_attempted", 0), 0),
+        search_trigger_variants_attempted=safe_int(row.get("search_trigger_variants_attempted", 0), 0),
+        search_family_count=safe_int(row.get("search_family_count", 0), 0),
+        search_lineage_count=safe_int(row.get("search_lineage_count", 0), 0),
+        search_scope_version=str(row.get("search_scope_version", "phase1_v1")),
+        search_burden_estimated=bool(as_bool(row.get("search_burden_estimated", False))),
+    )
     
     return bundle.to_dict()
 

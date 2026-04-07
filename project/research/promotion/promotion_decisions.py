@@ -27,7 +27,32 @@ from project.research.utils.decision_safety import coerce_numeric_nan, finite_le
 from project.research.validation.evidence_bundle import (
     build_evidence_bundle,
     evaluate_promotion_bundle,
+    validate_evidence_bundle,
 )
+
+
+def _apply_authoritative_bundle_decision(
+    result: Dict[str, Any],
+    bundle_decision: Dict[str, Any],
+) -> Dict[str, Any]:
+    """Apply bundle decision as authority for final promotion outcome fields.
+
+    This function overwrites row-level decision fields with bundle-level
+    decision values, making the bundle evaluation the single source of truth
+    for promotion status, track, rank score, and rejection reasons.
+    """
+    out = dict(result)
+
+    out["eligible"] = bool(bundle_decision["eligible"])
+    out["promotion_status"] = str(bundle_decision["promotion_status"])
+    out["promotion_decision"] = str(bundle_decision["promotion_status"])
+    out["promotion_track"] = str(bundle_decision["promotion_track"])
+    out["rank_score"] = float(bundle_decision["rank_score"])
+    out["rejection_reasons"] = list(bundle_decision.get("rejection_reasons", []))
+    out["reject_reason"] = "|".join(out["rejection_reasons"])
+    out["gate_results"] = dict(bundle_decision.get("gate_results", {}))
+
+    return out
 
 
 def evaluate_row(
@@ -358,12 +383,12 @@ def evaluate_row(
             policy_version=policy.policy_version,
             bundle_version=policy.bundle_version,
         )
+        validate_evidence_bundle(bundle)
         bundle_decision = evaluate_promotion_bundle(bundle, policy)
         bundle["promotion_decision"] = dict(bundle_decision)
         bundle["rejection_reasons"] = list(bundle_decision.get("rejection_reasons", []))
-        return _restore_boolean_compat_gates(
-            _apply_bundle_policy_result(result, bundle, bundle_decision)
-        )
+        result = _apply_authoritative_bundle_decision(result, bundle_decision)
+        return _restore_boolean_compat_gates(result)
     except Exception as e:
         if isinstance(e, PromotionDecisionError):
             raise
