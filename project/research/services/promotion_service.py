@@ -862,6 +862,32 @@ def _write_multiplicity_scope_diagnostics(out_dir: Path, diag: Dict[str, Any]) -
     return {"json_path": str(json_path), "md_path": str(md_path)}
 
 
+REQUIRED_PROMOTION_FIELDS = frozenset({
+        "candidate_id",
+        "family",
+        "event_type",
+        "net_expectancy_bps",
+        "stability_score",
+        "sign_consistency",
+        "cost_survival_ratio",
+        "q_value",
+        "n_events",
+    })
+
+
+def _diagnose_missing_fields(df: pd.DataFrame) -> list[str]:
+    """Return list of missing required fields for promotion."""
+    if df.empty:
+        return []
+    missing = []
+    for field in REQUIRED_PROMOTION_FIELDS:
+        if field not in df.columns:
+            missing.append(field)
+        elif df[field].isna().all():
+            missing.append(f"{field} (all null)")
+    return missing
+
+
 def execute_promotion(config: PromotionConfig) -> PromotionServiceResult:
     data_root = get_data_root()
     out_dir = config.resolved_out_dir()
@@ -940,9 +966,58 @@ def execute_promotion(config: PromotionConfig) -> PromotionServiceResult:
         
         if canonical_candidate_path.exists():
             promotion_input_mode = "canonical"
-            candidates_df = read_parquet(canonical_candidate_path)
+            validation_meta_df = read_parquet(canonical_candidate_path)
+            
+            validation_svc = ValidationService(data_root=data_root)
+            source_tables = validation_svc.load_candidate_tables(config.run_id)
+            source_candidates_df = pd.DataFrame()
+            for source in ("edge_candidates", "promotion_audit", "phase2_candidates"):
+                if not source_tables[source].empty:
+                    source_candidates_df = source_tables[source]
+                    break
+            
+            if source_candidates_df.empty:
+                logging.warning(
+                    "Canonical promotion-ready candidates found but source tables empty for run %s",
+                    config.run_id
+                )
+            elif validation_meta_df.empty:
+                logging.warning(
+                    "Canonical promotion-ready candidates file is empty for run %s",
+                    config.run_id
+                )
+            else:
+                validated_ids = set(validation_meta_df["candidate_id"].dropna().astype(str))
+                candidates_df = source_candidates_df[
+                    source_candidates_df["candidate_id"].astype(str).isin(validated_ids)
+                ].copy()
+                
+                for col in validation_meta_df.columns:
+                    if col not in candidates_df.columns and col != "candidate_id":
+                        candidates_df[col] = validation_meta_df.set_index("candidate_id").reindex(
+                            candidates_df["candidate_id"].astype(str)
+                        )[col].values
+                
+                if candidates_df.empty and not validation_meta_df.empty:
+                    logging.warning(
+                        "No matching candidates found between validation metadata and source tables for run %s",
+                        config.run_id
+                    )
+                    candidates_df = pd.DataFrame()
+            
             if not candidates_df.empty:
-                logging.info("Loaded canonical promotion-ready candidates from %s", canonical_candidate_path)
+                    missing_fields = _diagnose_missing_fields(candidates_df)
+                    if missing_fields:
+                        diagnostics["canonical_missing_fields"] = missing_fields
+                        logging.warning(
+                            "Canonical promotion input missing required fields: %s",
+                            ", ".join(missing_fields)
+                        )
+                    logging.info(
+                        "Loaded %d candidates via canonical path for run %s",
+                        len(candidates_df),
+                        config.run_id
+                    )
         else:
             if not config.use_compatibility_bridge:
                 raise FileNotFoundError(
@@ -954,9 +1029,6 @@ def execute_promotion(config: PromotionConfig) -> PromotionServiceResult:
                 "Canonical promotion-ready candidates not found for run %s; falling back to legacy table loading",
                 config.run_id
             )
-            # Reconstruct candidates_df from bundle for promotion processing
-            # We need all columns that promote_candidates might use.
-            # For compatibility, we'll try to load the full table and then filter by validated ones.
             val_svc = ValidationService(data_root=data_root)
             tables = val_svc.load_candidate_tables(config.run_id)
             for source in ("edge_candidates", "promotion_audit", "phase2_candidates"):
@@ -965,8 +1037,6 @@ def execute_promotion(config: PromotionConfig) -> PromotionServiceResult:
                     break
             
             if candidates_df.empty:
-                 # If table is empty but bundle has candidates, we can't do much without the full metrics
-                 # but this shouldn't happen if the bundle was created from those tables.
                  raise FileNotFoundError(f"Missing required candidates tables for run {config.run_id}")
 
             validated_ids = {c.candidate_id for c in val_bundle.validated_candidates}
