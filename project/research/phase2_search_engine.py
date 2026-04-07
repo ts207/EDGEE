@@ -1210,6 +1210,12 @@ def run(
 
             candidates = h_result.final_candidates
             if not candidates.empty:
+                if "gate_search_min_t_stat" in candidates.columns:
+                    gate_mask = candidates["gate_search_min_t_stat"].fillna(False).astype(bool)
+                    candidates = candidates[gate_mask].copy()
+                    if candidates.empty:
+                        log.warning("All hierarchical candidates filtered by gate_search_min_t_stat")
+                        continue
                 if "candidate_id" in candidates.columns:
                     candidates = candidates.copy()
                     candidates["candidate_id"] = symbol + "::" + candidates["candidate_id"].astype(str)

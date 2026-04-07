@@ -109,9 +109,9 @@ def _evaluate_hypotheses(
         candidates = hypotheses_to_bridge_candidates(
             metrics,
             symbol=symbol,
-            min_t_stat=float(bridge_gates.get("min_t_stat", 1.5)),
+            min_t_stat=min_t_stat,
             min_n=min_n,
-            bridge_min_t_stat=float(bridge_gates.get("bridge_min_t_stat", 2.0)),
+            bridge_min_t_stat=float(bridge_gates.get("search_bridge_min_t_stat", 2.0)),
             bridge_min_robustness_score=float(bridge_gates.get("bridge_min_robustness_score", 0.7)),
             bridge_min_regime_stability_score=float(
                 bridge_gates.get("bridge_min_regime_stability_score", 0.6)

@@ -82,6 +82,11 @@ def _build_jobs(preset_def: Dict[str, Any], preset_dir: Path, execute: bool) -> 
         slice_cfg = _load_slice(slice_file, preset_dir)
         _validate_slice(slice_cfg, slice_file)
         slice_id = slice_cfg.get("id", Path(slice_file).stem)
+
+        if slice_cfg.get("negative_control"):
+            logger.info(f"Skipping negative control slice: {slice_id} ({slice_cfg.get('negative_control_reason', '')})")
+            continue
+
         symbols = slice_cfg.get("symbols", [])
         timeframe = slice_cfg.get("timeframe", "1h")
         start = str(slice_cfg.get("start", ""))

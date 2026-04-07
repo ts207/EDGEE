@@ -119,18 +119,6 @@ def load_validation_bundle(run_id: str, base_dir: Optional[Path] = None) -> Opti
             validation_stage_version=c_data.get("validation_stage_version", "v1"),
         )
 
-    # Load effect_stability_report with backward-compat fallback
-    effect_stability_report = data.get("effect_stability_report", {})
-    if not effect_stability_report:
-        stability_path = base_dir / "effect_stability_report.json"
-        if stability_path.exists():
-            try:
-                with stability_path.open("r", encoding="utf-8") as f:
-                    effect_stability_report = json.load(f)
-            except Exception:
-                # Legacy fallback failed, keep empty but note for maintenance
-                effect_stability_report = {}
-
     return ValidationBundle(
         run_id=data["run_id"],
         created_at=data["created_at"],
@@ -139,5 +127,4 @@ def load_validation_bundle(run_id: str, base_dir: Optional[Path] = None) -> Opti
         rejected_candidates=[_parse_candidate(c) for c in data.get("rejected_candidates", [])],
         inconclusive_candidates=[_parse_candidate(c) for c in data.get("inconclusive_candidates", [])],
         summary_stats=data.get("summary_stats", {}),
-        effect_stability_report=effect_stability_report,
     )

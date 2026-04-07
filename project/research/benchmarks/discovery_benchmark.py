@@ -149,7 +149,16 @@ def _restore_config_file(path: Path, original: Optional[dict]):
 
 
 def _extract_benchmark_metrics(df: pd.DataFrame, out_dir: Path) -> Dict[str, Any]:
+    if df.empty:
+        return {
+            "emergence": False,
+            "candidate_count": 0,
+            "top10_candidate_count": 0,
+            "top10": {},
+        }
+
     top10 = df.nsmallest(10, "effective_rank") if "effective_rank" in df.columns else df.head(10)
+    top10_count = len(top10)
 
     flag_col = "promotion_candidate_flag" if "promotion_candidate_flag" in df.columns else "is_discovery"
     promotion_density = float(df[flag_col].fillna(False).mean()) if flag_col in df.columns else 0.0
@@ -172,6 +181,51 @@ def _extract_benchmark_metrics(df: pd.DataFrame, out_dir: Path) -> Dict[str, Any
         if not vals.empty:
             survival = float(vals.median())
 
+    median_discovery_quality = None
+    if "discovery_quality_score" in df.columns:
+        vals = pd.to_numeric(df["discovery_quality_score"], errors="coerce").dropna()
+        if not vals.empty:
+            median_discovery_quality = float(vals.median())
+
+    max_discovery_quality = None
+    if "discovery_quality_score" in df.columns:
+        vals = pd.to_numeric(df["discovery_quality_score"], errors="coerce").dropna()
+        if not vals.empty:
+            max_discovery_quality = float(vals.max())
+
+    median_t_stat = None
+    if "t_stat" in df.columns:
+        vals = pd.to_numeric(top10["t_stat"], errors="coerce").dropna()
+        if not vals.empty:
+            median_t_stat = float(vals.median())
+
+    median_estimate_bps = None
+    if "estimate_bps" in df.columns:
+        vals = pd.to_numeric(top10["estimate_bps"], errors="coerce").dropna()
+        if not vals.empty:
+            median_estimate_bps = float(vals.median())
+
+    median_falsification = None
+    if "falsification_component" in df.columns:
+        vals = pd.to_numeric(top10["falsification_component"], errors="coerce").dropna()
+        if not vals.empty:
+            median_falsification = float(vals.median())
+
+    fold_stability = None
+    if "fold_stability_bonus" in df.columns and "fold_stability_penalty" in df.columns:
+        bonus = pd.to_numeric(top10["fold_stability_bonus"], errors="coerce").fillna(0)
+        penalty = pd.to_numeric(top10["fold_stability_penalty"], errors="coerce").fillna(0)
+        fold_stability = float((bonus - penalty).median())
+
+    unique_family_id = 0
+    if "family_id" in top10.columns:
+        unique_family_id = int(top10["family_id"].nunique())
+
+    unique_template_id = 0
+    template_col = "rule_template" if "rule_template" in top10.columns else "template_verb"
+    if template_col in top10.columns:
+        unique_template_id = int(top10[template_col].nunique())
+
     shortlist_count = 0
     shortlist_path = out_dir / "shortlist_candidates.parquet"
     if shortlist_path.exists():
@@ -181,6 +235,17 @@ def _extract_benchmark_metrics(df: pd.DataFrame, out_dir: Path) -> Dict[str, Any
             pass
 
     return {
+        "emergence": len(df) > 0,
+        "candidate_count": len(df),
+        "top10_candidate_count": top10_count,
+        "median_discovery_quality_score": median_discovery_quality,
+        "max_discovery_quality_score": max_discovery_quality,
+        "median_t_stat": median_t_stat,
+        "median_estimate_bps": median_estimate_bps,
+        "median_falsification_component": median_falsification,
+        "fold_stability_component": fold_stability,
+        "unique_family_id_top10": unique_family_id,
+        "unique_template_id_top10": unique_template_id,
         "top10": {
             "promotion_density": promotion_density,
             "placebo_fail_rate": placebo_fail,
@@ -188,7 +253,6 @@ def _extract_benchmark_metrics(df: pd.DataFrame, out_dir: Path) -> Dict[str, Any
             "median_after_cost_expectancy_bps": expectancy,
             "median_cost_survival_ratio": survival,
         },
-        "candidate_count": len(df),
         "shortlist_count": shortlist_count,
     }
 

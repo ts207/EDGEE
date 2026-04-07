@@ -222,6 +222,7 @@ def _build_parser() -> argparse.ArgumentParser:
         proposal_parser.add_argument("--run_id", default=None)
         proposal_parser.add_argument("--out_dir", default=None)
         proposal_parser.add_argument("--check", type=int, default=0)
+        proposal_parser.add_argument("--legacy_compatibility", type=int, default=0)
 
     compare_parser = operator_sub.add_parser(
         "compare",

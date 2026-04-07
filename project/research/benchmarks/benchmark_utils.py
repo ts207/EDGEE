@@ -69,6 +69,27 @@ def evaluate_thresholds(
             top10.get("median_cost_survival_ratio"),
             baseline_top10.get("median_cost_survival_ratio"),
         )
+        delta_discovery_quality = _safe_delta(
+            result.get("median_discovery_quality_score"),
+            baseline.get("median_discovery_quality_score"),
+        )
+        delta_falsification = _safe_delta(
+            result.get("median_falsification_component"),
+            baseline.get("median_falsification_component"),
+            invert=True,
+        )
+
+        emergence_delta = None
+        baseline_emergence = baseline.get("emergence", False)
+        current_emergence = result.get("emergence", False)
+        if baseline_emergence and current_emergence:
+            emergence_delta = 0.0
+        elif not baseline_emergence and current_emergence:
+            emergence_delta = 1.0
+        elif baseline_emergence and not current_emergence:
+            emergence_delta = -1.0
+        else:
+            emergence_delta = 0.0
 
         scorecard[mode_id] = {
             "delta_quality_vs_A": delta_quality,
@@ -76,6 +97,9 @@ def evaluate_thresholds(
             "delta_diversity_vs_A": delta_diversity,
             "delta_runtime_compat_vs_A": delta_runtime,
             "delta_efficiency_vs_A": delta_efficiency,
+            "delta_discovery_quality_vs_A": delta_discovery_quality,
+            "delta_falsification_vs_A": delta_falsification,
+            "emergence_delta_vs_A": emergence_delta,
         }
 
     components = _evaluate_components(mode_results, thresholds)
@@ -171,12 +195,8 @@ def _component_recommendation(
     base_val = base_result.get("top10", {}).get(metric)
     enhanced_val = enhanced_result.get("top10", {}).get(metric)
 
-    if base_val is None or enhanced_val is None:
-        return "inconclusive"
-
-    improvement = enhanced_val - base_val
-    if invert:
-        improvement = -improvement
+    base_emergence = base_result.get("emergence", False)
+    enhanced_emergence = enhanced_result.get("emergence", False)
 
     component_name = None
     for name, pairs in [("scoring", ["A", "B"]), ("folds", ["B", "C"]),
@@ -185,6 +205,41 @@ def _component_recommendation(
         if compare == pairs:
             component_name = name
             break
+
+    if component_name == "hierarchical":
+        base_count = base_result.get("candidate_count", 0)
+        enhanced_count = enhanced_result.get("candidate_count", 0)
+        base_quality = base_result.get("median_discovery_quality_score")
+        enhanced_quality = enhanced_result.get("median_discovery_quality_score")
+
+        if base_count == 0 and enhanced_count > 0:
+            if enhanced_quality is not None and enhanced_quality > 0:
+                return "promote"
+            elif enhanced_quality is not None and enhanced_quality >= -0.5:
+                return "hold"
+            else:
+                return "inconclusive"
+        elif base_count == 0 and enhanced_count == 0:
+            return "inconclusive"
+        elif enhanced_count > base_count and base_count > 0:
+            if enhanced_quality is not None and base_quality is not None:
+                if enhanced_quality > base_quality:
+                    return "promote"
+                elif enhanced_quality >= base_quality - 0.5:
+                    return "hold"
+            return "hold"
+
+    if base_val is None or enhanced_val is None:
+        if component_name != "hierarchical":
+            return "inconclusive"
+
+        if enhanced_emergence and not base_emergence:
+            return "promote"
+        return "inconclusive"
+
+    improvement = enhanced_val - base_val
+    if invert:
+        improvement = -improvement
 
     comp_thresholds = thresholds.get(component_name, {}) if component_name else {}
     min_improvement = comp_thresholds.get("min_quality_improvement",

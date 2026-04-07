@@ -164,8 +164,6 @@ def prepare_search_features_for_symbol(
     if event_registry_override:
         fixture_events = pd.read_parquet(event_registry_override)
         ts_col = "timestamp" if "timestamp" in fixture_events.columns else "ts"
-        if ts_col in fixture_events.columns:
-            fixture_events[ts_col] = pd.to_datetime(fixture_events[ts_col], utc=True, errors="coerce")
         event_flags = _build_flags_from_fixture(fixture_events, symbol, ts_col)
     else:
         event_flags = load_registry_flags(data_root=data_root, run_id=run_id)
@@ -269,7 +267,11 @@ def _build_flags_from_fixture(
     if sub.empty or "event_type" not in sub.columns:
         return pd.DataFrame()
 
-    sub[ts_col] = pd.to_datetime(sub[ts_col], utc=True, errors="coerce")
+    # Convert timestamps - handle both int64 milliseconds and datetime
+    if sub[ts_col].dtype == "int64":
+        sub[ts_col] = pd.to_datetime(sub[ts_col], unit="ms", utc=True, errors="coerce")
+    else:
+        sub[ts_col] = pd.to_datetime(sub[ts_col], utc=True, errors="coerce")
     sub = sub.dropna(subset=[ts_col])
 
     sig_col = "signal_column" if "signal_column" in sub.columns else None
@@ -299,4 +301,20 @@ def _build_flags_from_fixture(
 
     flag_cols = [c for c in merged.columns if c not in (ts_col, "symbol")]
     merged[flag_cols] = merged[flag_cols].fillna(False).astype(bool)
+
+    if "sign" in sub.columns and "event_type" in sub.columns:
+        for event_type in sub["event_type"].unique():
+            event_type_str = str(event_type).strip().upper()
+            event_type_lower = event_type_str.lower()
+            dir_col = f"evt_direction_{event_type_lower}"
+            event_type_mask = sub["event_type"] == event_type
+            dir_df = sub[event_type_mask][[ts_col, "symbol", "sign"]].copy()
+            dir_df[dir_col] = pd.to_numeric(dir_df["sign"], errors="coerce").astype(float)
+            dir_pivot = dir_df.pivot_table(
+                index=[ts_col, "symbol"],
+                values=dir_col,
+                aggfunc="first",
+            ).reset_index()
+            merged = merged.merge(dir_pivot, on=[ts_col, "symbol"], how="left")
+
     return merged
