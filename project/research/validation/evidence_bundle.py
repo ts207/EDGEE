@@ -274,9 +274,9 @@ def build_evidence_bundle(
         bundle_version=bundle_version,
     )
     if microstructure_pass is not None:
-        bundle.cost_robustness["microstructure_pass"] = microstructure_pass
+        bundle.cost_robustness.microstructure_pass = microstructure_pass
     else:
-        bundle.cost_robustness.pop("microstructure_pass", None)
+        bundle.cost_robustness.__dict__.pop("microstructure_pass", None)
     _set_optional_bool(bundle.metadata, row, "gate_stability")
     _set_optional_bool(bundle.metadata, row, "gate_after_cost_stressed_positive")
     _set_optional_bool(bundle.metadata, row, "gate_delayed_entry_stress")
@@ -335,20 +335,11 @@ def build_evidence_bundle(
 
 
 def validate_evidence_bundle(bundle: Dict[str, Any]) -> None:
-    required = [
-        "candidate_id",
-        "event_type",
-        "sample_definition",
-        "effect_estimates",
-        "uncertainty_estimates",
-        "stability_tests",
-        "falsification_results",
-        "cost_robustness",
-        "multiplicity_adjustment",
-    ]
-    missing = [k for k in required if k not in bundle]
-    if missing:
-        raise ValueError(f"Missing evidence bundle keys: {missing}")
+    from project.research.validation.schemas import EvidenceBundle as _EvidenceBundle
+    try:
+        _EvidenceBundle.model_validate(bundle)
+    except Exception as exc:
+        raise ValueError(f"Evidence bundle validation failed: {exc}") from exc
 
 
 def evaluate_promotion_bundle(bundle: Dict[str, Any], policy: PromotionPolicy) -> Dict[str, Any]:
