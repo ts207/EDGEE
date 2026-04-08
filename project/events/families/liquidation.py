@@ -149,9 +149,164 @@ class LiquidationCascadeDetector(EpisodeDetector):
         return events
 
 
+class LiquidationCascadeProxyDetector(EpisodeDetector):
+    """OI-native proxy for LIQUIDATION_CASCADE using only Bybit-native data.
+
+    Requires: OI pct drop above rolling quantile + volume surge + directional price drop.
+    Does NOT require liquidation_notional.
+    """
+
+    event_type = "LIQUIDATION_CASCADE_PROXY"
+    required_columns = (
+        "timestamp",
+        "oi_notional",
+        "oi_delta_1h",
+        "close",
+        "high",
+        "low",
+        "volume",
+    )
+    signal_column = "oi_delta_1h"
+    timeframe_minutes = 5
+    max_gap = 3
+    anchor_rule = "peak"
+    default_severity = "major"
+
+    def prepare_features(self, df: pd.DataFrame, **params: Any) -> dict[str, pd.Series]:
+        oi_window = int(params.get("oi_window", 288))
+        vol_window = int(params.get("vol_window", 288))
+        min_periods = int(params.get("min_periods", 24))
+
+        oi = pd.to_numeric(df["oi_notional"], errors="coerce").fillna(0.0)
+        oi_delta = pd.to_numeric(df["oi_delta_1h"], errors="coerce").fillna(0.0)
+        # prefer taker_base_volume for directional confirmation; fall back to total volume
+        vol_col = "taker_base_volume" if "taker_base_volume" in df.columns and pd.to_numeric(df["taker_base_volume"], errors="coerce").gt(0).any() else "volume"
+        volume = pd.to_numeric(df[vol_col], errors="coerce").fillna(0.0)
+        close = pd.to_numeric(df["close"], errors="coerce")
+        low = pd.to_numeric(df["low"], errors="coerce")
+
+        # OI pct drop: how large a drop relative to OI size
+        oi_pct_drop = -(oi_delta / oi.replace(0.0, np.nan)).fillna(0.0)
+        oi_drop_quantile = float(params.get("oi_drop_quantile", 0.95))
+        oi_drop_th = (
+            oi_pct_drop.shift(1)
+            .rolling(oi_window, min_periods=min_periods)
+            .quantile(oi_drop_quantile)
+            .fillna(0.01)
+        )
+
+        # Volume surge threshold
+        vol_surge_quantile = float(params.get("vol_surge_quantile", 0.90))
+        vol_th = (
+            volume.shift(1)
+            .rolling(vol_window, min_periods=min_periods)
+            .quantile(vol_surge_quantile)
+            .fillna(0.0)
+        )
+
+        # Short-window price drawdown
+        ret_window = int(params.get("ret_window", 3))
+        rolling_low = low.rolling(ret_window, min_periods=1).min()
+        price_drop = -(
+            (rolling_low / close.shift(ret_window).replace(0.0, np.nan)) - 1.0
+        ).fillna(0.0)
+        price_drop_th = float(params.get("price_drop_th", 0.003))
+
+        return {
+            "oi": oi,
+            "oi_delta": oi_delta,
+            "oi_pct_drop": oi_pct_drop,
+            "oi_drop_th": oi_drop_th,
+            "volume": volume,
+            "vol_th": vol_th,
+            "price_drop": price_drop,
+            "price_drop_th": price_drop_th,
+            "close": close,
+            "low": low,
+        }
+
+    def compute_raw_mask(
+        self, df: pd.DataFrame, *, features: dict[str, pd.Series], **params: Any
+    ) -> pd.Series:
+        oi_pct_drop = features["oi_pct_drop"]
+        oi_drop_th = features["oi_drop_th"]
+        volume = features["volume"]
+        vol_th = features["vol_th"]
+        price_drop = features["price_drop"]
+        price_drop_th = features["price_drop_th"]
+
+        oi_mask = oi_pct_drop >= oi_drop_th
+        vol_mask = volume >= vol_th
+        price_mask = price_drop >= price_drop_th
+
+        return (oi_mask & vol_mask & price_mask).fillna(False)
+
+    def compute_intensity(
+        self, df: pd.DataFrame, *, features: dict[str, pd.Series], **params: Any
+    ) -> pd.Series:
+        baseline = features["oi_drop_th"].replace(0.0, np.nan)
+        intensity = features["oi_pct_drop"] / baseline
+        return intensity.replace([np.inf, -np.inf], np.nan)
+
+    def detect(self, df: pd.DataFrame, *, symbol: str, **params: Any) -> pd.DataFrame:
+        self.check_required_columns(df)
+        if df.empty:
+            return pd.DataFrame(columns=EVENT_COLUMNS)
+        features = self.prepare_features(df, **params)
+        mask = self.compute_raw_mask(df, features=features, **params)
+        intensity = self.compute_intensity(df, features=features, **params)
+        episodes = build_episodes(
+            mask, score=intensity, max_gap=int(params.get("max_gap", self.max_gap))
+        )
+        rows = []
+        for sub_idx, episode in enumerate(episodes):
+            idx = int(
+                episode.peak_idx
+                if str(params.get("anchor_rule", self.anchor_rule)).lower() == "peak"
+                else episode.start_idx
+            )
+            ts = pd.to_datetime(df.at[idx, "timestamp"], utc=True, errors="coerce")
+            if pd.isna(ts):
+                continue
+            row = emit_event(
+                event_type=self.event_type,
+                symbol=symbol,
+                event_id=format_event_id(self.event_type, symbol, idx, sub_idx),
+                eval_bar_ts=ts,
+                direction="down",
+                intensity=float(np.nan_to_num(intensity.iloc[idx], nan=1.0)),
+                severity=self.default_severity,
+                timeframe_minutes=self.timeframe_minutes,
+                causal=self.causal,
+                metadata={
+                    "start_idx": int(episode.start_idx),
+                    "end_idx": int(episode.end_idx),
+                    "peak_idx": int(episode.peak_idx),
+                    "duration_bars": int(episode.duration_bars),
+                    "episode_id": f"{self.event_type.lower()}_{symbol}_{sub_idx:04d}",
+                },
+            )
+            row["event_idx"] = idx
+
+            # Enrich with OI reduction and price drawdown stats
+            start = episode.start_idx
+            end = episode.end_idx
+            subset = df.iloc[int(start) : int(end) + 1]
+            oi_start = float(df["oi_notional"].iloc[max(0, int(start) - 1)])
+            oi_end = float(df["oi_notional"].iloc[int(end)])
+            row["oi_reduction_pct"] = (oi_start - oi_end) / oi_start if oi_start > 0 else 0.0
+            p_start = float(df["close"].iloc[max(0, int(start) - 1)])
+            p_low = float(subset["low"].min())
+            row["price_drawdown"] = (p_start - p_low) / p_start if p_start > 0 else 0.0
+            rows.append(row)
+
+        return pd.DataFrame(rows) if rows else pd.DataFrame(columns=EVENT_COLUMNS)
+
+
 from project.events.detectors.registry import register_detector
 
 register_detector("LIQUIDATION_CASCADE", LiquidationCascadeDetector)
+register_detector("LIQUIDATION_CASCADE_PROXY", LiquidationCascadeProxyDetector)
 
 
 def detect_liquidation_family(df: pd.DataFrame, symbol: str, **params: Any) -> pd.DataFrame:

@@ -2817,6 +2817,64 @@ events:
       - severity_bucket
       max_candidates_per_run: 300
     spec_path: spec/events/LIQUIDATION_CASCADE.yaml
+  LIQUIDATION_CASCADE_PROXY:
+    event_type: LIQUIDATION_CASCADE_PROXY
+    canonical_family: POSITIONING_EXTREMES
+    canonical_regime: POSITIONING_UNWIND_DELEVERAGING
+    legacy_family: POSITIONING_EXTREMES
+    event_kind: market_event
+    reports_dir: liquidation_events
+    events_file: liquidation_cascade_proxy_events.parquet
+    signal_column: liquidation_cascade_proxy_event
+    subtype: liquidation_cascade_proxy
+    phase: onset
+    evidence_mode: indirect
+    asset_scope: single_asset
+    venue_scope: single_venue
+    is_composite: false
+    is_context_tag: false
+    is_strategy_construct: false
+    research_only: false
+    strategy_only: false
+    deconflict_priority: 0
+    disposition: standalone
+    layer: proxy
+    notes: OI-native proxy for LIQUIDATION_CASCADE using only Bybit-native data.
+    tier: C
+    operational_role: trigger
+    deployment_disposition: secondary_or_confirm
+    runtime_category: active_runtime_event
+    maturity: experimental
+    default_executable: true
+    enabled: true
+    detector_name: LiquidationCascadeProxyDetector
+    instrument_classes:
+    - crypto
+    - futures
+    requires_features: []
+    runtime_tags:
+    - oi_dynamic
+    - liquidation_proxy
+    sequence_eligible: true
+    cluster_id: oi_dynamic
+    collapse_target: ''
+    overlap_group: liquidation_proxy
+    precedence_rank: 1
+    routing_profile_ref: ''
+    suppresses: []
+    suppressed_by: []
+    maturity_scores: {}
+    parameters:
+      oi_window: 288
+      vol_window: 288
+      min_periods: 24
+      oi_drop_quantile: 0.95
+      vol_surge_quantile: 0.90
+      ret_window: 3
+      price_drop_th: 0.003
+      max_gap: 3
+      synthetic_coverage: covered
+    spec_path: spec/events/LIQUIDATION_CASCADE_PROXY.yaml
   LIQUIDATION_EXHAUSTION_REVERSAL:
     event_type: LIQUIDATION_EXHAUSTION_REVERSAL
     canonical_family: TREND_FAILURE_EXHAUSTION

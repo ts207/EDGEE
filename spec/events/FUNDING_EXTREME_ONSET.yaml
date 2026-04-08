@@ -46,7 +46,7 @@ parameters:
   accel_pct: 95.0
   accel_lookback: 32
   persistence_pct: 85.0
-  persistence_bars: 12
+  persistence_bars: 3
   normalization_pct: 50.0
   normalization_lookback: 96
   min_event_spacing: 96
