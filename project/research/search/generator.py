@@ -114,17 +114,23 @@ def _build_hypotheses(
             log.warning("Unsupported trigger_type in _build_hypotheses: %s", trigger_type)
             continue
 
-        for horizon, direction, lag, ctx, template in product(
-            horizons, directions, entry_lags, contexts, templates
-        ):
-            yield HypothesisSpec(
-                trigger=trigger,
-                direction=direction,
-                horizon=horizon,
-                template_id=template,
-                context=ctx,
-                entry_lag=lag,
-            )
+        for template in templates:
+            operator = get_domain_registry().get_operator(template)
+            operator_raw = operator.raw if operator is not None and isinstance(operator.raw, dict) else {}
+            requires_direction = bool(operator_raw.get("requires_direction", True))
+            template_directions = directions if requires_direction else directions[:1]
+
+            for horizon, direction, lag, ctx in product(
+                horizons, template_directions, entry_lags, contexts
+            ):
+                yield HypothesisSpec(
+                    trigger=trigger,
+                    direction=direction,
+                    horizon=horizon,
+                    template_id=template,
+                    context=ctx,
+                    entry_lag=lag,
+                )
 
 
 def _event_default_templates(

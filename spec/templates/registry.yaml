@@ -386,6 +386,7 @@ events:
     - convexity_capture
     - only_if_funding
     - only_if_oi
+    - only_if_regime
     - tail_risk_avoid
     horizons:
     - 5m

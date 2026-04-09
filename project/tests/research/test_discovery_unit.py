@@ -84,6 +84,30 @@ def test_synthesize_registry_candidates_search_budget():
     assert len(df) == 2
 
 
+def test_synthesize_registry_candidates_respects_operator_side_policy():
+    events_df = pd.DataFrame(
+        {
+            "timestamp": [1, 2, 3],
+            "return_24": [0.01, 0.02, 0.03],
+        }
+    )
+
+    df = _synthesize_registry_candidates(
+        run_id="r0",
+        symbol="BTCUSDT",
+        event_type="VOL_SPIKE",
+        events_df=events_df,
+        horizon_bars=24,
+        entry_lag_bars=1,
+        templates=("continuation", "mean_reversion", "reversal_or_squeeze"),
+        directions=("long",),
+    ).set_index("rule_template")
+
+    assert float(df.loc["continuation", "direction"]) == 1.0
+    assert float(df.loc["reversal_or_squeeze", "direction"]) == 1.0
+    assert float(df.loc["mean_reversion", "direction"]) == -1.0
+
+
 def test_infer_event_direction_sign_uses_text_direction_tokens():
     events_df = pd.DataFrame(
         {

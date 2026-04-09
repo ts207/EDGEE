@@ -331,6 +331,31 @@ def test_gate_templates_fail_closed_in_canonical_evaluator(monkeypatch):
     assert metrics.loc[0, "invalid_reason"] == "gate_template_unsupported"
 
 
+def test_non_forward_label_targets_fail_closed_in_canonical_evaluator(monkeypatch):
+    _patch_robustness(monkeypatch)
+    features = _base_features()
+    signal_col = EVENT_REGISTRY_SPECS["VOL_SHOCK"].signal_column
+    features[signal_col] = False
+    features.loc[[0, 5], signal_col] = True
+
+    spec = HypothesisSpec(
+        trigger=TriggerSpec.event("VOL_SHOCK"),
+        direction="long",
+        horizon="12b",
+        template_id="continuation",
+    )
+
+    monkeypatch.setattr(
+        "project.research.search.evaluator_utils.operator_semantics",
+        lambda _: {"side_policy": "both", "label_target": "mfe_h", "requires_direction": True},
+    )
+
+    metrics = evaluate_hypothesis_batch([spec], features, min_sample_size=1)
+
+    assert bool(metrics.loc[0, "valid"]) is False
+    assert metrics.loc[0, "invalid_reason"] == "unsupported_label_target"
+
+
 def test_non_default_profiles_fail_closed_in_canonical_evaluator(monkeypatch):
     _patch_robustness(monkeypatch)
     features = _base_features()

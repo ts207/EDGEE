@@ -51,3 +51,35 @@ def test_generator_attaches_optional_filter_overlays_without_changing_primary_te
     hypotheses, _ = generate_hypotheses_with_audit(search_space_path=search_spec)
     assert any(getattr(spec, "filter_template_id", None) == "only_if_regime" for spec in hypotheses)
     assert all(spec.template_id == "continuation" for spec in hypotheses)
+
+
+def test_generator_emits_single_direction_for_non_directional_templates(tmp_path):
+    search_spec = tmp_path / "search.yaml"
+    search_spec.write_text(
+        "\n".join(
+            [
+                "kind: search_spec",
+                "triggers:",
+                "  events:",
+                "    - LIQUIDATION_CASCADE_PROXY",
+                "expression_templates:",
+                "  - mean_reversion",
+                "  - continuation",
+                "horizons: [15m]",
+                "directions: [long, short]",
+                "entry_lag: 1",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    hypotheses, _ = generate_hypotheses_with_audit(search_space_path=search_spec)
+
+    mean_reversion_directions = {
+        spec.direction for spec in hypotheses if spec.template_id == "mean_reversion"
+    }
+    continuation_directions = {
+        spec.direction for spec in hypotheses if spec.template_id == "continuation"
+    }
+
+    assert mean_reversion_directions == {"long"}
+    assert continuation_directions == {"long", "short"}

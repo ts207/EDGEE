@@ -3,45 +3,71 @@
 ### What has run
 
 **Infrastructure (pipeline bugs fixed — all working)**
-- 9 pipeline bugs fixed this session (dependency races, zero-output rejections, exit code handling, search engine event type routing, filter template mis-classification, DataFrame.attrs concat crash)
+- 9 pipeline bugs fixed (dependency races, zero-output rejections, exit code handling, search engine event type routing, filter template mis-classification, DataFrame.attrs concat crash)
 - Pipeline runs end-to-end, exit 0, all stages succeed or warn
 
 **Shared lake cache populated**
 - BTC+ETH 2021–2024 cleaned bars, features, market context written to shared lake
-- Subsequent runs use cache hits (fast)
+- Re-use `--run_id funding_extreme_combined` for same date range to skip data building (fastest cache)
 
-**LIQUIDATION_CASCADE_PROXY campaign — STOPPED**
+---
 
-Run: `liq_proxy_combined` (BTC+ETH, 2021–2024, oi_quantile=0.98, vol_quantile=0.90)
+### LIQUIDATION_CASCADE_PROXY — STOPPED
 
-| Symbol | Events | Best horizon | t_stat | mean bps | n_train |
-|--------|--------|-------------|--------|----------|---------|
-| BTCUSDT | ~1000 | 60m long | 1.73 | 10.1 | 597 |
-| ETHUSDT | ~930 | 60m long (also 15m) | 1.79 | 12.5 | 549 |
+Run: `liq_proxy_combined` (BTC+ETH, 2021–2024)
 
-**Decision: STOP.** Gate requires t≥2.0. Ceiling is ~1.8 per symbol across all threshold configs.
+| Symbol | Events | Best horizon | t_stat | mean bps |
+|--------|--------|-------------|--------|----------|
+| BTCUSDT | ~1000 | 60m long | 1.73 | 10.1 |
+| ETHUSDT | ~930 | 60m long | 1.79 | 12.5 |
 
-**Root cause:** Proxy detector fires on OI+volume coincidences that include false positives (funding payments, block trades, rollover events). Per-event return std ~150 bps vs 10 bps mean → SNR too low. Threshold calibration from 0.95→0.99 was fully explored; 0.98 is best known point.
+**Decision: STOP.** t ceiling ~1.8 (gate=2.0). Proxy fires on OI+volume coincidences including false positives. Best config locked: `oi_drop_quantile=0.98`, `vol_surge_quantile=0.90`.
 
-**Signal is real:** direction (long 60m) replicates BTC+ETH with consistent effect size. Effect is not noise — it's genuine cascade exhaustion bounce. But the proxy can't select events cleanly enough to pass gate.
+---
 
-### What the detector needs
+### FUNDING_EXTREME_ONSET — ACTIVE, NEEDS REGIME CONDITIONING
 
-To reach t≥2.0, need ONE of:
-1. **Confirmation bar requirement** — OI must remain suppressed N bars after signal (e.g., `oi_suppress_bars: 2`). This would filter false-positive OI spikes that recover immediately.
-2. **Funding rate gate** — require `funding_rate > X` at signal time. Real cascades happen in funding-elevated regimes.
-3. **Cascade true positive** — use `LIQUIDATION_CASCADE` (requires liquidation_notional feed). Check if Bybit cross-exchange liquidation data exists in the lake.
+Run: `funding_extreme_combined` (BTC+ETH, 2021–2024, 5m timeframe)
 
-### Next campaign options
+| Symbol | Horizon | Direction | t_stat | mean bps | n | robustness |
+|--------|---------|-----------|--------|----------|---|------------|
+| BTCUSDT | 60m | long | 3.27 | 14.97 | 684 | 0.4747 |
+| ETHUSDT | — | — | <2.0 | — | — | — |
 
-**Option A: Fix the proxy**
-Add confirmation requirement to `LiquidationCascadeProxyDetector`. Spec change needed. Then re-run.
+**Status: regime-conditional signal.** Signal is statistically real (t=3.27, q=0.001, passes FDR). Fails promotion because:
+- `robustness_score=0.4747 < gate 0.6` → `gate_c_regime_stable=False`
+- Signal works in ~7/11 market regimes (`regime_support_ratio=0.636`), fails in ~4
+- `falsification_component=0.0` → `discovery_quality_score=-0.36`
+- ETH: no signal at any horizon
 
-**Option B: Switch to FUNDING_EXTREME_ONSET**
-This event has cleaner signal (funding state is a leading indicator). Known to fire cleanly on 5m data. Run:
+**Root cause:** The unconditional search averages over all market regimes. In ~4 regimes (likely low-vol chop or deleveraging), funding extremes do not predict 60m reversals.
+
+---
+
+### Next step: regime-conditioned re-run
+
+**Plan:** Add `only_if_regime` to FUNDING_EXTREME_ONSET's filter templates in `spec/templates/registry.yaml`. This adds hypotheses conditioned on `rv_pct_17280 > 0.7` (realized vol in top 30%), which should isolate the regime where the signal is strong.
+
+**Step 1 — Edit `spec/templates/registry.yaml`** (the FUNDING_EXTREME_ONSET block):
+```yaml
+FUNDING_EXTREME_ONSET:
+  ...
+  templates:
+  - reversal_or_squeeze
+  - mean_reversion
+  - continuation
+  - exhaustion_reversal
+  - convexity_capture
+  - only_if_funding
+  - only_if_oi
+  - only_if_regime      # ← ADD THIS (rv_pct_17280 > 0.7 = high-vol conditioning)
+  - tail_risk_avoid
+```
+
+**Step 2 — Re-run** (cache hits from `funding_extreme_combined`):
 ```
 python3 -m project.pipelines.run_all \
-  --run_id funding_extreme_btc_full \
+  --run_id funding_extreme_highvol \
   --symbols BTCUSDT,ETHUSDT \
   --start 2021-01-01 \
   --end 2024-12-31 \
@@ -49,18 +75,23 @@ python3 -m project.pipelines.run_all \
   --timeframe 5m
 ```
 
-**Option C: OI_FLUSH**
-Adjacent event, tighter definition. Often co-occurs with LIQUIDATION_CASCADE_PROXY but OI_FLUSH focuses on the OI component only. May have cleaner signal.
+**What to look for:** A new candidate with `filter_template_id=only_if_regime` at 60m long with `robustness_score >= 0.6`. If found, check whether it also passes `gate_oos_validation` (≥0.7).
+
+**Alternative conditioning:** If `only_if_regime` doesn't help, try `only_if_trend` (logret_1 > 0.001, trending market). Available columns in features also include `high_vol_regime`, `bull_trend_regime`, `chop_regime` for manual slicing.
+
+**Filter template definitions** (from `spec/templates/registry.yaml` `filter_templates:` section):
+- `only_if_regime`: `rv_pct_17280 > 0.7` (high realized vol)
+- `only_if_trend`: `logret_1 > 0.001` (recent positive momentum)
+- `only_if_funding`: `funding_rate > 0.0` (positive funding)
+
+---
 
 ### Infrastructure facts
 
-- `spec/events/LIQUIDATION_CASCADE_PROXY.yaml` — `oi_drop_quantile: 0.98` is the best calibration point
-- `spec/templates/registry.yaml` — LIQUIDATION_CASCADE_PROXY added (mirrors LIQUIDATION_CASCADE)
+- `spec/events/LIQUIDATION_CASCADE_PROXY.yaml` — `oi_drop_quantile: 0.98` is best calibration (do not change)
+- `spec/templates/registry.yaml` — LIQUIDATION_CASCADE_PROXY added; FUNDING_EXTREME_ONSET has funding+oi filter templates
 - `project/events/phase2.py` — LIQUIDATION_CASCADE_PROXY added to PHASE2_EVENT_CHAIN
-- Pipeline runs with `--events EVENTNAME` correctly pins `phase2_event_type` to that event
-- Filter templates (e.g., `only_if_regime`) are now correctly separated from expression templates in resolved search specs
-- `promote_candidates` exits 1 + warns (not fails) when validation bundle is missing — expected in discovery runs
-
-### Shared lake state
-
-All BTC+ETH 2021–2024 cleaned/features/market_context are cached in `data/lake/runs/liq_proxy_combined/`. Re-use this run_id for re-runs of the same date range to skip data building.
+- `--events EVENTNAME` correctly pins `phase2_event_type` in the planner
+- Filter templates are correctly separated from expression templates in resolved search specs
+- `promote_candidates` exits 1 + warns (not fails) for missing validation bundle — expected in discovery runs
+- Lake cache at `data/lake/runs/funding_extreme_combined/` covers BTC+ETH 2021–2024 fully

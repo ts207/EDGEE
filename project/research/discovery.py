@@ -15,6 +15,7 @@ import numpy as np
 import pandas as pd
 
 from project.core.constants import HORIZON_BARS_BY_TIMEFRAME
+from project.domain.compiled_registry import get_domain_registry
 
 log = logging.getLogger(__name__)
 
@@ -105,6 +106,17 @@ def return_sign_hint(events_df: pd.DataFrame) -> float:
 def action_name_from_direction(direction: float) -> str:
     """Return 'long' or 'short' based on sign."""
     return "long" if float(direction) >= 0 else "short"
+
+
+def _legacy_template_direction_sign(template_id: str, requested_sign: float) -> float:
+    """Map legacy template direction handling onto compiled operator side-policy."""
+    operator = get_domain_registry().get_operator(str(template_id).strip())
+    if operator is None or not isinstance(operator.raw, dict):
+        return float(requested_sign)
+    side_policy = str(operator.raw.get("side_policy", "both")).strip().lower()
+    if side_policy == "contrarian":
+        return float(-requested_sign)
+    return float(requested_sign)
 
 
 def event_template_map() -> Dict[str, str]:
@@ -374,10 +386,7 @@ def _synthesize_experiment_hypotheses(
         # Resolve direction sign
         d_sign = direction_token_to_float(h.direction)
 
-        # Adjust sign based on template if needed (legacy behavior for 'mean_reversion')
-        actual_sign = d_sign
-        if h.template_id == "mean_reversion":
-            actual_sign = -d_sign
+        actual_sign = _legacy_template_direction_sign(h.template_id, d_sign)
 
         h_bars = horizon_to_bars(h.horizon)
 
@@ -598,8 +607,7 @@ def _synthesize_registry_candidates(
                     if d_sign == 0.0:
                         continue
 
-                    # Adjust sign for mean_reversion if it's the template
-                    actual_sign = float(d_sign if tpl == "continuation" else -d_sign)
+                    actual_sign = _legacy_template_direction_sign(tpl, d_sign)
 
                     # Compute stats for this combination
                     returns = candidate_return_series(

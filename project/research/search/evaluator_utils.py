@@ -324,8 +324,11 @@ def signed_returns_for_spec(
     semantics = operator_semantics(spec)
     if semantics is None:
         return None, "unknown_template_operator"
-    if semantics["label_target"] == "gate":
+    label_target = str(semantics["label_target"]).strip().lower()
+    if label_target == "gate":
         return None, "gate_template_unsupported"
+    if label_target != "fwd_return_h":
+        return None, "unsupported_label_target"
 
     if spec.trigger.trigger_type == TriggerType.EVENT and not semantics["requires_direction"]:
         direction_series = event_direction_series(spec, features)
@@ -342,7 +345,7 @@ def signed_returns_for_spec(
                 template_verb=spec.template_id,
                 side_policy=str(semantics["side_policy"]),
                 event_direction=value,
-                label_target=str(semantics["label_target"]),
+                label_target=label_target,
                 fallback_sign=_fallback,
             )
         ).astype(float)
