@@ -112,7 +112,7 @@ def test_artifacts_contract(test_env):
     assert "features" in reqs
     assert "state_engines" in reqs
     assert reqs["detectors"] == ["VolShockDetector"]
-    assert registry_sources["events"] == ["spec/events/event_registry_unified.yaml"]
+    assert "spec/events/VOL_SHOCK.yaml" in registry_sources["events"]
     assert registry_sources["templates"] == ["spec/templates/registry.yaml"]
     assert "project/configs/registries/events.yaml" not in json.dumps(registry_sources)
 

@@ -38,7 +38,7 @@ runtime:
   reports_dir: funding_events
   events_file: funding_episode_events.parquet
   signal_column: funding_extreme_onset_event
-canonical_family: POSITIONING_EXTREMES
+research_family: POSITIONING_EXTREMES
 detector_contract: true
 parameters:
   funding_pct_window: 2880

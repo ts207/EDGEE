@@ -6,5 +6,5 @@ parameters:
   right_event: LIQUIDITY_VACUUM
   op: confirm
   max_gap_bars: 6
-canonical_family: LIQUIDITY_DISLOCATION
+research_family: LIQUIDITY_DISLOCATION
 cluster_id: liquidity_stress

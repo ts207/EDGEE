@@ -15,9 +15,9 @@ def validate_ontology() -> List[Tuple[str, str]]:
 
     # Validate events
     for eid, spec in events.items():
-        fam = spec.get("family") or spec.get("canonical_family")
+        fam = spec.get("family") or spec.get("research_family") or spec.get("canonical_family")
         if not fam:
-            errors.append((f"ontology/events/{eid}.yaml", "Missing family/canonical_family"))
+            errors.append((f"ontology/events/{eid}.yaml", "Missing family/research_family"))
         elif fam not in event_fams:
             errors.append((f"ontology/events/{eid}.yaml", f"Undefined event family: {fam}"))
 

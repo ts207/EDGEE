@@ -11,7 +11,7 @@ parameters:
   min_spacing: 24
   cooldown_bars: 24
   merge_gap_bars: 0
-canonical_family: POSITIONING_EXTREMES
+research_family: POSITIONING_EXTREMES
 trigger: Detector triggers on funding flip pattern
 confirmation: Post-detection price action confirms signal validity
 expected_behavior:

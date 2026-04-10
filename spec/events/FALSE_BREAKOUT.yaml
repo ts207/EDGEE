@@ -9,7 +9,7 @@ parameters:
   breakout_z_threshold: 2.5
   cooldown_bars: 12
   merge_gap_bars: 0
-canonical_family: TREND_STRUCTURE
+research_family: TREND_STRUCTURE
 trigger: Detector triggers on false breakout pattern
 confirmation: Post-detection price action confirms signal validity
 expected_behavior:

@@ -8,7 +8,7 @@ parameters:
   alpha2: 0.95
   lookback_window: 288
   cooldown_bars: 12
-canonical_family: STATISTICAL_DISLOCATION
+research_family: STATISTICAL_DISLOCATION
 trigger: Detector triggers on copula pairs trading pattern
 confirmation: Post-detection price action confirms signal validity
 expected_behavior:

@@ -17,7 +17,7 @@ parameters:
   rv_window: 288
   vol_window: 288
   min_history_bars: 288
-canonical_family: LIQUIDITY_DISLOCATION
+research_family: LIQUIDITY_DISLOCATION
 version: 1
 kind: event
 trigger: Detector triggers on orderflow imbalance shock pattern

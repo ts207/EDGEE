@@ -139,14 +139,24 @@ def _flatten_failure_modes(values: Any) -> list[str]:
 
 
 def _default_description(event_type: str, row: Mapping[str, Any]) -> str:
-    regime = _coalesce_text(row.get("canonical_regime"), row.get("canonical_family"), default="UNSPECIFIED")
+    regime = _coalesce_text(
+        row.get("canonical_regime"),
+        row.get("research_family"),
+        row.get("canonical_family"),
+        default="UNSPECIFIED",
+    )
     phase = _coalesce_text(row.get("phase"), default="event")
     evidence = _coalesce_text(row.get("evidence_mode"), default="unspecified evidence")
     return f"{event_type} is a {phase.replace('_', ' ')} contract in the {regime.replace('_', ' ')} regime using {evidence.replace('_', ' ')} evidence."
 
 
 def _default_causal_mechanism(event_type: str, row: Mapping[str, Any]) -> str:
-    regime = _coalesce_text(row.get("canonical_regime"), row.get("canonical_family"), default="market microstructure")
+    regime = _coalesce_text(
+        row.get("canonical_regime"),
+        row.get("research_family"),
+        row.get("canonical_family"),
+        default="market microstructure",
+    )
     phase = _coalesce_text(row.get("phase"), default="state transition")
     return f"The event is treated as a {phase.replace('_', ' ')} in {regime.replace('_', ' ')}, where the detector seeks an observable footprint large enough to matter for downstream research while suppressing mechanical lookalikes."
 
@@ -265,14 +275,18 @@ def _infer_threshold_method(parameters: Mapping[str, Any], source_spec: Mapping[
     if any(key.endswith("_abs_min") for key in keys) or "min_flip_abs" in keys:
         return "absolute_move_floor"
 
-    family = str(source_spec.get("canonical_family", "detector")).strip() or "detector"
+    family = str(
+        source_spec.get("research_family", source_spec.get("canonical_family", "detector"))
+    ).strip() or "detector"
     phase = str(source_spec.get("phase", "event")).strip() or "event"
     evidence = str(source_spec.get("evidence_mode", "observed")).strip() or "observed"
     return _normalize_policy_token(family, phase, evidence, "gate")
 
 
 def _calibration_objective(source_spec: Mapping[str, Any]) -> tuple[str, str]:
-    family = str(source_spec.get("canonical_family", "")).strip().upper()
+    family = str(
+        source_spec.get("research_family", source_spec.get("canonical_family", ""))
+    ).strip().upper()
     phase = str(source_spec.get("phase", "")).strip().lower()
     objective_by_phase = {
         "breakout": "breakout follow-through versus false-break separation",
@@ -360,7 +374,12 @@ def _infer_calibration_method(parameters: Mapping[str, Any], source_spec: Mappin
 
 def _infer_regime_applicability(event_type: str, row: Mapping[str, Any]) -> str:
     role = _coalesce_text(row.get("operational_role"), default="trigger")
-    regime = _coalesce_text(row.get("canonical_regime"), row.get("canonical_family"), default="UNSPECIFIED")
+    regime = _coalesce_text(
+        row.get("canonical_regime"),
+        row.get("research_family"),
+        row.get("canonical_family"),
+        default="UNSPECIFIED",
+    )
     return f"Primary use is as a {role.replace('_', ' ')} inside {regime.replace('_', ' ')} research and promotion flows."
 
 
@@ -398,6 +417,7 @@ def _merged_row(event_type: str) -> dict[str, Any]:
         parameters.update(dict(runtime_spec["parameters"]))
     row["parameters"] = parameters
     row.setdefault("event_type", event_type)
+    row.setdefault("research_family", event_def.research_family)
     row.setdefault("canonical_family", event_def.canonical_family)
     row.setdefault("canonical_regime", event_def.canonical_regime)
     row.setdefault("legacy_family", event_def.legacy_family)
@@ -438,7 +458,16 @@ def build_event_contract(event_type: str) -> dict[str, Any]:
 
     contract = {
         "event_type": token,
-        "canonical_family": _coalesce_text(row.get("canonical_family"), row.get("canonical_regime")),
+        "research_family": _coalesce_text(
+            row.get("research_family"),
+            row.get("canonical_family"),
+            row.get("canonical_regime"),
+        ),
+        "canonical_family": _coalesce_text(
+            row.get("research_family"),
+            row.get("canonical_family"),
+            row.get("canonical_regime"),
+        ),
         "canonical_regime": _coalesce_text(row.get("canonical_regime"), row.get("canonical_family")),
         "legacy_family": _coalesce_text(row.get("legacy_family")),
         "phase": _coalesce_text(row.get("phase")),
@@ -492,7 +521,7 @@ def build_event_contract(event_type: str) -> dict[str, Any]:
             row.get("expected_overlap")
             or params.get("expected_overlap")
             or expected_behavior.get("expected_overlap")
-        ) or [f"Can overlap with nearby {_coalesce_text(row.get("canonical_regime"), row.get("canonical_family"), default="adjacent").replace("_", " " ).lower()} events when the same mechanism cascades across bars."],
+        ) or [f"Can overlap with nearby {_coalesce_text(row.get("canonical_regime"), row.get("research_family"), row.get("canonical_family"), default="adjacent").replace("_", " " ).lower()} events when the same mechanism cascades across bars."],
         "invalidation_rule": _coalesce_text(
             row.get("invalidation_rule"),
             params.get("invalidation_rule"),

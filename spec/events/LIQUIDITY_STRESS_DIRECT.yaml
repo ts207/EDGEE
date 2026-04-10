@@ -13,7 +13,7 @@ parameters:
   depth_collapse_th: 0.5
   spread_spike_th: 3.0
   median_window: 288
-canonical_family: LIQUIDITY_DISLOCATION
+research_family: LIQUIDITY_DISLOCATION
 trigger: Detector triggers on liquidity stress direct pattern
 confirmation: Post-detection price action confirms signal validity
 expected_behavior:

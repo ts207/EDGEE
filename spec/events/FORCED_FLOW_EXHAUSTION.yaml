@@ -23,7 +23,7 @@ parameters:
   spread_abs_min: 5.0
   rv_decay_ratio: 0.99
   min_spacing: 32
-canonical_family: FORCED_FLOW_AND_EXHAUSTION
+research_family: FORCED_FLOW_AND_EXHAUSTION
 trigger: Detector triggers on forced flow exhaustion pattern
 confirmation: Post-detection price action confirms signal validity
 expected_behavior:

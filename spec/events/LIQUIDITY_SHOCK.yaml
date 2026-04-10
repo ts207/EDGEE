@@ -16,7 +16,7 @@ provenance:
   claim_id:
   - CL_0094
   - CL_0408
-canonical_family: LIQUIDITY_DISLOCATION
+research_family: LIQUIDITY_DISLOCATION
 trigger: Detector triggers on liquidity shock pattern
 confirmation: Post-detection price action confirms signal validity
 expected_behavior:

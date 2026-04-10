@@ -35,7 +35,7 @@ parameters:
   persistence_norm_horizon: 96
   interaction_min_rows_per_year: 150
   min_hazard_events: 50
-canonical_family: POSITIONING_EXTREMES
+research_family: POSITIONING_EXTREMES
 trigger: Detector triggers on funding normalization trigger pattern
 confirmation: Post-detection price action confirms signal validity
 expected_behavior:

@@ -110,7 +110,12 @@ def compute_discovery_prechecks(
         try:
             event_spec = registry.get_event(event_id)
             if event_spec is not None:
-                canonical_family = event_spec.canonical_regime or event_spec.canonical_family or event_spec.event_type
+                canonical_family = (
+                    event_spec.research_family
+                    or event_spec.canonical_family
+                    or event_spec.canonical_regime
+                    or event_spec.event_type
+                )
         except Exception:
             pass
             

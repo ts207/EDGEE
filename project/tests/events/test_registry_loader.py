@@ -38,7 +38,8 @@ def test_compose_event_config_filters_templates_against_legacy_family():
         runtime_overrides={"templates": ("desync_repair", "mean_reversion")},
     )
 
-    assert cfg.family == "CROSS_ASSET_DESYNCHRONIZATION"
+    assert cfg.family == "INFORMATION_DESYNC"
+    assert cfg.canonical_regime == "CROSS_ASSET_DESYNCHRONIZATION"
     assert cfg.legacy_family
     assert cfg.templates == ("desync_repair",)
 
@@ -49,7 +50,8 @@ def test_compose_event_config_drops_incompatible_liquidity_template():
         runtime_overrides={"templates": ("stop_run_repair", "reversal_or_squeeze")},
     )
 
-    assert cfg.family == "LIQUIDITY_STRESS"
+    assert cfg.family == "LIQUIDITY_DISLOCATION"
+    assert cfg.canonical_regime == "LIQUIDITY_STRESS"
     assert cfg.legacy_family
     assert cfg.templates == ("stop_run_repair",)
 

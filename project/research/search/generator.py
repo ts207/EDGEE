@@ -157,13 +157,15 @@ def _event_default_templates(
     legacy_family = None
     parameters = raw.get("parameters")
     if isinstance(parameters, dict):
-        legacy_family = parameters.get("canonical_family")
+        legacy_family = parameters.get("research_family") or parameters.get("canonical_family")
     if legacy_family:
         templates = list(registry.family_hypothesis_templates(str(legacy_family)))
         if templates:
             return templates
 
-    templates = list(registry.family_hypothesis_templates(event_def.canonical_family))
+    templates = list(
+        registry.family_hypothesis_templates(event_def.research_family or event_def.canonical_family)
+    )
     if templates:
         return templates
     return list(fallback_templates)

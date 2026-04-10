@@ -39,7 +39,7 @@ runtime:
   reports_dir: liquidation_events
   events_file: liquidation_cascade_proxy_events.parquet
   signal_column: liquidation_cascade_proxy_event
-canonical_family: POSITIONING_EXTREMES
+research_family: POSITIONING_EXTREMES
 detector_contract: true
 parameters:
   oi_window: 288

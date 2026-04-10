@@ -339,9 +339,15 @@ def build_unified_registry(repo_root: Path) -> Dict[str, Any]:
         )
 
         event_rows[event_type] = {
+            "research_family": _first_text(
+                payload.get("research_family", _MISSING),
+                payload.get("canonical_family", _MISSING),
+                default=ontology["canonical_regime"],
+            ),
             "canonical_family": _first_text(
-                _present(identity, "canonical_regime"),
-                ontology["canonical_regime"],
+                payload.get("research_family", _MISSING),
+                payload.get("canonical_family", _MISSING),
+                default=ontology["canonical_regime"],
             ),
             "canonical_regime": _first_text(
                 _present(identity, "canonical_regime"),
@@ -482,6 +488,7 @@ def build_unified_registry(repo_root: Path) -> Dict[str, Any]:
         base = event_rows.setdefault(
             token,
             {
+                "research_family": "",
                 "canonical_family": "",
                 "canonical_regime": "",
                 "legacy_family": token,
@@ -529,7 +536,15 @@ def build_unified_registry(repo_root: Path) -> Dict[str, Any]:
             if token in event_rows:
                 raise ValueError(f"Active event_type {token} missing from ontology mapping")
             continue
-        base["canonical_family"] = ontology["canonical_regime"]
+        research_family = _first_text(
+            row.get("research_family", _MISSING),
+            row.get("canonical_family", _MISSING),
+            base.get("research_family", _MISSING),
+            base.get("canonical_family", _MISSING),
+            default=ontology["canonical_regime"],
+        )
+        base["research_family"] = research_family
+        base["canonical_family"] = research_family
         base["canonical_regime"] = ontology["canonical_regime"]
         for key in (
             "subtype",
@@ -570,7 +585,7 @@ def build_unified_registry(repo_root: Path) -> Dict[str, Any]:
     all_families = set()
     all_families.update(str(k).strip().upper() for k in legacy_family_rows.keys())
     all_families.update(str(k).strip().upper() for k in template_families.keys())
-    all_families.update(str(row.get("legacy_family", "")).strip().upper() for row in event_rows.values())
+    all_families.update(str(row.get("research_family", "")).strip().upper() for row in event_rows.values())
     all_families.discard("")
 
     for family in sorted(all_families):
@@ -620,7 +635,8 @@ def build_unified_registry(repo_root: Path) -> Dict[str, Any]:
             "notes": (
                 "Single event-centric schema for phase1+phase2 composition. "
                 "Generated compatibility sidecars are downstream outputs only. "
-                "canonical_family is a staged compatibility alias of canonical_regime; "
+                "research_family is the authoritative coarse search/template grouping; "
+                "canonical_family is a generated compatibility alias of research_family; "
                 "legacy_family preserves current family-default wiring."
             ),
         },

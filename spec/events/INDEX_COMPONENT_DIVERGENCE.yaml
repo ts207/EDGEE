@@ -8,7 +8,7 @@ parameters:
   lead_lag_window: 60
   cooldown_bars: 12
   merge_gap_bars: 0
-canonical_family: INFORMATION_DESYNC
+research_family: INFORMATION_DESYNC
 trigger: Detector triggers on index component divergence pattern
 confirmation: Post-detection price action confirms signal validity
 expected_behavior:

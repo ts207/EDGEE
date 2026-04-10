@@ -146,9 +146,9 @@ _registry = _unified_registry
 def _family_by_event() -> Dict[str, str]:
     registry = get_domain_registry()
     return {
-        event_type: spec.canonical_regime or spec.canonical_family
+        event_type: spec.research_family or spec.canonical_family or spec.canonical_regime
         for event_type, spec in registry.event_definitions.items()
-        if spec.canonical_regime or spec.canonical_family
+        if spec.research_family or spec.canonical_family or spec.canonical_regime
     }
 
 
@@ -244,10 +244,15 @@ def compose_config(
     family_name = (
         str(
             row.get(
-                "canonical_regime",
+                "research_family",
                 row.get("canonical_family", _family_by_event().get(normalized, "UNSPECIFIED")),
             )
         )
+        .strip()
+        .upper()
+    )
+    regime_name = (
+        str(getattr(event_def, "canonical_regime", "") or row.get("canonical_regime", family_name))
         .strip()
         .upper()
     )
@@ -259,11 +264,12 @@ def compose_config(
         legacy_family = str(
             row.get("family")
             or _legacy_family_by_event().get(normalized, "")
+            or event_parameters.get("research_family")
             or event_parameters.get("canonical_family")
         ).strip().upper()
     family_defaults_all = unified.get("families", {})
     family_defaults = (
-        family_defaults_all.get(legacy_family, {}) if isinstance(family_defaults_all, dict) else {}
+        family_defaults_all.get(family_name, {}) if isinstance(family_defaults_all, dict) else {}
     )
 
     overrides = dict(runtime_overrides or {})
@@ -332,7 +338,12 @@ def compose_config(
     compatible_templates: list[str] = []
     family_candidates = {
         token
-        for token in (family_name, legacy_family, event_parameters.get("canonical_family"))
+        for token in (
+            family_name,
+            legacy_family,
+            event_parameters.get("research_family"),
+            event_parameters.get("canonical_family"),
+        )
         if isinstance(token, str) and token.strip()
     }
     for t_name in templates:
@@ -359,7 +370,7 @@ def compose_config(
     return ComposedConfig(
         event_type=normalized,
         family=family_name,
-        canonical_regime=family_name,
+        canonical_regime=regime_name,
         legacy_family=legacy_family,
         reports_dir=_coalesce_text(
             row.get("reports_dir"),

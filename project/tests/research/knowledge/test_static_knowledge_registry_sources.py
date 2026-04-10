@@ -82,6 +82,6 @@ def test_static_knowledge_uses_canonical_semantic_sources_when_runtime_mirrors_c
     assert continuation_attrs["enabled"] is True
     assert "EVENT" in continuation_attrs["supports_trigger_types"]
 
-    assert result["index"]["sources"]["semantic"]["events"] == "spec/events/event_registry_unified.yaml"
+    assert result["index"]["sources"]["semantic"]["events"] == "spec/events/*.yaml"
     assert result["index"]["sources"]["semantic"]["states"] == "spec/states/*.yaml"
     assert result["index"]["sources"]["semantic"]["templates"] == "spec/templates/registry.yaml"

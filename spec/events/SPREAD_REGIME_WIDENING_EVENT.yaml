@@ -11,7 +11,7 @@ parameters:
   min_spacing: 48
   cooldown_bars: 48
   merge_gap_bars: 0
-canonical_family: EXECUTION_FRICTION
+research_family: EXECUTION_FRICTION
 trigger: Detector triggers on spread regime widening event pattern
 confirmation: Post-detection price action confirms signal validity
 expected_behavior:

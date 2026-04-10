@@ -29,7 +29,7 @@ parameters:
   post_cluster_lookback: 48
   cooldown_bars: 24
   merge_gap_bars: 0
-canonical_family: FORCED_FLOW_AND_EXHAUSTION
+research_family: FORCED_FLOW_AND_EXHAUSTION
 trigger: Detector triggers on post deleveraging rebound pattern
 confirmation: Post-detection price action confirms signal validity
 expected_behavior:

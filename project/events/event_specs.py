@@ -15,6 +15,7 @@ class EventRegistrySpec:
     reports_dir: str
     events_file: str
     signal_column: str
+    research_family: str = ""
     canonical_regime: str = ""
     legacy_family: str = ""
     subtype: str = ""
@@ -44,7 +45,7 @@ class EventRegistrySpec:
 
     @property
     def canonical_family(self) -> str:
-        return self.canonical_regime
+        return self.research_family
 
 
 def _load_event_specs() -> Dict[str, EventRegistrySpec]:
@@ -68,7 +69,7 @@ def _load_event_specs() -> Dict[str, EventRegistrySpec]:
         if bool(row.get("deprecated", False)) or not bool(row.get("active", True)):
             continue
 
-        family_name = str(row.get("canonical_family", "")).strip().upper()
+        family_name = str(row.get("research_family", row.get("canonical_family", ""))).strip().upper()
         family_params = {}
         if family_name and isinstance(families, dict):
             family_info = families.get(family_name)
@@ -113,6 +114,9 @@ def _load_event_specs() -> Dict[str, EventRegistrySpec]:
             reports_dir=reports_dir,
             events_file=events_file,
             signal_column=signal_column,
+            research_family=str(
+                row.get("research_family", row.get("canonical_family", ""))
+            ).strip().upper(),
             canonical_regime=str(
                 row.get("canonical_regime", row.get("canonical_family", ""))
             ).strip().upper(),

@@ -18,7 +18,7 @@ parameters:
   min_history_bars: 288
   cooldown_bars: 96
   merge_gap_bars: 0
-canonical_family: LIQUIDITY_DISLOCATION
+research_family: LIQUIDITY_DISLOCATION
 trigger: Detector triggers when direct imbalance stall confirms an absorption-style
   liquidity stress surface.
 confirmation: Spread and realized-volatility stress persist long enough to confirm

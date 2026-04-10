@@ -15,6 +15,9 @@ def test_template_registry_compat_payload_is_generated_from_canonical_source() -
     assert canonical["metadata"]["status"] == "authoritative"
     assert compat["metadata"]["status"] == "generated"
     assert compat["metadata"]["authored_source"] == "spec/templates/registry.yaml"
+    assert canonical["events"]["VOL_SHOCK"]["research_family"] == "VOLATILITY_TRANSITION"
+    assert "canonical_family" not in canonical["events"]["VOL_SHOCK"]
+    assert compat["events"]["VOL_SHOCK"]["canonical_family"] == "VOLATILITY_TRANSITION"
     assert compat["operators"]["continuation"]["supports_trigger_types"] == canonical["operators"]["continuation"]["supports_trigger_types"]
 
 

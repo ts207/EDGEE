@@ -31,8 +31,9 @@ def test_compiled_registry_exposes_canonical_ontology_fields():
     registry = get_domain_registry()
     spec = registry.get_event("LIQUIDITY_STRESS_DIRECT")
     assert spec is not None
+    assert spec.research_family == "LIQUIDITY_DISLOCATION"
     assert spec.canonical_regime == "LIQUIDITY_STRESS"
-    assert spec.canonical_family == spec.canonical_regime
+    assert spec.canonical_family == spec.research_family
     assert spec.legacy_family == "LIQUIDITY_STRESS_DIRECT"
     assert spec.evidence_mode == "direct"
 

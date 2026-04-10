@@ -18,6 +18,20 @@ def _canonical_template_registry() -> Dict[str, Any]:
 def build_template_registry_compat_payload() -> Dict[str, Any]:
     canonical = _canonical_template_registry()
     payload = dict(canonical)
+    events = canonical.get("events", {})
+    if isinstance(events, dict):
+        compat_events: Dict[str, Dict[str, Any]] = {}
+        for event_id, row in events.items():
+            if not isinstance(row, dict):
+                continue
+            compat_row = dict(row)
+            research_family = str(
+                row.get("research_family", row.get("canonical_family", ""))
+            ).strip().upper()
+            if research_family:
+                compat_row.setdefault("canonical_family", research_family)
+            compat_events[str(event_id).strip().upper()] = compat_row
+        payload["events"] = compat_events
     metadata = canonical.get("metadata", {})
     payload["metadata"] = {
         **(dict(metadata) if isinstance(metadata, dict) else {}),

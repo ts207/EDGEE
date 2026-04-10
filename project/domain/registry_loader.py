@@ -99,16 +99,17 @@ def _merge_event_rows(unified: Dict[str, Any]) -> Dict[str, EventDefinition]:
         row: Dict[str, Any] = {}
         if isinstance(defaults, dict):
             row.update(defaults)
-        canonical_regime = str(
-            unified_row.get("canonical_regime", unified_row.get("canonical_family", ""))
+        research_family = str(
+            unified_row.get("research_family", unified_row.get("canonical_family", ""))
         ).strip().upper()
+        canonical_regime = str(unified_row.get("canonical_regime", "")).strip().upper()
         legacy_family = str(unified_row.get("legacy_family", "")).strip().upper()
         if (
-            legacy_family
+            research_family
             and isinstance(families, dict)
-            and isinstance(families.get(legacy_family), dict)
+            and isinstance(families.get(research_family), dict)
         ):
-            row.update(families[legacy_family])
+            row.update(families[research_family])
         
         if isinstance(unified_row, dict):
             row.update(unified_row)
@@ -116,11 +117,11 @@ def _merge_event_rows(unified: Dict[str, Any]) -> Dict[str, EventDefinition]:
         default_params = defaults.get("parameters", {}) if isinstance(defaults, dict) else {}
         family_params = {}
         if (
-            legacy_family
+            research_family
             and isinstance(families, dict)
-            and isinstance(families.get(legacy_family), dict)
+            and isinstance(families.get(research_family), dict)
         ):
-            family_params = families[legacy_family].get("parameters", {})
+            family_params = families[research_family].get("parameters", {})
             
         if isinstance(default_params, dict):
             parameters.update(default_params)
@@ -134,7 +135,8 @@ def _merge_event_rows(unified: Dict[str, Any]) -> Dict[str, EventDefinition]:
         
         out[event_type] = EventDefinition(
             event_type=event_type,
-            canonical_family=canonical_regime or str(row.get("canonical_family", "")).strip().upper(),
+            research_family=research_family or str(row.get("canonical_family", "")).strip().upper(),
+            canonical_family=research_family or str(row.get("canonical_family", "")).strip().upper(),
             canonical_regime=canonical_regime or str(row.get("canonical_family", "")).strip().upper(),
             legacy_family=legacy_family,
             event_kind=str(row.get("event_kind", "market_event")).strip() or "market_event",
@@ -298,7 +300,7 @@ def _load_state_aliases() -> tuple[str, ...]:
 
 
 def _load_searchable_families() -> tuple[tuple[str, ...], tuple[str, ...]]:
-    payload = load_yaml_relative("spec/grammar/family_registry.yaml")
+    payload = _load_family_registry_payload()
     event_families = payload.get("event_families", {}) if isinstance(payload, dict) else {}
     state_families = payload.get("state_families", {}) if isinstance(payload, dict) else {}
     searchable_events = tuple(
@@ -316,6 +318,59 @@ def _load_searchable_families() -> tuple[tuple[str, ...], tuple[str, ...]]:
         )
     )
     return searchable_events, searchable_states
+
+
+def _load_family_registry_payload(
+    template_registry_payload: Dict[str, Any] | None = None,
+) -> Dict[str, Any]:
+    canonical = (
+        dict(template_registry_payload)
+        if isinstance(template_registry_payload, dict)
+        else load_template_registry()
+    )
+    authored = load_yaml_relative("spec/grammar/family_registry.yaml")
+    event_families = authored.get("event_families", {}) if isinstance(authored, dict) else {}
+    state_families = authored.get("state_families", {}) if isinstance(authored, dict) else {}
+    template_families = canonical.get("families", {}) if isinstance(canonical, dict) else {}
+
+    merged_event_families: Dict[str, Dict[str, Any]] = {}
+    all_event_family_names = {
+        str(name).strip().upper()
+        for name in (
+            list(event_families.keys()) if isinstance(event_families, dict) else []
+        )
+        + (list(template_families.keys()) if isinstance(template_families, dict) else [])
+        if str(name).strip()
+    }
+    for family_name in sorted(all_event_family_names):
+        authored_row = (
+            event_families.get(family_name, {})
+            if isinstance(event_families, dict)
+            else {}
+        )
+        canonical_row = (
+            template_families.get(family_name, {})
+            if isinstance(template_families, dict)
+            else {}
+        )
+        merged_row: Dict[str, Any] = {}
+        if isinstance(authored_row, dict):
+            merged_row.update(dict(authored_row))
+        if isinstance(canonical_row, dict):
+            templates = canonical_row.get("templates", canonical_row.get("allowed_templates", []))
+            merged_row["allowed_templates"] = [
+                str(item).strip()
+                for item in templates
+                if str(item).strip()
+            ]
+        merged_event_families[family_name] = merged_row
+
+    return {
+        "version": int(authored.get("version", 1) or 1) if isinstance(authored, dict) else 1,
+        "kind": str(authored.get("kind", "family_registry")).strip() if isinstance(authored, dict) else "family_registry",
+        "event_families": merged_event_families,
+        "state_families": dict(state_families) if isinstance(state_families, dict) else {},
+    }
 
 
 def _load_stress_scenarios() -> tuple[Dict[str, Any], ...]:
@@ -606,7 +661,7 @@ def _build_domain_registry_from_sources() -> DomainRegistry:
     if not unified:
         raise FileNotFoundError("Unified event registry is missing or empty")
     template_registry_payload = load_template_registry()
-    family_registry_payload = load_yaml_relative("spec/grammar/family_registry.yaml")
+    family_registry_payload = _load_family_registry_payload(template_registry_payload)
     event_definitions = _merge_event_rows(unified)
     state_definitions = _load_states()
     template_operator_definitions = _load_operators(unified)
@@ -644,6 +699,7 @@ def _build_domain_registry_from_sources() -> DomainRegistry:
 def _event_definition_payload(spec: EventDefinition) -> Dict[str, Any]:
     return {
         "event_type": spec.event_type,
+        "research_family": spec.research_family,
         "canonical_family": spec.canonical_family,
         "canonical_regime": spec.canonical_regime,
         "legacy_family": spec.legacy_family,
@@ -882,7 +938,8 @@ def compile_domain_registry_from_sources() -> DomainRegistry:
 def _event_definition_from_payload(row: Dict[str, Any]) -> EventDefinition:
     return EventDefinition(
         event_type=str(row.get("event_type", "")).strip().upper(),
-        canonical_family=str(row.get("canonical_family", "")).strip().upper(),
+        research_family=str(row.get("research_family", row.get("canonical_family", ""))).strip().upper(),
+        canonical_family=str(row.get("canonical_family", row.get("research_family", ""))).strip().upper(),
         canonical_regime=str(row.get("canonical_regime", "")).strip().upper(),
         legacy_family=str(row.get("legacy_family", "")).strip().upper(),
         event_kind=str(row.get("event_kind", "market_event")).strip() or "market_event",

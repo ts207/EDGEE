@@ -141,6 +141,16 @@ templates:
     supports_trigger_types:
     - EVENT
     - STATE
+  only_if_highvol:
+    enabled: true
+    template_kind: filter_template
+    supports_contexts: true
+    supports_directions:
+    - long
+    - short
+    supports_trigger_types:
+    - EVENT
+    - STATE
   only_if_liquidity:
     enabled: true
     template_kind: filter_template

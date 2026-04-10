@@ -1,9 +1,10 @@
 version: 1
 kind: family_registry
-# AUTHORITATIVE SOURCE: spec/templates/registry.yaml
-# This file is reconciled to match the canonical template registry.
-# Do NOT edit allowed_templates here independently — update spec/templates/registry.yaml
-# and run validate_registry_consistency() to catch any future divergence.
+# AUTHORITY SPLIT:
+# - searchable flags and descriptions live here.
+# - allowed_templates are derived from spec/templates/registry.yaml and treated as
+#   compatibility metadata only.
+# Do NOT edit allowed_templates here independently — update spec/templates/registry.yaml.
 
 event_families:
   LIQUIDITY_DISLOCATION:

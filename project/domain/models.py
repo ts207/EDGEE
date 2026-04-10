@@ -8,6 +8,7 @@ from typing import Any, Dict, Mapping
 @dataclass(frozen=True)
 class EventDefinition:
     event_type: str
+    research_family: str
     canonical_family: str
     canonical_regime: str
     legacy_family: str
@@ -315,6 +316,7 @@ class DomainRegistry:
             return {}
         row = dict(event.raw)
         row.setdefault("event_type", event.event_type)
+        row.setdefault("research_family", event.research_family)
         row.setdefault("canonical_family", event.canonical_family)
         row.setdefault("canonical_regime", event.canonical_regime)
         row.setdefault("legacy_family", event.legacy_family)
@@ -344,7 +346,8 @@ class DomainRegistry:
             sorted(
                 event_type
                 for event_type, spec in self.event_definitions.items()
-                if spec.canonical_family == family
+                if spec.research_family == family
+                or spec.canonical_family == family
                 or spec.canonical_regime == family
                 or spec.legacy_family == family
             )

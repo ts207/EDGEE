@@ -76,7 +76,9 @@ def _event_spec_payload(event_type: str) -> dict[str, Any]:
 
 
 def _legacy_family_for_proxy(spec_payload: Mapping[str, Any], fallback: str) -> str:
-    token = _clean_text(spec_payload.get("canonical_family"))
+    token = _clean_text(spec_payload.get("research_family")) or _clean_text(
+        spec_payload.get("canonical_family")
+    )
     return token or fallback
 
 

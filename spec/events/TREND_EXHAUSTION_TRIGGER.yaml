@@ -26,7 +26,7 @@ parameters:
   cascade_window_bars: 12
   cooldown_bars: 96
   merge_gap_bars: 0
-canonical_family: FORCED_FLOW_AND_EXHAUSTION
+research_family: FORCED_FLOW_AND_EXHAUSTION
 trigger: Detector triggers on trend exhaustion trigger pattern
 confirmation: Post-detection price action confirms signal validity
 expected_behavior:

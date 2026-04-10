@@ -23,6 +23,7 @@ def test_domain_registry_compiles_core_event_state_and_template_views():
     event = registry.get_event("VOL_SHOCK")
     assert event is not None
     assert event.event_type == "VOL_SHOCK"
+    assert event.research_family == "VOLATILITY_TRANSITION"
     assert event.canonical_family == "VOLATILITY_TRANSITION"
     assert event.canonical_regime == "VOLATILITY_TRANSITION"
     assert event.signal_column
@@ -103,8 +104,44 @@ def test_domain_registry_event_row_exposes_routing_profile_ref():
 
     row = registry.event_row("LIQUIDATION_CASCADE_PROXY")
 
+    assert row["research_family"] == "POSITIONING_EXTREMES"
     assert row["canonical_regime"] == "LIQUIDATION_CASCADE"
     assert row["routing_profile_ref"] == "LIQUIDATION_CASCADE"
+
+
+def test_domain_registry_exposes_research_family_separately_from_canonical_regime():
+    registry = refresh_domain_registry(rebuild_from_sources=True)
+
+    row = registry.event_row("OI_FLUSH")
+
+    assert row["research_family"] == "POSITIONING_EXTREMES"
+    assert row["canonical_family"] == "POSITIONING_EXTREMES"
+    assert row["canonical_regime"] == "POSITIONING_UNWIND_DELEVERAGING"
+
+
+def test_domain_registry_derives_family_allowed_templates_from_template_registry(monkeypatch):
+    from project.domain import registry_loader
+
+    original = registry_loader.load_yaml_relative
+
+    def patched(relative_path: str):
+        payload = original(relative_path)
+        if relative_path == "spec/grammar/family_registry.yaml":
+            poisoned = dict(payload)
+            event_families = dict(poisoned.get("event_families", {}))
+            liquidity = dict(event_families.get("LIQUIDITY_DISLOCATION", {}))
+            liquidity["allowed_templates"] = ["poisoned_template"]
+            event_families["LIQUIDITY_DISLOCATION"] = liquidity
+            poisoned["event_families"] = event_families
+            return poisoned
+        return payload
+
+    monkeypatch.setattr(registry_loader, "load_yaml_relative", patched)
+
+    registry = registry_loader.compile_domain_registry_from_sources()
+
+    assert "poisoned_template" not in registry.event_family_rows()["LIQUIDITY_DISLOCATION"]["allowed_templates"]
+    assert "mean_reversion" in registry.event_family_rows()["LIQUIDITY_DISLOCATION"]["allowed_templates"]
 
 
 def test_domain_registry_exposes_context_and_searchable_family_views():

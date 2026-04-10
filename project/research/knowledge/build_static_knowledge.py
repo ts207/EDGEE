@@ -146,7 +146,7 @@ def build_static_knowledge(
         family = str(row.get("family", "")).strip().upper()
         detector_name = str(row.get("detector") or detector_ownership.get(event_type, "")).strip()
         enabled = bool(row.get("enabled", True))
-        source_path = str(row.get("source_path", "spec/events/event_registry_unified.yaml"))
+        source_path = str(row.get("source_path", "spec/events/*.yaml"))
         entities.append(
             {
                 "entity_id": entity_id("event", event_type),
@@ -420,7 +420,9 @@ def build_static_knowledge(
 
     for event_type, spec in domain.event_definitions.items():
         event_meta = event_rows.get(event_type, {})
-        family_name = str(event_meta.get("family", spec.canonical_family)).strip().upper()
+        family_name = str(
+            event_meta.get("family", spec.research_family or spec.canonical_family)
+        ).strip().upper()
         for template_id in domain.family_templates(family_name):
             _append_relation(
                 relations,
@@ -471,7 +473,7 @@ def build_static_knowledge(
         "sources": {
             "registry_root": str(resolved_registry_root),
             "semantic": {
-                "events": "spec/events/event_registry_unified.yaml",
+                "events": "spec/events/*.yaml",
                 "states": "spec/states/*.yaml",
                 "templates": "spec/templates/registry.yaml",
             },

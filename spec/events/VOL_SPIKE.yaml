@@ -8,7 +8,7 @@ parameters:
   cooldown_bars: 6
   anchor_rule: first
   min_occurrences: 5
-canonical_family: VOLATILITY_TRANSITION
+research_family: VOLATILITY_TRANSITION
 trigger: Detector triggers on vol spike pattern
 confirmation: Post-detection price action confirms signal validity
 expected_behavior:

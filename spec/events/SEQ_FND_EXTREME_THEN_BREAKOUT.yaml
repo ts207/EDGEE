@@ -3,7 +3,7 @@ kind: event
 event_type: SEQ_FND_EXTREME_THEN_BREAKOUT
 active: true
 synthetic_coverage: covered
-canonical_family: POSITIONING_EXTREMES
+research_family: POSITIONING_EXTREMES
 reports_dir: event_sequences
 events_file: event_sequences.parquet
 signal_column: seq_fnd_extreme_then_breakout_event

@@ -5,7 +5,7 @@ synthetic_coverage: covered
 reports_dir: cross_asset_desync_event
 events_file: cross_asset_desync_event_events.parquet
 signal_column: cross_asset_desync_event
-canonical_family: CROSS_ASSET_DESYNCHRONIZATION
+research_family: CROSS_ASSET_DESYNCHRONIZATION
 detector_contract: true
 description: Cross-asset desynchronization between a primary asset and an explicitly
   paired reference asset.

@@ -10,7 +10,9 @@ metadata:
   - spec/multiplicity/families.yaml
   - spec/multiplicity/taxonomy.yaml
   notes: Canonical authored template source. Generated runtime and ontology template
-    registries are rebuilt from this file.
+    registries are rebuilt from this file. Event rows use research_family as the
+    coarse search/template grouping key; canonical_family is generated only for
+    compatibility sidecars.
   phase2_search_unit: trigger_x_expression_template
   template_kind_policy: Expression templates are the primary search unit. Filter templates
     are optional overlays. Execution-template-only search branches are reserved and
@@ -67,6 +69,16 @@ defaults:
       - 3.0
       - 5.0
 families:
+  LIQUIDITY_STRESS:
+    templates:
+    - mean_reversion
+    - continuation
+    - stop_run_repair
+    - overshoot_repair
+    - only_if_liquidity
+    - slippage_aware_filter
+    - only_if_regime
+    - only_if_highvol
   LIQUIDITY_DISLOCATION:
     templates:
     - mean_reversion
@@ -175,7 +187,7 @@ families:
     - tail_risk_avoid
 events:
   LIQUIDITY_VACUUM:
-    canonical_family: LIQUIDITY_DISLOCATION
+    research_family: LIQUIDITY_DISLOCATION
     templates:
     - mean_reversion
     - stop_run_repair
@@ -188,7 +200,7 @@ events:
     max_candidates_per_run: 1000
     conditioning_cols: []
   LIQUIDITY_SHOCK:
-    canonical_family: LIQUIDITY_DISLOCATION
+    research_family: LIQUIDITY_DISLOCATION
     templates:
     - mean_reversion
     - continuation
@@ -200,7 +212,7 @@ events:
     - 15m
     max_candidates_per_run: 600
   DEPTH_COLLAPSE:
-    canonical_family: LIQUIDITY_DISLOCATION
+    research_family: LIQUIDITY_DISLOCATION
     templates:
     - mean_reversion
     - continuation
@@ -212,7 +224,7 @@ events:
     - 15m
     max_candidates_per_run: 600
   DEPTH_STRESS_PROXY:
-    canonical_family: LIQUIDITY_DISLOCATION
+    research_family: LIQUIDITY_DISLOCATION
     templates:
     - mean_reversion
     - continuation
@@ -224,7 +236,7 @@ events:
     - 15m
     max_candidates_per_run: 600
   SPREAD_BLOWOUT:
-    canonical_family: LIQUIDITY_DISLOCATION
+    research_family: LIQUIDITY_DISLOCATION
     templates:
     - mean_reversion
     - continuation
@@ -236,7 +248,7 @@ events:
     - 15m
     max_candidates_per_run: 600
   ORDERFLOW_IMBALANCE_SHOCK:
-    canonical_family: LIQUIDITY_DISLOCATION
+    research_family: LIQUIDITY_DISLOCATION
     templates:
     - mean_reversion
     - continuation
@@ -248,7 +260,7 @@ events:
     - 15m
     max_candidates_per_run: 600
   SWEEP_STOPRUN:
-    canonical_family: LIQUIDITY_DISLOCATION
+    research_family: LIQUIDITY_DISLOCATION
     templates:
     - mean_reversion
     - continuation
@@ -262,7 +274,7 @@ events:
     max_candidates_per_run: 600
   ABSORPTION_EVENT:
     active: false
-    canonical_family: LIQUIDITY_DISLOCATION
+    research_family: LIQUIDITY_DISLOCATION
     templates:
     - mean_reversion
     - continuation
@@ -274,7 +286,7 @@ events:
     - 15m
     max_candidates_per_run: 600
   ABSORPTION_PROXY:
-    canonical_family: LIQUIDITY_DISLOCATION
+    research_family: LIQUIDITY_DISLOCATION
     templates:
     - mean_reversion
     - stop_run_repair
@@ -285,7 +297,7 @@ events:
     - 15m
     max_candidates_per_run: 600
   LIQUIDITY_GAP_PRINT:
-    canonical_family: LIQUIDITY_DISLOCATION
+    research_family: LIQUIDITY_DISLOCATION
     templates:
     - mean_reversion
     - continuation
@@ -293,11 +305,15 @@ events:
     - overshoot_repair
     - only_if_liquidity
     - slippage_aware_filter
+    - only_if_regime
+    - only_if_highvol
     horizons:
-    - 15m
+    - 12b
+    - 24b
+    - 48b
     max_candidates_per_run: 600
   LIQUIDITY_STRESS_DIRECT:
-    canonical_family: LIQUIDITY_DISLOCATION
+    research_family: LIQUIDITY_DISLOCATION
     templates:
     - mean_reversion
     - continuation
@@ -309,7 +325,7 @@ events:
     - 15m
     max_candidates_per_run: 600
   LIQUIDITY_STRESS_PROXY:
-    canonical_family: LIQUIDITY_DISLOCATION
+    research_family: LIQUIDITY_DISLOCATION
     templates:
     - mean_reversion
     - continuation
@@ -321,7 +337,7 @@ events:
     - 15m
     max_candidates_per_run: 600
   PRICE_VOL_IMBALANCE_PROXY:
-    canonical_family: LIQUIDITY_DISLOCATION
+    research_family: LIQUIDITY_DISLOCATION
     templates:
     - mean_reversion
     - continuation
@@ -333,7 +349,7 @@ events:
     - 15m
     max_candidates_per_run: 600
   WICK_REVERSAL_PROXY:
-    canonical_family: LIQUIDITY_DISLOCATION
+    research_family: LIQUIDITY_DISLOCATION
     templates:
     - mean_reversion
     - stop_run_repair
@@ -344,7 +360,7 @@ events:
     - 15m
     max_candidates_per_run: 500
   VOL_SHOCK:
-    canonical_family: VOLATILITY_TRANSITION
+    research_family: VOLATILITY_TRANSITION
     templates:
     - mean_reversion
     - continuation
@@ -353,7 +369,7 @@ events:
     - 60m
     max_candidates_per_run: 500
   VOL_SPIKE:
-    canonical_family: VOLATILITY_TRANSITION
+    research_family: VOLATILITY_TRANSITION
     templates:
     - mean_reversion
     - continuation
@@ -365,7 +381,7 @@ events:
     - 60m
     max_candidates_per_run: 500
   VOL_RELAXATION_START:
-    canonical_family: VOLATILITY_TRANSITION
+    research_family: VOLATILITY_TRANSITION
     templates:
     - mean_reversion
     - continuation
@@ -377,7 +393,7 @@ events:
     - 60m
     max_candidates_per_run: 500
   VOL_CLUSTER_SHIFT:
-    canonical_family: VOLATILITY_TRANSITION
+    research_family: VOLATILITY_TRANSITION
     templates:
     - mean_reversion
     - continuation
@@ -389,7 +405,7 @@ events:
     - 60m
     max_candidates_per_run: 500
   RANGE_COMPRESSION_END:
-    canonical_family: VOLATILITY_TRANSITION
+    research_family: VOLATILITY_TRANSITION
     templates:
     - mean_reversion
     - continuation
@@ -401,7 +417,7 @@ events:
     - 60m
     max_candidates_per_run: 500
   BREAKOUT_TRIGGER:
-    canonical_family: VOLATILITY_TRANSITION
+    research_family: VOLATILITY_TRANSITION
     templates:
     - mean_reversion
     - continuation
@@ -413,7 +429,7 @@ events:
     - 60m
     max_candidates_per_run: 500
   FUNDING_EXTREME_ONSET:
-    canonical_family: POSITIONING_EXTREMES
+    research_family: POSITIONING_EXTREMES
     templates:
     - reversal_or_squeeze
     - mean_reversion
@@ -431,7 +447,7 @@ events:
     - 60m
     max_candidates_per_run: 500
   FUNDING_FLIP:
-    canonical_family: POSITIONING_EXTREMES
+    research_family: POSITIONING_EXTREMES
     templates:
     - reversal_or_squeeze
     - mean_reversion
@@ -446,7 +462,7 @@ events:
     - 60m
     max_candidates_per_run: 500
   FUNDING_PERSISTENCE_TRIGGER:
-    canonical_family: POSITIONING_EXTREMES
+    research_family: POSITIONING_EXTREMES
     templates:
     - reversal_or_squeeze
     - mean_reversion
@@ -462,7 +478,7 @@ events:
     - 60m
     max_candidates_per_run: 500
   FUNDING_NORMALIZATION_TRIGGER:
-    canonical_family: POSITIONING_EXTREMES
+    research_family: POSITIONING_EXTREMES
     templates:
     - reversal_or_squeeze
     - mean_reversion
@@ -476,7 +492,7 @@ events:
     - 60m
     max_candidates_per_run: 500
   OI_SPIKE_POSITIVE:
-    canonical_family: POSITIONING_EXTREMES
+    research_family: POSITIONING_EXTREMES
     templates:
     - reversal_or_squeeze
     - mean_reversion
@@ -490,7 +506,7 @@ events:
     - 60m
     max_candidates_per_run: 250
   OI_SPIKE_NEGATIVE:
-    canonical_family: POSITIONING_EXTREMES
+    research_family: POSITIONING_EXTREMES
     templates:
     - reversal_or_squeeze
     - mean_reversion
@@ -505,7 +521,7 @@ events:
     - 60m
     max_candidates_per_run: 250
   OI_FLUSH:
-    canonical_family: POSITIONING_EXTREMES
+    research_family: POSITIONING_EXTREMES
     templates:
     - reversal_or_squeeze
     - mean_reversion
@@ -522,7 +538,7 @@ events:
     - 60m
     max_candidates_per_run: 500
   LIQUIDATION_CASCADE:
-    canonical_family: POSITIONING_EXTREMES
+    research_family: POSITIONING_EXTREMES
     templates:
     - reversal_or_squeeze
     - mean_reversion
@@ -537,7 +553,7 @@ events:
     - 15m
     - 60m
   LIQUIDATION_CASCADE_PROXY:
-    canonical_family: POSITIONING_EXTREMES
+    research_family: POSITIONING_EXTREMES
     templates:
     - reversal_or_squeeze
     - mean_reversion
@@ -553,7 +569,7 @@ events:
     - 60m
     max_candidates_per_run: 300
   DELEVERAGING_WAVE:
-    canonical_family: POSITIONING_EXTREMES
+    research_family: POSITIONING_EXTREMES
     templates:
     - reversal_or_squeeze
     - mean_reversion
@@ -568,7 +584,7 @@ events:
     - 60m
     max_candidates_per_run: 500
   FORCED_FLOW_EXHAUSTION:
-    canonical_family: FORCED_FLOW_AND_EXHAUSTION
+    research_family: FORCED_FLOW_AND_EXHAUSTION
     templates:
     - mean_reversion
     - exhaustion_reversal
@@ -582,7 +598,7 @@ events:
     - 60m
     max_candidates_per_run: 500
   TREND_EXHAUSTION_TRIGGER:
-    canonical_family: FORCED_FLOW_AND_EXHAUSTION
+    research_family: FORCED_FLOW_AND_EXHAUSTION
     templates:
     - mean_reversion
     - exhaustion_reversal
@@ -594,7 +610,7 @@ events:
     - 60m
     max_candidates_per_run: 500
   MOMENTUM_DIVERGENCE_TRIGGER:
-    canonical_family: FORCED_FLOW_AND_EXHAUSTION
+    research_family: FORCED_FLOW_AND_EXHAUSTION
     templates:
     - mean_reversion
     - exhaustion_reversal
@@ -607,7 +623,7 @@ events:
     - 60m
     max_candidates_per_run: 500
   CLIMAX_VOLUME_BAR:
-    canonical_family: FORCED_FLOW_AND_EXHAUSTION
+    research_family: FORCED_FLOW_AND_EXHAUSTION
     templates:
     - mean_reversion
     - exhaustion_reversal
@@ -621,7 +637,7 @@ events:
     - 60m
     max_candidates_per_run: 500
   FAILED_CONTINUATION:
-    canonical_family: FORCED_FLOW_AND_EXHAUSTION
+    research_family: FORCED_FLOW_AND_EXHAUSTION
     templates:
     - mean_reversion
     - exhaustion_reversal
@@ -633,7 +649,7 @@ events:
     - 60m
     max_candidates_per_run: 500
   FLOW_EXHAUSTION_PROXY:
-    canonical_family: FORCED_FLOW_AND_EXHAUSTION
+    research_family: FORCED_FLOW_AND_EXHAUSTION
     templates:
     - mean_reversion
     - exhaustion_reversal
@@ -645,7 +661,7 @@ events:
     - 60m
     max_candidates_per_run: 500
   LIQUIDATION_EXHAUSTION_REVERSAL:
-    canonical_family: FORCED_FLOW_AND_EXHAUSTION
+    research_family: FORCED_FLOW_AND_EXHAUSTION
     templates:
     - mean_reversion
     - exhaustion_reversal
@@ -657,7 +673,7 @@ events:
     - 60m
     max_candidates_per_run: 400
   POST_DELEVERAGING_REBOUND:
-    canonical_family: FORCED_FLOW_AND_EXHAUSTION
+    research_family: FORCED_FLOW_AND_EXHAUSTION
     templates:
     - mean_reversion
     - exhaustion_reversal
@@ -669,7 +685,7 @@ events:
     - 60m
     max_candidates_per_run: 400
   RANGE_BREAKOUT:
-    canonical_family: TREND_STRUCTURE
+    research_family: TREND_STRUCTURE
     templates:
     - breakout_followthrough
     - false_breakout_reversal
@@ -683,7 +699,7 @@ events:
     - 60m
     max_candidates_per_run: 450
   FALSE_BREAKOUT:
-    canonical_family: TREND_STRUCTURE
+    research_family: TREND_STRUCTURE
     templates:
     - breakout_followthrough
     - false_breakout_reversal
@@ -696,7 +712,7 @@ events:
     - 60m
     max_candidates_per_run: 450
   TREND_ACCELERATION:
-    canonical_family: TREND_STRUCTURE
+    research_family: TREND_STRUCTURE
     templates:
     - breakout_followthrough
     - false_breakout_reversal
@@ -709,7 +725,7 @@ events:
     - 60m
     max_candidates_per_run: 450
   TREND_DECELERATION:
-    canonical_family: TREND_STRUCTURE
+    research_family: TREND_STRUCTURE
     templates:
     - breakout_followthrough
     - false_breakout_reversal
@@ -722,7 +738,7 @@ events:
     - 60m
     max_candidates_per_run: 450
   PULLBACK_PIVOT:
-    canonical_family: TREND_STRUCTURE
+    research_family: TREND_STRUCTURE
     templates:
     - breakout_followthrough
     - false_breakout_reversal
@@ -735,7 +751,7 @@ events:
     - 60m
     max_candidates_per_run: 450
   SUPPORT_RESISTANCE_BREAK:
-    canonical_family: TREND_STRUCTURE
+    research_family: TREND_STRUCTURE
     templates:
     - breakout_followthrough
     - false_breakout_reversal
@@ -748,7 +764,7 @@ events:
     - 60m
     max_candidates_per_run: 450
   ZSCORE_STRETCH:
-    canonical_family: STATISTICAL_DISLOCATION
+    research_family: STATISTICAL_DISLOCATION
     templates:
     - mean_reversion
     - overshoot_repair
@@ -758,7 +774,7 @@ events:
     - 60m
     max_candidates_per_run: 350
   BAND_BREAK:
-    canonical_family: STATISTICAL_DISLOCATION
+    research_family: STATISTICAL_DISLOCATION
     templates:
     - mean_reversion
     - overshoot_repair
@@ -768,7 +784,7 @@ events:
     - 60m
     max_candidates_per_run: 350
   OVERSHOOT_AFTER_SHOCK:
-    canonical_family: STATISTICAL_DISLOCATION
+    research_family: STATISTICAL_DISLOCATION
     templates:
     - mean_reversion
     - overshoot_repair
@@ -778,7 +794,7 @@ events:
     - 60m
     max_candidates_per_run: 350
   GAP_OVERSHOOT:
-    canonical_family: STATISTICAL_DISLOCATION
+    research_family: STATISTICAL_DISLOCATION
     templates:
     - mean_reversion
     - overshoot_repair
@@ -788,7 +804,7 @@ events:
     - 60m
     max_candidates_per_run: 350
   COPULA_PAIRS_TRADING:
-    canonical_family: STATISTICAL_DISLOCATION
+    research_family: STATISTICAL_DISLOCATION
     templates:
     - mean_reversion
     - overshoot_repair
@@ -798,7 +814,7 @@ events:
     - 60m
     max_candidates_per_run: 350
   FND_DISLOC:
-    canonical_family: STATISTICAL_DISLOCATION
+    research_family: STATISTICAL_DISLOCATION
     templates:
     - mean_reversion
     - overshoot_repair
@@ -808,7 +824,7 @@ events:
     - 60m
     max_candidates_per_run: 350
   BASIS_DISLOC:
-    canonical_family: STATISTICAL_DISLOCATION
+    research_family: STATISTICAL_DISLOCATION
     templates:
     - mean_reversion
     - overshoot_repair
@@ -818,7 +834,7 @@ events:
     - 60m
     max_candidates_per_run: 350
   VOL_REGIME_SHIFT_EVENT:
-    canonical_family: REGIME_TRANSITION
+    research_family: REGIME_TRANSITION
     templates:
     - only_if_regime
     - continuation
@@ -829,7 +845,7 @@ events:
     - 60m
     max_candidates_per_run: 350
   TREND_TO_CHOP_SHIFT:
-    canonical_family: REGIME_TRANSITION
+    research_family: REGIME_TRANSITION
     templates:
     - only_if_regime
     - continuation
@@ -840,7 +856,7 @@ events:
     - 60m
     max_candidates_per_run: 350
   CHOP_TO_TREND_SHIFT:
-    canonical_family: REGIME_TRANSITION
+    research_family: REGIME_TRANSITION
     templates:
     - only_if_regime
     - continuation
@@ -851,7 +867,7 @@ events:
     - 60m
     max_candidates_per_run: 350
   CORRELATION_BREAKDOWN_EVENT:
-    canonical_family: REGIME_TRANSITION
+    research_family: REGIME_TRANSITION
     templates:
     - only_if_regime
     - continuation
@@ -862,7 +878,7 @@ events:
     - 60m
     max_candidates_per_run: 350
   BETA_SPIKE_EVENT:
-    canonical_family: REGIME_TRANSITION
+    research_family: REGIME_TRANSITION
     templates:
     - only_if_regime
     - continuation
@@ -873,7 +889,7 @@ events:
     - 60m
     max_candidates_per_run: 350
   CROSS_VENUE_DESYNC:
-    canonical_family: INFORMATION_DESYNC
+    research_family: INFORMATION_DESYNC
     templates:
     - desync_repair
     - convergence
@@ -886,7 +902,7 @@ events:
     - 60m
     max_candidates_per_run: 600
   INDEX_COMPONENT_DIVERGENCE:
-    canonical_family: INFORMATION_DESYNC
+    research_family: INFORMATION_DESYNC
     templates:
     - desync_repair
     - convergence
@@ -899,7 +915,7 @@ events:
     - 60m
     max_candidates_per_run: 500
   SPOT_PERP_BASIS_SHOCK:
-    canonical_family: INFORMATION_DESYNC
+    research_family: INFORMATION_DESYNC
     templates:
     - desync_repair
     - convergence
@@ -912,7 +928,7 @@ events:
     - 60m
     max_candidates_per_run: 500
   LEAD_LAG_BREAK:
-    canonical_family: INFORMATION_DESYNC
+    research_family: INFORMATION_DESYNC
     templates:
     - desync_repair
     - convergence
@@ -925,7 +941,7 @@ events:
     - 60m
     max_candidates_per_run: 500
   CROSS_ASSET_DESYNC_EVENT:
-    canonical_family: INFORMATION_DESYNC
+    research_family: INFORMATION_DESYNC
     templates:
     - desync_repair
     - convergence
@@ -938,7 +954,7 @@ events:
     - 60m
     max_candidates_per_run: 600
   SEQ_FND_EXTREME_THEN_BREAKOUT:
-    canonical_family: POSITIONING_EXTREMES
+    research_family: POSITIONING_EXTREMES
     templates:
     - reversal_or_squeeze
     - mean_reversion
@@ -953,7 +969,7 @@ events:
     - 60m
     max_candidates_per_run: 250
   SEQ_LIQ_VACUUM_THEN_DEPTH_RECOVERY:
-    canonical_family: LIQUIDITY_DISLOCATION
+    research_family: LIQUIDITY_DISLOCATION
     templates:
     - mean_reversion
     - stop_run_repair
@@ -965,7 +981,7 @@ events:
     - 15m
     max_candidates_per_run: 400
   SEQ_OI_SPIKEPOS_THEN_VOL_SPIKE:
-    canonical_family: POSITIONING_EXTREMES
+    research_family: POSITIONING_EXTREMES
     templates:
     - reversal_or_squeeze
     - mean_reversion
@@ -980,7 +996,7 @@ events:
     - 60m
     max_candidates_per_run: 250
   SEQ_VOL_COMP_THEN_BREAKOUT:
-    canonical_family: VOLATILITY_TRANSITION
+    research_family: VOLATILITY_TRANSITION
     templates:
     - mean_reversion
     - continuation
@@ -992,7 +1008,7 @@ events:
     - 60m
     max_candidates_per_run: 350
   SESSION_OPEN_EVENT:
-    canonical_family: TEMPORAL_STRUCTURE
+    research_family: TEMPORAL_STRUCTURE
     templates:
     - mean_reversion
     - continuation
@@ -1001,7 +1017,7 @@ events:
     - 15m
     max_candidates_per_run: 300
   SESSION_CLOSE_EVENT:
-    canonical_family: TEMPORAL_STRUCTURE
+    research_family: TEMPORAL_STRUCTURE
     templates:
     - mean_reversion
     - continuation
@@ -1010,7 +1026,7 @@ events:
     - 15m
     max_candidates_per_run: 300
   FUNDING_TIMESTAMP_EVENT:
-    canonical_family: TEMPORAL_STRUCTURE
+    research_family: TEMPORAL_STRUCTURE
     templates:
     - mean_reversion
     - continuation
@@ -1019,7 +1035,7 @@ events:
     - 15m
     max_candidates_per_run: 300
   SCHEDULED_NEWS_WINDOW_EVENT:
-    canonical_family: TEMPORAL_STRUCTURE
+    research_family: TEMPORAL_STRUCTURE
     templates:
     - mean_reversion
     - continuation
@@ -1028,7 +1044,7 @@ events:
     - 15m
     max_candidates_per_run: 300
   SPREAD_REGIME_WIDENING_EVENT:
-    canonical_family: EXECUTION_FRICTION
+    research_family: EXECUTION_FRICTION
     templates:
     - slippage_aware_filter
     - tail_risk_avoid
@@ -1037,7 +1053,7 @@ events:
     - 15m
     max_candidates_per_run: 300
   SLIPPAGE_SPIKE_EVENT:
-    canonical_family: EXECUTION_FRICTION
+    research_family: EXECUTION_FRICTION
     templates:
     - slippage_aware_filter
     - tail_risk_avoid
@@ -1046,7 +1062,7 @@ events:
     - 15m
     max_candidates_per_run: 300
   FEE_REGIME_CHANGE_EVENT:
-    canonical_family: EXECUTION_FRICTION
+    research_family: EXECUTION_FRICTION
     templates:
     - slippage_aware_filter
     - tail_risk_avoid
@@ -1542,6 +1558,7 @@ operators:
     - POSITIONING_UNWIND_DELEVERAGING
     - FORCED_FLOW_AND_EXHAUSTION
     - TREND_FAILURE_EXHAUSTION
+    - LIQUIDITY_STRESS
     default_conditioning: {}
     risk_metrics_required: []
     template_kind: filter_template
@@ -1570,6 +1587,7 @@ operators:
     - BASIS_FUNDING_DISLOCATION
     - FORCED_FLOW_AND_EXHAUSTION
     - TREND_FAILURE_EXHAUSTION
+    - LIQUIDITY_STRESS
     default_conditioning: {}
     risk_metrics_required: []
     template_kind: filter_template

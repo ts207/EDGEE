@@ -3,7 +3,7 @@ kind: event
 event_type: SEQ_LIQ_VACUUM_THEN_DEPTH_RECOVERY
 active: true
 synthetic_coverage: covered
-canonical_family: LIQUIDITY_DISLOCATION
+research_family: LIQUIDITY_DISLOCATION
 reports_dir: event_sequences
 events_file: event_sequences.parquet
 signal_column: seq_liq_vacuum_then_depth_recovery_event

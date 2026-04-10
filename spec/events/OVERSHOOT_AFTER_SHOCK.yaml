@@ -10,7 +10,7 @@ parameters:
   rv_quantile: 0.95
   cooldown_bars: 12
   merge_gap_bars: 0
-canonical_family: STATISTICAL_DISLOCATION
+research_family: STATISTICAL_DISLOCATION
 trigger: Detector triggers on overshoot after shock pattern
 confirmation: Post-detection price action confirms signal validity
 expected_behavior:

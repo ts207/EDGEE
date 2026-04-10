@@ -9,7 +9,7 @@ parameters:
   breakout_strength_min: 0.003
   cooldown_bars: 24
   merge_gap_bars: 0
-canonical_family: FORCED_FLOW_AND_EXHAUSTION
+research_family: FORCED_FLOW_AND_EXHAUSTION
 trigger: Detector triggers on failed continuation pattern
 confirmation: Post-detection price action confirms signal validity
 expected_behavior:

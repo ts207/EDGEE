@@ -30,7 +30,7 @@ parameters:
   min_spacing: 24
   cooldown_bars: 12
   merge_gap_bars: 0
-canonical_family: FORCED_FLOW_AND_EXHAUSTION
+research_family: FORCED_FLOW_AND_EXHAUSTION
 trigger: Detector triggers when liquidation and OI unwind confirm forced-flow exhaustion.
 confirmation: Price reversal and volatility-cooldown behavior confirm the exhaustion
   signal.

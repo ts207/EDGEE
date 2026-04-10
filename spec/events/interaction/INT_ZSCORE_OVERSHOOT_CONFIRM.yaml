@@ -6,5 +6,5 @@ parameters:
   right_event: OVERSHOOT_AFTER_SHOCK
   op: confirm
   max_gap_bars: 12
-canonical_family: STATISTICAL_DISLOCATION
+research_family: STATISTICAL_DISLOCATION
 cluster_id: statistical_stretch

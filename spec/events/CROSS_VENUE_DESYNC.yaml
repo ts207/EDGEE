@@ -38,7 +38,7 @@ runtime:
   reports_dir: cross_venue_desync
   events_file: cross_venue_desync_events.parquet
   signal_column: cross_venue_desync_event
-canonical_family: INFORMATION_DESYNC
+research_family: INFORMATION_DESYNC
 detector_contract: true
 parameters:
   window_end: 32

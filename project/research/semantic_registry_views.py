@@ -31,12 +31,13 @@ def build_canonical_semantic_registry_views(
 
     event_rows: Dict[str, Dict[str, Any]] = {}
     for event_id, spec in sorted(domain.event_definitions.items()):
-        family_name = str(spec.canonical_family or spec.canonical_regime).strip().upper()
+        family_name = str(spec.research_family or spec.canonical_family or spec.canonical_regime).strip().upper()
         if not domain.family_templates(family_name):
             family_name = str(spec.legacy_family or family_name).strip().upper()
         event_rows[event_id] = {
             "enabled": bool(spec.enabled),
             "family": family_name,
+            "research_family": str(spec.research_family).strip().upper(),
             "canonical_family": str(spec.canonical_family).strip().upper(),
             "canonical_regime": str(spec.canonical_regime).strip().upper(),
             "legacy_family": str(spec.legacy_family).strip().upper(),
@@ -117,6 +118,18 @@ def build_canonical_semantic_registry_views(
 
 
 def canonical_semantic_source_paths() -> Dict[str, list[Path]]:
+    event_dir = resolve_relative_spec_path("spec/events", repo_root=REPO_ROOT)
+    event_paths = [
+        path
+        for path in sorted(event_dir.glob("*.yaml"))
+        if not path.name.startswith("_")
+        and path.name not in {
+            "canonical_event_registry.yaml",
+            "event_contract_overrides.yaml",
+            "event_ontology_mapping.yaml",
+            "event_registry_unified.yaml",
+        }
+    ]
     state_dir = resolve_relative_spec_path("spec/states", repo_root=REPO_ROOT)
     state_paths = [
         path
@@ -124,12 +137,7 @@ def canonical_semantic_source_paths() -> Dict[str, list[Path]]:
         if path.name not in _STATE_GENERATED_FILENAMES
     ]
     return {
-        "events": [
-            resolve_relative_spec_path(
-                "spec/events/event_registry_unified.yaml",
-                repo_root=REPO_ROOT,
-            )
-        ],
+        "events": event_paths,
         "templates": [
             resolve_relative_spec_path("spec/templates/registry.yaml", repo_root=REPO_ROOT)
         ],

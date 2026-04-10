@@ -36,7 +36,7 @@ def _canonical_grouping_for_event(event_type: object) -> str:
     spec = get_domain_registry().get_event(token)
     if spec is None:
         return token
-    return spec.canonical_regime or spec.canonical_family or spec.event_type
+    return spec.research_family or spec.canonical_family or spec.canonical_regime or spec.event_type
 
 
 def _json_array(values: list[object]) -> str:

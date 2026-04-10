@@ -21,6 +21,8 @@ def test_domain_graph_payload_carries_runtime_and_state_metadata() -> None:
     payload = build_domain_graph_payload()
 
     depth_collapse = payload["events"]["DEPTH_COLLAPSE"]
+    assert depth_collapse["research_family"] == "LIQUIDITY_DISLOCATION"
+    assert depth_collapse["canonical_family"] == "LIQUIDITY_DISLOCATION"
     assert depth_collapse["detector_name"] == "DepthCollapseDetector"
     assert depth_collapse["canonical_regime"] == "LIQUIDITY_STRESS"
 

@@ -556,7 +556,9 @@ def _assemble_bundle(
     effect_pvalue = _ttest_greater(event_values.tolist())
 
     governance = get_event_governance_metadata(spec.event_type)
-    event_family = str(governance.get("canonical_family", spec.event_type)).strip().upper() or spec.event_type
+    event_family = str(
+        governance.get("research_family", governance.get("canonical_family", spec.event_type))
+    ).strip().upper() or spec.event_type
     event_contract_ids = list(spec.event_contract_ids) if spec.event_contract_ids else [spec.event_type]
     metadata_event_family = event_contract_ids[0] if event_contract_ids else event_family
     return {

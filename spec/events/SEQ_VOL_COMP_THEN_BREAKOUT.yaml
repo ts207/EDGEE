@@ -3,7 +3,7 @@ kind: event
 event_type: SEQ_VOL_COMP_THEN_BREAKOUT
 active: true
 synthetic_coverage: covered
-canonical_family: VOLATILITY_TRANSITION
+research_family: VOLATILITY_TRANSITION
 reports_dir: event_sequences
 events_file: event_sequences.parquet
 signal_column: seq_vol_comp_then_breakout_event

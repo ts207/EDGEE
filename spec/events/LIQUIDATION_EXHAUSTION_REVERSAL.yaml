@@ -38,7 +38,7 @@ parameters:
 notes:
 - This detector is evaluated on bar features and depends on a prior forced-flow cluster
   being present in recent history.
-canonical_family: FORCED_FLOW_AND_EXHAUSTION
+research_family: FORCED_FLOW_AND_EXHAUSTION
 trigger: Detector triggers on liquidation exhaustion reversal pattern
 confirmation: Post-detection price action confirms signal validity
 expected_behavior:

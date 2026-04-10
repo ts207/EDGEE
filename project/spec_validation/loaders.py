@@ -28,9 +28,10 @@ def load_ontology_events() -> Dict[str, Dict[str, Any]]:
     for event_type, contract in load_active_event_contracts().items():
         raw = dict(contract.get("raw", {}))
         raw.setdefault("event_type", event_type)
+        raw.setdefault("research_family", contract.get("research_family", contract.get("canonical_family", "")))
         raw.setdefault("canonical_family", contract.get("canonical_family", ""))
         raw.setdefault("canonical_regime", contract.get("canonical_regime", ""))
-        raw.setdefault("family", contract.get("canonical_family", ""))
+        raw.setdefault("family", contract.get("research_family", contract.get("canonical_family", "")))
         raw.setdefault("tier", contract.get("tier", ""))
         raw.setdefault("operational_role", contract.get("operational_role", ""))
         events[event_type] = raw

@@ -15,7 +15,7 @@ parameters:
   minute_close_start: 55
   session_range_quantile: 0.0
   session_vol_z_min: null
-canonical_family: TEMPORAL_STRUCTURE
+research_family: TEMPORAL_STRUCTURE
 trigger: Detector triggers on session close event pattern
 confirmation: Post-detection price action confirms signal validity
 expected_behavior:

@@ -8,8 +8,9 @@ metadata:
     event_specs_dir: spec/events
     template_registry: spec/templates/registry.yaml
   notes: Single event-centric schema for phase1+phase2 composition. Generated compatibility
-    sidecars are downstream outputs only. canonical_family is a staged compatibility
-    alias of canonical_regime; legacy_family preserves current family-default wiring.
+    sidecars are downstream outputs only. research_family is the authoritative coarse
+    search/template grouping; canonical_family is a generated compatibility alias
+    of research_family; legacy_family preserves current family-default wiring.
 defaults:
   parameters:
     merge_gap_bars: 1
@@ -34,8 +35,6 @@ defaults:
   - severity_bucket
   max_candidates_per_run: 1000
 families:
-  ABSORPTION_PROXY:
-    parameters: {}
   BASIS_FUNDING_DISLOCATION:
     parameters: {}
     templates:
@@ -52,15 +51,11 @@ families:
     - tail_risk_avoid
   CROSS_ASSET_INTERACTION:
     parameters: {}
-  DEPTH_STRESS_PROXY:
-    parameters: {}
   EXECUTION_FRICTION:
     parameters: {}
     templates:
     - slippage_aware_filter
     - tail_risk_avoid
-  FLOW_EXHAUSTION_PROXY:
-    parameters: {}
   FORCED_FLOW_AND_EXHAUSTION:
     parameters: {}
     templates:
@@ -88,10 +83,6 @@ families:
     - overshoot_repair
     - only_if_liquidity
     - slippage_aware_filter
-  LIQUIDITY_STRESS_DIRECT:
-    parameters: {}
-  LIQUIDITY_STRESS_PROXY:
-    parameters: {}
   ORDERFLOW:
     parameters: {}
   POSITIONING_EXTREMES:
@@ -117,11 +108,7 @@ families:
     - only_if_oi
     - only_if_regime
     - tail_risk_avoid
-  POST_DELEVERAGING_REBOUND:
-    parameters: {}
   PRICE_ACTION:
-    parameters: {}
-  PRICE_VOL_IMBALANCE_PROXY:
     parameters: {}
   REGIME_TRANSITION:
     parameters: {}
@@ -173,8 +160,6 @@ families:
     - volatility_expansion_follow
     - pullback_entry
     - only_if_regime
-  WICK_REVERSAL_PROXY:
-    parameters: {}
 canonical_regimes:
   BASIS_FUNDING_DISLOCATION:
     event_types:
@@ -356,7 +341,8 @@ canonical_regimes:
     - VOL_SHOCK
 events:
   ABSORPTION_PROXY:
-    canonical_family: LIQUIDITY_STRESS
+    research_family: LIQUIDITY_DISLOCATION
+    canonical_family: LIQUIDITY_DISLOCATION
     canonical_regime: LIQUIDITY_STRESS
     legacy_family: ABSORPTION_PROXY
     event_kind: market_event
@@ -400,7 +386,7 @@ events:
     parameters:
       maturity: standard
       synthetic_coverage: covered
-      canonical_family: LIQUIDITY_DISLOCATION
+      research_family: LIQUIDITY_DISLOCATION
       trigger: Detector triggers when direct imbalance stall confirms an absorption-style
         liquidity stress surface.
       confirmation: Spread and realized-volatility stress persist long enough to confirm
@@ -430,7 +416,8 @@ events:
     - 15m
     max_candidates_per_run: 600
   BAND_BREAK:
-    canonical_family: STATISTICAL_STRETCH_OVERSHOOT
+    research_family: STATISTICAL_DISLOCATION
+    canonical_family: STATISTICAL_DISLOCATION
     canonical_regime: STATISTICAL_STRETCH_OVERSHOOT
     legacy_family: STATISTICAL_DISLOCATION
     event_kind: market_event
@@ -475,7 +462,7 @@ events:
     suppressed_by: []
     parameters:
       synthetic_coverage: covered
-      canonical_family: STATISTICAL_DISLOCATION
+      research_family: STATISTICAL_DISLOCATION
       trigger: Detector triggers on band break pattern
       confirmation: Post-detection price action confirms signal validity
       expected_behavior:
@@ -499,7 +486,8 @@ events:
     - 60m
     max_candidates_per_run: 350
   BASIS_DISLOC:
-    canonical_family: BASIS_FUNDING_DISLOCATION
+    research_family: STATISTICAL_DISLOCATION
+    canonical_family: STATISTICAL_DISLOCATION
     canonical_regime: BASIS_FUNDING_DISLOCATION
     legacy_family: STATISTICAL_DISLOCATION
     event_kind: market_event
@@ -564,6 +552,7 @@ events:
     - 60m
     max_candidates_per_run: 350
   BETA_SPIKE_EVENT:
+    research_family: REGIME_TRANSITION
     canonical_family: REGIME_TRANSITION
     canonical_regime: REGIME_TRANSITION
     legacy_family: REGIME_TRANSITION
@@ -609,7 +598,7 @@ events:
     suppressed_by: []
     parameters:
       synthetic_coverage: covered
-      canonical_family: REGIME_TRANSITION
+      research_family: REGIME_TRANSITION
       trigger: Detector triggers on beta spike event pattern
       confirmation: Post-detection price action confirms signal validity
       expected_behavior:
@@ -634,7 +623,8 @@ events:
     - 60m
     max_candidates_per_run: 350
   BREAKOUT_TRIGGER:
-    canonical_family: VOLATILITY_RELAXATION_COMPRESSION_RELEASE
+    research_family: VOLATILITY_TRANSITION
+    canonical_family: VOLATILITY_TRANSITION
     canonical_regime: VOLATILITY_RELAXATION_COMPRESSION_RELEASE
     legacy_family: VOLATILITY_TRANSITION
     event_kind: market_event
@@ -680,7 +670,7 @@ events:
     suppressed_by: []
     parameters:
       synthetic_coverage: covered
-      canonical_family: VOLATILITY_TRANSITION
+      research_family: VOLATILITY_TRANSITION
       trigger: Detector triggers on breakout trigger pattern
       confirmation: Post-detection price action confirms signal validity
       expected_behavior:
@@ -709,6 +699,7 @@ events:
     - 60m
     max_candidates_per_run: 500
   CHOP_TO_TREND_SHIFT:
+    research_family: REGIME_TRANSITION
     canonical_family: REGIME_TRANSITION
     canonical_regime: REGIME_TRANSITION
     legacy_family: REGIME_TRANSITION
@@ -755,7 +746,7 @@ events:
     suppressed_by: []
     parameters:
       synthetic_coverage: covered
-      canonical_family: REGIME_TRANSITION
+      research_family: REGIME_TRANSITION
       trigger: Detector triggers on chop to trend shift pattern
       confirmation: Post-detection price action confirms signal validity
       expected_behavior:
@@ -780,7 +771,8 @@ events:
     - 60m
     max_candidates_per_run: 350
   CLIMAX_VOLUME_BAR:
-    canonical_family: TREND_FAILURE_EXHAUSTION
+    research_family: FORCED_FLOW_AND_EXHAUSTION
+    canonical_family: FORCED_FLOW_AND_EXHAUSTION
     canonical_regime: TREND_FAILURE_EXHAUSTION
     legacy_family: FORCED_FLOW_AND_EXHAUSTION
     event_kind: market_event
@@ -826,7 +818,7 @@ events:
     suppressed_by: []
     parameters:
       synthetic_coverage: covered
-      canonical_family: FORCED_FLOW_AND_EXHAUSTION
+      research_family: FORCED_FLOW_AND_EXHAUSTION
       trigger: Detector triggers on climax volume bar pattern
       confirmation: Post-detection price action confirms signal validity
       expected_behavior:
@@ -857,7 +849,8 @@ events:
     - 60m
     max_candidates_per_run: 500
   COPULA_PAIRS_TRADING:
-    canonical_family: STATISTICAL_STRETCH_OVERSHOOT
+    research_family: STATISTICAL_DISLOCATION
+    canonical_family: STATISTICAL_DISLOCATION
     canonical_regime: STATISTICAL_STRETCH_OVERSHOOT
     legacy_family: STATISTICAL_DISLOCATION
     event_kind: strategy_construct
@@ -902,7 +895,7 @@ events:
     suppressed_by: []
     parameters:
       synthetic_coverage: covered
-      canonical_family: STATISTICAL_DISLOCATION
+      research_family: STATISTICAL_DISLOCATION
       trigger: Detector triggers on copula pairs trading pattern
       confirmation: Post-detection price action confirms signal validity
       expected_behavior:
@@ -926,6 +919,7 @@ events:
     - 60m
     max_candidates_per_run: 350
   CORRELATION_BREAKDOWN_EVENT:
+    research_family: REGIME_TRANSITION
     canonical_family: REGIME_TRANSITION
     canonical_regime: REGIME_TRANSITION
     legacy_family: REGIME_TRANSITION
@@ -971,7 +965,7 @@ events:
     suppressed_by: []
     parameters:
       synthetic_coverage: covered
-      canonical_family: REGIME_TRANSITION
+      research_family: REGIME_TRANSITION
       trigger: Detector triggers on correlation breakdown event pattern
       confirmation: Post-detection price action confirms signal validity
       expected_behavior:
@@ -996,7 +990,8 @@ events:
     - 60m
     max_candidates_per_run: 350
   CROSS_ASSET_DESYNC_EVENT:
-    canonical_family: CROSS_ASSET_DESYNCHRONIZATION
+    research_family: INFORMATION_DESYNC
+    canonical_family: INFORMATION_DESYNC
     canonical_regime: CROSS_ASSET_DESYNCHRONIZATION
     legacy_family: INFORMATION_DESYNC
     event_kind: market_event
@@ -1041,7 +1036,7 @@ events:
     suppressed_by: []
     parameters:
       synthetic_coverage: covered
-      canonical_family: CROSS_ASSET_DESYNCHRONIZATION
+      research_family: CROSS_ASSET_DESYNCHRONIZATION
       detector_contract: true
       causal_mechanism: When two historically linked assets stop moving together,
         one leg may be lagging price discovery or absorbing flow asymmetrically. The
@@ -1119,7 +1114,8 @@ events:
     - 60m
     max_candidates_per_run: 600
   CROSS_VENUE_DESYNC:
-    canonical_family: BASIS_FUNDING_DISLOCATION
+    research_family: INFORMATION_DESYNC
+    canonical_family: INFORMATION_DESYNC
     canonical_regime: BASIS_FUNDING_DISLOCATION
     legacy_family: INFORMATION_DESYNC
     event_kind: market_event
@@ -1164,7 +1160,7 @@ events:
     suppressed_by: []
     parameters:
       synthetic_coverage: covered
-      canonical_family: INFORMATION_DESYNC
+      research_family: INFORMATION_DESYNC
       detector_contract: true
       detector:
         signal_definition: 'Detects cross-venue price desynchronization: spot-perp
@@ -1259,7 +1255,8 @@ events:
     - 60m
     max_candidates_per_run: 600
   DELEVERAGING_WAVE:
-    canonical_family: POSITIONING_UNWIND_DELEVERAGING
+    research_family: POSITIONING_EXTREMES
+    canonical_family: POSITIONING_EXTREMES
     canonical_regime: POSITIONING_UNWIND_DELEVERAGING
     legacy_family: POSITIONING_EXTREMES
     event_kind: market_event
@@ -1320,7 +1317,7 @@ events:
     suppressed_by: []
     parameters:
       synthetic_coverage: covered
-      canonical_family: POSITIONING_EXTREMES
+      research_family: POSITIONING_EXTREMES
       trigger: Detector triggers on deleveraging wave pattern
       confirmation: Post-detection price action confirms signal validity
       expected_behavior:
@@ -1349,7 +1346,8 @@ events:
     - 60m
     max_candidates_per_run: 500
   DEPTH_COLLAPSE:
-    canonical_family: LIQUIDITY_STRESS
+    research_family: LIQUIDITY_DISLOCATION
+    canonical_family: LIQUIDITY_DISLOCATION
     canonical_regime: LIQUIDITY_STRESS
     legacy_family: LIQUIDITY_DISLOCATION
     event_kind: market_event
@@ -1395,7 +1393,7 @@ events:
     parameters:
       maturity: standard
       synthetic_coverage: covered
-      canonical_family: LIQUIDITY_DISLOCATION
+      research_family: LIQUIDITY_DISLOCATION
       trigger: Detector triggers on depth collapse pattern
       confirmation: Post-detection price action confirms signal validity
       expected_behavior:
@@ -1425,7 +1423,8 @@ events:
     - 15m
     max_candidates_per_run: 600
   DEPTH_STRESS_PROXY:
-    canonical_family: LIQUIDITY_STRESS
+    research_family: LIQUIDITY_DISLOCATION
+    canonical_family: LIQUIDITY_DISLOCATION
     canonical_regime: LIQUIDITY_STRESS
     legacy_family: DEPTH_STRESS_PROXY
     event_kind: market_event
@@ -1469,7 +1468,7 @@ events:
     parameters:
       maturity: standard
       synthetic_coverage: covered
-      canonical_family: LIQUIDITY_DISLOCATION
+      research_family: LIQUIDITY_DISLOCATION
       trigger: Detector triggers when direct depth depletion confirms a liquidity-stress
         surface.
       confirmation: Spread and realized-volatility stress remain elevated around the
@@ -1503,7 +1502,8 @@ events:
     - 15m
     max_candidates_per_run: 600
   FAILED_CONTINUATION:
-    canonical_family: TREND_FAILURE_EXHAUSTION
+    research_family: FORCED_FLOW_AND_EXHAUSTION
+    canonical_family: FORCED_FLOW_AND_EXHAUSTION
     canonical_regime: TREND_FAILURE_EXHAUSTION
     legacy_family: FORCED_FLOW_AND_EXHAUSTION
     event_kind: market_event
@@ -1548,7 +1548,7 @@ events:
     suppressed_by: []
     parameters:
       synthetic_coverage: covered
-      canonical_family: FORCED_FLOW_AND_EXHAUSTION
+      research_family: FORCED_FLOW_AND_EXHAUSTION
       trigger: Detector triggers on failed continuation pattern
       confirmation: Post-detection price action confirms signal validity
       expected_behavior:
@@ -1575,7 +1575,8 @@ events:
     - 60m
     max_candidates_per_run: 500
   FALSE_BREAKOUT:
-    canonical_family: TREND_FAILURE_EXHAUSTION
+    research_family: TREND_STRUCTURE
+    canonical_family: TREND_STRUCTURE
     canonical_regime: TREND_FAILURE_EXHAUSTION
     legacy_family: TREND_STRUCTURE
     event_kind: market_event
@@ -1621,7 +1622,7 @@ events:
     suppressed_by: []
     parameters:
       synthetic_coverage: covered
-      canonical_family: TREND_STRUCTURE
+      research_family: TREND_STRUCTURE
       trigger: Detector triggers on false breakout pattern
       confirmation: Post-detection price action confirms signal validity
       expected_behavior:
@@ -1649,6 +1650,7 @@ events:
     - 60m
     max_candidates_per_run: 450
   FEE_REGIME_CHANGE_EVENT:
+    research_family: EXECUTION_FRICTION
     canonical_family: EXECUTION_FRICTION
     canonical_regime: EXECUTION_FRICTION
     legacy_family: EXECUTION_FRICTION
@@ -1694,7 +1696,7 @@ events:
     suppressed_by: []
     parameters:
       synthetic_coverage: covered
-      canonical_family: EXECUTION_FRICTION
+      research_family: EXECUTION_FRICTION
       trigger: Detector triggers on fee regime change event pattern
       confirmation: Post-detection price action confirms signal validity
       expected_behavior:
@@ -1717,7 +1719,8 @@ events:
     - 15m
     max_candidates_per_run: 300
   FLOW_EXHAUSTION_PROXY:
-    canonical_family: TREND_FAILURE_EXHAUSTION
+    research_family: FORCED_FLOW_AND_EXHAUSTION
+    canonical_family: FORCED_FLOW_AND_EXHAUSTION
     canonical_regime: TREND_FAILURE_EXHAUSTION
     legacy_family: FLOW_EXHAUSTION_PROXY
     event_kind: market_event
@@ -1761,7 +1764,7 @@ events:
     parameters:
       maturity: standard
       synthetic_coverage: covered
-      canonical_family: FORCED_FLOW_AND_EXHAUSTION
+      research_family: FORCED_FLOW_AND_EXHAUSTION
       trigger: Detector triggers when liquidation and OI unwind confirm forced-flow
         exhaustion.
       confirmation: Price reversal and volatility-cooldown behavior confirm the exhaustion
@@ -1804,7 +1807,8 @@ events:
     - 60m
     max_candidates_per_run: 500
   FND_DISLOC:
-    canonical_family: BASIS_FUNDING_DISLOCATION
+    research_family: STATISTICAL_DISLOCATION
+    canonical_family: STATISTICAL_DISLOCATION
     canonical_regime: BASIS_FUNDING_DISLOCATION
     legacy_family: STATISTICAL_DISLOCATION
     event_kind: market_event
@@ -1873,7 +1877,8 @@ events:
     - 60m
     max_candidates_per_run: 350
   FORCED_FLOW_EXHAUSTION:
-    canonical_family: TREND_FAILURE_EXHAUSTION
+    research_family: FORCED_FLOW_AND_EXHAUSTION
+    canonical_family: FORCED_FLOW_AND_EXHAUSTION
     canonical_regime: TREND_FAILURE_EXHAUSTION
     legacy_family: ORDERFLOW
     event_kind: market_event
@@ -1920,7 +1925,7 @@ events:
     parameters:
       maturity: standard
       synthetic_coverage: covered
-      canonical_family: FORCED_FLOW_AND_EXHAUSTION
+      research_family: FORCED_FLOW_AND_EXHAUSTION
       trigger: Detector triggers on forced flow exhaustion pattern
       confirmation: Post-detection price action confirms signal validity
       expected_behavior:
@@ -1962,7 +1967,8 @@ events:
     - 60m
     max_candidates_per_run: 500
   FUNDING_EXTREME_ONSET:
-    canonical_family: BASIS_FUNDING_DISLOCATION
+    research_family: POSITIONING_EXTREMES
+    canonical_family: POSITIONING_EXTREMES
     canonical_regime: BASIS_FUNDING_DISLOCATION
     legacy_family: POSITIONING_EXTREMES
     event_kind: market_event
@@ -2007,7 +2013,7 @@ events:
     suppressed_by: []
     parameters:
       synthetic_coverage: covered
-      canonical_family: POSITIONING_EXTREMES
+      research_family: POSITIONING_EXTREMES
       detector_contract: true
       detector:
         signal_definition: 'Detects the onset of a funding rate extreme: funding crosses
@@ -2132,7 +2138,8 @@ events:
     - 60m
     max_candidates_per_run: 500
   FUNDING_FLIP:
-    canonical_family: BASIS_FUNDING_DISLOCATION
+    research_family: POSITIONING_EXTREMES
+    canonical_family: POSITIONING_EXTREMES
     canonical_regime: BASIS_FUNDING_DISLOCATION
     legacy_family: POSITIONING_EXTREMES
     event_kind: market_event
@@ -2178,7 +2185,7 @@ events:
     suppressed_by: []
     parameters:
       synthetic_coverage: covered
-      canonical_family: POSITIONING_EXTREMES
+      research_family: POSITIONING_EXTREMES
       trigger: Detector triggers on funding flip pattern
       confirmation: Post-detection price action confirms signal validity
       expected_behavior:
@@ -2210,7 +2217,8 @@ events:
     - 60m
     max_candidates_per_run: 500
   FUNDING_NORMALIZATION_TRIGGER:
-    canonical_family: BASIS_FUNDING_DISLOCATION
+    research_family: POSITIONING_EXTREMES
+    canonical_family: POSITIONING_EXTREMES
     canonical_regime: BASIS_FUNDING_DISLOCATION
     legacy_family: POSITIONING_EXTREMES
     event_kind: market_event
@@ -2255,7 +2263,7 @@ events:
     suppressed_by: []
     parameters:
       synthetic_coverage: covered
-      canonical_family: POSITIONING_EXTREMES
+      research_family: POSITIONING_EXTREMES
       trigger: Detector triggers on funding normalization trigger pattern
       confirmation: Post-detection price action confirms signal validity
       expected_behavior:
@@ -2310,7 +2318,8 @@ events:
     - 60m
     max_candidates_per_run: 500
   FUNDING_PERSISTENCE_TRIGGER:
-    canonical_family: BASIS_FUNDING_DISLOCATION
+    research_family: POSITIONING_EXTREMES
+    canonical_family: POSITIONING_EXTREMES
     canonical_regime: BASIS_FUNDING_DISLOCATION
     legacy_family: POSITIONING_EXTREMES
     event_kind: market_event
@@ -2355,7 +2364,7 @@ events:
     suppressed_by: []
     parameters:
       synthetic_coverage: covered
-      canonical_family: POSITIONING_EXTREMES
+      research_family: POSITIONING_EXTREMES
       trigger: Detector triggers on funding persistence trigger pattern
       confirmation: Post-detection price action confirms signal validity
       expected_behavior:
@@ -2412,7 +2421,8 @@ events:
     - 60m
     max_candidates_per_run: 500
   FUNDING_TIMESTAMP_EVENT:
-    canonical_family: SCHEDULED_TEMPORAL_WINDOW
+    research_family: TEMPORAL_STRUCTURE
+    canonical_family: TEMPORAL_STRUCTURE
     canonical_regime: SCHEDULED_TEMPORAL_WINDOW
     legacy_family: TEMPORAL_STRUCTURE
     event_kind: context_tag
@@ -2473,7 +2483,7 @@ events:
     suppressed_by: []
     parameters:
       synthetic_coverage: covered
-      canonical_family: TEMPORAL_STRUCTURE
+      research_family: TEMPORAL_STRUCTURE
       trigger: Detector triggers on funding timestamp event pattern
       confirmation: Post-detection price action confirms signal validity
       expected_behavior:
@@ -2495,7 +2505,8 @@ events:
     - 15m
     max_candidates_per_run: 300
   GAP_OVERSHOOT:
-    canonical_family: STATISTICAL_STRETCH_OVERSHOOT
+    research_family: STATISTICAL_DISLOCATION
+    canonical_family: STATISTICAL_DISLOCATION
     canonical_regime: STATISTICAL_STRETCH_OVERSHOOT
     legacy_family: STATISTICAL_DISLOCATION
     event_kind: market_event
@@ -2540,7 +2551,7 @@ events:
     suppressed_by: []
     parameters:
       synthetic_coverage: covered
-      canonical_family: STATISTICAL_DISLOCATION
+      research_family: STATISTICAL_DISLOCATION
       trigger: Detector triggers on gap overshoot pattern
       confirmation: Post-detection price action confirms signal validity
       expected_behavior:
@@ -2565,7 +2576,8 @@ events:
     - 60m
     max_candidates_per_run: 350
   INDEX_COMPONENT_DIVERGENCE:
-    canonical_family: CROSS_ASSET_DESYNCHRONIZATION
+    research_family: INFORMATION_DESYNC
+    canonical_family: INFORMATION_DESYNC
     canonical_regime: CROSS_ASSET_DESYNCHRONIZATION
     legacy_family: INFORMATION_DESYNC
     event_kind: market_event
@@ -2610,7 +2622,7 @@ events:
     suppressed_by: []
     parameters:
       synthetic_coverage: covered
-      canonical_family: INFORMATION_DESYNC
+      research_family: INFORMATION_DESYNC
       trigger: Detector triggers on index component divergence pattern
       confirmation: Post-detection price action confirms signal validity
       expected_behavior:
@@ -2637,7 +2649,8 @@ events:
     - 60m
     max_candidates_per_run: 500
   LEAD_LAG_BREAK:
-    canonical_family: CROSS_ASSET_DESYNCHRONIZATION
+    research_family: INFORMATION_DESYNC
+    canonical_family: INFORMATION_DESYNC
     canonical_regime: CROSS_ASSET_DESYNCHRONIZATION
     legacy_family: INFORMATION_DESYNC
     event_kind: market_event
@@ -2682,7 +2695,7 @@ events:
     suppressed_by: []
     parameters:
       synthetic_coverage: covered
-      canonical_family: INFORMATION_DESYNC
+      research_family: INFORMATION_DESYNC
       trigger: Detector triggers on lead lag break pattern
       confirmation: Post-detection price action confirms signal validity
       expected_behavior:
@@ -2709,7 +2722,8 @@ events:
     - 60m
     max_candidates_per_run: 500
   LIQUIDATION_CASCADE:
-    canonical_family: LIQUIDATION_CASCADE
+    research_family: POSITIONING_EXTREMES
+    canonical_family: POSITIONING_EXTREMES
     canonical_regime: LIQUIDATION_CASCADE
     legacy_family: POSITIONING_EXTREMES
     event_kind: market_event
@@ -2780,7 +2794,8 @@ events:
     - 15m
     - 60m
   LIQUIDATION_CASCADE_PROXY:
-    canonical_family: LIQUIDATION_CASCADE
+    research_family: POSITIONING_EXTREMES
+    canonical_family: POSITIONING_EXTREMES
     canonical_regime: LIQUIDATION_CASCADE
     legacy_family: POSITIONING_EXTREMES
     event_kind: market_event
@@ -2828,7 +2843,7 @@ events:
     suppressed_by: []
     parameters:
       synthetic_coverage: covered
-      canonical_family: POSITIONING_EXTREMES
+      research_family: POSITIONING_EXTREMES
       detector_contract: true
       detector:
         signal_definition: 'Detects liquidation-cascade-like conditions using only
@@ -2925,7 +2940,8 @@ events:
     - 60m
     max_candidates_per_run: 300
   LIQUIDATION_EXHAUSTION_REVERSAL:
-    canonical_family: TREND_FAILURE_EXHAUSTION
+    research_family: FORCED_FLOW_AND_EXHAUSTION
+    canonical_family: FORCED_FLOW_AND_EXHAUSTION
     canonical_regime: TREND_FAILURE_EXHAUSTION
     legacy_family: POSITIONING_EXTREMES
     event_kind: market_event
@@ -2973,7 +2989,7 @@ events:
       notes:
       - This detector is evaluated on bar features and depends on a prior forced-flow
         cluster being present in recent history.
-      canonical_family: FORCED_FLOW_AND_EXHAUSTION
+      research_family: FORCED_FLOW_AND_EXHAUSTION
       trigger: Detector triggers on liquidation exhaustion reversal pattern
       confirmation: Post-detection price action confirms signal validity
       expected_behavior:
@@ -3020,7 +3036,8 @@ events:
     - 60m
     max_candidates_per_run: 400
   LIQUIDITY_GAP_PRINT:
-    canonical_family: LIQUIDITY_STRESS
+    research_family: LIQUIDITY_DISLOCATION
+    canonical_family: LIQUIDITY_DISLOCATION
     canonical_regime: LIQUIDITY_STRESS
     legacy_family: LIQUIDITY_DISLOCATION
     event_kind: market_event
@@ -3065,7 +3082,7 @@ events:
     suppressed_by: []
     parameters:
       synthetic_coverage: covered
-      canonical_family: LIQUIDITY_DISLOCATION
+      research_family: LIQUIDITY_DISLOCATION
       trigger: Detector triggers on liquidity gap print pattern
       confirmation: Post-detection price action confirms signal validity
       expected_behavior:
@@ -3088,11 +3105,16 @@ events:
     - overshoot_repair
     - only_if_liquidity
     - slippage_aware_filter
+    - only_if_regime
+    - only_if_highvol
     horizons:
-    - 15m
+    - 12b
+    - 24b
+    - 48b
     max_candidates_per_run: 600
   LIQUIDITY_SHOCK:
-    canonical_family: LIQUIDITY_STRESS
+    research_family: LIQUIDITY_DISLOCATION
+    canonical_family: LIQUIDITY_DISLOCATION
     canonical_regime: LIQUIDITY_STRESS
     legacy_family: LIQUIDITY_DISLOCATION
     event_kind: market_event
@@ -3138,7 +3160,7 @@ events:
     suppressed_by: []
     parameters:
       synthetic_coverage: covered
-      canonical_family: LIQUIDITY_DISLOCATION
+      research_family: LIQUIDITY_DISLOCATION
       trigger: Detector triggers on liquidity shock pattern
       confirmation: Post-detection price action confirms signal validity
       expected_behavior:
@@ -3163,7 +3185,8 @@ events:
     - 15m
     max_candidates_per_run: 600
   LIQUIDITY_STRESS_DIRECT:
-    canonical_family: LIQUIDITY_STRESS
+    research_family: LIQUIDITY_DISLOCATION
+    canonical_family: LIQUIDITY_DISLOCATION
     canonical_regime: LIQUIDITY_STRESS
     legacy_family: LIQUIDITY_STRESS_DIRECT
     event_kind: market_event
@@ -3205,7 +3228,7 @@ events:
     suppressed_by: []
     parameters:
       synthetic_coverage: covered
-      canonical_family: LIQUIDITY_DISLOCATION
+      research_family: LIQUIDITY_DISLOCATION
       trigger: Detector triggers on liquidity stress direct pattern
       confirmation: Post-detection price action confirms signal validity
       expected_behavior:
@@ -3230,7 +3253,8 @@ events:
     - 15m
     max_candidates_per_run: 600
   LIQUIDITY_STRESS_PROXY:
-    canonical_family: LIQUIDITY_STRESS
+    research_family: LIQUIDITY_DISLOCATION
+    canonical_family: LIQUIDITY_DISLOCATION
     canonical_regime: LIQUIDITY_STRESS
     legacy_family: LIQUIDITY_STRESS_PROXY
     event_kind: market_event
@@ -3274,7 +3298,7 @@ events:
     parameters:
       maturity: standard
       synthetic_coverage: covered
-      canonical_family: LIQUIDITY_DISLOCATION
+      research_family: LIQUIDITY_DISLOCATION
       trigger: Detector triggers when direct liquidity stress and proxy range-stress
         confirmation align.
       confirmation: Spread stress should remain elevated briefly while proxy range
@@ -3300,7 +3324,8 @@ events:
     - 15m
     max_candidates_per_run: 600
   LIQUIDITY_VACUUM:
-    canonical_family: LIQUIDITY_STRESS
+    research_family: LIQUIDITY_DISLOCATION
+    canonical_family: LIQUIDITY_DISLOCATION
     canonical_regime: LIQUIDITY_STRESS
     legacy_family: LIQUIDITY_DISLOCATION
     event_kind: market_event
@@ -3351,7 +3376,7 @@ events:
     suppressed_by: []
     parameters:
       synthetic_coverage: covered
-      canonical_family: LIQUIDITY_DISLOCATION
+      research_family: LIQUIDITY_DISLOCATION
       detector_contract: true
       detector:
         signal_definition: 'Identifies bars where an absolute return shock (abs_return
@@ -3462,7 +3487,8 @@ events:
     conditioning_cols: []
     max_candidates_per_run: 1000
   MOMENTUM_DIVERGENCE_TRIGGER:
-    canonical_family: TREND_FAILURE_EXHAUSTION
+    research_family: FORCED_FLOW_AND_EXHAUSTION
+    canonical_family: FORCED_FLOW_AND_EXHAUSTION
     canonical_regime: TREND_FAILURE_EXHAUSTION
     legacy_family: FORCED_FLOW_AND_EXHAUSTION
     event_kind: market_event
@@ -3507,7 +3533,7 @@ events:
     suppressed_by: []
     parameters:
       synthetic_coverage: covered
-      canonical_family: FORCED_FLOW_AND_EXHAUSTION
+      research_family: FORCED_FLOW_AND_EXHAUSTION
       trigger: Detector triggers on momentum divergence trigger pattern
       confirmation: Post-detection price action confirms signal validity
       expected_behavior:
@@ -3536,7 +3562,8 @@ events:
     - 60m
     max_candidates_per_run: 500
   OI_FLUSH:
-    canonical_family: POSITIONING_UNWIND_DELEVERAGING
+    research_family: POSITIONING_EXTREMES
+    canonical_family: POSITIONING_EXTREMES
     canonical_regime: POSITIONING_UNWIND_DELEVERAGING
     legacy_family: POSITIONING_EXTREMES
     event_kind: market_event
@@ -3582,7 +3609,7 @@ events:
     suppressed_by: []
     parameters:
       synthetic_coverage: covered
-      canonical_family: POSITIONING_EXTREMES
+      research_family: POSITIONING_EXTREMES
       trigger: Detector triggers on oi flush pattern
       confirmation: Post-detection price action confirms signal validity
       expected_behavior:
@@ -3612,7 +3639,8 @@ events:
     - 60m
     max_candidates_per_run: 500
   OI_SPIKE_NEGATIVE:
-    canonical_family: POSITIONING_EXPANSION
+    research_family: POSITIONING_EXTREMES
+    canonical_family: POSITIONING_EXTREMES
     canonical_regime: POSITIONING_EXPANSION
     legacy_family: POSITIONING_EXTREMES
     event_kind: market_event
@@ -3657,7 +3685,7 @@ events:
     suppressed_by: []
     parameters:
       synthetic_coverage: covered
-      canonical_family: POSITIONING_EXTREMES
+      research_family: POSITIONING_EXTREMES
       trigger: Detector triggers on oi spike negative pattern
       confirmation: Post-detection price action confirms signal validity
       expected_behavior:
@@ -3685,7 +3713,8 @@ events:
     - 60m
     max_candidates_per_run: 250
   OI_SPIKE_POSITIVE:
-    canonical_family: POSITIONING_EXPANSION
+    research_family: POSITIONING_EXTREMES
+    canonical_family: POSITIONING_EXTREMES
     canonical_regime: POSITIONING_EXPANSION
     legacy_family: POSITIONING_EXTREMES
     event_kind: market_event
@@ -3730,7 +3759,7 @@ events:
     suppressed_by: []
     parameters:
       synthetic_coverage: covered
-      canonical_family: POSITIONING_EXTREMES
+      research_family: POSITIONING_EXTREMES
       trigger: Detector triggers on oi spike positive pattern
       confirmation: Post-detection price action confirms signal validity
       expected_behavior:
@@ -3757,7 +3786,8 @@ events:
     - 60m
     max_candidates_per_run: 250
   ORDERFLOW_IMBALANCE_SHOCK:
-    canonical_family: LIQUIDITY_STRESS
+    research_family: LIQUIDITY_DISLOCATION
+    canonical_family: LIQUIDITY_DISLOCATION
     canonical_regime: LIQUIDITY_STRESS
     legacy_family: ORDERFLOW
     event_kind: market_event
@@ -3803,7 +3833,7 @@ events:
     parameters:
       maturity: standard
       synthetic_coverage: covered
-      canonical_family: LIQUIDITY_DISLOCATION
+      research_family: LIQUIDITY_DISLOCATION
       trigger: Detector triggers on orderflow imbalance shock pattern
       confirmation: Post-detection price action confirms signal validity
       expected_behavior:
@@ -3837,7 +3867,8 @@ events:
     - 15m
     max_candidates_per_run: 600
   OVERSHOOT_AFTER_SHOCK:
-    canonical_family: STATISTICAL_STRETCH_OVERSHOOT
+    research_family: STATISTICAL_DISLOCATION
+    canonical_family: STATISTICAL_DISLOCATION
     canonical_regime: STATISTICAL_STRETCH_OVERSHOOT
     legacy_family: STATISTICAL_DISLOCATION
     event_kind: market_event
@@ -3882,7 +3913,7 @@ events:
     suppressed_by: []
     parameters:
       synthetic_coverage: covered
-      canonical_family: STATISTICAL_DISLOCATION
+      research_family: STATISTICAL_DISLOCATION
       trigger: Detector triggers on overshoot after shock pattern
       confirmation: Post-detection price action confirms signal validity
       expected_behavior:
@@ -3908,7 +3939,8 @@ events:
     - 60m
     max_candidates_per_run: 350
   POST_DELEVERAGING_REBOUND:
-    canonical_family: POSITIONING_UNWIND_DELEVERAGING
+    research_family: FORCED_FLOW_AND_EXHAUSTION
+    canonical_family: FORCED_FLOW_AND_EXHAUSTION
     canonical_regime: POSITIONING_UNWIND_DELEVERAGING
     legacy_family: POST_DELEVERAGING_REBOUND
     event_kind: market_event
@@ -3950,7 +3982,7 @@ events:
     suppressed_by: []
     parameters:
       synthetic_coverage: covered
-      canonical_family: FORCED_FLOW_AND_EXHAUSTION
+      research_family: FORCED_FLOW_AND_EXHAUSTION
       trigger: Detector triggers on post deleveraging rebound pattern
       confirmation: Post-detection price action confirms signal validity
       expected_behavior:
@@ -3996,7 +4028,8 @@ events:
     - 60m
     max_candidates_per_run: 400
   PRICE_VOL_IMBALANCE_PROXY:
-    canonical_family: LIQUIDITY_STRESS
+    research_family: LIQUIDITY_DISLOCATION
+    canonical_family: LIQUIDITY_DISLOCATION
     canonical_regime: LIQUIDITY_STRESS
     legacy_family: PRICE_VOL_IMBALANCE_PROXY
     event_kind: market_event
@@ -4040,7 +4073,7 @@ events:
     parameters:
       maturity: standard
       synthetic_coverage: covered
-      canonical_family: LIQUIDITY_DISLOCATION
+      research_family: LIQUIDITY_DISLOCATION
       trigger: Detector triggers when return expansion, realized-volatility shock,
         volume expansion, and flow pressure align into a direct imbalance surface.
       confirmation: The synchronized stress cluster persists long enough to confirm
@@ -4074,7 +4107,8 @@ events:
     - 15m
     max_candidates_per_run: 600
   PULLBACK_PIVOT:
-    canonical_family: TREND_CONTINUATION
+    research_family: TREND_STRUCTURE
+    canonical_family: TREND_STRUCTURE
     canonical_regime: TREND_CONTINUATION
     legacy_family: TREND_STRUCTURE
     event_kind: market_event
@@ -4119,7 +4153,7 @@ events:
     suppressed_by: []
     parameters:
       synthetic_coverage: covered
-      canonical_family: TREND_STRUCTURE
+      research_family: TREND_STRUCTURE
       trigger: Detector triggers on pullback pivot pattern
       confirmation: Post-detection price action confirms signal validity
       expected_behavior:
@@ -4146,7 +4180,8 @@ events:
     - 60m
     max_candidates_per_run: 450
   RANGE_BREAKOUT:
-    canonical_family: TREND_CONTINUATION
+    research_family: TREND_STRUCTURE
+    canonical_family: TREND_STRUCTURE
     canonical_regime: TREND_CONTINUATION
     legacy_family: TREND_STRUCTURE
     event_kind: market_event
@@ -4191,7 +4226,7 @@ events:
     suppressed_by: []
     parameters:
       synthetic_coverage: covered
-      canonical_family: TREND_STRUCTURE
+      research_family: TREND_STRUCTURE
       trigger: Detector triggers on range breakout pattern
       confirmation: Post-detection price action confirms signal validity
       expected_behavior:
@@ -4219,7 +4254,8 @@ events:
     - 60m
     max_candidates_per_run: 450
   RANGE_COMPRESSION_END:
-    canonical_family: VOLATILITY_RELAXATION_COMPRESSION_RELEASE
+    research_family: VOLATILITY_TRANSITION
+    canonical_family: VOLATILITY_TRANSITION
     canonical_regime: VOLATILITY_RELAXATION_COMPRESSION_RELEASE
     legacy_family: VOLATILITY_TRANSITION
     event_kind: market_event
@@ -4264,7 +4300,7 @@ events:
     suppressed_by: []
     parameters:
       synthetic_coverage: covered
-      canonical_family: VOLATILITY_TRANSITION
+      research_family: VOLATILITY_TRANSITION
       trigger: Detector triggers on range compression end pattern
       confirmation: Post-detection price action confirms signal validity
       expected_behavior:
@@ -4291,7 +4327,8 @@ events:
     - 60m
     max_candidates_per_run: 500
   SCHEDULED_NEWS_WINDOW_EVENT:
-    canonical_family: SCHEDULED_TEMPORAL_WINDOW
+    research_family: TEMPORAL_STRUCTURE
+    canonical_family: TEMPORAL_STRUCTURE
     canonical_regime: SCHEDULED_TEMPORAL_WINDOW
     legacy_family: TEMPORAL_STRUCTURE
     event_kind: context_tag
@@ -4356,7 +4393,7 @@ events:
     suppressed_by: []
     parameters:
       synthetic_coverage: covered
-      canonical_family: TEMPORAL_STRUCTURE
+      research_family: TEMPORAL_STRUCTURE
       trigger: Detector triggers on scheduled news window event pattern
       confirmation: Post-detection price action confirms signal validity
       expected_behavior:
@@ -4377,7 +4414,8 @@ events:
     - 15m
     max_candidates_per_run: 300
   SEQ_FND_EXTREME_THEN_BREAKOUT:
-    canonical_family: BASIS_FUNDING_DISLOCATION
+    research_family: POSITIONING_EXTREMES
+    canonical_family: POSITIONING_EXTREMES
     canonical_regime: BASIS_FUNDING_DISLOCATION
     legacy_family: POSITIONING_EXTREMES
     event_kind: composite_event
@@ -4423,7 +4461,7 @@ events:
     suppressed_by: []
     parameters:
       synthetic_coverage: covered
-      canonical_family: POSITIONING_EXTREMES
+      research_family: POSITIONING_EXTREMES
       trigger: Detector triggers on seq fnd extreme then breakout pattern
       confirmation: Post-detection price action confirms signal validity
       expected_behavior:
@@ -4450,7 +4488,8 @@ events:
     - 60m
     max_candidates_per_run: 250
   SEQ_LIQ_VACUUM_THEN_DEPTH_RECOVERY:
-    canonical_family: LIQUIDITY_STRESS
+    research_family: LIQUIDITY_DISLOCATION
+    canonical_family: LIQUIDITY_DISLOCATION
     canonical_regime: LIQUIDITY_STRESS
     legacy_family: LIQUIDITY_DISLOCATION
     event_kind: composite_event
@@ -4497,7 +4536,7 @@ events:
     suppressed_by: []
     parameters:
       synthetic_coverage: covered
-      canonical_family: LIQUIDITY_DISLOCATION
+      research_family: LIQUIDITY_DISLOCATION
       trigger: Detector triggers on seq liq vacuum then depth recovery pattern
       confirmation: Post-detection price action confirms signal validity
       expected_behavior:
@@ -4521,7 +4560,8 @@ events:
     - 15m
     max_candidates_per_run: 400
   SEQ_OI_SPIKEPOS_THEN_VOL_SPIKE:
-    canonical_family: POSITIONING_EXPANSION
+    research_family: POSITIONING_EXTREMES
+    canonical_family: POSITIONING_EXTREMES
     canonical_regime: POSITIONING_EXPANSION
     legacy_family: POSITIONING_EXTREMES
     event_kind: composite_event
@@ -4567,7 +4607,7 @@ events:
     suppressed_by: []
     parameters:
       synthetic_coverage: covered
-      canonical_family: POSITIONING_EXTREMES
+      research_family: POSITIONING_EXTREMES
       trigger: Detector triggers on seq oi spikepos then vol spike pattern
       confirmation: Post-detection price action confirms signal validity
       expected_behavior:
@@ -4594,7 +4634,8 @@ events:
     - 60m
     max_candidates_per_run: 250
   SEQ_VOL_COMP_THEN_BREAKOUT:
-    canonical_family: VOLATILITY_RELAXATION_COMPRESSION_RELEASE
+    research_family: VOLATILITY_TRANSITION
+    canonical_family: VOLATILITY_TRANSITION
     canonical_regime: VOLATILITY_RELAXATION_COMPRESSION_RELEASE
     legacy_family: VOLATILITY_TRANSITION
     event_kind: composite_event
@@ -4640,7 +4681,7 @@ events:
     suppressed_by: []
     parameters:
       synthetic_coverage: covered
-      canonical_family: VOLATILITY_TRANSITION
+      research_family: VOLATILITY_TRANSITION
       trigger: Detector triggers on seq vol comp then breakout pattern
       confirmation: Post-detection price action confirms signal validity
       expected_behavior:
@@ -4664,7 +4705,8 @@ events:
     - 60m
     max_candidates_per_run: 350
   SESSION_CLOSE_EVENT:
-    canonical_family: SCHEDULED_TEMPORAL_WINDOW
+    research_family: TEMPORAL_STRUCTURE
+    canonical_family: TEMPORAL_STRUCTURE
     canonical_regime: SCHEDULED_TEMPORAL_WINDOW
     legacy_family: TEMPORAL_STRUCTURE
     event_kind: context_tag
@@ -4709,7 +4751,7 @@ events:
     suppressed_by: []
     parameters:
       synthetic_coverage: covered
-      canonical_family: TEMPORAL_STRUCTURE
+      research_family: TEMPORAL_STRUCTURE
       trigger: Detector triggers on session close event pattern
       confirmation: Post-detection price action confirms signal validity
       expected_behavior:
@@ -4738,7 +4780,8 @@ events:
     - 15m
     max_candidates_per_run: 300
   SESSION_OPEN_EVENT:
-    canonical_family: SCHEDULED_TEMPORAL_WINDOW
+    research_family: TEMPORAL_STRUCTURE
+    canonical_family: TEMPORAL_STRUCTURE
     canonical_regime: SCHEDULED_TEMPORAL_WINDOW
     legacy_family: TEMPORAL_STRUCTURE
     event_kind: context_tag
@@ -4783,7 +4826,7 @@ events:
     suppressed_by: []
     parameters:
       synthetic_coverage: covered
-      canonical_family: TEMPORAL_STRUCTURE
+      research_family: TEMPORAL_STRUCTURE
       trigger: Detector triggers on session open event pattern
       confirmation: Post-detection price action confirms signal validity
       expected_behavior:
@@ -4812,6 +4855,7 @@ events:
     - 15m
     max_candidates_per_run: 300
   SLIPPAGE_SPIKE_EVENT:
+    research_family: EXECUTION_FRICTION
     canonical_family: EXECUTION_FRICTION
     canonical_regime: EXECUTION_FRICTION
     legacy_family: EXECUTION_FRICTION
@@ -4858,7 +4902,7 @@ events:
     suppressed_by: []
     parameters:
       synthetic_coverage: covered
-      canonical_family: EXECUTION_FRICTION
+      research_family: EXECUTION_FRICTION
       trigger: Detector triggers on slippage spike event pattern
       confirmation: Post-detection price action confirms signal validity
       expected_behavior:
@@ -4881,7 +4925,8 @@ events:
     - 15m
     max_candidates_per_run: 300
   SPOT_PERP_BASIS_SHOCK:
-    canonical_family: BASIS_FUNDING_DISLOCATION
+    research_family: INFORMATION_DESYNC
+    canonical_family: INFORMATION_DESYNC
     canonical_regime: BASIS_FUNDING_DISLOCATION
     legacy_family: INFORMATION_DESYNC
     event_kind: market_event
@@ -4928,7 +4973,7 @@ events:
     suppressed_by: []
     parameters:
       synthetic_coverage: covered
-      canonical_family: INFORMATION_DESYNC
+      research_family: INFORMATION_DESYNC
       trigger: Detector triggers on spot perp basis shock pattern
       confirmation: Post-detection price action confirms signal validity
       expected_behavior:
@@ -4957,7 +5002,8 @@ events:
     - 60m
     max_candidates_per_run: 500
   SPREAD_BLOWOUT:
-    canonical_family: LIQUIDITY_STRESS
+    research_family: LIQUIDITY_DISLOCATION
+    canonical_family: LIQUIDITY_DISLOCATION
     canonical_regime: LIQUIDITY_STRESS
     legacy_family: LIQUIDITY_DISLOCATION
     event_kind: market_event
@@ -5028,7 +5074,7 @@ events:
     suppressed_by: []
     parameters:
       synthetic_coverage: covered
-      canonical_family: LIQUIDITY_DISLOCATION
+      research_family: LIQUIDITY_DISLOCATION
       trigger: Detector triggers on spread blowout pattern
       confirmation: Post-detection price action confirms signal validity
       expected_behavior:
@@ -5055,6 +5101,7 @@ events:
     - 15m
     max_candidates_per_run: 600
   SPREAD_REGIME_WIDENING_EVENT:
+    research_family: EXECUTION_FRICTION
     canonical_family: EXECUTION_FRICTION
     canonical_regime: EXECUTION_FRICTION
     legacy_family: EXECUTION_FRICTION
@@ -5101,7 +5148,7 @@ events:
     suppressed_by: []
     parameters:
       synthetic_coverage: covered
-      canonical_family: EXECUTION_FRICTION
+      research_family: EXECUTION_FRICTION
       trigger: Detector triggers on spread regime widening event pattern
       confirmation: Post-detection price action confirms signal validity
       expected_behavior:
@@ -5127,7 +5174,8 @@ events:
     - 15m
     max_candidates_per_run: 300
   SUPPORT_RESISTANCE_BREAK:
-    canonical_family: TREND_CONTINUATION
+    research_family: TREND_STRUCTURE
+    canonical_family: TREND_STRUCTURE
     canonical_regime: TREND_CONTINUATION
     legacy_family: TREND_STRUCTURE
     event_kind: market_event
@@ -5172,7 +5220,7 @@ events:
     suppressed_by: []
     parameters:
       synthetic_coverage: covered
-      canonical_family: TREND_STRUCTURE
+      research_family: TREND_STRUCTURE
       trigger: Detector triggers on support resistance break pattern
       confirmation: Post-detection price action confirms signal validity
       expected_behavior:
@@ -5199,7 +5247,8 @@ events:
     - 60m
     max_candidates_per_run: 450
   SWEEP_STOPRUN:
-    canonical_family: LIQUIDITY_STRESS
+    research_family: LIQUIDITY_DISLOCATION
+    canonical_family: LIQUIDITY_DISLOCATION
     canonical_regime: LIQUIDITY_STRESS
     legacy_family: PRICE_ACTION
     event_kind: market_event
@@ -5246,7 +5295,7 @@ events:
     parameters:
       maturity: standard
       synthetic_coverage: covered
-      canonical_family: LIQUIDITY_DISLOCATION
+      research_family: LIQUIDITY_DISLOCATION
       trigger: Detector triggers on sweep stoprun pattern
       confirmation: Post-detection price action confirms signal validity
       expected_behavior:
@@ -5274,7 +5323,8 @@ events:
     - 15m
     max_candidates_per_run: 600
   TREND_ACCELERATION:
-    canonical_family: TREND_CONTINUATION
+    research_family: TREND_STRUCTURE
+    canonical_family: TREND_STRUCTURE
     canonical_regime: TREND_CONTINUATION
     legacy_family: TREND_STRUCTURE
     event_kind: market_event
@@ -5319,7 +5369,7 @@ events:
     suppressed_by: []
     parameters:
       synthetic_coverage: covered
-      canonical_family: TREND_STRUCTURE
+      research_family: TREND_STRUCTURE
       trigger: Detector triggers on trend acceleration pattern
       confirmation: Post-detection price action confirms signal validity
       expected_behavior:
@@ -5346,7 +5396,8 @@ events:
     - 60m
     max_candidates_per_run: 450
   TREND_DECELERATION:
-    canonical_family: TREND_FAILURE_EXHAUSTION
+    research_family: TREND_STRUCTURE
+    canonical_family: TREND_STRUCTURE
     canonical_regime: TREND_FAILURE_EXHAUSTION
     legacy_family: TREND_STRUCTURE
     event_kind: market_event
@@ -5391,7 +5442,7 @@ events:
     suppressed_by: []
     parameters:
       synthetic_coverage: covered
-      canonical_family: TREND_STRUCTURE
+      research_family: TREND_STRUCTURE
       trigger: Detector triggers on trend deceleration pattern
       confirmation: Post-detection price action confirms signal validity
       expected_behavior:
@@ -5418,7 +5469,8 @@ events:
     - 60m
     max_candidates_per_run: 450
   TREND_EXHAUSTION_TRIGGER:
-    canonical_family: TREND_FAILURE_EXHAUSTION
+    research_family: FORCED_FLOW_AND_EXHAUSTION
+    canonical_family: FORCED_FLOW_AND_EXHAUSTION
     canonical_regime: TREND_FAILURE_EXHAUSTION
     legacy_family: FORCED_FLOW_AND_EXHAUSTION
     event_kind: market_event
@@ -5464,7 +5516,7 @@ events:
     suppressed_by: []
     parameters:
       synthetic_coverage: covered
-      canonical_family: FORCED_FLOW_AND_EXHAUSTION
+      research_family: FORCED_FLOW_AND_EXHAUSTION
       trigger: Detector triggers on trend exhaustion trigger pattern
       confirmation: Post-detection price action confirms signal validity
       expected_behavior:
@@ -5508,6 +5560,7 @@ events:
     - 60m
     max_candidates_per_run: 500
   TREND_TO_CHOP_SHIFT:
+    research_family: REGIME_TRANSITION
     canonical_family: REGIME_TRANSITION
     canonical_regime: REGIME_TRANSITION
     legacy_family: REGIME_TRANSITION
@@ -5554,7 +5607,7 @@ events:
     suppressed_by: []
     parameters:
       synthetic_coverage: covered
-      canonical_family: REGIME_TRANSITION
+      research_family: REGIME_TRANSITION
       trigger: Detector triggers on trend to chop shift pattern
       confirmation: Post-detection price action confirms signal validity
       expected_behavior:
@@ -5579,7 +5632,8 @@ events:
     - 60m
     max_candidates_per_run: 350
   VOL_CLUSTER_SHIFT:
-    canonical_family: VOLATILITY_EXPANSION
+    research_family: VOLATILITY_TRANSITION
+    canonical_family: VOLATILITY_TRANSITION
     canonical_regime: VOLATILITY_EXPANSION
     legacy_family: VOLATILITY_TRANSITION
     event_kind: market_event
@@ -5624,7 +5678,7 @@ events:
     suppressed_by: []
     parameters:
       synthetic_coverage: covered
-      canonical_family: VOLATILITY_TRANSITION
+      research_family: VOLATILITY_TRANSITION
       trigger: Detector triggers on vol cluster shift pattern
       confirmation: Post-detection price action confirms signal validity
       expected_behavior:
@@ -5651,6 +5705,7 @@ events:
     - 60m
     max_candidates_per_run: 500
   VOL_REGIME_SHIFT_EVENT:
+    research_family: REGIME_TRANSITION
     canonical_family: REGIME_TRANSITION
     canonical_regime: REGIME_TRANSITION
     legacy_family: REGIME_TRANSITION
@@ -5697,7 +5752,7 @@ events:
     suppressed_by: []
     parameters:
       synthetic_coverage: covered
-      canonical_family: REGIME_TRANSITION
+      research_family: REGIME_TRANSITION
       trigger: Detector triggers on vol regime shift event pattern
       confirmation: Post-detection price action confirms signal validity
       expected_behavior:
@@ -5722,7 +5777,8 @@ events:
     - 60m
     max_candidates_per_run: 350
   VOL_RELAXATION_START:
-    canonical_family: VOLATILITY_RELAXATION_COMPRESSION_RELEASE
+    research_family: VOLATILITY_TRANSITION
+    canonical_family: VOLATILITY_TRANSITION
     canonical_regime: VOLATILITY_RELAXATION_COMPRESSION_RELEASE
     legacy_family: VOLATILITY_TRANSITION
     event_kind: market_event
@@ -5767,7 +5823,7 @@ events:
     suppressed_by: []
     parameters:
       synthetic_coverage: covered
-      canonical_family: VOLATILITY_TRANSITION
+      research_family: VOLATILITY_TRANSITION
       trigger: Detector triggers on vol relaxation start pattern
       confirmation: Post-detection price action confirms signal validity
       expected_behavior:
@@ -5794,6 +5850,7 @@ events:
     - 60m
     max_candidates_per_run: 500
   VOL_SHOCK:
+    research_family: VOLATILITY_TRANSITION
     canonical_family: VOLATILITY_TRANSITION
     canonical_regime: VOLATILITY_TRANSITION
     legacy_family: VOLATILITY_TRANSITION
@@ -5933,7 +5990,8 @@ events:
     - 60m
     max_candidates_per_run: 500
   VOL_SPIKE:
-    canonical_family: VOLATILITY_EXPANSION
+    research_family: VOLATILITY_TRANSITION
+    canonical_family: VOLATILITY_TRANSITION
     canonical_regime: VOLATILITY_EXPANSION
     legacy_family: VOLATILITY_TRANSITION
     event_kind: market_event
@@ -5979,7 +6037,7 @@ events:
     suppressed_by: []
     parameters:
       synthetic_coverage: covered
-      canonical_family: VOLATILITY_TRANSITION
+      research_family: VOLATILITY_TRANSITION
       trigger: Detector triggers on vol spike pattern
       confirmation: Post-detection price action confirms signal validity
       expected_behavior:
@@ -6005,7 +6063,8 @@ events:
     - 60m
     max_candidates_per_run: 500
   WICK_REVERSAL_PROXY:
-    canonical_family: LIQUIDITY_STRESS
+    research_family: LIQUIDITY_DISLOCATION
+    canonical_family: LIQUIDITY_DISLOCATION
     canonical_regime: LIQUIDITY_STRESS
     legacy_family: WICK_REVERSAL_PROXY
     event_kind: market_event
@@ -6049,7 +6108,7 @@ events:
     parameters:
       maturity: standard
       synthetic_coverage: covered
-      canonical_family: LIQUIDITY_DISLOCATION
+      research_family: LIQUIDITY_DISLOCATION
       trigger: Detector triggers when wick-dominance and reclaim structure align with
         abnormal realized volume.
       confirmation: Follow-through should hold the reclaimed range while realized
@@ -6076,7 +6135,8 @@ events:
     - 15m
     max_candidates_per_run: 500
   ZSCORE_STRETCH:
-    canonical_family: STATISTICAL_STRETCH_OVERSHOOT
+    research_family: STATISTICAL_DISLOCATION
+    canonical_family: STATISTICAL_DISLOCATION
     canonical_regime: STATISTICAL_STRETCH_OVERSHOOT
     legacy_family: STATISTICAL_DISLOCATION
     event_kind: market_event
@@ -6121,7 +6181,7 @@ events:
     suppressed_by: []
     parameters:
       synthetic_coverage: covered
-      canonical_family: STATISTICAL_DISLOCATION
+      research_family: STATISTICAL_DISLOCATION
       trigger: Detector triggers on zscore stretch pattern
       confirmation: Post-detection price action confirms signal validity
       expected_behavior:

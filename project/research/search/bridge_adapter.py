@@ -53,7 +53,10 @@ def _registry_semantics(event_type: str) -> tuple[str, str]:
     if spec is None:
         token = str(event_type or "").strip().upper()
         return token, token
-    return spec.event_type, spec.canonical_regime or spec.canonical_family or spec.event_type
+    return (
+        spec.event_type,
+        spec.research_family or spec.canonical_family or spec.canonical_regime or spec.event_type,
+    )
 
 
 def hypotheses_to_bridge_candidates(

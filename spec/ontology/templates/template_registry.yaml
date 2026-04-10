@@ -54,6 +54,19 @@ defaults:
       - 3.0
       - 5.0
 families:
+  BASIS_FUNDING_DISLOCATION:
+    allowed_templates:
+    - reversal_or_squeeze
+    - mean_reversion
+    - continuation
+    - exhaustion_reversal
+    - convexity_capture
+    - only_if_funding
+    - only_if_oi
+    - only_if_regime
+    - only_if_highvol
+    - only_if_trend
+    - tail_risk_avoid
   EXECUTION_FRICTION:
     allowed_templates:
     - slippage_aware_filter
@@ -65,6 +78,7 @@ families:
     - momentum_fade
     - range_reversion
     - only_if_trend
+    - only_if_regime
     - drawdown_filter
   INFORMATION_DESYNC:
     allowed_templates:
@@ -91,6 +105,17 @@ families:
     - only_if_funding
     - only_if_oi
     - tail_risk_avoid
+  POSITIONING_UNWIND_DELEVERAGING:
+    allowed_templates:
+    - reversal_or_squeeze
+    - mean_reversion
+    - continuation
+    - exhaustion_reversal
+    - convexity_capture
+    - only_if_funding
+    - only_if_oi
+    - only_if_regime
+    - tail_risk_avoid
   REGIME_TRANSITION:
     allowed_templates:
     - only_if_regime
@@ -109,6 +134,16 @@ families:
     - continuation
     - tail_risk_avoid
     - only_if_no_news_window
+  TREND_FAILURE_EXHAUSTION:
+    allowed_templates:
+    - mean_reversion
+    - exhaustion_reversal
+    - momentum_fade
+    - range_reversion
+    - only_if_trend
+    - only_if_regime
+    - only_if_highvol
+    - drawdown_filter
   TREND_STRUCTURE:
     allowed_templates:
     - breakout_followthrough
@@ -154,6 +189,10 @@ filter_templates:
     feature: rv_pct_17280
     operator: '>'
     threshold: 0.7
+  only_if_highvol:
+    feature: rv_pct_17280
+    operator: '>'
+    threshold: 0.85
   only_if_trend:
     feature: logret_1
     operator: '>'

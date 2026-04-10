@@ -8,7 +8,7 @@ parameters:
   oi_change_z_threshold: 3.0
   cooldown_bars: 24
   merge_gap_bars: 0
-canonical_family: POSITIONING_EXTREMES
+research_family: POSITIONING_EXTREMES
 trigger: Detector triggers on deleveraging wave pattern
 confirmation: Post-detection price action confirms signal validity
 expected_behavior:

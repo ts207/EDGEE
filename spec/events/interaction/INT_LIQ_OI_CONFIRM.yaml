@@ -6,5 +6,5 @@ parameters:
   right_event: OI_FLUSH
   op: confirm
   max_gap_bars: 12
-canonical_family: POSITIONING_EXTREMES
+research_family: POSITIONING_EXTREMES
 cluster_id: oi_dynamic

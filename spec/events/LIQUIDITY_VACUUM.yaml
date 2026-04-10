@@ -5,7 +5,7 @@ synthetic_coverage: covered
 reports_dir: liquidity_vacuum
 events_file: liquidity_vacuum_events.parquet
 signal_column: liquidity_vacuum_event
-canonical_family: LIQUIDITY_DISLOCATION
+research_family: LIQUIDITY_DISLOCATION
 detector_contract: true
 parameters:
   profile: lenient
