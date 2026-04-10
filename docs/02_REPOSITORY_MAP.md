@@ -1,75 +1,212 @@
 # Repository Map
 
-## Directory Overview
+This document maps the current repository at the level a maintainer or operator actually needs. The repo has grown beyond a simple stage-package split, so this map emphasizes ownership and runtime boundaries rather than only directory names.
 
-```
+## Top-Level Layout
+
+```text
 Edge/
-├── project/                  Core Python package
-│   ├── core/                 Shared utilities, config, validation, timeframes
-│   ├── io/                   Parquet/CSV I/O, lake path resolution
-│   ├── contracts/            Pipeline stage registry and artifact contracts
-│   ├── domain/               Domain models, compiled registry, hypothesis types
-│   ├── events/               Event specs, registry, episode models
-│   ├── features/             Feature derivation (Binance, Bybit derivatives)
-│   ├── engine/               Backtest engine, PnL, execution state
-│   ├── live/                 Live trading runtime (REST/WS clients, runner, OMS)
-│   ├── pipelines/            Pipeline stages, planner, clean/ingest/feature scripts
-│   ├── research/             Discovery, promotion, phase2 search engine, services
-│   ├── portfolio/            Incubation ledger, thesis overlap
-│   ├── runtime/              Normalized event stream
-│   ├── strategy/             Strategy DSL, templates, executable specs
-│   ├── specs/                Manifest, gates, ontology
-│   ├── operator/             Preflight, lint, explain commands
-│   └── scripts/              Entry-point scripts (run_live_engine, etc.)
-├── spec/                     YAML specifications
-│   ├── proposals/            Sprint proposals (StructuredHypothesis format)
-│   ├── campaigns/            Campaign matrix definitions
-│   ├── gates.yaml            Phase 2 promotion gate parameters
-│   └── events/               Event registry and regime routing
-├── docs/                     Documentation and generated reports
-│   └── generated/            Auto-generated metrics, catalogs, summaries
-└── plugins/                  Plugin extensions (edge-agents, edge-plugins)
+├── project/                  Main Python package
+├── spec/                     Authored YAML contracts and proposals
+├── docs/                     Hand-authored docs and generated references
+├── data/                     Local artifacts, reports, runs, and thesis inventory
+├── plugins/                  Repo-local plugin surfaces
+├── tests/                    Pytest suites
+└── Makefile                  Canonical repo task wrappers
 ```
 
-## Discovery Pipeline
+## `project/` Directory Map
 
-The canonical research flow uses a planner-owned stage graph:
+### Command and control
 
+- `project/cli.py`
+  Canonical CLI for `discover`, `validate`, `promote`, `deploy`, plus compatibility surfaces like `operator`, `pipeline`, `catalog`, and `ingest`.
+
+- `project/pipelines/`
+  Planner-owned orchestration, stage graph assembly, smoke flows, and run manifests.
+
+- `project/operator/`
+  Compatibility utilities for preflight, lint, explain, stability reports, and campaigns.
+
+### Stage-oriented packages
+
+- `project/discover/`
+  Discover-stage entry helpers and integration surface.
+
+- `project/validate/`
+  Validate-stage entry helpers.
+
+- `project/promote/`
+  Promote-stage entry helpers.
+
+- `project/deploy/`
+  Deploy-facing support code.
+
+### Research and evaluation core
+
+- `project/research/`
+  The largest research surface. Contains discovery, validation, promotion, search, reporting, benchmarks, trigger discovery, campaign support, and service-layer orchestration.
+
+- `project/research/services/`
+  Service-layer implementations for discovery, evaluation, promotion, run catalog, and reporting.
+
+- `project/research/validation/`
+  Validation bundle schemas, result writing, and evidence logic.
+
+- `project/research/trigger_discovery/`
+  Advanced proposal-generating trigger mining and adoption-state management.
+
+### Runtime and live execution
+
+- `project/live/`
+  Thesis contracts, thesis store, deployment gate, live runner, drift/decay, reconciliation, kill switch, and runtime-specific helpers.
+
+- `project/runtime/`
+  Normalized runtime streams, replay, and invariants.
+
+- `project/execution/`
+  Backtest/runtime execution plumbing.
+
+- `project/engine/`
+  PnL, allocation, and other execution-model utilities.
+
+### Domain, registry, and events
+
+- `project/events/`
+  Event families, adapters, detectors, scoring, registry helpers.
+
+- `project/domain/`
+  Compiled registry consumers, domain models, and promotion/domain read models.
+
+- `project/spec_registry/` and `project/spec_validation/`
+  Registry and spec validation surfaces.
+
+### App and interface layers
+
+- `project/apps/chatgpt/`
+  ChatGPT app / MCP scaffold over canonical operator and reporting surfaces.
+
+- `project/apps/pipeline/`
+  App-oriented pipeline surface.
+
+### Shared infrastructure
+
+- `project/core/`
+  Common config, exceptions, coercion, and utilities.
+
+- `project/io/` and `project/infra/`
+  I/O, orchestration helpers, and infrastructure scaffolding.
+
+- `project/artifacts/`
+  Canonical artifact path helpers.
+
+### Testing and reliability support
+
+- `project/reliability/`
+  Reliability-oriented logic and tooling.
+
+- `project/scripts/`
+  Shell and Python entrypoint scripts for live engine, governance, artifact generation, and maintenance.
+
+## `spec/` Directory Map
+
+- `spec/proposals/`
+  Bounded research proposal YAML files used by `discover`.
+
+- `spec/campaigns/`
+  Campaign contract specs for the compatibility operator campaign lane.
+
+- `spec/events/`
+  Authored event definitions and the compiled event registry surfaces.
+
+- `spec/gates.yaml`
+  Promotion and validation thresholds used by the canonical research lifecycle.
+
+- `spec/templates/`
+  Template and registry YAML surfaces referenced by the broader event/domain system.
+
+## `docs/` Directory Map
+
+- Hand-authored core docs:
+  `00_overview.md`, `01_discover.md`, `02_validate.md`, `03_promote.md`, `04_deploy.md`
+
+- Supporting references:
+  `02_REPOSITORY_MAP.md`, `05_data_foundation.md`, `06_core_concepts.md`, `90_architecture.md`, `operator_command_inventory.md`
+
+- Generated references:
+  `docs/generated/`
+
+Generated docs should be refreshed by repo generators, not hand-edited.
+
+## `data/` Directory Map
+
+The repo currently uses several important data roots:
+
+- `data/lake/`
+  Raw, cleaned, and feature data.
+
+- `data/reports/`
+  Stage outputs, diagnostics, and research reports.
+
+- `data/runs/`
+  Run-specific manifests, runtime outputs, and checklists.
+
+- `data/live/theses/`
+  Exported runtime thesis inventory that deploy consumes.
+
+- `data/research/programs/`
+  Program memory and research coordination artifacts.
+
+## Canonical Discovery Flow
+
+The planner-owned research flow still looks like:
+
+```text
+ingest
+  → build_cleaned
+  → build_features
+  → build_market_context
+  → phase2_search_engine
+  → validation bundle
+  → promotion
+  → export thesis batch
+  → deploy
 ```
-ingest → build_cleaned → build_features → build_market_context
-      → phase2_search_engine → export_edge_candidates → promote_candidates
+
+The key point is that `phase2_search_engine` is still the authoritative discovery engine, but the repo now has clearer downstream boundaries than older docs showed.
+
+## Runtime Thesis Flow
+
+The runtime-side path is:
+
+```text
+exported thesis batch
+  → ThesisStore
+  → DeploymentGate
+  → reconciliation / drift / scoring / risk
+  → OMS / execution
 ```
 
-`phase2_search_engine` is the **canonical planner-owned discovery stage** for
-generating and evaluating hypothesis candidates. It replaced the legacy
-`phase2_candidate_discovery.py` surface and is the single authoritative entry
-point for Phase 2 discovery. All new proposals must route through this stage.
+Only `live_enabled` theses are tradeable live.
 
-## Live Runtime Layer
+## Event Registry Lineage
 
-The Sprint 7 live runtime uses a supervised deployment lifecycle:
+Event metadata travels through three linked surfaces:
 
-```
-ThesisStore → DeploymentGate → KillSwitchManager → RiskEnforcer → OMS
-```
+1. `spec/events/*.yaml`
+2. `spec/events/event_registry_unified.yaml`
+3. `spec/domain/domain_graph.yaml`
 
-Only `live_enabled` theses may execute trades. Deployment progresses through:
-`promoted → paper_enabled → paper_approved → live_eligible → live_enabled`
+Any change to event routing, ontology, runtime metadata, or trigger semantics should keep those three layers aligned.
 
-## Venue Support
+## Plugin And App Boundaries
 
-- **Primary**: Bybit V5 Linear (perpetual derivatives)
-- **Legacy**: Binance UM Futures (supported via explicit `venue="binance"`)
+Two repo-local interface layers matter:
 
-Raw data is resolved via `raw_dataset_dir_candidates(venue=...)`.
-Default venue is `"bybit"`. Binance callers must pass `venue="binance"` explicitly.
+- `plugins/edge-agents/`
+  Maintenance, operator, export, sync, and validation wrappers.
 
-## Event Registry Surfaces
+- `project/apps/chatgpt/`
+  App/MCP layer that fronts canonical repo services.
 
-Event metadata is maintained across three linked surfaces:
-
-- authored specs in `spec/events/*.yaml`
-- compiled canonical registry in `spec/events/event_registry_unified.yaml`
-- compiled runtime/read model in `spec/domain/domain_graph.yaml`
-
-When event routing, ontology, or runtime metadata changes, those generated surfaces must be refreshed to keep discovery, validation, and runtime consumers aligned.
+Neither should be treated as the authority for thesis policy or research semantics. They are interface layers around the main repository model.

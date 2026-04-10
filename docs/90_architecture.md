@@ -1,60 +1,171 @@
 # Architecture
 
-This document describes the internal structure of the Edge repository and how it implements the four-stage model.
+This document explains how the current Edge repo is structured architecturally. The four stages remain the public lifecycle, but the implementation is now a layered control plane with explicit runtime contracts and interface shells.
 
-## Current State
+## Architectural Summary
 
-The repo's operational front door is not a set of isolated stage packages. The primary control plane is:
+The current repo has five major layers:
 
-* `project/cli.py` for canonical stage verbs and deprecated compatibility verbs
-* `project/pipelines/run_all.py` for planner-owned orchestration and run manifests
-* `project/research/phase2_search_engine.py` for canonical phase-2 discovery
-* `project/live/runner.py` for runtime session execution
-* `spec/events/*.yaml` -> `spec/events/event_registry_unified.yaml` -> `spec/domain/domain_graph.yaml` for event metadata lineage
+1. lifecycle command surface
+2. planner and research services
+3. artifact and registry contracts
+4. runtime thesis and live execution
+5. interface wrappers such as plugins and the ChatGPT app
 
-## Module Map
+The key architectural point is that Edge is no longer just "a few scripts that run in sequence." It is a contract-driven system whose stages communicate through persisted artifacts and typed runtime objects.
 
-### 1. Control Plane
-* `project/cli.py`: Canonical `discover`, `validate`, `promote`, `deploy` entrypoint plus deprecated `operator` compatibility surface.
-* `project/pipelines/`: Planner-owned orchestration, stage assembly, provenance, manifests, and pipeline bookkeeping.
-* `project/operator/`: Proposal preflight, explain/lint helpers, campaign support, and bounded operator utilities.
+## Primary Control Plane
 
-### 2. Research Core
-* `project/research/phase2_search_engine.py`: Canonical planner-owned phase-2 discovery stage.
-* `project/research/agent_io/`: Proposal handling and experiment execution.
-* `project/research/services/`: Evaluation, promotion, reporting, and run-comparison services.
-* `project/research/validation/`: Statistical tests, regimes, and evidence bundles.
-* `project/research/promotion/`: Gate evaluators and decision logic.
+The most important architectural surfaces are:
 
-### 3. Runtime Core
-* `project/live/`: Execution engine, OMS, thesis store, deployment gate, and live safeguards.
-* `project/runtime/`: Runtime-facing replay, invariants, normalized events, and OMS replay support.
-* `project/live/contracts/`: Data models for promoted theses and trade intents.
+- `project/cli.py`
+  The canonical command router for lifecycle verbs and support planes.
 
-### 4. Infrastructure
-* `project/io/`: Parquet and CSV utilities.
-* `project/core/`: Configuration, logging, and common exceptions.
-* `project/domain/`: Compiled domain registry and graph-backed read model.
-* `project/events/`: Event detectors, authored event specs, and registry-sidecar tooling.
+- `project/pipelines/run_all.py`
+  Planner-owned orchestration and stage graph execution.
 
-## Artifact Boundaries
+- `project/research/services/`
+  Discovery, evaluation, promotion, reporting, and run-catalog service layer.
 
-Stages communicate through persisted artifacts. This gives:
+- `project/live/`
+  Runtime thesis store, live approval gate, runner, reconciliation, risk controls.
 
-1. Isolation: a failure in one stage does not corrupt another stage's state.
-2. Auditability: every deployment can be traced through a concrete artifact chain.
-3. Resumability: stages can be re-run independently if data or logic changes.
+- `project/artifacts/catalog.py`
+  Canonical artifact path helper layer.
 
-## Event Registry Path
+## Layer 1: Lifecycle Commands
 
-Event metadata moves through three layers:
+The public lifecycle is expressed as:
 
-1. Authored per-event specs in `spec/events/*.yaml`
-2. Canonical compiled event registry in `spec/events/event_registry_unified.yaml`
-3. Runtime/read-model projection in `spec/domain/domain_graph.yaml`
+- `discover`
+- `validate`
+- `promote`
+- `deploy`
 
-Changes to event ontology, routing, or runtime metadata should update those layers through the repo generators rather than by editing generated files manually.
+These commands should be treated as the conceptual architecture.
 
-## Compatibility Layer
+Support commands exist too:
 
-`project/cli.py` still exposes deprecated `operator` and `pipeline` surfaces for compatibility. Those commands are wrappers around the stage-based model and should not be documented as the primary architecture.
+- `operator` for compatibility
+- `catalog` for research operations and artifact intelligence
+- `ingest` for raw data ingestion
+- `pipeline` for deprecated orchestration compatibility
+
+Those support surfaces should not be mistaken for separate business lifecycles.
+
+## Layer 2: Research and Planner Services
+
+The discovery/validation/promotion behavior is not owned solely by CLI handlers. The real execution model sits in service and planner layers.
+
+### Discovery
+
+- `project/research/phase2_search_engine.py`
+- `project/research/services/candidate_discovery_service.py`
+- `project/discover/`
+
+### Validation
+
+- `project/research/services/evaluation_service.py`
+- `project/research/validation/`
+- `project/validate/`
+
+### Promotion and export
+
+- `project/research/services/promotion_service.py`
+- `project/research/live_export.py`
+- `project/promote/`
+
+These surfaces give the repo a proper separation between command routing and stage implementation.
+
+## Layer 3: Artifact And Registry Contracts
+
+Two contract families dominate the repo:
+
+### Artifact contracts
+
+Stages communicate through persisted artifacts rather than in-memory chaining.
+
+That gives:
+
+- auditability
+- resumability
+- clear failure boundaries
+- easier compatibility handling for older runs
+
+### Registry contracts
+
+Event semantics are defined through the registry lineage:
+
+1. authored event specs in `spec/events/*.yaml`
+2. compiled registry in `spec/events/event_registry_unified.yaml`
+3. projected domain graph in `spec/domain/domain_graph.yaml`
+
+This is an architectural dependency of discovery, validation interpretation, and runtime trigger matching.
+
+## Layer 4: Runtime Thesis Architecture
+
+The runtime architecture is now more explicit than the earlier docs described.
+
+The core path is:
+
+```text
+exported thesis batch
+  → ThesisStore
+  → DeploymentGate
+  → reconciliation
+  → scoring / drift / decay / allocation controls
+  → OMS / execution
+```
+
+Important architectural invariants:
+
+- runtime reads exported thesis batches from `data/live/theses/`
+- `DeploymentGate` is the contract boundary for live approval metadata
+- only `live_enabled` theses are tradeable live
+- richer thesis lifecycle states exist even if launcher checks are conservative
+
+## Layer 5: Interface Shells
+
+The repo includes interface layers that should not redefine system policy.
+
+### ChatGPT app
+
+`project/apps/chatgpt/` is an MCP / ChatGPT-oriented interface around canonical operator, reporting, and dashboard behavior.
+
+### Plugin wrappers
+
+`plugins/edge-agents/` provides maintenance and operator wrapper scripts such as:
+
+- proposal preflight / plan / run
+- repo validation
+- thesis export
+- plugin sync
+- ChatGPT app inspection
+
+Architecturally, these are shells around the repo. They are not the source of truth for lifecycle behavior.
+
+## Compatibility Boundary
+
+Compatibility still matters. The repo intentionally keeps:
+
+- `edge operator ...`
+- `edge pipeline run-all`
+
+But the architecture should be documented as:
+
+- stage verbs are canonical
+- compatibility commands wrap those semantics
+- generated docs and wrappers are downstream surfaces, not policy owners
+
+## Why The Architecture Uses Persisted Boundaries
+
+Persisted stage boundaries are a deliberate architectural choice.
+
+They allow:
+
+- stage reruns without recomputing everything
+- stable handoff from research to runtime
+- artifact audit and historical comparison
+- live gating against typed thesis objects rather than ad hoc promotion tables
+
+That separation is one of the most important "project updates" the docs now need to reflect clearly.

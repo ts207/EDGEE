@@ -1,65 +1,143 @@
-# Edge documentation
+# Edge Documentation
 
-This doc set is organized around the unified 4-stage public operating model:
+This doc set is the hand-authored documentation spine for the current Edge repository.
+
+The organizing model is still:
 
 `discover → validate → promote → deploy`
 
-## Baseline State Inventory
-- **Current Canonical Model:** The 4-stage pipeline defined in `project/cli.py` and `docs/00_overview.md`.
-- **Current Compatibility Model:** The legacy `operator` CLI and related abstractions which wrap the older research loop model.
-- **Known Drift:** We are in the process of deprecating the older "founding seed" documentation paths.
-- **Current Registry State:** Event metadata is authored per event under `spec/events/*.yaml`, compiled into `spec/events/event_registry_unified.yaml`, and then projected into `spec/domain/domain_graph.yaml`.
-- **Current Runtime Gate:** Research-generated ideas do not become deployable until they pass the explicit `discover -> validate -> promote -> deploy` artifact chain.
+But the repo now has several adjacent surfaces that older docs underexplained:
 
-## Canonical spine
+- compatibility operator commands
+- trigger-discovery governance
+- explicit thesis export into runtime inventory
+- live deployment gating and thesis-state lifecycle
+- plugin and ChatGPT app interface layers
+- generated audit / inventory docs
+
+This index is the current map of that full surface.
+
+## Start Here
 
 Read these first, in order:
 
-1. [00_overview.md](00_overview.md) — System model, the 4 stages, and core objects
-2. [01_discover.md](01_discover.md) — Generating candidates and issuing structured proposals
-3. [02_validate.md](02_validate.md) — Truth-testing candidates, cost-sensitivity, robust stability
-4. [03_promote.md](03_promote.md) — Packaging robust candidates into trading theses 
-5. [04_deploy.md](04_deploy.md) — Running promoted theses in paper or live mode with explicit deployment-state gating
+1. [00_overview.md](00_overview.md)
+2. [01_discover.md](01_discover.md)
+3. [02_validate.md](02_validate.md)
+4. [03_promote.md](03_promote.md)
+5. [04_deploy.md](04_deploy.md)
 
-## Supplementary Foundations
+Those five docs explain the canonical stage story, the command surfaces behind it, and the artifact chain that binds research to runtime.
 
-- Data access and ingest: [05_data_foundation.md](05_data_foundation.md)
-- Definitions and primitives: [06_core_concepts.md](06_core_concepts.md)
-- Subsystem map: [02_REPOSITORY_MAP.md](02_REPOSITORY_MAP.md)
+## What Is Canonical
 
-## Maintenance and Architecture References
+The canonical public surface is:
 
-- [90_architecture.md](90_architecture.md) — High-level architecture decisions
-- [91_advanced_research.md](91_advanced_research.md) — Advanced topics (Internal maintenance lane)
-- [92_assurance_and_benchmarks.md](92_assurance_and_benchmarks.md) — Maintenance checks and tests
-- [93_trigger_discovery.md](93_trigger_discovery.md) — Advanced Trigger Discovery (Internal research lane)
-- [ARCHITECTURE_SURFACE_INVENTORY.md](ARCHITECTURE_SURFACE_INVENTORY.md) — Surface API boundaries
+- `python -m project.cli discover ...`
+- `python -m project.cli validate ...`
+- `python -m project.cli promote ...`
+- `python -m project.cli deploy ...`
 
-## Generated docs
+Helpful wrappers:
 
-Generated docs are inventory and evidence, not onboarding.
-Important generated surfaces include:
+- `make discover`
+- `make validate`
+- `make promote`
+- `make export`
+- `make deploy-paper`
+
+Important clarifications:
+
+- `promote export` is the runtime handoff into `data/live/theses/`
+- `catalog` and `ingest` are support planes, not extra lifecycle stages
+- `operator` is compatibility-only even though it still exists
+- `pipeline run-all` is legacy orchestration, not the recommended front door
+
+## If You Need...
+
+### A conceptual model
+
+- [00_overview.md](00_overview.md)
+- [06_core_concepts.md](06_core_concepts.md)
+
+### Stage-by-stage operations
+
+- [01_discover.md](01_discover.md)
+- [02_validate.md](02_validate.md)
+- [03_promote.md](03_promote.md)
+- [04_deploy.md](04_deploy.md)
+- [operator_command_inventory.md](operator_command_inventory.md)
+
+### Repo structure and subsystem ownership
+
+- [02_REPOSITORY_MAP.md](02_REPOSITORY_MAP.md)
+- [90_architecture.md](90_architecture.md)
+- [ARCHITECTURE_SURFACE_INVENTORY.md](ARCHITECTURE_SURFACE_INVENTORY.md)
+
+### Data paths, artifacts, and lineage
+
+- [05_data_foundation.md](05_data_foundation.md)
+- [02_validate.md](02_validate.md)
+- [03_promote.md](03_promote.md)
+- [04_deploy.md](04_deploy.md)
+
+### Maintenance, validation, and regression discipline
+
+- [92_assurance_and_benchmarks.md](92_assurance_and_benchmarks.md)
+- [94_discovery_benchmarks.md](94_discovery_benchmarks.md)
+
+### Advanced internal research lanes
+
+- [91_advanced_research.md](91_advanced_research.md)
+- [93_trigger_discovery.md](93_trigger_discovery.md)
+- [operator_campaigns.md](operator_campaigns.md)
+
+## Supporting Docs
+
+### Foundations
+
+- [05_data_foundation.md](05_data_foundation.md) — data roots, artifact directories, lineage boundaries
+- [06_core_concepts.md](06_core_concepts.md) — glossary for proposals, candidates, theses, states, and evidence
+
+### Architecture and ownership
+
+- [02_REPOSITORY_MAP.md](02_REPOSITORY_MAP.md) — directory-level map of the repo
+- [90_architecture.md](90_architecture.md) — current architectural boundaries and control planes
+
+### Operations and commands
+
+- [operator_command_inventory.md](operator_command_inventory.md) — canonical commands, compatibility mappings, and maintenance entrypoints
+- [operator_campaigns.md](operator_campaigns.md) — bounded campaign loop in the legacy operator lane
+
+## Generated Docs
+
+`docs/generated/` is evidence, inventory, and generated reference material. It is not the primary onboarding surface.
+
+Use generated docs when you need current derived state:
 
 - [generated/system_map.md](generated/system_map.md)
 - [generated/event_contract_reference.md](generated/event_contract_reference.md)
 - [generated/event_contract_completeness.md](generated/event_contract_completeness.md)
 - [generated/event_tiers.md](generated/event_tiers.md)
-- [operator_command_inventory.md](operator_command_inventory.md)
+- [generated/thesis_overlap_graph.md](generated/thesis_overlap_graph.md)
 
-## Templates and notes
+Do not hand-edit generated docs when a generator exists.
+
+## Templates and Notes
 
 Templates:
+
 - [templates/bounded_experiment_template.md](templates/bounded_experiment_template.md)
 - [templates/experiment_review_template.md](templates/experiment_review_template.md)
 - [templates/hypothesis_template.md](templates/hypothesis_template.md)
 - [templates/edge_registry_template.md](templates/edge_registry_template.md)
 
-Research notes:
-- `docs/research/`
+Research notes live under `docs/research/`.
 
-## Documentation rules
+## Documentation Rules
 
-- teach the canonical 4-stage operator story once, then link instead of repeating it
-- keep legacy and bootstrap surfaces visible, but clearly marked as compatibility or advanced maintenance
-- update the owning canonical doc when behavior changes
-- regenerate generated docs instead of editing them by hand
+- Teach the canonical stage story first, then link outward.
+- Mark compatibility, bootstrap, and internal research lanes explicitly.
+- Prefer code-backed terminology from `project/cli.py`, `project/artifacts/`, and `project/live/contracts/`.
+- Update the owning hand-authored doc when behavior changes.
+- Regenerate generated docs instead of editing them manually.

@@ -6,6 +6,7 @@ import yaml
 
 from project.domain.registry_loader import build_domain_graph_payload
 from project.spec_registry import load_state_family_registry, load_state_registry, resolve_relative_spec_path
+from project.spec_validation import loaders as spec_validation_loaders
 
 
 def _load_yaml(path: Path) -> dict:
@@ -52,3 +53,29 @@ def test_domain_graph_state_payload_traces_to_canonical_state_specs() -> None:
 
     for state_id, row in payload["states"].items():
         assert row["spec_path"].endswith(f"spec/states/{state_id}.yaml")
+
+
+def test_ontology_state_loader_ignores_generated_ontology_shadow_files(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    shadow_root = tmp_path / "ontology" / "states"
+    shadow_root.mkdir(parents=True)
+    (shadow_root / "HIGH_VOL_REGIME.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "state_id": "HIGH_VOL_REGIME",
+                "family": "SHADOW_FAMILY",
+                "enabled": False,
+                "description": "shadow copy should not be loaded",
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(spec_validation_loaders, "ONTOLOGY_DIR", tmp_path / "ontology")
+
+    payload = spec_validation_loaders.load_ontology_states()
+
+    assert payload["HIGH_VOL_REGIME"]["family"] == "VOLATILITY_TRANSITION"
+    assert payload["HIGH_VOL_REGIME"]["source_event_type"] == "VOL_CLUSTER_SHIFT"

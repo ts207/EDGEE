@@ -1,77 +1,172 @@
 # Stage 4: Deploy
 
-Deployment is the final stage where promoted theses are executed in a runtime environment.
+Deploy is the runtime execution boundary. It is the first stage that actually interacts with runtime thesis batches, approval contracts, and live-engine controls.
 
-## Concept
-The deployment stage is responsible for:
-* **Session Management**: Running paper or live trading sessions.
-* **Risk Controls**: Applying hard caps on position size, drawdown, and correlation.
-* **Lineage Tracking**: Ensuring every live trade can be traced back to its research run.
+The most important current rule is simple:
 
-## Workflow
-1. **List Theses**:
-   ```bash
-   edge deploy list-theses
-   ```
-2. **Start Paper Session**:
-   ```bash
-   edge deploy paper --run_id <run_id>
-   ```
-3. **Check Status**:
-   ```bash
-   edge deploy status
-   ```
+- discovery does not deploy
+- validation does not deploy
+- promotion does not deploy
+- export prepares the thesis batch
+- deploy consumes that exported batch under explicit gating
 
-## Runtime Modes
-* **Monitor Only**: Read-only observation of market data without order submission.
-* **Paper Trading**: Executing against live data with simulated fills. Used for final out-of-sample confirmation.
-* **Live Trading**: Executing with real capital on exchange.
+## Canonical Commands
 
-### Valid Runtime Modes
-The live engine supports only two runtime modes:
-- `monitor_only` — observation mode, no order submission
-- `trading` — active trading mode
-
-The legacy `paper_trading` mode is no longer valid. Paper trading is now configured via the OMS lineage in the engine config, not the runtime mode.
-
-### Deploy Command Requirements
-Both `deploy paper` and `deploy live` require a configuration file:
+### List exported thesis batches
 
 ```bash
-edge deploy paper --run_id <run_id> --config configs/live_paper.yaml
-edge deploy live --run_id <run_id> --config configs/live_production.yaml
+python -m project.cli deploy list-theses
 ```
 
-If `--config` is omitted, defaults are used:
-- Paper: `project/configs/live_paper.yaml`
-- Live: `project/configs/live_production.yaml`
+### Inspect a thesis batch
 
-## Export Behavior
-Live export requires a non-empty promoted candidates DataFrame by default. The `allow_bundle_only_export=True` flag permits export without promoted candidates, but this is a compatibility behavior, not the canonical path.
+```bash
+python -m project.cli deploy inspect-thesis --run_id <run_id>
+```
 
-## Risk & Governance
-* **Deployment State**: Operator-facing trade eligibility is enforced exclusively via `deployment_state`. A thesis can be explicitly limited to `monitor_only`, `paper_only`, or successfully promoted to `live_enabled`. This flag must pass gate validation prior to engine startup.
-* **Kill Switch**: Sessions can be disabled immediately if risk thresholds are breached.
+### Launch paper mode
 
----
+```bash
+python -m project.cli deploy paper --run_id <run_id> --config project/configs/live_paper.yaml
+```
 
-## Live Engine Parameters Reference
+### Launch live mode
 
-### Kill Switch (`project/live/kill_switch.py`)
+```bash
+python -m project.cli deploy live --run_id <run_id> --config project/configs/live_production.yaml
+```
 
-| Parameter | Value | Notes |
-|-----------|-------|-------|
-| `PSI_ERROR_THRESHOLD` | 0.25 | Triggers kill-switch. PSI > 0.25 = major distributional shift. |
-| `PSI_WARN_THRESHOLD` | 0.10 | Logs warning without triggering. |
-| Tier-1 monitored features | 6 | `vol_regime`, `ms_spread_state`, `funding_abs_pct`, `basis_zscore`, `oi_delta_1h`, `spread_bps` |
+### Status
 
-PSI interpretation: < 0.10 stable · 0.10–0.25 minor shift (warn) · > 0.25 major shift (error trigger).
+```bash
+python -m project.cli deploy status
+```
 
-The `check_feature_drift` method uses a KS statistic alongside PSI (returned in the drift result dict as `ks_statistic`). KS is more sensitive to tail divergence and catches drift that PSI's bin-clumping behaviour can miss.
+## What Deploy Reads
 
-### Decay Monitor (`project/live/decay.py`)
+Deploy does not read raw promotion tables directly. It reads:
 
-When no `decay_rules` are passed at engine startup, the following conservative defaults are active:
+- `data/live/theses/<run_id>/promoted_theses.json`
+
+That file is produced by `promote export`.
+
+If the thesis batch does not exist, deploy fails with the correct boundary message: the promote stage was not completed into runtime inventory.
+
+## Deployment States
+
+The thesis contract now supports richer deployment lifecycle states than the older docs reflected:
+
+- `monitor_only`
+- `paper_only`
+- `promoted`
+- `paper_enabled`
+- `paper_approved`
+- `live_eligible`
+- `live_enabled`
+- `live_paused`
+- `live_disabled`
+- `retired`
+
+Current runtime rule:
+
+- only `live_enabled` is tradeable for real live order submission
+
+That is enforced by `LIVE_TRADEABLE_STATES` in `project/live/contracts/promoted_thesis.py`.
+
+## Current CLI Gate Behavior
+
+The launcher behavior in `project/cli.py` is intentionally conservative:
+
+### `deploy paper`
+
+The current CLI blocks paper launch unless the batch contains at least one thesis whose `deployment_state` is:
+
+- `paper_only`, or
+- `live_enabled`
+
+### `deploy live`
+
+The current CLI blocks live launch unless the batch contains at least one `live_enabled` thesis.
+
+This means the runtime contract knows about richer lifecycle states, but the launcher still uses a strict eligibility check at startup.
+
+## DeploymentGate
+
+`project/live/deployment.py` enforces the live approval contract.
+
+For theses in `live_eligible` or `live_enabled`, the gate checks:
+
+- `live_approval.live_approval_status == "approved"`
+- `approved_by` is populated
+- `approved_at` is populated
+- `risk_profile_id` is populated
+- paper duration requirements are satisfied if configured
+
+For `live_enabled` theses specifically, the gate also checks:
+
+- cap profile is configured with hard caps
+- `deployment_mode_allowed` is `live_eligible` or `live_enabled`
+
+This is the repo’s hard guard against treating promotion class alone as enough for live trading.
+
+## Thesis Reconciliation
+
+The current runtime also includes startup reconciliation logic in `project/live/thesis_reconciliation.py`.
+
+This exists to catch batch drift such as:
+
+- removed theses
+- downgraded theses
+- superseded theses
+- state regressions
+
+That matters because a new export can be written between runtime restarts. Reconciliation prevents the engine from silently treating changed inventory as if nothing happened.
+
+## Runtime Modes
+
+The live engine runtime modes are:
+
+- `monitor_only`
+- `trading`
+
+The older `paper_trading` runtime mode is not the current model. Paper trading is now represented by configuration and thesis-state usage, not a third runtime-mode string.
+
+## Config Paths
+
+If `--config` is omitted, `project/cli.py` defaults to:
+
+- paper: `project/configs/live_paper.yaml`
+- live: `project/configs/live_production.yaml`
+
+Passing `--config` is still useful when you want an explicit environment, policy, or OMS configuration.
+
+## Risk And Runtime Controls
+
+Deployment is not just a launcher. The runtime includes several explicit safeguards.
+
+### Kill switch
+
+`project/live/kill_switch.py` uses:
+
+| Parameter | Value |
+|-----------|-------|
+| `PSI_ERROR_THRESHOLD` | 0.25 |
+| `PSI_WARN_THRESHOLD` | 0.10 |
+
+Tier-1 monitored features currently include:
+
+- `vol_regime`
+- `ms_spread_state`
+- `funding_abs_pct`
+- `basis_zscore`
+- `oi_delta_1h`
+- `spread_bps`
+
+The runtime also checks KS statistics alongside PSI for drift sensitivity.
+
+### Decay defaults
+
+`project/live/decay.py` activates conservative default rules when no explicit decay rules are supplied:
 
 | Rule | Metric | Threshold | Window | Action |
 |------|--------|-----------|--------|--------|
@@ -79,52 +174,36 @@ When no `decay_rules` are passed at engine startup, the following conservative d
 | `slippage_spike_default` | slippage bps | 20 bps | 5 samples | downsize 50% |
 | `hit_rate_decay_default` | hit rate | 0.40 | 10 samples | warn |
 
-Operators may override by passing explicit `decay_rules` to `LiveEngineRunner`. The defaults are intentionally conservative — tighten thresholds for strategies with higher expected edge.
+### Decision score floor
 
-### Allocation Policy (`project/engine/risk_allocator.py`)
+`project/live/scoring.py` enforces:
 
-The default `AllocationPolicy.mode` is `"deterministic_optimizer"`. This ensures allocation decisions are reproducible and auditable, consistent with the artifact-lineage model. The `"heuristic"` mode remains available for testing but should not be used in production.
+- `MIN_SETUP_MATCH = 0.20`
 
-### Stressed Regime Correlation Limits (`project/engine/risk_allocator.py`)
+If setup match falls below that floor, the additive score is forced to zero before a trade decision proceeds.
 
-The `stressed_regime_values` vocabulary covers all known regime-registry naming conventions:
+### Allocation policy
 
-```
-stress, crisis, high_vol,
-STRESS, CRISIS, HIGH_VOL, SHOCK, HIGH_VOL_REGIME,
-high_vol_shock, vol_shock, crisis_regime, CRISIS_REGIME
-```
+`project/engine/risk_allocator.py` defaults to:
 
-If a new stressed-regime label is added to the registry, it must also be added here or the protective correlation limit will silently fail to activate.
+- `AllocationPolicy.mode = "deterministic_optimizer"`
 
-### Funding Schedule (`project/engine/pnl.py`)
+That default exists to keep allocation decisions reproducible and auditable.
 
-Use the correct named constant for each venue:
+## Funding And Venue Nuance
 
-```python
-from project.engine.pnl import FUNDING_HOURS_BINANCE, FUNDING_HOURS_BYBIT_4H
+Carry calculations are venue-sensitive. `project/engine/pnl.py` includes explicit funding schedules such as:
 
-# Binance UM perpetuals and Bybit 8-hour contracts
-compute_pnl_ledger(..., funding_hours=FUNDING_HOURS_BINANCE)   # (0, 8, 16)
+- `FUNDING_HOURS_BINANCE`
+- `FUNDING_HOURS_BYBIT_4H`
 
-# Bybit 4-hour contracts
-compute_pnl_ledger(..., funding_hours=FUNDING_HOURS_BYBIT_4H)  # (0, 4, 8, 12, 16, 20)
-```
+Using the wrong schedule can materially understate carry for venues with 4-hour funding cadence.
 
-Using the wrong schedule silently understates carry by 50% for Bybit 4-hour instruments.
+## What Deploy Does Not Do
 
-### Decision Score Gate (`project/live/scoring.py`)
+Deploy does not:
 
-A hard `MIN_SETUP_MATCH = 0.20` floor is enforced before the additive score is computed. If `setup_match_score < 0.20`, `total_score` is forced to 0.0 regardless of execution quality, thesis strength, or regime alignment. This prevents the additive architecture from triggering trades when no qualifying event has fired.
-
-Score components for reference:
-
-| Component | Weight | Max contribution |
-|-----------|--------|-----------------|
-| Setup match | × 0.45 | 0.45 |
-| Execution quality | additive | 0.30 |
-| Thesis strength | additive | 0.50 |
-| Regime alignment | additive | 0.10 |
-| Contradiction penalty | subtractive | −1.0 |
-
-Trade thresholds are defined in the policy config (typically `trade_normal ≥ 0.75`).
+- auto-generate theses from discovery outputs
+- bypass approval metadata because a thesis was production-promoted
+- reinterpret a missing export batch as a recoverable warning
+- treat generated research artifacts as a substitute for the thesis store

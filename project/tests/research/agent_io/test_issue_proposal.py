@@ -19,20 +19,22 @@ def _write_registry(reg_dir: Path) -> None:
             {
                 "events": {
                     "BASIS_DISLOC": {
-                        "enabled": True,
-                        "instrument_classes": ["crypto"],
-                        "sequence_eligible": True,
-                        "requires_features": [],
+                        "enabled": False,
+                        "instrument_classes": ["equities"],
+                        "sequence_eligible": False,
+                        "requires_features": ["poison_feature"],
                     }
                 }
             }
         )
     )
-    (reg_dir / "states.yaml").write_text(yaml.dump({"states": {}}))
+    (reg_dir / "states.yaml").write_text(
+        yaml.dump({"states": {"HIGH_VOL_REGIME": {"enabled": False, "instrument_classes": ["equities"]}}})
+    )
     (reg_dir / "features.yaml").write_text(yaml.dump({"features": {}}))
     (reg_dir / "templates.yaml").write_text(
         yaml.dump(
-            {"templates": {"continuation": {"enabled": True, "supports_trigger_types": ["EVENT"]}}}
+            {"templates": {"continuation": {"enabled": False, "supports_trigger_types": ["FEATURE_PREDICATE"]}}}
         )
     )
     (reg_dir / "contexts.yaml").write_text(

@@ -27,19 +27,19 @@ def registry_root(tmp_path):
         yaml.dump(
             {
                 "events": {
-                    "VOL_SPIKE": {
-                        "enabled": True,
-                        "instrument_classes": ["crypto"],
+                    "VOL_SHOCK": {
+                        "enabled": False,
+                        "instrument_classes": ["equities"],
                         "sequence_eligible": True,
                     },
-                    "LIQ_GAP": {
-                        "enabled": True,
-                        "instrument_classes": ["crypto"],
+                    "DEPTH_COLLAPSE": {
+                        "enabled": False,
+                        "instrument_classes": ["equities"],
                         "sequence_eligible": True,
                     },
-                    "NOT_SEQ": {
+                    "SEQ_VOL_COMP_THEN_BREAKOUT": {
                         "enabled": True,
-                        "instrument_classes": ["crypto"],
+                        "instrument_classes": ["equities"],
                         "sequence_eligible": False,
                     },
                 }
@@ -48,14 +48,14 @@ def registry_root(tmp_path):
     )
 
     (reg_dir / "states.yaml").write_text(
-        yaml.dump({"states": {"HIGH_VOL": {"enabled": True, "instrument_classes": ["crypto"]}}})
+        yaml.dump({"states": {"HIGH_VOL_REGIME": {"enabled": False, "instrument_classes": ["crypto"]}}})
     )
 
     (reg_dir / "features.yaml").write_text(
         yaml.dump(
             {
                 "features": {
-                    "rsi": {"allowed_operators": [">", "<"], "instrument_classes": ["crypto"]}
+                    "rsi_14": {"allowed_operators": [">", "<"], "instrument_classes": ["crypto"]}
                 }
             }
         )
@@ -66,16 +66,15 @@ def registry_root(tmp_path):
             {
                 "templates": {
                     "continuation": {
-                        "enabled": True,
+                        "enabled": False,
                         "supports_trigger_types": [
-                            "EVENT",
-                            "STATE",
-                            "SEQUENCE",
                             "FEATURE_PREDICATE",
-                            "INTERACTION",
                         ],
                     },
-                    "event_only": {"enabled": True, "supports_trigger_types": ["EVENT"]},
+                    "breakout_followthrough": {
+                        "enabled": False,
+                        "supports_trigger_types": ["STATE"],
+                    },
                 }
             }
         )
@@ -113,7 +112,7 @@ def _make_config(tmp_path, **overrides):
             "start": "2024-01-01",
             "end": "2024-01-02",
         },
-        "trigger_space": {"allowed_trigger_types": ["EVENT"], "events": {"include": ["VOL_SPIKE"]}},
+        "trigger_space": {"allowed_trigger_types": ["EVENT"], "events": {"include": ["VOL_SHOCK"]}},
         "templates": {"include": ["continuation"]},
         "evaluation": {"horizons_bars": [10], "directions": ["long"], "entry_lags": [1]},
         "contexts": {"include": {}},
@@ -137,14 +136,14 @@ def _make_config(tmp_path, **overrides):
 
 
 def test_validate_template_compatibility(registry_root, tmp_path):
-    # event_only template with STATE trigger should fail
+    # breakout_followthrough supports EVENT/SEQUENCE canonically, not STATE.
     conf = _make_config(
         tmp_path,
-        trigger_space={"allowed_trigger_types": ["STATE"], "states": {"include": ["HIGH_VOL"]}},
-        templates={"include": ["event_only"]},
+        trigger_space={"allowed_trigger_types": ["STATE"], "states": {"include": ["HIGH_VOL_REGIME"]}},
+        templates={"include": ["breakout_followthrough"]},
     )
     with pytest.raises(
-        ValueError, match="Template 'event_only' does not support trigger type 'STATE'"
+        ValueError, match="Template 'breakout_followthrough' does not support trigger type 'STATE'"
     ):
         build_experiment_plan(conf, registry_root)
 
@@ -154,22 +153,33 @@ def test_validate_sequence_eligibility(registry_root, tmp_path):
         tmp_path,
         trigger_space={
             "allowed_trigger_types": ["SEQUENCE"],
-            "sequences": {"include": [["VOL_SPIKE", "NOT_SEQ"]]},
+            "sequences": {"include": [["VOL_SHOCK", "SEQ_VOL_COMP_THEN_BREAKOUT"]]},
         },
     )
-    with pytest.raises(ValueError, match="Event 'NOT_SEQ' is not sequence-eligible"):
+    with pytest.raises(ValueError, match="Event 'SEQ_VOL_COMP_THEN_BREAKOUT' is not sequence-eligible"):
         build_experiment_plan(conf, registry_root)
 
 
-def test_validate_feature_predicate(registry_root, tmp_path):
+def test_validate_feature_predicate(registry_root, tmp_path, monkeypatch):
+    from project.research.semantic_registry_views import build_canonical_semantic_registry_views
+
+    canonical = build_canonical_semantic_registry_views()
+    canonical["templates"]["templates"]["continuation"]["supports_trigger_types"].append(
+        "FEATURE_PREDICATE"
+    )
+    monkeypatch.setattr(
+        "project.research.experiment_engine_schema.build_canonical_semantic_registry_views",
+        lambda: canonical,
+    )
+
     conf = _make_config(
         tmp_path,
         trigger_space={
             "allowed_trigger_types": ["FEATURE_PREDICATE"],
-            "feature_predicates": {"include": [{"feature": "rsi", "operator": "=="}]},
+            "feature_predicates": {"include": [{"feature": "rsi_14", "operator": "=="}]},
         },
     )
-    with pytest.raises(ValueError, match="Operator '==' not allowed for feature 'rsi'"):
+    with pytest.raises(ValueError, match="Operator '==' not allowed for feature 'rsi_14'"):
         build_experiment_plan(conf, registry_root)
 
 
@@ -177,10 +187,10 @@ def test_validate_instrument_mismatch(registry_root, tmp_path):
     conf = _make_config(
         tmp_path,
         instrument_scope={"instrument_classes": ["equities"]},
-        trigger_space={"allowed_trigger_types": ["EVENT"], "events": {"include": ["VOL_SPIKE"]}},
+        trigger_space={"allowed_trigger_types": ["EVENT"], "events": {"include": ["VOL_SHOCK"]}},
     )
     with pytest.raises(
-        ValueError, match="Event 'VOL_SPIKE' is not allowed for instrument class 'equities'"
+        ValueError, match="Event 'VOL_SHOCK' is not allowed for instrument class 'equities'"
     ):
         build_experiment_plan(conf, registry_root)
 
@@ -192,6 +202,16 @@ def test_validate_entry_lag_zero_is_rejected(registry_root, tmp_path):
     )
     with pytest.raises(ValueError, match="entry_lags must be >= 1"):
         build_experiment_plan(conf, registry_root)
+
+
+def test_registry_bundle_ignores_conflicting_runtime_semantic_mirrors(registry_root):
+    registries = RegistryBundle(registry_root)
+
+    assert registries.events["events"]["VOL_SHOCK"]["enabled"] is True
+    assert registries.events["events"]["VOL_SHOCK"]["instrument_classes"] == ["crypto", "futures"]
+    assert registries.templates["templates"]["continuation"]["enabled"] is True
+    assert "EVENT" in registries.templates["templates"]["continuation"]["supports_trigger_types"]
+    assert registries.states["states"]["HIGH_VOL_REGIME"]["enabled"] is True
 
 
 def test_build_experiment_plan_canonicalizes_carry_state_aliases(registry_root, tmp_path):
@@ -276,7 +296,7 @@ def test_resolve_requested_event_ids_expands_regime_only_requests_and_drops_non_
         def get_event_ids_for_regime(self, regime: str, executable_only: bool = True):
             assert regime == "LIQUIDITY_STRESS"
             assert executable_only is True
-            return ["VOL_SPIKE", "PRICE_VOL_IMBALANCE_PROXY"]
+            return ["VOL_SHOCK", "NOT_IN_AUTHORITY"]
 
         def get_event(self, event_id: str):
             return SimpleNamespace(
@@ -291,7 +311,7 @@ def test_resolve_requested_event_ids_expands_regime_only_requests_and_drops_non_
         lambda: _RegistryStub(),
     )
 
-    assert _resolve_requested_event_ids(request, registries) == ["VOL_SPIKE"]
+    assert _resolve_requested_event_ids(request, registries) == ["VOL_SHOCK"]
 
 
 def test_resolve_requested_event_ids_keeps_explicit_events_authoritative_when_regime_matches(
@@ -310,7 +330,7 @@ def test_resolve_requested_event_ids_keeps_explicit_events_authoritative_when_re
         ),
         trigger_space=TriggerSpace(
             allowed_trigger_types=["EVENT"],
-            events={"include": ["VOL_SPIKE"]},
+            events={"include": ["VOL_SHOCK"]},
             canonical_regimes=["LIQUIDITY_STRESS"],
         ),
         templates=TemplateSelection(include=["continuation"]),
@@ -329,7 +349,7 @@ def test_resolve_requested_event_ids_keeps_explicit_events_authoritative_when_re
         def get_event_ids_for_regime(self, regime: str, executable_only: bool = True):
             assert regime == "LIQUIDITY_STRESS"
             assert executable_only is True
-            return ["VOL_SPIKE", "LIQ_GAP"]
+            return ["VOL_SHOCK", "DEPTH_COLLAPSE"]
 
         def get_event(self, event_id: str):
             return SimpleNamespace(
@@ -344,7 +364,7 @@ def test_resolve_requested_event_ids_keeps_explicit_events_authoritative_when_re
         lambda: _RegistryStub(),
     )
 
-    assert _resolve_requested_event_ids(request, registries) == ["VOL_SPIKE"]
+    assert _resolve_requested_event_ids(request, registries) == ["VOL_SHOCK"]
 
 
 def test_resolve_requested_event_ids_rejects_explicit_event_regime_mismatch(
@@ -363,7 +383,7 @@ def test_resolve_requested_event_ids_rejects_explicit_event_regime_mismatch(
         ),
         trigger_space=TriggerSpace(
             allowed_trigger_types=["EVENT"],
-            events={"include": ["VOL_SPIKE"]},
+            events={"include": ["VOL_SHOCK"]},
             canonical_regimes=["VOLATILITY_EXPANSION"],
         ),
         templates=TemplateSelection(include=["continuation"]),
@@ -382,7 +402,7 @@ def test_resolve_requested_event_ids_rejects_explicit_event_regime_mismatch(
         def get_event_ids_for_regime(self, regime: str, executable_only: bool = True):
             assert regime == "VOLATILITY_EXPANSION"
             assert executable_only is True
-            return ["LIQ_GAP"]
+            return ["DEPTH_COLLAPSE"]
 
         def get_event(self, event_id: str):
             return SimpleNamespace(

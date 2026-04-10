@@ -31,6 +31,7 @@ from project.research.knowledge.memory import (
     read_memory_table,
     write_memory_table,
 )
+from project.research.semantic_registry_views import build_canonical_semantic_registry_views
 
 _LOG = logging.getLogger(__name__)
 
@@ -87,12 +88,8 @@ def _load_family_events(
 
     normalized = str(family).strip().upper()
     configs = []
-    events_registry = registry_root / "events.yaml"
-    payload = {}
-    if events_registry.exists():
-        import yaml
-
-        payload = yaml.safe_load(events_registry.read_text(encoding="utf-8")) or {}
+    del registry_root
+    payload = build_canonical_semantic_registry_views()["events"]
     events = payload.get("events", {}) if isinstance(payload, dict) else {}
     for event_type, spec in events.items():
         if not isinstance(spec, dict):

@@ -66,6 +66,13 @@ __all__ = [
 ]
 
 
+def _repo_relative_path(path: Path) -> str:
+    try:
+        return path.resolve().relative_to(Path(__file__).resolve().parents[2]).as_posix()
+    except Exception:
+        return path.as_posix()
+
+
 def load_agent_experiment_config(path: Path) -> AgentExperimentRequest:
     raw = yaml.safe_load(path.read_text())
     raw_contexts = dict(raw.get("contexts") or {})
@@ -203,7 +210,7 @@ def resolve_required_states(
 def export_experiment_artifacts(
     plan: ValidatedExperimentPlan,
     config_path: Path,
-    registry_root: Path,
+    registries: RegistryBundle,
     out_dir: Path,
 ) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -214,10 +221,22 @@ def export_experiment_artifacts(
     (out_dir / "request_hash.txt").write_text(hashlib.sha256(request_bytes).hexdigest())
 
     registry_hash = hashlib.sha256()
-    for yaml_path in sorted(registry_root.glob("*.yaml")):
-        registry_hash.update(yaml_path.name.encode("utf-8"))
-        registry_hash.update(yaml_path.read_bytes())
+    registry_sources: dict[str, list[str]] = {}
+    for category, paths in sorted(registries.registry_source_paths().items()):
+        normalized_paths: list[str] = []
+        for path in sorted(paths):
+            normalized = _repo_relative_path(path)
+            normalized_paths.append(normalized)
+            registry_hash.update(category.encode("utf-8"))
+            registry_hash.update(normalized.encode("utf-8"))
+            if path.exists():
+                registry_hash.update(path.read_bytes())
+        registry_sources[category] = normalized_paths
     (out_dir / "registry_hash.txt").write_text(registry_hash.hexdigest())
+    (out_dir / "registry_sources.json").write_text(
+        json.dumps(registry_sources, indent=2, sort_keys=True),
+        encoding="utf-8",
+    )
 
     plan_dict = {
         "program_id": plan.program_id,
@@ -336,6 +355,6 @@ def build_experiment_plan(
     )
 
     if out_dir is not None:
-        export_experiment_artifacts(plan, config_path, registry_root, out_dir)
+        export_experiment_artifacts(plan, config_path, registries, out_dir)
 
     return plan

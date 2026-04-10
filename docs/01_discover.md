@@ -1,71 +1,194 @@
 # Stage 1: Discover
 
-Discovery is the entry point of the Edge pipeline. Its purpose is to generate a broad set of candidates based on a research hypothesis.
+Discover is the bounded research issuance stage. It takes a proposal YAML, resolves its search space against the registry, runs the canonical phase-2 discovery engine, and writes the candidate artifacts that the rest of the lifecycle depends on.
 
-## Concept
-In discovery, we define:
-* **Anchor**: What market event or price transition are we anchoring to? (e.g., `VOL_SHOCK`, `OI_SPIKE`)
-* **Filters**: What contextual states must be true? (e.g., `regime == "volatile"`)
-* **Sampling Policy**: How should we handle multiple triggers within the same timeframe?
+## What Discover Means In Edge
 
-## Workflow
-1. **Define Structured Hypothesis**: Create a YAML spec defining the anchor and filters.
-2. **Run Discovery**:
-   ```bash
-   edge discover run --proposal spec/proposals/canonical_event_hypothesis_h24.yaml
-   ```
-3. **Inspect Candidates**: Review the ranked candidate set produced in `phase2_candidates.parquet`.
+Discover is not "run arbitrary strategy search." In the current repo it means:
 
-## Key Outputs
-* `phase2_candidates.parquet`: All candidates generated during the discovery run.
-* `phase2_diagnostics.json`: Metadata and coverage statistics for the run.
-## What stable default discovery currently includes
+- freeze a proposal
+- anchor the proposal to explicit event and context semantics
+- execute the planner-owned discovery path
+- write candidates and diagnostics as persisted artifacts
 
-The canonical discovery path currently uses:
+The main research objects here are:
 
-- a single-hypothesis operator proposal
+- Proposal / Structured Hypothesis
+- Anchor
+- Filter
+- Sampling Policy
+- Candidate
+
+## Canonical Commands
+
+### Plan without executing
+
+```bash
+python -m project.cli discover plan --proposal spec/proposals/<proposal>.yaml
+```
+
+or:
+
+```bash
+make discover PROPOSAL=spec/proposals/<proposal>.yaml DISCOVER_ACTION=plan
+```
+
+### Execute a discovery run
+
+```bash
+python -m project.cli discover run --proposal spec/proposals/<proposal>.yaml
+```
+
+or:
+
+```bash
+make discover PROPOSAL=spec/proposals/<proposal>.yaml DISCOVER_ACTION=run
+```
+
+### List discovery artifacts
+
+```bash
+python -m project.cli discover list-artifacts --run_id <run_id>
+```
+
+## Main Inputs
+
+### Proposal YAML
+
+The proposal is the bounded experiment contract. In practical terms it tells discovery:
+
+- which Anchor family to test
+- which Filters or regime predicates must be true
+- which scope, horizon, and search dimensions are allowed
+- where the registry root is
+- how to name or persist the run
+
+### Registry Surfaces
+
+Discovery depends on the event / domain registry lineage:
+
+- authored event specs in `spec/events/*.yaml`
+- compiled event registry in `spec/events/event_registry_unified.yaml`
+- projected domain graph in `spec/domain/domain_graph.yaml`
+
+If those drift, discovery semantics drift too.
+
+### Data Root
+
+Most users let the repo default the data root, but discovery can be pointed at another root with `--data_root`.
+
+## Main Code Surfaces
+
+- `project/cli.py`
+- `project/discover/`
+- `project/research/phase2_search_engine.py`
+- `project/research/services/candidate_discovery_service.py`
+- `project/research/agent_io/`
+- `project/operator/preflight.py` and `project/operator/proposal_tools.py` for compatibility helpers
+
+## Main Outputs
+
+The canonical helper path for candidate output is:
+
+- `data/reports/phase2/<run_id>/phase2_candidates.parquet`
+
+Other discovery-adjacent outputs commonly include:
+
+- `data/reports/phase2/<run_id>/phase2_diagnostics.json`
+- `data/reports/edge_candidates/<run_id>/...`
+- run manifests under `data/runs/<run_id>/`
+
+The CLI intentionally resolves some legacy locations when listing artifacts, so older runs can still be inspected.
+
+## Stable Default Behavior
+
+The stable default discovery path currently assumes:
+
+- a bounded proposal, not open-ended search
+- planner-owned phase-2 discovery
 - flat search expansion
 - discovery v2 scoring
-- repeated walk-forward validation support
-- standard candidate diagnostics
+- persisted diagnostics and rejection reason counts
+- downstream validation as the next required boundary
 
-Discovery ranking in the stable default path considers:
+Current ranking logic considers, at a high level:
 
-- statistical significance
-- support / sample quality
-- cheap falsification prechecks
-- tradability prechecks
-- overlap / novelty penalties
-- fold stability
+- statistical strength
+- support and sample quality
+- precheck failures
+- tradability constraints
+- overlap and novelty pressure
+- fold and split stability
 
-The canonical discovery path does **not** enable these by default:
+## What Discover Does Not Do
 
-- hierarchical search
-- ledger-adjusted ranking
-- diversified shortlist
-- trigger discovery lane
+Discover does not:
 
-## Discovery mode maturity levels
+- validate a claim for deployment on its own
+- create a runtime-ready thesis batch
+- bypass promotion because a candidate looks good
+- turn trigger mining outputs directly into production registry definitions
 
-### Stable
-- flat search
-- discovery v2 scoring
-- current validation path
-- explicit runtime lineage and deployment-state permission model
+## Advanced Trigger Discovery Lane
 
-### Experimental
-- hierarchical search
-- ledger-adjusted discovery ranking
-- diversified shortlist
-- trigger discovery
+The repo now has an internal trigger-discovery lane under:
 
-Current example:
-- `LIQUIDATION_CASCADE_PROXY` is an experimental proxy event that extends liquidation-style discovery when direct `liquidation_notional` feeds are unavailable. It remains registry-governed and does not bypass validation or promotion gates.
+```bash
+python -m project.cli discover triggers ...
+```
 
-### Compatibility-only
-- legacy proposal/operator surfaces retained for migration or internal support
+This lane is proposal-generating research, not the default lifecycle path.
 
-## Failure Modes
-* **Low Signal**: No candidates with positive expectancy found.
-* **Insufficient Coverage**: Data for the requested symbols/dates is missing or corrupted.
-* **Anchor Mismatch**: The chosen anchor does not occur enough times to be statistically meaningful.
+Supported commands include:
+
+- `parameter-sweep`
+- `feature-cluster`
+- `report`
+- `emit-registry-payload`
+- `list`
+- `inspect`
+- `review`
+- `approve`
+- `reject`
+- `mark-adopted`
+
+The important operational boundary is:
+
+- trigger discovery can suggest registry payloads
+- it does not automatically alter the registry
+- it does not bypass validation or promotion
+- manual review and governance still apply
+
+## Compatibility Surfaces
+
+The older `operator` lane still exists for:
+
+- `operator preflight`
+- `operator plan`
+- `operator run`
+- `operator lint`
+- `operator explain`
+
+Those commands wrap the same bounded-research model. New docs should teach `discover` first.
+
+## Common Failure Modes
+
+### Proposal or registry mismatch
+
+The proposal resolves to invalid anchors, invalid fields, or a stale registry assumption.
+
+### Data coverage failure
+
+Required symbols, features, or time windows are missing under the active data root.
+
+### Thin event support
+
+The Anchor exists, but not often enough to support credible discovery statistics.
+
+### No surviving candidates
+
+Discovery runs successfully, but all candidates fail minimum filters or ranking thresholds.
+
+### Legacy path confusion
+
+Older runs may have artifacts in fallback locations. Use `discover list-artifacts` or the helper paths rather than guessing directory layouts by hand.

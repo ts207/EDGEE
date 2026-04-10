@@ -318,6 +318,18 @@ events:
     tags:
     - forced_liquidation
     - high_urgency
+  LIQUIDATION_CASCADE_PROXY:
+    detector: LiquidationCascadeProxyDetector
+    enabled: true
+    family: POSITIONING_EXTREMES
+    instrument_classes:
+    - crypto
+    - futures
+    requires_features: []
+    sequence_eligible: true
+    tags:
+    - oi_dynamic
+    - liquidation_proxy
   LIQUIDATION_EXHAUSTION_REVERSAL:
     detector: PostDeleveragingReboundDetector
     enabled: true

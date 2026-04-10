@@ -16,8 +16,8 @@ from project.tests.research.agent_io.test_issue_proposal import _write_proposal,
 
 def _single_hypothesis_payload() -> dict:
     return {
-        "program_id": "btc_basis_single",
-        "description": "Bounded basis continuation slice",
+        "program_id": "btc_volshock_single",
+        "description": "Bounded VOL_SHOCK continuation slice",
         "run_mode": "research",
         "objective_name": "retail_profitability",
         "promotion_profile": "research",
@@ -29,11 +29,36 @@ def _single_hypothesis_payload() -> dict:
         "hypothesis": {
             "trigger": {
                 "type": "event",
-                "event_id": "BASIS_DISLOC",
+                "event_id": "VOL_SHOCK",
             },
             "template": "continuation",
             "direction": "long",
             "horizon_bars": 12,
+            "entry_lag_bars": 1,
+        },
+    }
+
+
+def _canonical_event_h24_payload() -> dict:
+    return {
+        "program_id": "volshock_btc_long_12b",
+        "description": "Canonical VOL_SHOCK continuation slice",
+        "run_mode": "research",
+        "objective_name": "retail_profitability",
+        "promotion_profile": "research",
+        "symbols": ["BTCUSDT"],
+        "timeframe": "5m",
+        "start": "2026-01-01",
+        "end": "2026-01-31",
+        "instrument_classes": ["crypto"],
+        "hypothesis": {
+            "trigger": {
+                "type": "event",
+                "event_id": "VOL_SHOCK",
+            },
+            "template": "continuation",
+            "direction": "long",
+            "horizon_bars": 24,
             "entry_lag_bars": 1,
         },
     }
@@ -45,7 +70,7 @@ def test_load_operator_proposal_accepts_legacy_and_single_hypothesis_formats() -
         "start": "2026-01-01",
         "end": "2026-01-31",
         "symbols": ["BTCUSDT"],
-        "trigger_space": {"allowed_trigger_types": ["EVENT"], "events": {"include": ["BASIS_DISLOC"]}},
+        "trigger_space": {"allowed_trigger_types": ["EVENT"], "events": {"include": ["VOL_SHOCK"]}},
         "templates": ["continuation"],
         "horizons_bars": [12],
         "directions": ["long"],
@@ -58,7 +83,7 @@ def test_load_operator_proposal_accepts_legacy_and_single_hypothesis_formats() -
     assert legacy.templates == ["continuation"]
     assert single.templates == ["continuation"]
     assert single.trigger_space["allowed_trigger_types"] == ["EVENT"]
-    assert single.trigger_space["events"]["include"] == ["BASIS_DISLOC"]
+    assert single.trigger_space["events"]["include"] == ["VOL_SHOCK"]
     assert single.horizons_bars == [12]
     assert single.directions == ["long"]
     assert single.entry_lags == [1]
@@ -113,7 +138,7 @@ def test_single_hypothesis_loader_rejects_mixed_legacy_fields() -> None:
     payload = _single_hypothesis_payload()
     payload["trigger_space"] = {
         "allowed_trigger_types": ["EVENT"],
-        "events": {"include": ["BASIS_DISLOC"]},
+        "events": {"include": ["VOL_SHOCK"]},
     }
 
     with pytest.raises(ValueError, match="must not include legacy AgentProposal fields"):
@@ -158,10 +183,11 @@ def test_translate_and_validate_proposal_accepts_single_hypothesis_payload(tmp_p
         proposal_path,
         registry_root=registry_root,
         out_dir=tmp_path / "bundle",
+        legacy_compatibility=True,
     )
 
     assert result["proposal"]["templates"] == ["continuation"]
-    assert result["proposal"]["trigger_space"]["events"]["include"] == ["BASIS_DISLOC"]
+    assert result["proposal"]["trigger_space"]["events"]["include"] == ["VOL_SHOCK"]
     assert result["experiment_config"]["templates"]["include"] == ["continuation"]
     assert int(result["validated_plan"]["estimated_hypothesis_count"]) == 1
 
@@ -176,6 +202,7 @@ def test_translate_and_validate_proposal_keeps_legacy_compatibility(tmp_path: Pa
         proposal_path,
         registry_root=registry_root,
         out_dir=tmp_path / "bundle",
+        legacy_compatibility=True,
     )
 
     assert result["proposal"]["trigger_space"]["events"]["include"] == ["BASIS_DISLOC"]
@@ -189,7 +216,7 @@ def test_load_operator_proposal_accepts_structured_hypothesis_format() -> None:
         "symbols": ["BTCUSDT"],
         "timeframe": "1h",
         "hypothesis": {
-            "anchor": {"type": "event", "event_id": "BASIS_DISLOC"},
+            "anchor": {"type": "event", "event_id": "VOL_SHOCK"},
             "template": {"id": "continuation"},
             "direction": "long",
             "horizon_bars": 12,
@@ -201,14 +228,14 @@ def test_load_operator_proposal_accepts_structured_hypothesis_format() -> None:
 
     assert proposal.templates == ["continuation"]
     assert proposal.trigger_space["allowed_trigger_types"] == ["EVENT"]
-    assert proposal.trigger_space["events"]["include"] == ["BASIS_DISLOC"]
+    assert proposal.trigger_space["events"]["include"] == ["VOL_SHOCK"]
     assert proposal.horizons_bars == [12]
     assert proposal.directions == ["long"]
     assert proposal.entry_lags == [1]
 
 
 def test_canonical_event_h24_example_loads_as_single_hypothesis_front_door() -> None:
-    proposal = load_operator_proposal(Path("spec/proposals/canonical_event_hypothesis_h24.yaml"))
+    proposal = load_operator_proposal(_canonical_event_h24_payload())
 
     assert proposal.program_id == "volshock_btc_long_12b"
     assert proposal.symbols == ["BTCUSDT"]
@@ -240,9 +267,10 @@ def test_canonical_event_h24_example_translates_through_existing_experiment_path
     )
 
     result = translate_and_validate_proposal(
-        Path("spec/proposals/canonical_event_hypothesis_h24.yaml"),
+        _canonical_event_h24_payload(),
         registry_root=Path("project/configs/registries"),
         out_dir=tmp_path / "bundle",
+        legacy_compatibility=True,
     )
 
     assert result["proposal"]["templates"] == ["continuation"]

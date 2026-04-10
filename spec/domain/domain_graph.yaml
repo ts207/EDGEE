@@ -4,7 +4,7 @@ metadata:
   status: generated
   graph_role: runtime_read_model
   schema_version: 2
-  generated_at_utc: '2026-04-08T22:57:04Z'
+  generated_at_utc: '2026-04-10T06:26:51Z'
   notes: Compiled runtime read model. Semantic nodes are normalized for direct runtime/search
     loading.
 events:
@@ -587,6 +587,8 @@ events:
       - momentum_fade
       - range_reversion
       - only_if_trend
+      - only_if_regime
+      - only_if_highvol
       - drawdown_filter
       horizons:
       - 60m
@@ -1866,6 +1868,8 @@ events:
       - momentum_fade
       - range_reversion
       - only_if_trend
+      - only_if_regime
+      - only_if_highvol
       - drawdown_filter
       horizons:
       - 60m
@@ -2047,6 +2051,9 @@ events:
       - convexity_capture
       - only_if_funding
       - only_if_oi
+      - only_if_regime
+      - only_if_highvol
+      - only_if_trend
       - tail_risk_avoid
       horizons:
       - 5m
@@ -2215,8 +2222,8 @@ events:
         - 'Low liquidity regime: OI/vol signals unreliable'
       cluster_id: funding_crowding
       funding_pct_window: 2880
-      extreme_pct: 95.0
-      accel_pct: 95.0
+      extreme_pct: 85.0
+      accel_pct: 85.0
       accel_lookback: 32
       persistence_pct: 85.0
       persistence_bars: 12
@@ -2337,7 +2344,8 @@ events:
       persistence_bars: 12
       normalization_pct: 50.0
       normalization_lookback: 96
-      min_event_spacing: 96
+      min_event_spacing: 576
+      min_spacing: 576
       event_lookahead: 96
       liquidation_abs_return: 0.03
       drawdown_abs_return: 0.03
@@ -2369,6 +2377,7 @@ events:
       - only_if_funding
       - only_if_oi
       - tail_risk_avoid
+      - only_if_regime
       horizons:
       - 5m
       - 60m
@@ -2815,12 +2824,12 @@ events:
       - ms_trend_state
       - ms_spread_state
       - severity_bucket
-      max_candidates_per_run: 300
+      max_candidates_per_run: 1000
     spec_path: spec/events/LIQUIDATION_CASCADE.yaml
   LIQUIDATION_CASCADE_PROXY:
     event_type: LIQUIDATION_CASCADE_PROXY
-    canonical_family: POSITIONING_UNWIND_DELEVERAGING
-    canonical_regime: POSITIONING_UNWIND_DELEVERAGING
+    canonical_family: LIQUIDATION_CASCADE
+    canonical_regime: LIQUIDATION_CASCADE
     legacy_family: POSITIONING_EXTREMES
     event_kind: market_event
     reports_dir: liquidation_events
@@ -2862,7 +2871,7 @@ events:
     collapse_target: ''
     overlap_group: liquidation_proxy
     precedence_rank: 1
-    routing_profile_ref: POSITIONING_UNWIND_DELEVERAGING
+    routing_profile_ref: LIQUIDATION_CASCADE
     suppresses: []
     suppressed_by: []
     maturity_scores: {}
@@ -2934,6 +2943,9 @@ events:
         false_positive_scenarios:
         - Scheduled funding payment causing OI adjustment without forced liquidations
         - Delisting or partial rollover reducing OI mechanically
+        disabled_regimes:
+        - DELEVERAGING_WAVE active and unresolved: cascade already captured
+        - LOW_LIQUIDITY_STATE active: oi_delta_1h noise inflates pct drop signal
         expected_overlap:
         - OI_FLUSH: high co-occurrence (OI_FLUSH is a subset without volume/price
             confirmation)
@@ -2946,7 +2958,7 @@ events:
       oi_window: 288
       vol_window: 288
       min_periods: 24
-      oi_drop_quantile: 0.95
+      oi_drop_quantile: 0.98
       vol_surge_quantile: 0.9
       ret_window: 3
       price_drop_th: 0.003
@@ -2972,7 +2984,7 @@ events:
       - ms_trend_state
       - ms_spread_state
       - severity_bucket
-      max_candidates_per_run: 1000
+      max_candidates_per_run: 300
     spec_path: spec/events/LIQUIDATION_CASCADE_PROXY.yaml
   LIQUIDATION_EXHAUSTION_REVERSAL:
     event_type: LIQUIDATION_EXHAUSTION_REVERSAL
@@ -3660,6 +3672,7 @@ events:
       - range_reversion
       - only_if_trend
       - drawdown_filter
+      - only_if_regime
       horizons:
       - 60m
       conditioning_cols:
@@ -3737,7 +3750,7 @@ events:
       cluster_id: oi_dynamic
       oi_window: 96
       spike_z_th: 2.5
-      flush_pct_th: -0.005
+      flush_pct_th: -0.02
     runtime:
       templates:
       - reversal_or_squeeze
@@ -3747,6 +3760,8 @@ events:
       - convexity_capture
       - only_if_funding
       - only_if_oi
+      - only_if_regime
+      - only_if_highvol
       - tail_risk_avoid
       horizons:
       - 5m
@@ -4462,6 +4477,7 @@ events:
       - trend_continuation
       - continuation
       - only_if_trend
+      - only_if_regime
       horizons:
       - 15m
       - 60m
@@ -5703,6 +5719,7 @@ events:
       - overshoot_repair
       - only_if_liquidity
       - slippage_aware_filter
+      - only_if_regime
       horizons:
       - 15m
       conditioning_cols:
@@ -8767,6 +8784,22 @@ templates:
     supports_trigger_types:
     - EVENT
     - STATE
+  only_if_highvol:
+    template_id: only_if_highvol
+    compatible_families:
+    - REGIME_TRANSITION
+    - VOLATILITY_TRANSITION
+    - POSITIONING_EXTREMES
+    - BASIS_FUNDING_DISLOCATION
+    - FORCED_FLOW_AND_EXHAUSTION
+    - TREND_FAILURE_EXHAUSTION
+    template_kind: filter_template
+    side_policy: both
+    label_target: gate
+    requires_direction: false
+    supports_trigger_types:
+    - EVENT
+    - STATE
   only_if_liquidity:
     template_id: only_if_liquidity
     compatible_families:
@@ -8805,6 +8838,11 @@ templates:
     compatible_families:
     - REGIME_TRANSITION
     - VOLATILITY_TRANSITION
+    - POSITIONING_EXTREMES
+    - BASIS_FUNDING_DISLOCATION
+    - POSITIONING_UNWIND_DELEVERAGING
+    - FORCED_FLOW_AND_EXHAUSTION
+    - TREND_FAILURE_EXHAUSTION
     template_kind: filter_template
     side_policy: both
     label_target: gate
@@ -8817,6 +8855,7 @@ templates:
     compatible_families:
     - FORCED_FLOW_AND_EXHAUSTION
     - TREND_STRUCTURE
+    - BASIS_FUNDING_DISLOCATION
     template_kind: filter_template
     side_policy: both
     label_target: gate
@@ -9813,6 +9852,20 @@ runtime:
     families:
       ABSORPTION_PROXY:
         parameters: {}
+      BASIS_FUNDING_DISLOCATION:
+        parameters: {}
+        templates:
+        - reversal_or_squeeze
+        - mean_reversion
+        - continuation
+        - exhaustion_reversal
+        - convexity_capture
+        - only_if_funding
+        - only_if_oi
+        - only_if_regime
+        - only_if_highvol
+        - only_if_trend
+        - tail_risk_avoid
       CROSS_ASSET_INTERACTION:
         parameters: {}
       DEPTH_STRESS_PROXY:
@@ -9832,6 +9885,7 @@ runtime:
         - momentum_fade
         - range_reversion
         - only_if_trend
+        - only_if_regime
         - drawdown_filter
       INFORMATION_DESYNC:
         parameters: {}
@@ -9867,6 +9921,18 @@ runtime:
         - only_if_funding
         - only_if_oi
         - tail_risk_avoid
+      POSITIONING_UNWIND_DELEVERAGING:
+        parameters: {}
+        templates:
+        - reversal_or_squeeze
+        - mean_reversion
+        - continuation
+        - exhaustion_reversal
+        - convexity_capture
+        - only_if_funding
+        - only_if_oi
+        - only_if_regime
+        - tail_risk_avoid
       POST_DELEVERAGING_REBOUND:
         parameters: {}
       PRICE_ACTION:
@@ -9894,6 +9960,17 @@ runtime:
         - continuation
         - tail_risk_avoid
         - only_if_no_news_window
+      TREND_FAILURE_EXHAUSTION:
+        parameters: {}
+        templates:
+        - mean_reversion
+        - exhaustion_reversal
+        - momentum_fade
+        - range_reversion
+        - only_if_trend
+        - only_if_regime
+        - only_if_highvol
+        - drawdown_filter
       TREND_STRUCTURE:
         parameters: {}
         templates:
@@ -10023,6 +10100,8 @@ runtime:
         - momentum_fade
         - range_reversion
         - only_if_trend
+        - only_if_regime
+        - only_if_highvol
         - drawdown_filter
         horizons:
         - 60m
@@ -10255,6 +10334,8 @@ runtime:
         - momentum_fade
         - range_reversion
         - only_if_trend
+        - only_if_regime
+        - only_if_highvol
         - drawdown_filter
         horizons:
         - 60m
@@ -10275,6 +10356,9 @@ runtime:
         - convexity_capture
         - only_if_funding
         - only_if_oi
+        - only_if_regime
+        - only_if_highvol
+        - only_if_trend
         - tail_risk_avoid
         horizons:
         - 5m
@@ -10338,6 +10422,7 @@ runtime:
         - only_if_funding
         - only_if_oi
         - tail_risk_avoid
+        - only_if_regime
         horizons:
         - 5m
         - 60m
@@ -10439,7 +10524,7 @@ runtime:
         - ms_trend_state
         - ms_spread_state
         - severity_bucket
-        max_candidates_per_run: 300
+        max_candidates_per_run: 1000
       LIQUIDATION_CASCADE_PROXY:
         templates:
         - reversal_or_squeeze
@@ -10461,7 +10546,7 @@ runtime:
         - ms_trend_state
         - ms_spread_state
         - severity_bucket
-        max_candidates_per_run: 1000
+        max_candidates_per_run: 300
       LIQUIDATION_EXHAUSTION_REVERSAL:
         templates:
         - mean_reversion
@@ -10571,6 +10656,7 @@ runtime:
         - range_reversion
         - only_if_trend
         - drawdown_filter
+        - only_if_regime
         horizons:
         - 60m
         conditioning_cols:
@@ -10590,6 +10676,8 @@ runtime:
         - convexity_capture
         - only_if_funding
         - only_if_oi
+        - only_if_regime
+        - only_if_highvol
         - tail_risk_avoid
         horizons:
         - 5m
@@ -10740,6 +10828,7 @@ runtime:
         - trend_continuation
         - continuation
         - only_if_trend
+        - only_if_regime
         horizons:
         - 15m
         - 60m
@@ -10986,6 +11075,7 @@ runtime:
         - overshoot_repair
         - only_if_liquidity
         - slippage_aware_filter
+        - only_if_regime
         horizons:
         - 15m
         conditioning_cols:
@@ -11268,6 +11358,19 @@ runtime:
         - only_if_funding
         - only_if_oi
         - tail_risk_avoid
+      BASIS_FUNDING_DISLOCATION:
+        templates:
+        - reversal_or_squeeze
+        - mean_reversion
+        - continuation
+        - exhaustion_reversal
+        - convexity_capture
+        - only_if_funding
+        - only_if_oi
+        - only_if_regime
+        - only_if_highvol
+        - only_if_trend
+        - tail_risk_avoid
       FORCED_FLOW_AND_EXHAUSTION:
         templates:
         - mean_reversion
@@ -11275,6 +11378,17 @@ runtime:
         - momentum_fade
         - range_reversion
         - only_if_trend
+        - only_if_regime
+        - drawdown_filter
+      TREND_FAILURE_EXHAUSTION:
+        templates:
+        - mean_reversion
+        - exhaustion_reversal
+        - momentum_fade
+        - range_reversion
+        - only_if_trend
+        - only_if_regime
+        - only_if_highvol
         - drawdown_filter
       TREND_STRUCTURE:
         templates:
@@ -11313,6 +11427,17 @@ runtime:
         templates:
         - slippage_aware_filter
         - tail_risk_avoid
+      POSITIONING_UNWIND_DELEVERAGING:
+        templates:
+        - reversal_or_squeeze
+        - mean_reversion
+        - continuation
+        - exhaustion_reversal
+        - convexity_capture
+        - only_if_funding
+        - only_if_oi
+        - only_if_regime
+        - tail_risk_avoid
     filter_templates:
       only_if_funding:
         feature: funding_rate
@@ -11342,6 +11467,10 @@ runtime:
         feature: rv_pct_17280
         operator: '>'
         threshold: 0.7
+      only_if_highvol:
+        feature: rv_pct_17280
+        operator: '>'
+        threshold: 0.85
       only_if_trend:
         feature: logret_1
         operator: '>'

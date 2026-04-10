@@ -493,6 +493,24 @@ events:
     is_composite: false
     is_context_tag: false
     is_strategy_construct: false
+  LIQUIDATION_CASCADE_PROXY:
+    canonical_regime: LIQUIDATION_CASCADE
+    subtype: liquidation_cascade_proxy
+    phase: onset
+    evidence_mode: proxy
+    layer: canonical
+    disposition: merge
+    asset_scope: single_asset
+    venue_scope: single_venue
+    deconflict_priority: 0
+    research_only: false
+    strategy_only: false
+    notes: Use when liquidation_notional data is unavailable (e.g., Bybit native data
+      without cross-exchange liquidation feed). Expected to have lower precision than
+      LIQUIDATION_CASCADE but comparable recall for large cascade events.
+    is_composite: false
+    is_context_tag: false
+    is_strategy_construct: false
   LIQUIDATION_EXHAUSTION_REVERSAL:
     canonical_regime: TREND_FAILURE_EXHAUSTION
     subtype: liquidation_exhaustion_reversal

@@ -5,8 +5,8 @@ events_file: funding_episode_events.parquet
 signal_column: funding_normalization_event
 parameters:
   funding_pct_window: 2880
-  extreme_pct: 95.0
-  accel_pct: 95.0
+  extreme_pct: 85.0
+  accel_pct: 85.0
   accel_lookback: 32
   persistence_pct: 85.0
   persistence_bars: 12

@@ -93,6 +93,19 @@ families:
     - only_if_funding
     - only_if_oi
     - tail_risk_avoid
+  BASIS_FUNDING_DISLOCATION:
+    templates:
+    - reversal_or_squeeze
+    - mean_reversion
+    - continuation
+    - exhaustion_reversal
+    - convexity_capture
+    - only_if_funding
+    - only_if_oi
+    - only_if_regime
+    - only_if_highvol
+    - only_if_trend
+    - tail_risk_avoid
   FORCED_FLOW_AND_EXHAUSTION:
     templates:
     - mean_reversion
@@ -100,6 +113,17 @@ families:
     - momentum_fade
     - range_reversion
     - only_if_trend
+    - only_if_regime
+    - drawdown_filter
+  TREND_FAILURE_EXHAUSTION:
+    templates:
+    - mean_reversion
+    - exhaustion_reversal
+    - momentum_fade
+    - range_reversion
+    - only_if_trend
+    - only_if_regime
+    - only_if_highvol
     - drawdown_filter
   TREND_STRUCTURE:
     templates:
@@ -137,6 +161,17 @@ families:
   EXECUTION_FRICTION:
     templates:
     - slippage_aware_filter
+    - tail_risk_avoid
+  POSITIONING_UNWIND_DELEVERAGING:
+    templates:
+    - reversal_or_squeeze
+    - mean_reversion
+    - continuation
+    - exhaustion_reversal
+    - convexity_capture
+    - only_if_funding
+    - only_if_oi
+    - only_if_regime
     - tail_risk_avoid
 events:
   LIQUIDITY_VACUUM:
@@ -221,6 +256,7 @@ events:
     - overshoot_repair
     - only_if_liquidity
     - slippage_aware_filter
+    - only_if_regime
     horizons:
     - 15m
     max_candidates_per_run: 600
@@ -387,6 +423,8 @@ events:
     - only_if_funding
     - only_if_oi
     - only_if_regime
+    - only_if_highvol
+    - only_if_trend
     - tail_risk_avoid
     horizons:
     - 5m
@@ -418,6 +456,7 @@ events:
     - only_if_funding
     - only_if_oi
     - tail_risk_avoid
+    - only_if_regime
     horizons:
     - 5m
     - 60m
@@ -475,6 +514,8 @@ events:
     - convexity_capture
     - only_if_funding
     - only_if_oi
+    - only_if_regime
+    - only_if_highvol
     - tail_risk_avoid
     horizons:
     - 5m
@@ -534,6 +575,8 @@ events:
     - momentum_fade
     - range_reversion
     - only_if_trend
+    - only_if_regime
+    - only_if_highvol
     - drawdown_filter
     horizons:
     - 60m
@@ -559,6 +602,7 @@ events:
     - range_reversion
     - only_if_trend
     - drawdown_filter
+    - only_if_regime
     horizons:
     - 60m
     max_candidates_per_run: 500
@@ -570,6 +614,8 @@ events:
     - momentum_fade
     - range_reversion
     - only_if_trend
+    - only_if_regime
+    - only_if_highvol
     - drawdown_filter
     horizons:
     - 60m
@@ -631,6 +677,7 @@ events:
     - trend_continuation
     - continuation
     - only_if_trend
+    - only_if_regime
     horizons:
     - 15m
     - 60m
@@ -1036,6 +1083,10 @@ filter_templates:
     feature: rv_pct_17280
     operator: '>'
     threshold: 0.7
+  only_if_highvol:
+    feature: rv_pct_17280
+    operator: '>'
+    threshold: 0.85
   only_if_trend:
     feature: logret_1
     operator: '>'
@@ -1486,12 +1537,45 @@ operators:
     compatible_families:
     - REGIME_TRANSITION
     - VOLATILITY_TRANSITION
+    - POSITIONING_EXTREMES
+    - BASIS_FUNDING_DISLOCATION
+    - POSITIONING_UNWIND_DELEVERAGING
+    - FORCED_FLOW_AND_EXHAUSTION
+    - TREND_FAILURE_EXHAUSTION
     default_conditioning: {}
     risk_metrics_required: []
     template_kind: filter_template
     feature: rv_pct_17280
     operator: '>'
     threshold: 0.7
+  only_if_highvol:
+    enabled: true
+    supports_contexts: true
+    supports_directions:
+    - long
+    - short
+    supports_trigger_types:
+    - EVENT
+    - STATE
+    operator_id: op.only_if_highvol
+    operator_version: v1
+    requires_direction: false
+    side_policy: both
+    label_target: gate
+    test_spec: binary_gate
+    compatible_families:
+    - REGIME_TRANSITION
+    - VOLATILITY_TRANSITION
+    - POSITIONING_EXTREMES
+    - BASIS_FUNDING_DISLOCATION
+    - FORCED_FLOW_AND_EXHAUSTION
+    - TREND_FAILURE_EXHAUSTION
+    default_conditioning: {}
+    risk_metrics_required: []
+    template_kind: filter_template
+    feature: rv_pct_17280
+    operator: '>'
+    threshold: 0.85
   only_if_trend:
     enabled: true
     supports_contexts: true
@@ -1510,6 +1594,7 @@ operators:
     compatible_families:
     - FORCED_FLOW_AND_EXHAUSTION
     - TREND_STRUCTURE
+    - BASIS_FUNDING_DISLOCATION
     default_conditioning: {}
     risk_metrics_required: []
     template_kind: filter_template

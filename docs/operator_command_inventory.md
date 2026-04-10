@@ -1,59 +1,168 @@
-# Operator command inventory
+# Command Inventory
 
-> [!WARNING]
-> **Legacy Compatibility Surface**
-> This inventory focuses on deprecated operator facades. Consider discover, validate, promote, and deploy directly.
+Maintained against `project/cli.py` and `Makefile`.
 
-Maintained against `project/cli.py` and `Makefile`. Update this file when those surfaces change.
+This file is intentionally broader than the old name suggests. It covers:
 
-## Preferred front door
+- canonical lifecycle commands
+- support-plane commands
+- compatibility operator commands
+- maintenance and validation targets
 
-Use these surfaces first:
+## Use These First
+
+For day-to-day lifecycle work, prefer:
 
 - `make discover PROPOSAL=<proposal.yaml> DISCOVER_ACTION=plan|run`
-- `edge operator preflight --proposal <proposal.yaml>`
+- `make validate RUN_ID=<run_id>`
+- `make promote RUN_ID=<run_id> SYMBOLS=BTCUSDT,ETHUSDT`
 - `make export RUN_ID=<run_id>`
-- `make validate`
-- `make review RUN_ID=<run_id> REVIEW_ACTION=diagnose|regime-report`
-- `make review REVIEW_ACTION=compare RUN_IDS=<baseline_run,followup_run>`
-
-Treat `make package` as an advanced bootstrap/governance surface, not the default way to produce a runtime thesis batch.
+- `make deploy-paper RUN_ID=<run_id>`
 
 Direct CLI equivalents:
 
-- `edge operator preflight|plan|run` for bounded research issuance
-- `edge operator diagnose|regime-report|compare` for post-run review
-- `python -m project.research.export_promoted_theses --run_id <run_id>` for explicit thesis-batch export
+- `python -m project.cli discover plan|run`
+- `python -m project.cli validate run|report|diagnose`
+- `python -m project.cli promote run|export`
+- `python -m project.cli deploy list-theses|inspect-thesis|paper|live|status`
 
-## Canonical operator commands
+## Canonical Lifecycle Commands
 
-- `edge operator campaign`
-- `edge operator compare`
-- `edge operator diagnose`
-- `edge operator explain`
-- `edge operator lint`
-- `edge operator plan`
+### Discover
+
+- `edge discover run --proposal <proposal.yaml>`
+- `edge discover plan --proposal <proposal.yaml>`
+- `edge discover list-artifacts --run_id <run_id>`
+
+### Validate
+
+- `edge validate run --run_id <run_id>`
+- `edge validate report --run_id <run_id>`
+- `edge validate diagnose --run_id <run_id>`
+- `edge validate list-artifacts --run_id <run_id>`
+
+### Promote
+
+- `edge promote run --run_id <run_id> --symbols BTCUSDT,ETHUSDT`
+- `edge promote export --run_id <run_id>`
+- `edge promote list-artifacts --run_id <run_id>`
+
+### Deploy
+
+- `edge deploy list-theses`
+- `edge deploy inspect-thesis --run_id <run_id>`
+- `edge deploy paper --run_id <run_id> [--config <yaml>]`
+- `edge deploy live --run_id <run_id> [--config <yaml>]`
+- `edge deploy status`
+
+## Support-Plane Commands
+
+These are important, but they are not extra lifecycle stages.
+
+### Ingest
+
+- `edge ingest --run_id <run_id> --symbols BTCUSDT --start YYYY-MM-DD --end YYYY-MM-DD --exchange bybit --data_type ohlcv`
+
+### Catalog
+
+- `edge catalog list [--stage discover|validate|promote|deploy]`
+- `edge catalog compare --run_id_a <run_a> --run_id_b <run_b> --stage discover|validate|promote`
+- `edge catalog audit-artifacts [--run_id <run_id>] [--rewrite_stamps 1]`
+
+### Advanced trigger discovery
+
+- `edge discover triggers parameter-sweep ...`
+- `edge discover triggers feature-cluster ...`
+- `edge discover triggers report --proposal_dir <dir>`
+- `edge discover triggers emit-registry-payload --candidate_id <id> --proposal_dir <dir>`
+- `edge discover triggers list`
+- `edge discover triggers inspect --candidate_id <id>`
+- `edge discover triggers review --candidate_id <id>`
+- `edge discover triggers approve --candidate_id <id>`
+- `edge discover triggers reject --candidate_id <id> --reason <text>`
+- `edge discover triggers mark-adopted --candidate_id <id>`
+
+## Compatibility Operator Commands
+
+> [!WARNING]
+> `edge operator ...` is still supported, but it is a compatibility surface. New documentation should teach the stage verbs first.
+
+Current `operator` commands:
+
 - `edge operator preflight`
-- `edge operator regime-report`
+- `edge operator plan`
 - `edge operator run`
+- `edge operator lint`
+- `edge operator explain`
+- `edge operator compare`
+- `edge operator regime-report`
+- `edge operator diagnose`
+- `edge operator campaign start`
 
-## Operator action targets
+Current conceptual mapping:
+
+| Compatibility command | Preferred surface |
+|-----------------------|-------------------|
+| `operator preflight` | discover planning / proposal validation |
+| `operator plan` | `discover plan` |
+| `operator run` | `discover run` |
+| `operator regime-report` | `validate report` |
+| `operator diagnose` | `validate diagnose` |
+| `operator compare` | `catalog compare` or validation/report review depending on need |
+
+## Deprecated Pipeline Command
+
+Still present:
+
+- `edge pipeline run-all`
+
+This is a compatibility orchestration command, not the canonical lifecycle front door.
+
+## Make Targets
+
+### Canonical lifecycle wrappers
 
 - `discover`
-- `export`
 - `validate`
+- `promote`
+- `export`
+- `deploy-paper`
+
+### Review and maintenance wrappers
+
 - `review`
+- `legacy-validate`
+- `governance`
+- `minimum-green-gate`
+- `test`
+- `test-fast`
+- `lint`
+- `format`
+- `format-check`
+- `style`
+- `pre-commit`
 
-## Advanced / maintenance make targets
+### Advanced workflow bundles
 
+- `run`
 - `baseline`
-- `bench-pipeline`
-- `benchmark-core`
-- `benchmark-review`
-- `benchmark-certify`
-- `benchmark-m0`
-- `benchmark-maintenance`
+- `discover-blueprints`
+- `discover-edges`
+- `discover-edges-from-raw`
+- `discover-target`
+- `discover-concept`
+- `golden-workflow`
+- `golden-synthetic-discovery`
+- `golden-certification`
+- `synthetic-demo`
+- `package`
+
+### Benchmark and hygiene targets
+
 - `benchmark-maintenance-smoke`
+- `benchmark-maintenance`
+- `benchmark-m0`
+- `bench-pipeline`
 - `check-hygiene`
 - `clean`
 - `clean-all-data`
@@ -61,140 +170,28 @@ Direct CLI equivalents:
 - `clean-repo`
 - `clean-run-data`
 - `clean-runtime`
-- `compile`
 - `debloat`
-- `discover-blueprints`
-- `discover-concept`
-- `discover-edges`
-- `discover-edges-from-raw`
-- `discover-hybrid`
-- `discover-target`
-- `format`
-- `format-check`
-- `golden-certification`
-- `golden-synthetic-discovery`
-- `golden-workflow`
-- `governance`
-- `help`
-- `lint`
-- `minimum-green-gate`
-- `monitor`
-- `package`
-- `pre-commit`
-- `run`
-- `style`
-- `synthetic-demo`
-- `test`
-- `test-fast`
+- `compile`
 
-## Inventory payload
+## Maintenance Script Inventory
 
-```json
-{
-  "advanced_make_targets": [
-    "baseline",
-    "bench-pipeline",
-    "benchmark-core",
-    "benchmark-review",
-    "benchmark-certify",
-    "benchmark-m0",
-    "benchmark-maintenance",
-    "benchmark-maintenance-smoke",
-    "check-hygiene",
-    "clean",
-    "clean-all-data",
-    "clean-hygiene",
-    "clean-repo",
-    "clean-run-data",
-    "clean-runtime",
-    "compile",
-    "debloat",
-    "discover-blueprints",
-    "discover-concept",
-    "discover-edges",
-    "discover-edges-from-raw",
-    "discover-hybrid",
-    "discover-target",
-    "format",
-    "format-check",
-    "golden-certification",
-    "golden-synthetic-discovery",
-    "golden-workflow",
-    "governance",
-    "help",
-    "lint",
-    "minimum-green-gate",
-    "monitor",
-    "package",
-    "pre-commit",
-    "run",
-    "style",
-    "synthetic-demo",
-    "test",
-    "test-fast"
-  ],
-  "canonical_operator_commands": [
-    "edge operator campaign",
-    "edge operator compare",
-    "edge operator diagnose",
-    "edge operator explain",
-    "edge operator lint",
-    "edge operator plan",
-    "edge operator preflight",
-    "edge operator regime-report",
-    "edge operator run"
-  ],
-  "make_targets": [
-    "baseline",
-    "bench-pipeline",
-    "benchmark-core",
-    "benchmark-review",
-    "benchmark-certify",
-    "benchmark-m0",
-    "benchmark-maintenance",
-    "benchmark-maintenance-smoke",
-    "check-hygiene",
-    "clean",
-    "clean-all-data",
-    "clean-hygiene",
-    "clean-repo",
-    "clean-run-data",
-    "clean-runtime",
-    "compile",
-    "debloat",
-    "discover",
-    "discover-blueprints",
-    "discover-concept",
-    "discover-edges",
-    "discover-edges-from-raw",
-    "discover-hybrid",
-    "discover-target",
-    "export",
-    "format",
-    "format-check",
-    "golden-certification",
-    "golden-synthetic-discovery",
-    "golden-workflow",
-    "governance",
-    "help",
-    "lint",
-    "minimum-green-gate",
-    "monitor",
-    "package",
-    "pre-commit",
-    "review",
-    "run",
-    "style",
-    "synthetic-demo",
-    "test",
-    "test-fast",
-    "validate"
-  ],
-  "operator_action_targets": [
-    "discover",
-    "export",
-    "validate",
-    "review"
-  ]
-}
-```
+The repo-local plugin wrappers under `plugins/edge-agents/scripts/` are important for maintenance and operator support. The main ones are:
+
+- `edge_preflight_proposal.sh`
+- `edge_plan_proposal.sh`
+- `edge_run_proposal.sh`
+- `edge_lint_proposal.sh`
+- `edge_explain_proposal.sh`
+- `edge_diagnose_run.sh`
+- `edge_regime_report.sh`
+- `edge_compare_runs.sh`
+- `edge_export_theses.sh`
+- `edge_validate_repo.sh`
+- `edge_verify_contracts.sh`
+- `edge_governance.sh`
+- `edge_package_theses.sh`
+- `edge_bootstrap_theses.sh`
+- `edge_chatgpt_app.sh`
+- `edge_sync_plugin.sh`
+
+Use these as wrappers around canonical repo surfaces, not as replacement policy layers.

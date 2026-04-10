@@ -19,6 +19,7 @@ from project.research.agent_io.issue_proposal import generate_run_id, issue_prop
 from project.research.agent_io.proposal_schema import load_operator_proposal
 from project.research.knowledge.memory import ensure_memory_store, read_memory_table
 from project.research.knowledge.schemas import canonical_json, region_key
+from project.research.semantic_registry_views import build_canonical_semantic_registry_views
 from project.spec_registry.search_space import (
     DEFAULT_EVENT_PRIORITY_WEIGHT,
     load_event_priority_weights,
@@ -261,9 +262,10 @@ class CampaignPlanner:
         self.registry_root = Path(config.registry_root)
         self.paths = ensure_memory_store(config.program_id, data_root=self.data_root)
         self.search_space_path = _search_space_path(self.registry_root, config.search_space_path)
+        semantic_registry = build_canonical_semantic_registry_views()
         self.registry = {
-            "events": self._load_yaml(self.registry_root / "events.yaml"),
-            "templates": self._load_yaml(self.registry_root / "templates.yaml"),
+            "events": semantic_registry["events"],
+            "templates": semantic_registry["templates"],
             "search_limits": self._load_yaml(self.registry_root / "search_limits.yaml"),
         }
         self.event_weights = self._event_priority_weights(self.search_space_path)

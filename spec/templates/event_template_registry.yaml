@@ -222,6 +222,7 @@ events:
     - overshoot_repair
     - only_if_liquidity
     - slippage_aware_filter
+    - only_if_regime
     horizons:
     - 15m
     max_candidates_per_run: 600
@@ -387,6 +388,9 @@ events:
     - convexity_capture
     - only_if_funding
     - only_if_oi
+    - only_if_regime
+    - only_if_highvol
+    - only_if_trend
     - tail_risk_avoid
     horizons:
     - 5m
@@ -418,6 +422,7 @@ events:
     - only_if_funding
     - only_if_oi
     - tail_risk_avoid
+    - only_if_regime
     horizons:
     - 5m
     - 60m
@@ -475,6 +480,8 @@ events:
     - convexity_capture
     - only_if_funding
     - only_if_oi
+    - only_if_regime
+    - only_if_highvol
     - tail_risk_avoid
     horizons:
     - 5m
@@ -519,6 +526,8 @@ events:
     - momentum_fade
     - range_reversion
     - only_if_trend
+    - only_if_regime
+    - only_if_highvol
     - drawdown_filter
     horizons:
     - 60m
@@ -544,6 +553,7 @@ events:
     - range_reversion
     - only_if_trend
     - drawdown_filter
+    - only_if_regime
     horizons:
     - 60m
     max_candidates_per_run: 500
@@ -555,6 +565,8 @@ events:
     - momentum_fade
     - range_reversion
     - only_if_trend
+    - only_if_regime
+    - only_if_highvol
     - drawdown_filter
     horizons:
     - 60m
@@ -616,6 +628,7 @@ events:
     - trend_continuation
     - continuation
     - only_if_trend
+    - only_if_regime
     horizons:
     - 15m
     - 60m

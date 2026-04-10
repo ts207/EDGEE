@@ -61,6 +61,7 @@ def test_translate_and_validate_proposal_does_not_clobber_existing_config_on_fai
             registry_root=registry_root,
             out_dir=out_dir,
             config_path=config_path,
+            legacy_compatibility=True,
         )
 
     assert config_path.read_text(encoding="utf-8") == "program_id: stable_bundle\n"
@@ -81,6 +82,7 @@ def test_translate_and_validate_proposal_preserves_avoid_region_keys(tmp_path: P
         proposal_path,
         registry_root=registry_root,
         out_dir=tmp_path / "bundle",
+        legacy_compatibility=True,
     )
 
     assert result["experiment_config"]["avoid_region_keys"] == ["rk_1", "rk_2"]

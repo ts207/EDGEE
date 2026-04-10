@@ -103,7 +103,8 @@ def test_domain_registry_event_row_exposes_routing_profile_ref():
 
     row = registry.event_row("LIQUIDATION_CASCADE_PROXY")
 
-    assert row["routing_profile_ref"] == "POSITIONING_UNWIND_DELEVERAGING"
+    assert row["canonical_regime"] == "LIQUIDATION_CASCADE"
+    assert row["routing_profile_ref"] == "LIQUIDATION_CASCADE"
 
 
 def test_domain_registry_exposes_context_and_searchable_family_views():

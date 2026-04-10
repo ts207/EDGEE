@@ -19,17 +19,11 @@ def test_env(tmp_path):
         yaml.dump(
             {
                 "events": {
-                    "VOL_SPIKE": {
-                        "enabled": True,
-                        "instrument_classes": ["crypto"],
+                    "VOL_SHOCK": {
+                        "enabled": False,
+                        "instrument_classes": ["equities"],
                         "sequence_eligible": True,
-                        "requires_features": [],
-                    },
-                    "LIQ_GAP": {
-                        "enabled": True,
-                        "instrument_classes": ["crypto"],
-                        "sequence_eligible": True,
-                        "requires_features": [],
+                        "requires_features": ["poison_feature"],
                     },
                 }
             }
@@ -40,8 +34,8 @@ def test_env(tmp_path):
             {
                 "templates": {
                     "continuation": {
-                        "enabled": True,
-                        "supports_trigger_types": ["EVENT", "SEQUENCE"],
+                        "enabled": False,
+                        "supports_trigger_types": ["FEATURE_PREDICATE"],
                     }
                 }
             }
@@ -66,7 +60,7 @@ def test_env(tmp_path):
         )
     )
     (reg_dir / "detectors.yaml").write_text(
-        yaml.dump({"detector_ownership": {"VOL_SPIKE": "VolSpikeDetector"}})
+        yaml.dump({"detector_ownership": {"VOL_SHOCK": "VolShockDetector"}})
     )
 
     config = {
@@ -79,7 +73,7 @@ def test_env(tmp_path):
             "start": "2024-01-01",
             "end": "2024-01-02",
         },
-        "trigger_space": {"allowed_trigger_types": ["EVENT"], "events": {"include": ["VOL_SPIKE"]}},
+        "trigger_space": {"allowed_trigger_types": ["EVENT"], "events": {"include": ["VOL_SHOCK"]}},
         "templates": {"include": ["continuation"]},
         "evaluation": {"horizons_bars": [10], "directions": ["long"], "entry_lags": [1]},
         "contexts": {"include": {"session": ["open"]}},
@@ -106,16 +100,21 @@ def test_artifacts_contract(test_env):
     assert (out_dir / "request.yaml").exists()
     assert (out_dir / "request_hash.txt").exists()
     assert (out_dir / "registry_hash.txt").exists()
+    assert (out_dir / "registry_sources.json").exists()
     assert (out_dir / "validated_plan.json").exists()
     assert (out_dir / "execution_requirements.json").exists()
     assert (out_dir / "expanded_hypotheses.parquet").exists()
 
     # Check execution reqs
     reqs = json.loads((out_dir / "execution_requirements.json").read_text())
+    registry_sources = json.loads((out_dir / "registry_sources.json").read_text())
     assert "detectors" in reqs
     assert "features" in reqs
     assert "state_engines" in reqs
-    assert reqs["detectors"] == ["VolSpikeDetector"]
+    assert reqs["detectors"] == ["VolShockDetector"]
+    assert registry_sources["events"] == ["spec/events/event_registry_unified.yaml"]
+    assert registry_sources["templates"] == ["spec/templates/registry.yaml"]
+    assert "project/configs/registries/events.yaml" not in json.dumps(registry_sources)
 
     # Check hypotheses parquet schema
     df = pd.read_parquet(out_dir / "expanded_hypotheses.parquet")

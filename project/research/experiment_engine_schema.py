@@ -9,6 +9,11 @@ from typing import Any, Dict, List
 import yaml
 
 from project.domain.hypotheses import HypothesisSpec
+from project.research.semantic_registry_views import (
+    build_canonical_semantic_registry_views,
+    canonical_semantic_source_paths,
+    runtime_config_source_paths,
+)
 
 _LOG = logging.getLogger(__name__)
 
@@ -98,16 +103,27 @@ class ValidatedExperimentPlan:
 
 class RegistryBundle:
     def __init__(self, registry_root: Path):
-        self.events = self._load_yaml(registry_root / "events.yaml")
-        self.states = self._load_yaml(registry_root / "states.yaml")
-        self.features = self._load_yaml(registry_root / "features.yaml")
-        self.templates = self._load_yaml(registry_root / "templates.yaml")
-        self.contexts = self._load_yaml(registry_root / "contexts.yaml")
-        self.limits = self._load_yaml(registry_root / "search_limits.yaml")
-        self.detectors = self._load_yaml(registry_root / "detectors.yaml")
+        self.registry_root = Path(registry_root)
+        semantic_views = build_canonical_semantic_registry_views()
+        self.events = semantic_views["events"]
+        self.states = semantic_views["states"]
+        self.templates = semantic_views["templates"]
+        self.features = self._load_yaml(self.registry_root / "features.yaml")
+        self.contexts = self._load_yaml(self.registry_root / "contexts.yaml")
+        self.limits = self._load_yaml(self.registry_root / "search_limits.yaml")
+        self.detectors = self._load_yaml(self.registry_root / "detectors.yaml")
+        self.semantic_source_paths = canonical_semantic_source_paths()
+        self.runtime_config_source_paths = runtime_config_source_paths(self.registry_root)
 
     def _load_yaml(self, path: Path) -> Dict[str, Any]:
         if not path.exists():
             _LOG.warning(f"Registry file not found: {path}")
             return {}
-        return yaml.safe_load(path.read_text())
+        payload = yaml.safe_load(path.read_text())
+        return payload if isinstance(payload, dict) else {}
+
+    def registry_source_paths(self) -> Dict[str, List[Path]]:
+        return {
+            **self.semantic_source_paths,
+            **self.runtime_config_source_paths,
+        }

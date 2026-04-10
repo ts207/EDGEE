@@ -4,7 +4,7 @@ reports_dir: liquidation_events
 events_file: liquidation_cascade_proxy_events.parquet
 signal_column: liquidation_cascade_proxy_event
 identity:
-  canonical_regime: POSITIONING_UNWIND_DELEVERAGING
+  canonical_regime: LIQUIDATION_CASCADE
   legacy_family: POSITIONING_EXTREMES
   subtype: liquidation_cascade_proxy
   phase: onset
@@ -63,7 +63,7 @@ semantics:
     LIQUIDATION_CASCADE but comparable recall for large cascade events.
   precedence_rank: 1
 routing:
-  routing_profile_ref: POSITIONING_UNWIND_DELEVERAGING
+  routing_profile_ref: LIQUIDATION_CASCADE
 detector:
   signal_definition: >
     Detects liquidation-cascade-like conditions using only native exchange data.

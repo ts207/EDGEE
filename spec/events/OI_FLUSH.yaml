@@ -6,7 +6,7 @@ signal_column: oi_flush_event
 parameters:
   oi_window: 96
   spike_z_th: 2.5
-  flush_pct_th: -0.005
+  flush_pct_th: -0.02
 canonical_family: POSITIONING_EXTREMES
 trigger: Detector triggers on oi flush pattern
 confirmation: Post-detection price action confirms signal validity

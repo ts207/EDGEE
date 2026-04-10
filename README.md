@@ -1,80 +1,148 @@
-# Edge: Alpha Discovery & Runtime
+# Edge
 
-Edge is a staging system for crypto alpha discovery, validation, promotion, and deployment.
+Edge is a research-to-runtime system for event-anchored crypto alpha work.
+
+The canonical operating model is:
 
 `discover → validate → promote → deploy`
 
-## 1. The Four Stages
+That four-stage story is the public front door, but the repository now includes a broader control plane around it:
 
-### 1. **Discover**
-Broad candidate generation. We anchor research ideas to specific market events and filter them through state/regime predicates.
-* **Input**: Structured Hypothesis (Proposal)
-* **Output**: Candidates Table
+- a canonical stage CLI in `project/cli.py`
+- a planner-owned orchestration layer in `project/pipelines/run_all.py`
+- a compatibility `operator` surface for older bounded-research workflows
+- an explicit thesis export step that writes runtime inventory under `data/live/theses/`
+- a gated live runtime with thesis-state validation, approval metadata, kill switches, and reconciliation
+- an MCP / ChatGPT app interface in `project/apps/chatgpt/` that fronts canonical repo surfaces instead of redefining policy
 
-### 2. **Validate**
-Aggressive truth-testing. We subject candidates to falsification tests, cost-sensitivity analysis, and regime stability checks.
-* **Input**: Candidates
-* **Output**: Validated Candidates & Validation Bundle
+## System Model
 
-### 3. **Promote**
-Packaging and governance. We decide which robust candidates are ready for inventory based on retail profile and business objectives.
-* **Input**: Validated Candidates
-* **Output**: Promoted Theses
+### Discover
+Discovery turns a bounded proposal YAML into a candidate table. A proposal freezes the research claim, anchor, context, and search scope before execution.
 
-### 4. **Deploy**
-Runtime execution. We run promoted theses in paper or live mode with explicit risk controls.
-* **Input**: Promoted Theses
-* **Output**: Live PnL & Execution Attribution
+- Input: proposal / Structured Hypothesis
+- Main output: discovery artifacts under `data/reports/phase2/<run_id>/`
+- Key object: Candidate
 
----
+### Validate
+Validation is the falsification stage. It takes discovery outputs and writes the canonical bundle that downstream promotion reads.
 
-## 2. Core Concepts
+- Input: discovery run ID
+- Main output: `data/reports/validation/<run_id>/validation_bundle.json`
+- Key object: Validated Candidate
 
-* **Anchor**: The event (e.g., VOL_SHOCK) or transition that defines an edge.
-* **Filter**: Contextual state or regime predicates that narrow when an anchor is active.
-* **Sampling Policy**: Rules for how many times an edge can trigger (e.g., once per episode).
-* **Validated Candidate**: A candidate that has passed all statistical truth-testing.
-* **Promoted Thesis**: A packaged alpha idea ready for execution.
+### Promote
+Promotion decides which validated candidates are worth inventorying. It applies governance, retail-profile, and readiness logic and assigns a deployment state.
 
----
+- Input: validation bundle
+- Main output: promotion artifacts under `data/reports/promotions/<run_id>/`
+- Key object: Promoted Thesis
 
-## 3. Quickstart
+### Deploy
+Deployment consumes exported thesis batches. Paper and live execution are explicit runtime operations, not side effects of promotion.
 
-### Step 1: Discover Candidates
+- Input: `data/live/theses/<run_id>/promoted_theses.json`
+- Main output: runtime sessions, audit logs, and trade/execution state
+- Key object: live thesis batch
+
+## Core Concepts
+
+- Anchor: the event or transition that defines the hypothesis entry condition.
+- Filter: contextual predicates that narrow where the Anchor is valid.
+- Sampling Policy: the rules that decide how episodes are sampled from an event.
+- Candidate: a concrete hypothesis instance that survives discovery ranking.
+- Validated Candidate: a Candidate that survives validation gates and bundle construction.
+- Thesis: the packaged runtime-facing object produced by promotion and export.
+
+Edge is event-first. The repo is not organized around free-form strategy authoring as the default. It is organized around Anchors, Filters, evidence bundles, artifact lineage, and a thesis store.
+
+## Canonical Commands
+
+Use the stage verbs first:
+
 ```bash
-edge discover run --proposal spec/proposals/my_alpha.yaml
+make discover PROPOSAL=spec/proposals/<proposal>.yaml DISCOVER_ACTION=plan
+make discover PROPOSAL=spec/proposals/<proposal>.yaml DISCOVER_ACTION=run
+make validate RUN_ID=<run_id>
+make promote RUN_ID=<run_id> SYMBOLS=BTCUSDT,ETHUSDT
+make export RUN_ID=<run_id>
+make deploy-paper RUN_ID=<run_id>
 ```
 
-### Step 2: Validate Results
+Direct CLI equivalents:
+
 ```bash
-edge validate run --run_id <run_id>
+python -m project.cli discover plan --proposal spec/proposals/<proposal>.yaml
+python -m project.cli discover run --proposal spec/proposals/<proposal>.yaml
+python -m project.cli validate run --run_id <run_id>
+python -m project.cli promote run --run_id <run_id> --symbols BTCUSDT,ETHUSDT
+python -m project.cli promote export --run_id <run_id>
+python -m project.cli deploy paper --run_id <run_id> --config project/configs/live_paper.yaml
 ```
 
-### Step 3: Promote to Thesis
-```bash
-edge promote run --run_id <run_id> --symbols BTC
-```
+## What Changed
 
-### Step 4: Deploy (Paper)
-```bash
-edge deploy paper --run_id <run_id>
-```
+The current repo update that older docs did not explain clearly is:
 
----
+- `discover`, `validate`, `promote`, and `deploy` are the canonical lifecycle verbs
+- `operator` still exists, but it is a deprecated compatibility façade
+- `pipeline run-all` still exists, but it is not the preferred public surface
+- `promote export` is the bridge into runtime inventory and writes `data/live/theses/<run_id>/`
+- thesis lifecycle and runtime permissioning are now explicit through `deployment_state`, approval metadata, and `DeploymentGate`
+- advanced trigger discovery exists under `discover triggers ...`, but it is proposal-generating research, not a shortcut into live inventory
+- the ChatGPT app and plugin layers are interface shells over canonical repo behavior, not separate engines
 
-## 4. Documentation
+## Artifact Flow
 
-Detailed stage-by-stage documentation can be found in `docs/`:
+The most important lineage is:
 
-* [System Overview](docs/00_overview.md)
-* [Stage 1: Discover](docs/01_discover.md)
-* [Stage 2: Validate](docs/02_validate.md)
-* [Stage 3: Promote](docs/03_promote.md)
-* [Stage 4: Deploy](docs/04_deploy.md)
-* [Core Concepts & Glossary](docs/06_core_concepts.md)
+1. Proposal YAML in `spec/proposals/`
+2. Discovery artifacts in `data/reports/phase2/<run_id>/`
+3. Validation bundle in `data/reports/validation/<run_id>/`
+4. Promotion artifacts in `data/reports/promotions/<run_id>/`
+5. Exported thesis batch in `data/live/theses/<run_id>/promoted_theses.json`
+6. Runtime consumption by `project/live/`
 
----
+This boundary matters operationally:
 
-## 5. Compatibility Note
+- `promote run` does not start trading
+- `promote export` does not bypass deployment gates
+- `deploy live` is blocked unless the exported batch contains `live_enabled` theses
 
-Legacy commands (`operator`, `pipeline`) are still supported but deprecated. Please migrate to the new canonical verbs.
+## Repository Surfaces
+
+- `project/cli.py`: canonical stage CLI plus compatibility commands
+- `project/pipelines/`: planner-owned orchestration, manifests, stage graph, smoke flows
+- `project/research/`: discovery, validation, promotion, reporting, trigger discovery, campaign tools
+- `project/live/`: thesis contracts, deployment gate, live runner, reconciliation, kill switch, scoring
+- `project/events/` and `spec/events/`: authored event definitions and compiled registry surfaces
+- `project/apps/chatgpt/`: app / MCP scaffold around canonical operator workflows
+- `plugins/edge-agents/`: repo-local plugin scripts for maintenance, validation, and operator ergonomics
+
+## Documentation
+
+Start with:
+
+- [docs/README.md](docs/README.md)
+- [docs/00_overview.md](docs/00_overview.md)
+- [docs/01_discover.md](docs/01_discover.md)
+- [docs/02_validate.md](docs/02_validate.md)
+- [docs/03_promote.md](docs/03_promote.md)
+- [docs/04_deploy.md](docs/04_deploy.md)
+
+Then use:
+
+- [docs/02_REPOSITORY_MAP.md](docs/02_REPOSITORY_MAP.md)
+- [docs/05_data_foundation.md](docs/05_data_foundation.md)
+- [docs/06_core_concepts.md](docs/06_core_concepts.md)
+- [docs/operator_command_inventory.md](docs/operator_command_inventory.md)
+- [docs/90_architecture.md](docs/90_architecture.md)
+
+## Compatibility Note
+
+Legacy commands remain available for migration support:
+
+- `edge operator ...`
+- `edge pipeline run-all`
+
+They are wrappers around the current model. New documentation and maintenance work should teach the stage verbs and the export/runtime boundary first.

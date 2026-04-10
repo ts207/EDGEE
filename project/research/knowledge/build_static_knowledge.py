@@ -10,7 +10,7 @@ from typing import Any, Dict, Iterable, List
 import pandas as pd
 
 from project.core.config import get_data_root
-from project.domain.compiled_registry import get_domain_registry
+from project.domain.registry_loader import compile_domain_registry_from_sources
 from project.io.utils import write_parquet
 from project.spec_registry import load_yaml_path
 
@@ -24,6 +24,7 @@ from project.research.knowledge.schemas import (
     relation_id,
 )
 from project.research.knowledge.knobs import build_agent_knob_rows
+from project.research.semantic_registry_views import build_canonical_semantic_registry_views
 
 
 def _registry_path(registry_root: Path, name: str) -> Path:
@@ -113,14 +114,15 @@ def build_static_knowledge(
     )
     if not resolved_registry_root.is_absolute():
         resolved_registry_root = (Path.cwd() / resolved_registry_root).resolve()
-    domain = domain_registry or get_domain_registry()
+    domain = domain_registry or compile_domain_registry_from_sources()
 
     out_root = resolved_data_root / "knowledge" / "static"
     out_root.mkdir(parents=True, exist_ok=True)
 
-    events_payload = load_yaml_path(_registry_path(resolved_registry_root, "events"))
-    states_payload = load_yaml_path(_registry_path(resolved_registry_root, "states"))
-    templates_payload = load_yaml_path(_registry_path(resolved_registry_root, "templates"))
+    semantic_payloads = build_canonical_semantic_registry_views(domain_registry=domain)
+    events_payload = semantic_payloads["events"]
+    states_payload = semantic_payloads["states"]
+    templates_payload = semantic_payloads["templates"]
     contexts_payload = load_yaml_path(_registry_path(resolved_registry_root, "contexts"))
     detectors_payload = load_yaml_path(_registry_path(resolved_registry_root, "detectors"))
     features_payload = load_yaml_path(_registry_path(resolved_registry_root, "features"))
@@ -144,7 +146,7 @@ def build_static_knowledge(
         family = str(row.get("family", "")).strip().upper()
         detector_name = str(row.get("detector") or detector_ownership.get(event_type, "")).strip()
         enabled = bool(row.get("enabled", True))
-        source_path = str(_registry_path(resolved_registry_root, "events"))
+        source_path = str(row.get("source_path", "spec/events/event_registry_unified.yaml"))
         entities.append(
             {
                 "entity_id": entity_id("event", event_type),
@@ -206,7 +208,7 @@ def build_static_knowledge(
         if not isinstance(row, dict):
             continue
         family = str(row.get("family", "")).strip().upper()
-        source_path = str(_registry_path(resolved_registry_root, "states"))
+        source_path = str(row.get("source_path", f"spec/states/{state_id}.yaml"))
         entities.append(
             {
                 "entity_id": entity_id("state", state_id),
@@ -251,7 +253,7 @@ def build_static_knowledge(
     ):
         if not isinstance(row, dict):
             continue
-        source_path = str(_registry_path(resolved_registry_root, "templates"))
+        source_path = str(row.get("source_path", "spec/templates/registry.yaml"))
         trigger_types = tuple(
             str(v).strip().upper()
             for v in row.get("supports_trigger_types", []) or []
@@ -328,7 +330,7 @@ def build_static_knowledge(
                 "title": family_name,
                 "family": family_name,
                 "enabled": True,
-                "source_path": str(_registry_path(resolved_registry_root, "events")),
+                "source_path": "spec/templates/registry.yaml",
                 "description": "",
                 "attributes_json": canonical_json({"family": family_name}),
             }
@@ -417,7 +419,9 @@ def build_static_knowledge(
         )
 
     for event_type, spec in domain.event_definitions.items():
-        for template_id in domain.family_templates(spec.canonical_family):
+        event_meta = event_rows.get(event_type, {})
+        family_name = str(event_meta.get("family", spec.canonical_family)).strip().upper()
+        for template_id in domain.family_templates(family_name):
             _append_relation(
                 relations,
                 from_type="event",
@@ -425,9 +429,7 @@ def build_static_knowledge(
                 relation_type="compatible_with_template",
                 to_type="template",
                 to_name=template_id,
-                source_path=str(
-                    spec.spec_path or _registry_path(resolved_registry_root, "templates")
-                ),
+                source_path="spec/templates/registry.yaml",
             )
 
     entities_df = (
@@ -468,12 +470,16 @@ def build_static_knowledge(
         ),
         "sources": {
             "registry_root": str(resolved_registry_root),
-            "events": str(_registry_path(resolved_registry_root, "events")),
-            "states": str(_registry_path(resolved_registry_root, "states")),
-            "templates": str(_registry_path(resolved_registry_root, "templates")),
-            "contexts": str(_registry_path(resolved_registry_root, "contexts")),
-            "detectors": str(_registry_path(resolved_registry_root, "detectors")),
-            "features": str(_registry_path(resolved_registry_root, "features")),
+            "semantic": {
+                "events": "spec/events/event_registry_unified.yaml",
+                "states": "spec/states/*.yaml",
+                "templates": "spec/templates/registry.yaml",
+            },
+            "runtime_config": {
+                "contexts": str(_registry_path(resolved_registry_root, "contexts")),
+                "detectors": str(_registry_path(resolved_registry_root, "detectors")),
+                "features": str(_registry_path(resolved_registry_root, "features")),
+            },
         },
     }
     index_path.write_text(

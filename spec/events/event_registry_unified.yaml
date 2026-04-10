@@ -36,6 +36,20 @@ defaults:
 families:
   ABSORPTION_PROXY:
     parameters: {}
+  BASIS_FUNDING_DISLOCATION:
+    parameters: {}
+    templates:
+    - reversal_or_squeeze
+    - mean_reversion
+    - continuation
+    - exhaustion_reversal
+    - convexity_capture
+    - only_if_funding
+    - only_if_oi
+    - only_if_regime
+    - only_if_highvol
+    - only_if_trend
+    - tail_risk_avoid
   CROSS_ASSET_INTERACTION:
     parameters: {}
   DEPTH_STRESS_PROXY:
@@ -55,6 +69,7 @@ families:
     - momentum_fade
     - range_reversion
     - only_if_trend
+    - only_if_regime
     - drawdown_filter
   INFORMATION_DESYNC:
     parameters: {}
@@ -90,6 +105,18 @@ families:
     - only_if_funding
     - only_if_oi
     - tail_risk_avoid
+  POSITIONING_UNWIND_DELEVERAGING:
+    parameters: {}
+    templates:
+    - reversal_or_squeeze
+    - mean_reversion
+    - continuation
+    - exhaustion_reversal
+    - convexity_capture
+    - only_if_funding
+    - only_if_oi
+    - only_if_regime
+    - tail_risk_avoid
   POST_DELEVERAGING_REBOUND:
     parameters: {}
   PRICE_ACTION:
@@ -117,6 +144,17 @@ families:
     - continuation
     - tail_risk_avoid
     - only_if_no_news_window
+  TREND_FAILURE_EXHAUSTION:
+    parameters: {}
+    templates:
+    - mean_reversion
+    - exhaustion_reversal
+    - momentum_fade
+    - range_reversion
+    - only_if_trend
+    - only_if_regime
+    - only_if_highvol
+    - drawdown_filter
   TREND_STRUCTURE:
     parameters: {}
     templates:
@@ -179,8 +217,10 @@ canonical_regimes:
   LIQUIDATION_CASCADE:
     event_types:
     - LIQUIDATION_CASCADE
+    - LIQUIDATION_CASCADE_PROXY
     default_executable_event_types:
     - LIQUIDATION_CASCADE
+    - LIQUIDATION_CASCADE_PROXY
   LIQUIDITY_STRESS:
     event_types:
     - ABSORPTION_PROXY
@@ -222,12 +262,10 @@ canonical_regimes:
   POSITIONING_UNWIND_DELEVERAGING:
     event_types:
     - DELEVERAGING_WAVE
-    - LIQUIDATION_CASCADE_PROXY
     - OI_FLUSH
     - POST_DELEVERAGING_REBOUND
     default_executable_event_types:
     - DELEVERAGING_WAVE
-    - LIQUIDATION_CASCADE_PROXY
     - OI_FLUSH
     - POST_DELEVERAGING_REBOUND
   REGIME_TRANSITION:
@@ -812,6 +850,8 @@ events:
     - momentum_fade
     - range_reversion
     - only_if_trend
+    - only_if_regime
+    - only_if_highvol
     - drawdown_filter
     horizons:
     - 60m
@@ -1915,6 +1955,8 @@ events:
     - momentum_fade
     - range_reversion
     - only_if_trend
+    - only_if_regime
+    - only_if_highvol
     - drawdown_filter
     horizons:
     - 60m
@@ -2081,6 +2123,9 @@ events:
     - convexity_capture
     - only_if_funding
     - only_if_oi
+    - only_if_regime
+    - only_if_highvol
+    - only_if_trend
     - tail_risk_avoid
     horizons:
     - 5m
@@ -2222,8 +2267,8 @@ events:
         - 'Low liquidity regime: OI/vol signals unreliable'
       cluster_id: funding_crowding
       funding_pct_window: 2880
-      extreme_pct: 95.0
-      accel_pct: 95.0
+      extreme_pct: 85.0
+      accel_pct: 85.0
       accel_lookback: 32
       persistence_pct: 85.0
       persistence_bars: 12
@@ -2329,7 +2374,8 @@ events:
       persistence_bars: 12
       normalization_pct: 50.0
       normalization_lookback: 96
-      min_event_spacing: 96
+      min_event_spacing: 576
+      min_spacing: 576
       event_lookahead: 96
       liquidation_abs_return: 0.03
       drawdown_abs_return: 0.03
@@ -2360,6 +2406,7 @@ events:
     - only_if_funding
     - only_if_oi
     - tail_risk_avoid
+    - only_if_regime
     horizons:
     - 5m
     - 60m
@@ -2732,10 +2779,9 @@ events:
     - 5m
     - 15m
     - 60m
-    max_candidates_per_run: 300
   LIQUIDATION_CASCADE_PROXY:
-    canonical_family: POSITIONING_UNWIND_DELEVERAGING
-    canonical_regime: POSITIONING_UNWIND_DELEVERAGING
+    canonical_family: LIQUIDATION_CASCADE
+    canonical_regime: LIQUIDATION_CASCADE
     legacy_family: POSITIONING_EXTREMES
     event_kind: market_event
     subtype: liquidation_cascade_proxy
@@ -2773,7 +2819,7 @@ events:
     reports_dir: liquidation_events
     events_file: liquidation_cascade_proxy_events.parquet
     signal_column: liquidation_cascade_proxy_event
-    routing_profile_ref: POSITIONING_UNWIND_DELEVERAGING
+    routing_profile_ref: LIQUIDATION_CASCADE
     cluster_id: oi_dynamic
     collapse_target: ''
     overlap_group: liquidation_proxy
@@ -2844,6 +2890,9 @@ events:
         false_positive_scenarios:
         - Scheduled funding payment causing OI adjustment without forced liquidations
         - Delisting or partial rollover reducing OI mechanically
+        disabled_regimes:
+        - DELEVERAGING_WAVE active and unresolved: cascade already captured
+        - LOW_LIQUIDITY_STATE active: oi_delta_1h noise inflates pct drop signal
         expected_overlap:
         - OI_FLUSH: high co-occurrence (OI_FLUSH is a subset without volume/price
             confirmation)
@@ -2856,11 +2905,25 @@ events:
       oi_window: 288
       vol_window: 288
       min_periods: 24
-      oi_drop_quantile: 0.95
+      oi_drop_quantile: 0.98
       vol_surge_quantile: 0.9
       ret_window: 3
       price_drop_th: 0.003
       max_gap: 3
+    templates:
+    - reversal_or_squeeze
+    - mean_reversion
+    - continuation
+    - exhaustion_reversal
+    - convexity_capture
+    - only_if_funding
+    - only_if_oi
+    - tail_risk_avoid
+    horizons:
+    - 5m
+    - 15m
+    - 60m
+    max_candidates_per_run: 300
   LIQUIDATION_EXHAUSTION_REVERSAL:
     canonical_family: TREND_FAILURE_EXHAUSTION
     canonical_regime: TREND_FAILURE_EXHAUSTION
@@ -3468,6 +3531,7 @@ events:
     - range_reversion
     - only_if_trend
     - drawdown_filter
+    - only_if_regime
     horizons:
     - 60m
     max_candidates_per_run: 500
@@ -3531,7 +3595,7 @@ events:
       cluster_id: oi_dynamic
       oi_window: 96
       spike_z_th: 2.5
-      flush_pct_th: -0.005
+      flush_pct_th: -0.02
     templates:
     - reversal_or_squeeze
     - mean_reversion
@@ -3540,6 +3604,8 @@ events:
     - convexity_capture
     - only_if_funding
     - only_if_oi
+    - only_if_regime
+    - only_if_highvol
     - tail_risk_avoid
     horizons:
     - 5m
@@ -4147,6 +4213,7 @@ events:
     - trend_continuation
     - continuation
     - only_if_trend
+    - only_if_regime
     horizons:
     - 15m
     - 60m
@@ -5202,6 +5269,7 @@ events:
     - overshoot_repair
     - only_if_liquidity
     - slippage_aware_filter
+    - only_if_regime
     horizons:
     - 15m
     max_candidates_per_run: 600

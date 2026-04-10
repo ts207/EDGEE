@@ -44,25 +44,6 @@ def load_ontology_states() -> Dict[str, Dict[str, Any]]:
         state_id = str(row.get("state_id", "")).strip()
         if state_id:
             states[state_id] = dict(row)
-    state_dirs = [SPEC_DIR / "states", ONTOLOGY_DIR / "states"]
-    for state_dir in state_dirs:
-        if not state_dir.exists():
-            continue
-        for p in state_dir.glob("*.yaml"):
-            spec = load_yaml(p)
-            if not isinstance(spec, dict):
-                continue
-            kind = str(spec.get("kind", "")).strip().lower() if isinstance(spec, dict) else ""
-            if kind in {
-                "state_registry",
-                "state_family_registry",
-                "state_family_defaults",
-            }:
-                continue
-            if not any(str(spec.get(key, "")).strip() for key in ("state_id", "family")):
-                continue
-            state_id = str(spec.get("state_id", p.stem)).strip() or p.stem
-            states[state_id] = spec
     return states
 
 

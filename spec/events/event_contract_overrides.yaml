@@ -149,6 +149,11 @@ events:
     operational_role: trigger
     deployment_disposition: primary_trigger_candidate
     runtime_category: active_runtime_event
+  LIQUIDATION_CASCADE_PROXY:
+    tier: C
+    operational_role: trigger
+    deployment_disposition: secondary_or_confirm
+    runtime_category: active_runtime_event
   LIQUIDATION_EXHAUSTION_REVERSAL:
     tier: B
     operational_role: trigger
