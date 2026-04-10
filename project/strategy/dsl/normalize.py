@@ -160,6 +160,7 @@ def build_blueprint(raw: Dict[str, object]) -> Blueprint:
             discovery_start=str(lineage.get("discovery_start", "")),
             discovery_end=str(lineage.get("discovery_end", "")),
             canonical_event_type=str(lineage.get("canonical_event_type", "")),
+            research_family=str(lineage.get("research_family", lineage.get("canonical_family", ""))),
             canonical_family=str(lineage.get("canonical_family", "")),
             canonical_regime=str(lineage.get("canonical_regime", "")),
             subtype=str(lineage.get("subtype", "")),

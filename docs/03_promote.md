@@ -120,14 +120,13 @@ By the time a candidate is exported, it is no longer just a row in a promotion t
 
 That is the actual runtime boundary object.
 
-## Retail Profile And Compatibility Flags
+## Retail Profile
 
 The canonical promotion command supports:
 
 - `--retail_profile` with default `capital_constrained`
-- `--use_compatibility_bridge` for special compatibility behavior
 
-The compatibility bridge is not the default story. Teach the normal promotion path first.
+The compatibility bridge still exists in lower-level promotion tooling for explicit legacy recovery work, but it is not exposed on the canonical `project.cli promote run` front door.
 
 ## Why Promotion Is Separate From Validation
 

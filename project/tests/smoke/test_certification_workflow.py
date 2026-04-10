@@ -31,5 +31,10 @@ def test_certification_workflow_runs_end_to_end(tmp_path: Path) -> None:
     assert certification_manifest["certification_checks"]["feeds_healthy"]
     assert certification_manifest["certification_checks"]["live_state_snapshot_present"]
     assert certification_manifest["certification_checks"]["replay_digest_present"]
+    assert certification_manifest["certification_checks"]["promotion_export_consistent"]
+    assert certification_manifest["certification_checks"]["deployment_gate_passed"]
+    assert certification_manifest["control_plane"]["promoted_rows"] == 0
+    assert certification_manifest["control_plane"]["exported_thesis_count"] == 0
+    assert certification_manifest["control_plane"]["store_thesis_count"] == 0
     assert certification_summary["live_state_snapshot_path"] == str(live_state_snapshot_path)
     assert certification_manifest["live_state"]["snapshot_path"] == str(live_state_snapshot_path)

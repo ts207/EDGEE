@@ -45,6 +45,7 @@ def test_blueprint_contains_ontology_contract():
         "action": "long",
         "event": "CROSS_VENUE_DESYNC",
         "canonical_event_type": "CROSS_VENUE_DESYNC",
+        "research_family": "INFORMATION_DESYNC",
         "canonical_family": "INFORMATION_DESYNC",
         "template_verb": "desync_repair",
         "state_id": "DESYNC_PERSISTENCE_STATE",
@@ -67,6 +68,7 @@ def test_blueprint_contains_ontology_contract():
 
     assert bp.lineage.ontology_spec_hash == "sha256:test"
     assert bp.lineage.canonical_event_type == "CROSS_VENUE_DESYNC"
+    assert bp.lineage.research_family == "INFORMATION_DESYNC"
     assert bp.lineage.canonical_family == "INFORMATION_DESYNC"
     assert bp.lineage.template_verb == "desync_repair"
     assert bp.lineage.operator_version

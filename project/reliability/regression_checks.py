@@ -64,6 +64,8 @@ def assert_storage_fallback_respected(path: Path) -> None:
 
 
 def assert_bundle_policy_consistency(audit_df: pd.DataFrame, decisions_df: pd.DataFrame) -> None:
+    if audit_df.empty and decisions_df.empty:
+        return
     merged = audit_df[["candidate_id", "promotion_decision"]].merge(
         decisions_df[["candidate_id", "promotion_decision"]],
         on="candidate_id",

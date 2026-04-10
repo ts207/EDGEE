@@ -15,6 +15,14 @@ def _pick_column(frame: pd.DataFrame, candidates: tuple[str, ...]) -> str | None
     return None
 
 
+def _group_value(row: pd.Series, column: str, default: str = "UNKNOWN") -> str:
+    if column == "canonical_family":
+        return str(row.get("research_family", row.get("canonical_family", default)))
+    if column == "research_family":
+        return str(row.get("research_family", row.get("canonical_family", default)))
+    return str(row.get(column, default))
+
+
 def apply_statistical_gates(
     candidates: pd.DataFrame,
     gate_spec: Dict[str, Any],
@@ -39,12 +47,17 @@ def apply_statistical_gates(
         if group_cols:
             out["group_key"] = [
                 canonical_bh_group_key(
-                    canonical_family=str(row.get(group_cols[0], "UNKNOWN")) if group_cols else "UNKNOWN",
-                    canonical_event_type=str(row.get(group_cols[1], row.get(group_cols[0], "UNKNOWN")))
-                    if len(group_cols) > 1
-                    else str(row.get(group_cols[0], "UNKNOWN")),
-                    template_verb=str(row.get(group_cols[2], "verb")) if len(group_cols) > 2 else "verb",
-                    horizon=str(row.get(group_cols[3], gate_spec.get("horizon", "unknown")))
+                    canonical_family=_group_value(row, group_cols[0]) if group_cols else "UNKNOWN",
+                    canonical_event_type=_group_value(
+                        row,
+                        group_cols[1] if len(group_cols) > 1 else group_cols[0],
+                    )
+                    if group_cols
+                    else "UNKNOWN",
+                    template_verb=_group_value(row, group_cols[2], "verb")
+                    if len(group_cols) > 2
+                    else "verb",
+                    horizon=_group_value(row, group_cols[3], str(gate_spec.get("horizon", "unknown")))
                     if len(group_cols) > 3
                     else str(gate_spec.get("horizon", "unknown")),
                 )

@@ -38,12 +38,13 @@ def make_family_id(
     horizon: str,
     cond_label: str,
     *,
+    research_family: Optional[str] = None,
     canonical_family: Optional[str] = None,
     state_id: Optional[str] = None,
 ) -> str:
     """BH family key based on ontology axes, stratified by symbol."""
     base = canonical_bh_group_key(
-        canonical_family=str(canonical_family or event_type),
+        canonical_family=str(research_family or canonical_family or event_type),
         canonical_event_type=str(event_type),
         template_verb=str(rule),
         horizon=str(horizon),
@@ -201,6 +202,7 @@ def apply_multiplicity_controls(
         symbol = str(row.get("symbol", "")).strip().upper()
         event = str(
             row.get("canonical_regime", "")
+            or row.get("research_family", "")
             or row.get("canonical_family", "")
             or row.get("event_type", "")
         ).strip()

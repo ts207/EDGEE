@@ -23,6 +23,7 @@ def _make_fdr_df() -> pd.DataFrame:
         {
             "template_verb": ["mean_reversion", "continuation"],
             "horizon": ["5m", "15m"],
+            "research_family": ["LIQUIDITY_DISLOCATION", "TREND_STRUCTURE"],
             "canonical_family": ["LIQUIDITY_DISLOCATION", "TREND_STRUCTURE"],
             "canonical_event_type": ["EXTREME_SPREAD_SPIKE", "MOMENTUM_BREAKOUT"],
             "lambda_family": [120.0, 250.0],
@@ -43,6 +44,7 @@ def test_build_lambda_snapshot_schema():
         "level",
         "template_verb",
         "horizon",
+        "research_family",
         "canonical_family",
         "canonical_event_type",
         "lambda_value",
@@ -80,11 +82,13 @@ def test_save_lambda_state_json_roundtrip(tmp_path: Path):
 
     # Verify event entries have canonical_family
     for entry in state["event"]:
+        assert "research_family" in entry
         assert "canonical_family" in entry
         assert "canonical_event_type" not in entry  # event level doesn't have event type
 
     # Verify state entries have both
     for entry in state["state"]:
+        assert "research_family" in entry
         assert "canonical_family" in entry
         assert "canonical_event_type" in entry
 

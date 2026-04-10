@@ -26,6 +26,7 @@ CANONICAL_EVENT_JOIN_KEYS = {
     "signal_column",
     "runtime_event_type",
     "canonical_event_type",
+    "research_family",
     "canonical_family",
 }
 

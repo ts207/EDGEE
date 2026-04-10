@@ -153,6 +153,35 @@ class PromotionServiceResult:
     diagnostics: Dict[str, Any] = field(default_factory=dict)
 
 
+def _empty_artifact_frame(*columns: str) -> pd.DataFrame:
+    return pd.DataFrame(columns=list(columns))
+
+
+_EMPTY_PROMOTION_AUDIT_COLUMNS = (
+    "candidate_id",
+    "event_type",
+    "promotion_decision",
+    "promotion_track",
+    "policy_version",
+    "bundle_version",
+    "is_reduced_evidence",
+    "gate_promo_statistical",
+    "gate_promo_stability",
+    "gate_promo_cost_survival",
+    "gate_promo_negative_control",
+)
+_EMPTY_BUNDLE_SUMMARY_COLUMNS = (
+    "candidate_id",
+    "event_type",
+    "promotion_decision",
+    "promotion_track",
+    "policy_version",
+    "bundle_version",
+    "is_reduced_evidence",
+)
+_EMPTY_PROMOTION_DECISION_COLUMNS = _EMPTY_BUNDLE_SUMMARY_COLUMNS
+
+
 def _trace_payload(raw: Any) -> Dict[str, Any]:
     if isinstance(raw, dict):
         return dict(raw)
@@ -925,6 +954,47 @@ def execute_promotion(config: PromotionConfig) -> PromotionServiceResult:
                     "Canonical validation is mandatory in Sprint 4."
                 )
 
+        if not val_bundle.validated_candidates:
+            promotion_input_mode = "canonical_empty"
+            audit_df = _empty_artifact_frame(*_EMPTY_PROMOTION_AUDIT_COLUMNS)
+            promoted_df = normalize_dataframe_for_schema(pd.DataFrame(), "promoted_candidates")
+            evidence_bundle_summary = _empty_artifact_frame(*_EMPTY_BUNDLE_SUMMARY_COLUMNS)
+            promotion_decisions = _empty_artifact_frame(*_EMPTY_PROMOTION_DECISION_COLUMNS)
+            serialize_evidence_bundles([], out_dir / "evidence_bundles.jsonl")
+            diagnostics["promotion_input_mode"] = promotion_input_mode
+            diagnostics["decision_summary"] = _build_promotion_decision_diagnostics(audit_df)
+            diagnostics["live_thesis_export"] = {
+                "output_path": "",
+                "thesis_count": 0,
+                "active_count": 0,
+                "pending_count": 0,
+                "contract_json_path": "",
+                "contract_md_path": "",
+            }
+            diagnostics["promotion_lineage_audit"] = {}
+            diagnostics["no_promotable_candidates"] = True
+            diagnostics["no_promotable_reason"] = "validation produced zero validated candidates"
+            write_promotion_reports(
+                out_dir=out_dir,
+                audit_df=audit_df,
+                promoted_df=promoted_df,
+                evidence_bundle_summary=evidence_bundle_summary,
+                promotion_decisions=promotion_decisions,
+                diagnostics=diagnostics,
+                promotion_summary=pd.DataFrame(
+                    columns=[
+                        "candidate_id",
+                        "event_type",
+                        "stage",
+                        "statistic",
+                        "threshold",
+                        "pass_fail",
+                    ]
+                ),
+            )
+            finalize_manifest(manifest, "success", stats=diagnostics)
+            return PromotionServiceResult(0, out_dir, audit_df, promoted_df, diagnostics)
+
         source_manifest = load_run_manifest(config.run_id)
         source_run_mode = str(source_manifest.get("run_mode", "")).strip().lower()
         source_profile = str(source_manifest.get("discovery_profile", "")).strip().lower()
@@ -953,7 +1023,12 @@ def execute_promotion(config: PromotionConfig) -> PromotionServiceResult:
         canonical_candidate_path = (
             out_dir.parent.parent / "validation" / config.run_id / "promotion_ready_candidates.parquet"
         )
-        if not canonical_candidate_path.exists() and not config.use_compatibility_bridge:
+        canonical_candidate_csv_path = canonical_candidate_path.with_suffix(".csv")
+        if (
+            not canonical_candidate_path.exists()
+            and not canonical_candidate_csv_path.exists()
+            and not config.use_compatibility_bridge
+        ):
             raise FileNotFoundError(
                 f"Canonical promotion-ready candidates not found at {canonical_candidate_path}. "
                 "Set use_compatibility_bridge=True to fall back to legacy table loading."
@@ -973,9 +1048,9 @@ def execute_promotion(config: PromotionConfig) -> PromotionServiceResult:
         # Prefer canonical promotion-ready candidates artifact over ambient table loading
         candidates_df = pd.DataFrame()
         
-        if canonical_candidate_path.exists():
+        if canonical_candidate_path.exists() or canonical_candidate_csv_path.exists():
             promotion_input_mode = "canonical"
-            validation_meta_df = read_parquet(canonical_candidate_path)
+            validation_meta_df = _read_csv_or_parquet(canonical_candidate_path)
             
             validation_svc = ValidationService(data_root=data_root)
             source_tables = validation_svc.load_candidate_tables(config.run_id)

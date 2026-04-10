@@ -1,12 +1,24 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from types import SimpleNamespace
 
 import pandas as pd
 import pytest
 
 import project.research.services.promotion_service as svc
+import project.research.validation.result_writer as validation_writer
+from project.research.validation.contracts import (
+    ValidationBundle,
+    ValidatedCandidateRecord,
+    ValidationDecision,
+    ValidationMetrics,
+)
+from project.research.validation.result_writer import (
+    write_promotion_ready_candidates,
+    write_validation_bundle,
+)
 
 
 def _run_promotion(tmp_path, **overrides):
@@ -39,8 +51,133 @@ def _run_promotion(tmp_path, **overrides):
     return svc.execute_promotion(config)
 
 
+def _write_validated_candidate_artifacts(tmp_path: Path, run_id: str, candidate_id: str) -> None:
+    bundle = ValidationBundle(
+        run_id=run_id,
+        created_at="2026-01-01T00:00:00Z",
+        validated_candidates=[
+            ValidatedCandidateRecord(
+                candidate_id=candidate_id,
+                decision=ValidationDecision(
+                    status="validated",
+                    candidate_id=candidate_id,
+                    run_id=run_id,
+                    program_id="default_program",
+                    reason_codes=[],
+                ),
+                metrics=ValidationMetrics(sample_count=100, q_value=0.01, stability_score=0.8),
+            )
+        ],
+        rejected_candidates=[],
+        inconclusive_candidates=[],
+        summary_stats={"total": 1, "validated": 1},
+        effect_stability_report={},
+    )
+    for base_dir in (
+        tmp_path / "reports" / "validation" / run_id,
+        tmp_path / "validation" / run_id,
+        tmp_path.parent / "validation" / run_id,
+    ):
+        write_validation_bundle(bundle, base_dir=base_dir)
+        write_promotion_ready_candidates(bundle, base_dir=base_dir)
+
+
+def _valid_evidence_bundle_json(
+    *, run_id: str, candidate_id: str, event_type: str = "VOL_SHOCK", symbol: str = "BTCUSDT"
+) -> str:
+    return json.dumps(
+        {
+            "candidate_id": candidate_id,
+            "primary_event_id": event_type,
+            "event_family": event_type,
+            "event_type": event_type,
+            "run_id": run_id,
+            "sample_definition": {
+                "n_events": 100,
+                "validation_samples": 50,
+                "test_samples": 50,
+                "symbol": symbol,
+            },
+            "split_definition": {
+                "split_scheme_id": "confirmatory",
+                "purge_bars": 1,
+                "embargo_bars": 1,
+                "bar_duration_minutes": 5,
+            },
+            "effect_estimates": {
+                "estimate": 0.08,
+                "estimate_bps": 8.0,
+                "stderr": 0.02,
+                "stderr_bps": 2.0,
+            },
+            "uncertainty_estimates": {
+                "ci_low": 0.02,
+                "ci_high": 0.14,
+                "ci_low_bps": 2.0,
+                "ci_high_bps": 14.0,
+                "p_value_raw": 0.01,
+                "q_value": 0.01,
+                "q_value_by": 0.01,
+                "q_value_cluster": 0.01,
+                "n_obs": 100,
+                "n_clusters": 8,
+            },
+            "stability_tests": {
+                "sign_consistency": 1.0,
+                "stability_score": 0.9,
+                "regime_stability_pass": True,
+                "timeframe_consensus_pass": True,
+                "delay_robustness_pass": True,
+            },
+            "falsification_results": {
+                "shift_placebo_pass": True,
+                "random_placebo_pass": True,
+                "direction_reversal_pass": True,
+                "negative_control_pass": True,
+                "passes_control": True,
+            },
+            "cost_robustness": {
+                "cost_survival_ratio": 1.0,
+                "net_expectancy_bps": 6.0,
+                "effective_cost_bps": 2.0,
+                "turnover_proxy_mean": 1.0,
+                "tob_coverage": 0.9,
+                "tob_coverage_pass": True,
+                "stressed_cost_pass": True,
+                "retail_net_expectancy_pass": True,
+                "retail_cost_budget_pass": True,
+                "retail_turnover_pass": True,
+            },
+            "multiplicity_adjustment": {
+                "correction_family_id": "default_program",
+                "correction_method": "bh",
+                "p_value_adj": 0.01,
+                "p_value_adj_by": 0.01,
+                "p_value_adj_holm": 0.01,
+                "q_value_program": 0.01,
+                "q_value_scope": 0.01,
+                "effective_q_value": 0.01,
+            },
+            "metadata": {
+                "plan_row_id": "plan-1",
+                "hypothesis_id": "hyp-1",
+                "tob_coverage": 0.9,
+                "repeated_fold_consistency": 1.0,
+                "structural_robustness_score": 0.8,
+            },
+            "promotion_decision": {
+                "promotion_status": "promoted",
+                "promotion_track": "standard",
+                "eligible": True,
+                "rank_score": 1.0,
+            },
+        }
+    )
+
+
 def test_run_promotion_service_smoke(monkeypatch, tmp_path):
     monkeypatch.setattr(svc, "get_data_root", lambda: tmp_path)
+    monkeypatch.setattr(validation_writer, "get_data_root", lambda: tmp_path)
     monkeypatch.setattr(
         svc,
         "load_run_manifest",
@@ -69,50 +206,34 @@ def test_run_promotion_service_smoke(monkeypatch, tmp_path):
             {
                 "candidate_id": "cand_1",
                 "event_type": "VOL_SHOCK",
+                "family": "VOL_SHOCK",
+                "n_events": 100,
+                "stability_score": 0.8,
+                "sign_consistency": 0.9,
+                "cost_survival_ratio": 1.0,
+                "net_expectancy_bps": 6.0,
                 "q_value": 0.01,
                 "confirmatory_locked": True,
                 "frozen_spec_hash": "hash",
             }
         ]
-    ).to_csv(cand_path / "edge_candidates_normalized.csv", index=False)
+    ).to_parquet(cand_path / "edge_candidates_normalized.parquet", index=False)
+    _write_validated_candidate_artifacts(tmp_path, "r1", "cand_1")
 
     audit_df = pd.DataFrame(
         [
             {
-                "candidate_id": "cand_1",
-                "event_type": "VOL_SHOCK",
-                "promotion_decision": "promoted",
-                "promotion_track": "standard",
-                "promotion_metrics_trace": "{}",
-                "evidence_bundle_json": json.dumps(
-                    {
-                        "candidate_id": "cand_1",
-                        "event_type": "VOL_SHOCK",
-                        "promotion_decision": {
-                            "promotion_status": "promoted",
-                            "promotion_track": "standard",
-                        },
-                        "sample_definition": {
-                            "n_events": 100,
-                            "validation_samples": 50,
-                            "test_samples": 50,
-                            "symbol": "BTCUSDT",
-                        },
-                        "split_definition": {
-                            "split_scheme_id": "confirmatory",
-                            "bar_duration_minutes": 5,
-                        },
-                        "effect_estimates": {"estimate_bps": 8.0},
-                        "uncertainty_estimates": {},
-                        "stability_tests": {},
-                        "falsification_results": {},
-                        "cost_robustness": {"net_expectancy_bps": 6.0},
-                        "multiplicity_adjustment": {},
-                    }
-                ),
-            }
-        ]
-    )
+                    "candidate_id": "cand_1",
+                    "event_type": "VOL_SHOCK",
+                    "promotion_decision": "promoted",
+                    "promotion_track": "standard",
+                    "promotion_metrics_trace": "{}",
+                    "evidence_bundle_json": _valid_evidence_bundle_json(
+                        run_id="r1", candidate_id="cand_1"
+                    ),
+                }
+            ]
+        )
     promoted_df = pd.DataFrame(
         [{"candidate_id": "cand_1", "event_type": "VOL_SHOCK", "status": "PROMOTED"}]
     )
@@ -128,7 +249,7 @@ def test_run_promotion_service_smoke(monkeypatch, tmp_path):
 
     result = _run_promotion(tmp_path)
     assert result.exit_code == 0
-    assert any((tmp_path / "promotions").glob("promotion_statistical_audit.*"))
+    assert any((tmp_path / "promotions").glob("promotion_audit.*"))
     assert any((tmp_path / "promotions").glob("promoted_candidates.*"))
     assert (tmp_path / "promotions" / "evidence_bundles.jsonl").exists()
     assert (tmp_path / "live" / "theses" / "r1" / "promoted_theses.json").exists()
@@ -211,6 +332,58 @@ def test_run_promotion_service_fails_closed_when_promoted_row_lacks_evidence_bun
     result = _run_promotion(tmp_path)
 
     assert result.exit_code == 1
+
+
+def test_run_promotion_service_treats_zero_validated_candidates_as_success(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setattr(svc, "get_data_root", lambda: tmp_path)
+    monkeypatch.setattr(validation_writer, "get_data_root", lambda: tmp_path)
+    monkeypatch.setattr(
+        svc,
+        "load_run_manifest",
+        lambda run_id: {"run_mode": "confirmatory", "discovery_profile": "standard"},
+    )
+    monkeypatch.setattr(
+        svc,
+        "resolve_objective_profile_contract",
+        lambda **kwargs: SimpleNamespace(
+            min_net_expectancy_bps=5.0,
+            max_fee_plus_slippage_bps=10.0,
+            max_daily_turnover_multiple=5.0,
+            require_retail_viability=False,
+            require_low_capital_contract=False,
+        ),
+    )
+
+    run_id = "r1"
+    validation_dir = tmp_path / "reports" / "validation" / run_id
+    write_validation_bundle(
+        ValidationBundle(
+            run_id=run_id,
+            created_at="2026-01-01T00:00:00Z",
+            validated_candidates=[],
+            rejected_candidates=[],
+            inconclusive_candidates=[],
+            summary_stats={"total": 1, "validated": 0},
+            effect_stability_report={},
+        ),
+        base_dir=validation_dir,
+    )
+
+    result = _run_promotion(tmp_path)
+
+    assert result.exit_code == 0
+    assert result.audit_df.empty
+    assert result.promoted_df.empty
+    assert result.diagnostics["promotion_input_mode"] == "canonical_empty"
+    assert result.diagnostics["decision_summary"]["candidates_total"] == 0
+    assert result.diagnostics["decision_summary"]["promoted_count"] == 0
+    assert result.diagnostics["live_thesis_export"]["thesis_count"] == 0
+    assert (tmp_path / "promotions" / "promotion_diagnostics.json").exists()
+    assert (tmp_path / "promotions" / "promoted_candidates.parquet").exists()
+    assert (tmp_path / "promotions" / "evidence_bundles.jsonl").exists()
+    assert (tmp_path / "promotions" / "evidence_bundles.jsonl").read_text(encoding="utf-8") == ""
 
 
 def test_annotate_promotion_audit_decisions_derives_failed_stage_summary():
@@ -346,6 +519,7 @@ def test_load_hypothesis_index_merges_per_event_registries(monkeypatch, tmp_path
 
 def test_run_promotion_backfills_plan_row_id_from_hypothesis_id(monkeypatch, tmp_path):
     monkeypatch.setattr(svc, "get_data_root", lambda: tmp_path)
+    monkeypatch.setattr(validation_writer, "get_data_root", lambda: tmp_path)
     monkeypatch.setattr(
         svc,
         "load_run_manifest",
@@ -374,13 +548,20 @@ def test_run_promotion_backfills_plan_row_id_from_hypothesis_id(monkeypatch, tmp
             {
                 "candidate_id": "cand_1",
                 "event_type": "VOL_SHOCK",
+                "family": "VOL_SHOCK",
+                "n_events": 100,
+                "stability_score": 0.8,
+                "sign_consistency": 0.9,
+                "cost_survival_ratio": 1.0,
+                "net_expectancy_bps": 6.0,
                 "q_value": 0.01,
                 "hypothesis_id": "hyp_1",
                 "confirmatory_locked": True,
                 "frozen_spec_hash": "hash",
             }
         ]
-    ).to_csv(cand_path / "edge_candidates_normalized.csv", index=False)
+    ).to_parquet(cand_path / "edge_candidates_normalized.parquet", index=False)
+    _write_validated_candidate_artifacts(tmp_path, "r1", "cand_1")
 
     registry_path = tmp_path / "reports" / "phase2" / "r1" / "VOL_SHOCK" / "5m"
     registry_path.mkdir(parents=True, exist_ok=True)
@@ -397,31 +578,17 @@ def test_run_promotion_backfills_plan_row_id_from_hypothesis_id(monkeypatch, tmp
         audit_df = pd.DataFrame(
             [
                 {
-                    "candidate_id": "cand_1",
-                    "event_type": "VOL_SHOCK",
-                    "promotion_decision": "promoted",
-                    "promotion_track": "standard",
-                    "promotion_metrics_trace": "{}",
-                    "evidence_bundle_json": json.dumps(
-                        {
-                            "candidate_id": "cand_1",
-                            "event_type": "VOL_SHOCK",
-                            "promotion_decision": {
-                                "promotion_status": "promoted",
-                                "promotion_track": "standard",
-                            },
-                            "sample_definition": {"n_events": 100},
-                            "effect_estimates": {},
-                            "uncertainty_estimates": {},
-                            "stability_tests": {},
-                            "falsification_results": {},
-                            "cost_robustness": {},
-                            "multiplicity_adjustment": {},
-                        }
-                    ),
-                }
-            ]
-        )
+                        "candidate_id": "cand_1",
+                        "event_type": "VOL_SHOCK",
+                        "promotion_decision": "promoted",
+                        "promotion_track": "standard",
+                        "promotion_metrics_trace": "{}",
+                        "evidence_bundle_json": _valid_evidence_bundle_json(
+                            run_id="r1", candidate_id="cand_1"
+                        ),
+                    }
+                ]
+            )
         promoted_df = pd.DataFrame(
             [{"candidate_id": "cand_1", "event_type": "VOL_SHOCK", "status": "PROMOTED"}]
         )

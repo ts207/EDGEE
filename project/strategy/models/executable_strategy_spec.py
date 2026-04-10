@@ -36,6 +36,7 @@ class ResearchOriginSpec(BaseModel):
     ontology_spec_hash: str = ""
     promotion_track: str = "standard"
     canonical_event_type: str = ""
+    research_family: str = ""
     canonical_family: str = ""
     canonical_regime: str = ""
     subtype: str = ""
@@ -196,6 +197,7 @@ class ExecutableStrategySpec(BaseModel):
                 "promotion_track": self.research_origin.promotion_track,
                 "ontology_spec_hash": self.research_origin.ontology_spec_hash,
                 "canonical_event_type": self.research_origin.canonical_event_type,
+                "research_family": self.research_origin.research_family,
                 "canonical_family": self.research_origin.canonical_family,
                 "canonical_regime": self.research_origin.canonical_regime,
                 "subtype": self.research_origin.subtype,
@@ -246,6 +248,7 @@ class ExecutableStrategySpec(BaseModel):
                 ontology_spec_hash=blueprint.lineage.ontology_spec_hash,
                 promotion_track=blueprint.lineage.promotion_track,
                 canonical_event_type=blueprint.lineage.canonical_event_type,
+                research_family=blueprint.lineage.research_family,
                 canonical_family=blueprint.lineage.canonical_family,
                 canonical_regime=blueprint.lineage.canonical_regime,
                 subtype=blueprint.lineage.subtype,

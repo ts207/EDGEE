@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from project.domain.models import ThesisDefinition
 from project.live.contracts import (
     PromotedThesis,
     ThesisEvidence,
@@ -272,6 +273,47 @@ def test_retriever_blocks_non_live_deployment_state_in_trading_mode() -> None:
 
     assert match.eligibility_passed is False
     assert "deployment_state_blocked:paper_only" in match.reasons_against
+
+
+def test_retriever_prefers_exported_deployment_state_over_authored_definition(
+    monkeypatch,
+) -> None:
+    thesis = _canonical_confirm_thesis().model_copy(
+        update={"deployment_state": "live_enabled"}
+    )
+    store = ThesisStore([thesis])
+    context = LiveTradeContext(
+        timestamp="2026-04-02T00:00:00Z",
+        symbol="BTCUSDT",
+        timeframe="5m",
+        primary_event_id="VOL_SHOCK",
+        event_family="VOL_SHOCK",
+        canonical_regime="VOLATILITY_TRANSITION",
+        event_side="long",
+        live_features={},
+        regime_snapshot={"canonical_regime": "VOLATILITY_TRANSITION"},
+        execution_env={"runtime_mode": "trading"},
+        portfolio_state={},
+        active_event_ids=["VOL_SHOCK", "LIQUIDITY_VACUUM"],
+        active_episode_ids=[],
+    )
+    monkeypatch.setattr(
+        "project.live.retriever.resolve_promoted_thesis_definition",
+        lambda thesis: ThesisDefinition(
+            thesis_id=thesis.thesis_id,
+            thesis_kind="runtime_contract",
+            event_family="VOL_SHOCK",
+            timeframe="5m",
+            primary_event_id="VOL_SHOCK",
+            deployment_state="paper_only",
+        ),
+    )
+
+    match = retrieve_ranked_theses(thesis_store=store, context=context, include_pending=False, limit=1)[0]
+
+    assert match.eligibility_passed is True
+    assert "deployment_state:live_enabled" in match.reasons_for
+    assert "deployment_state_blocked:paper_only" not in match.reasons_against
 
 
 def test_retriever_supportive_context_boosts_score_without_gating() -> None:

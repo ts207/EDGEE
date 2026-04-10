@@ -754,7 +754,7 @@ class TestCanonicalPromotionArtifact:
         assert "validation_status" in df.columns
         assert "validation_run_id" in df.columns
 
-    def test_empty_validated_candidates_returns_none(self, tmp_path):
+    def test_empty_validated_candidates_still_write_canonical_artifact(self, tmp_path):
         from project.research.validation.contracts import ValidationBundle
         
         run_id = "test_empty_artifact"
@@ -772,7 +772,19 @@ class TestCanonicalPromotionArtifact:
         
         path = write_promotion_ready_candidates(bundle, base_dir=base_dir)
         
-        assert path is None
+        assert path is not None
+        assert path.exists()
+
+        df = pd.read_parquet(path)
+        assert df.empty
+        assert set(df.columns) >= {
+            "candidate_id",
+            "validation_status",
+            "validation_run_id",
+            "validation_program_id",
+            "validation_reason_codes",
+            "validation_stage_version",
+        }
 
 
 class TestSchemaValidation:

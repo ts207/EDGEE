@@ -98,7 +98,7 @@ Other discovery-adjacent outputs commonly include:
 - `data/reports/edge_candidates/<run_id>/...`
 - run manifests under `data/runs/<run_id>/`
 
-The CLI intentionally resolves some legacy locations when listing artifacts, so older runs can still be inspected.
+The canonical artifact helper paths point only at the flat phase-2 layout. Older runs that still use nested legacy layouts should be inspected through explicit compatibility helpers rather than through the default catalog path.
 
 ## Stable Default Behavior
 
@@ -191,4 +191,4 @@ Discovery runs successfully, but all candidates fail minimum filters or ranking 
 
 ### Legacy path confusion
 
-Older runs may have artifacts in fallback locations. Use `discover list-artifacts` or the helper paths rather than guessing directory layouts by hand.
+Older runs may have artifacts in fallback locations. Use explicit compatibility helpers or `discover list-artifacts` rather than guessing directory layouts by hand.

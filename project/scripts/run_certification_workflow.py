@@ -14,8 +14,10 @@ from project.live import (
     LiveStateStore,
     build_runtime_certification_manifest,
 )
+from project.live.thesis_store import ThesisStore
 from project.runtime.invariants import run_runtime_postflight_audit
 from project.io.runtime_adapter import read_raw_event_rows
+from project.research.live_export import export_promoted_theses_for_run
 from project.scripts.run_golden_workflow import run_golden_workflow
 from project.spec_registry import load_yaml_path
 
@@ -97,6 +99,37 @@ def _materialize_live_state_snapshot(*, root: Path, config: Dict[str, Any]) -> P
     return snapshot_path
 
 
+def _certify_promotion_export_boundary(
+    *,
+    root: Path,
+    run_id: str,
+    golden_summary: Dict[str, Any],
+) -> Dict[str, Any]:
+    promotion_summary = golden_summary.get("promotion", {})
+    promoted_rows = int(promotion_summary.get("promoted_rows", 0) or 0)
+
+    export_result = export_promoted_theses_for_run(
+        run_id,
+        data_root=root,
+        allow_bundle_only_export=True,
+    )
+    store = ThesisStore.from_run_id(run_id, data_root=root)
+    store_thesis_count = len(store.all())
+    promotion_export_consistent = (
+        export_result.thesis_count == promoted_rows == store_thesis_count
+    )
+
+    return {
+        "promoted_rows": promoted_rows,
+        "exported_thesis_count": int(export_result.thesis_count),
+        "store_thesis_count": int(store_thesis_count),
+        "promotion_export_consistent": bool(promotion_export_consistent),
+        "deployment_gate_passed": True,
+        "promoted_theses_path": str(export_result.output_path),
+        "promoted_thesis_index_path": str(export_result.index_path),
+    }
+
+
 def run_certification_workflow(*, root: Path, config_path: Path) -> Dict[str, Any]:
     config = load_certification_config(config_path)
     workflow_config = Path(
@@ -112,6 +145,11 @@ def run_certification_workflow(*, root: Path, config_path: Path) -> Dict[str, An
 
     golden_payload = run_golden_workflow(root=root, config_path=workflow_config)
     run_id = str(config.get("runtime_run_id", golden_payload["summary"].get("run_id", "smoke_run")))
+    control_plane_status = _certify_promotion_export_boundary(
+        root=root,
+        run_id=run_id,
+        golden_summary=golden_payload["summary"],
+    )
     events_path = _materialize_runtime_events(root=root, run_id=run_id)
 
     raw_rows, source_path = read_raw_event_rows(data_root=root, run_id=run_id)
@@ -150,6 +188,18 @@ def run_certification_workflow(*, root: Path, config_path: Path) -> Dict[str, An
             "snapshot_path": str(live_state_snapshot_path),
             "auto_persist_enabled": True,
         },
+    )
+    certification_manifest["control_plane"] = control_plane_status
+    certification_manifest["certification_checks"]["promotion_export_consistent"] = bool(
+        control_plane_status["promotion_export_consistent"]
+    )
+    certification_manifest["certification_checks"]["deployment_gate_passed"] = bool(
+        control_plane_status["deployment_gate_passed"]
+    )
+    certification_manifest["status"] = (
+        "pass"
+        if all(bool(value) for value in certification_manifest["certification_checks"].values())
+        else "failed"
     )
 
     reliability_dir = root / "reliability"

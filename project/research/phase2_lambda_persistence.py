@@ -54,12 +54,14 @@ def _load_previous_lambda_maps(
     # Vectorized: process each level as a filtered DataFrame slice
     for _level, _key_cols in [
         ("family", ["template_verb", "horizon"]),
-        ("event", ["template_verb", "horizon", "canonical_family"]),
-        ("state", ["template_verb", "horizon", "canonical_family", "canonical_event_type"]),
+        ("event", ["template_verb", "horizon", "research_family"]),
+        ("state", ["template_verb", "horizon", "research_family", "canonical_event_type"]),
     ]:
         _sub = df[df["level"].astype(str).str.strip().str.lower() == _level].copy()
         if _sub.empty:
             continue
+        if "research_family" not in _sub.columns and "canonical_family" in _sub.columns:
+            _sub["research_family"] = _sub["canonical_family"]
         _sub["lam_"] = pd.to_numeric(_sub["lambda_value"], errors="coerce")
         _sub = _sub.dropna(subset=["lam_"])
         _sub = _sub[_sub["lam_"] > 0.0]
@@ -71,7 +73,7 @@ def _load_previous_lambda_maps(
         # Normalise string columns
         for _c in _present:
             _sub[_c] = _sub[_c].fillna("").astype(str).str.strip()
-            if _c in ("canonical_family", "canonical_event_type"):
+            if _c in ("research_family", "canonical_event_type"):
                 _sub[_c] = _sub[_c].str.upper()
         for _rec in _sub[[*_present, "lam_"]].itertuples(index=False):
             _key = tuple(getattr(_rec, c) for c in _present)
@@ -96,6 +98,7 @@ def _build_lambda_snapshot(fdr_df: pd.DataFrame) -> pd.DataFrame:
                 "level",
                 "template_verb",
                 "horizon",
+                "research_family",
                 "canonical_family",
                 "canonical_event_type",
                 "lambda_value",
@@ -114,6 +117,7 @@ def _build_lambda_snapshot(fdr_df: pd.DataFrame) -> pd.DataFrame:
                 "level": "family",
                 "template_verb": _fam.get("template_verb", "").fillna("").astype(str),
                 "horizon": _fam.get("horizon", "").fillna("").astype(str),
+                "research_family": "",
                 "canonical_family": "",
                 "canonical_event_type": "",
                 "lambda_value": pd.to_numeric(
@@ -127,18 +131,25 @@ def _build_lambda_snapshot(fdr_df: pd.DataFrame) -> pd.DataFrame:
     evt_cols = [
         "template_verb",
         "horizon",
+        "research_family",
         "canonical_family",
         "lambda_event",
         "lambda_event_status",
     ]
     _evt = fdr_df[[c for c in evt_cols if c in fdr_df.columns]].drop_duplicates().copy()
     if not _evt.empty:
+        if "research_family" not in _evt.columns and "canonical_family" in _evt.columns:
+            _evt["research_family"] = _evt["canonical_family"]
         _evt_out = pd.DataFrame(
             {
                 "level": "event",
                 "template_verb": _evt.get("template_verb", "").fillna("").astype(str),
                 "horizon": _evt.get("horizon", "").fillna("").astype(str),
-                "canonical_family": _evt.get("canonical_family", "")
+                "research_family": _evt.get("research_family", "")
+                .fillna("")
+                .astype(str)
+                .str.upper(),
+                "canonical_family": _evt.get("research_family", _evt.get("canonical_family", ""))
                 .fillna("")
                 .astype(str)
                 .str.upper(),
@@ -153,6 +164,7 @@ def _build_lambda_snapshot(fdr_df: pd.DataFrame) -> pd.DataFrame:
     st_cols = [
         "template_verb",
         "horizon",
+        "research_family",
         "canonical_family",
         "canonical_event_type",
         "lambda_state",
@@ -160,12 +172,18 @@ def _build_lambda_snapshot(fdr_df: pd.DataFrame) -> pd.DataFrame:
     ]
     _st = fdr_df[[c for c in st_cols if c in fdr_df.columns]].drop_duplicates().copy()
     if not _st.empty:
+        if "research_family" not in _st.columns and "canonical_family" in _st.columns:
+            _st["research_family"] = _st["canonical_family"]
         _st_out = pd.DataFrame(
             {
                 "level": "state",
                 "template_verb": _st.get("template_verb", "").fillna("").astype(str),
                 "horizon": _st.get("horizon", "").fillna("").astype(str),
-                "canonical_family": _st.get("canonical_family", "")
+                "research_family": _st.get("research_family", "")
+                .fillna("")
+                .astype(str)
+                .str.upper(),
+                "canonical_family": _st.get("research_family", _st.get("canonical_family", ""))
                 .fillna("")
                 .astype(str)
                 .str.upper(),
@@ -187,6 +205,7 @@ def _build_lambda_snapshot(fdr_df: pd.DataFrame) -> pd.DataFrame:
                 "level",
                 "template_verb",
                 "horizon",
+                "research_family",
                 "canonical_family",
                 "canonical_event_type",
                 "lambda_value",
@@ -234,6 +253,7 @@ def save_lambda_state_json(
                 "lambda_status": str(row.get("lambda_status", "")),
             }
             if level in ("event", "state"):
+                entry["research_family"] = str(row.get("research_family", ""))
                 entry["canonical_family"] = str(row.get("canonical_family", ""))
             if level == "state":
                 entry["canonical_event_type"] = str(row.get("canonical_event_type", ""))

@@ -40,6 +40,14 @@ def _read_first_matching(root: Path, stem: str) -> Path:
     return matches[0]
 
 
+def _read_first_matching_any(root: Path, stems: tuple[str, ...]) -> Path:
+    for stem in stems:
+        matches = sorted(root.glob(f"{stem}.*"))
+        if matches:
+            return matches[0]
+    raise FileNotFoundError(f"missing artifacts {stems} under {root}")
+
+
 def run_smoke_cli(
     mode: str, *, root: Path, seed: int = 20260101, storage_mode: str = "auto"
 ) -> Dict[str, Any]:
@@ -89,7 +97,12 @@ def run_smoke_cli(
         promotion_result = run_promotion_smoke(dataset, research_result)
         promo_dir = Path(promotion_result["output_dir"])
         info = validate_promotion_artifacts(promo_dir)
-        audit_df = read_parquet(_read_first_matching(promo_dir, "promotion_statistical_audit"))
+        audit_df = read_parquet(
+            _read_first_matching_any(
+                promo_dir,
+                ("promotion_statistical_audit", "promotion_audit"),
+            )
+        )
         decisions_df = read_parquet(_read_first_matching(promo_dir, "promotion_decisions"))
         assert_bundle_policy_consistency(audit_df, decisions_df)
         summary["promotion"] = {"output_dir": str(promo_dir), **info}

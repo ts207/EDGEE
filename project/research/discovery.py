@@ -16,6 +16,7 @@ import pandas as pd
 
 from project.core.constants import HORIZON_BARS_BY_TIMEFRAME
 from project.domain.compiled_registry import get_domain_registry
+from project.research.multiplicity import make_family_id as _canonical_make_family_id
 
 log = logging.getLogger(__name__)
 
@@ -234,16 +235,21 @@ def make_family_id(
     horizon: str,
     cond_label: str,
     *,
+    research_family: Optional[str] = None,
     canonical_family: Optional[str] = None,
     state_id: Optional[str] = None,
 ) -> str:
-    """Generate a stable candidate family ID."""
-    tokens = [symbol, event_type, rule, horizon, cond_label]
-    if canonical_family:
-        tokens.append(canonical_family)
-    if state_id:
-        tokens.append(state_id)
-    return ":".join(str(t).upper() for t in tokens if t)
+    """Compatibility wrapper around the canonical family-id builder."""
+    return _canonical_make_family_id(
+        symbol,
+        event_type,
+        rule,
+        horizon,
+        cond_label,
+        research_family=research_family,
+        canonical_family=canonical_family,
+        state_id=state_id,
+    )
 
 
 def _synthesize_concept_candidates(

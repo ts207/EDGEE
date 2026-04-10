@@ -99,7 +99,8 @@ def hypotheses_to_bridge_candidates(
     out["event_type"] = event_types
     out["hypothesis_id"] = filtered["hypothesis_id"].astype(str)
     out["canonical_event_type"] = [canonical for canonical, _ in map(_registry_semantics, event_types)]
-    out["canonical_family"] = [family for _, family in map(_registry_semantics, event_types)]
+    out["research_family"] = [family for _, family in map(_registry_semantics, event_types)]
+    out["canonical_family"] = out["research_family"]
     out["candidate_id"] = [
         candidate_id_from_hypothesis(
             hypothesis_id=str(hypothesis_id),
@@ -240,7 +241,7 @@ def hypotheses_to_bridge_candidates(
             out["canonical_event_type"],
             filtered["template_id"],
             filtered["horizon"],
-            out["canonical_family"],
+            out["research_family"],
         )
     ]
 
@@ -255,7 +256,7 @@ def hypotheses_to_bridge_candidates(
         filter_rows = out[~base_mask]
         expanded_parts = [filter_rows]
         for _, row in base_rows.iterrows():
-            family = str(row.get("canonical_family", "")).strip().upper()
+            family = str(row.get("research_family", row.get("canonical_family", ""))).strip().upper()
             exec_templates = list(get_domain_registry().family_templates(family)) if family else []
             if not exec_templates:
                 if family:

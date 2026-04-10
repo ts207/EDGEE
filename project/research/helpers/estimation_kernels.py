@@ -372,7 +372,9 @@ def _apply_hierarchical_shrinkage(
     out["std_return"] = pd.to_numeric(out["std_return"], errors="coerce")
 
     family_col = (
-        out["canonical_family"]
+        out["research_family"]
+        if "research_family" in out.columns
+        else out["canonical_family"]
         if "canonical_family" in out.columns
         else out.get("event_type", pd.Series("", index=out.index))
     )

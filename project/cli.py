@@ -33,7 +33,10 @@ def _build_parser() -> argparse.ArgumentParser:
         prog="edge",
         description="Canonical CLI for the Edge 4-stage model: discover -> validate -> promote -> deploy.",
     )
-    subparsers = parser.add_subparsers(dest="command")
+    subparsers = parser.add_subparsers(
+        dest="command",
+        metavar="{discover,validate,promote,deploy,pipeline,ingest,catalog}",
+    )
 
     # --- CANONICAL STAGES ---
 
@@ -48,7 +51,6 @@ def _build_parser() -> argparse.ArgumentParser:
     discover_run.add_argument("--run_id", default=None)
     discover_run.add_argument("--out_dir", default=None)
     discover_run.add_argument("--check", type=int, default=0)
-    discover_run.add_argument("--legacy_compatibility", type=int, default=0)
 
     discover_plan = discover_sub.add_parser("plan", help="Plan discovery without executing.")
     discover_plan.add_argument("--proposal", required=True)
@@ -56,7 +58,6 @@ def _build_parser() -> argparse.ArgumentParser:
     discover_plan.add_argument("--data_root", default=None)
     discover_plan.add_argument("--run_id", default=None)
     discover_plan.add_argument("--out_dir", default=None)
-    discover_plan.add_argument("--legacy_compatibility", type=int, default=0)
 
     discover_artifacts = discover_sub.add_parser("list-artifacts", help="List discovery artifacts.")
     discover_artifacts.add_argument("--run_id", required=True)
@@ -159,7 +160,6 @@ def _build_parser() -> argparse.ArgumentParser:
     promote_run.add_argument("--symbols", required=True)
     promote_run.add_argument("--out_dir", default=None)
     promote_run.add_argument("--retail_profile", default="capital_constrained")
-    promote_run.add_argument("--use_compatibility_bridge", type=int, default=0)
 
     promote_export = promote_sub.add_parser("export", help="Export promoted theses for live use.")
     promote_export.add_argument("--run_id", required=True)
@@ -208,8 +208,12 @@ def _build_parser() -> argparse.ArgumentParser:
 
     operator_parser = subparsers.add_parser(
         "operator",
-        help="DEPRECATED: Use discover/validate/promote instead.",
+        help=argparse.SUPPRESS,
+        description="DEPRECATED compatibility surface. Use discover/validate/promote instead.",
     )
+    subparsers._choices_actions = [
+        action for action in subparsers._choices_actions if getattr(action, "dest", None) != "operator"
+    ]
     operator_sub = operator_parser.add_subparsers(dest="operator_command")
 
     preflight_parser = operator_sub.add_parser(
@@ -345,6 +349,9 @@ def main() -> int:
     parser = _build_parser()
     args, unknown = parser.parse_known_args()
 
+    if unknown and args.command in {"discover", "validate", "promote", "deploy"}:
+        parser.error(f"unrecognized arguments: {' '.join(unknown)}")
+
     # --- CANONICAL COMMAND DISPATCH ---
 
     if args.command == "discover":
@@ -366,11 +373,7 @@ def main() -> int:
         if args.subcommand == "list-artifacts":
             from project.core.config import get_data_root
             data_root = Path(args.data_root) if args.data_root else get_data_root()
-            # Discovery artifacts are usually under reports/phase2 or reports/edge_candidates
-            paths = [
-                data_root / "reports" / "phase2" / args.run_id,
-                data_root / "reports" / "edge_candidates" / args.run_id
-            ]
+            paths = [data_root / "reports" / "phase2" / args.run_id]
             print(f"Artifacts for discovery run {args.run_id}:")
             found = False
             for p in paths:
@@ -508,7 +511,6 @@ def main() -> int:
                 symbols=args.symbols,
                 out_dir=Path(args.out_dir) if args.out_dir else None,
                 retail_profile=args.retail_profile,
-                use_compatibility_bridge=bool(args.use_compatibility_bridge)
             )
             if result.exit_code != 0:
                 err = str(result.diagnostics.get("error", ""))

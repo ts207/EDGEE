@@ -4,6 +4,17 @@ import pandas as pd
 import numpy as np
 
 
+def _family_counts(frame: pd.DataFrame) -> pd.Series:
+    family_col = None
+    for candidate in ("research_family", "canonical_family"):
+        if candidate in frame.columns:
+            family_col = candidate
+            break
+    if family_col is None:
+        return pd.Series(dtype=float)
+    return frame[family_col].dropna().astype(str).value_counts(normalize=True)
+
+
 def compute_discovery_quality_kpis(candidates: pd.DataFrame, min_fdr: float = 0.05) -> dict:
     if candidates.empty:
         return {}
@@ -29,11 +40,7 @@ def compute_discovery_quality_kpis(candidates: pd.DataFrame, min_fdr: float = 0.
     )
 
     # Diversity
-    families = (
-        promoted["canonical_family"].dropna().astype(str).value_counts(normalize=True)
-        if "canonical_family" in promoted.columns
-        else pd.Series(dtype=float)
-    )
+    families = _family_counts(promoted)
     concentration = families.iloc[0] if not families.empty else np.nan
 
     # Generalization proxy (if test metrics exist)

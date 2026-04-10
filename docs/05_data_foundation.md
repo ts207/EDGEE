@@ -68,7 +68,7 @@ The repo exposes path helpers from `project/artifacts/catalog.py`. Those helpers
 | Exported thesis batch | `data/live/theses/<run_id>/promoted_theses.json` |
 | Thesis index | `data/live/theses/index.json` |
 
-Some helper functions also resolve legacy fallback locations for older runs. That compatibility behavior exists so inspection commands keep working, but new docs should teach the canonical paths above.
+The default helper paths now stay on the canonical flat layout above. Legacy fallback locations for older runs should be resolved only through explicit compatibility helpers.
 
 ## Stage Lineage
 

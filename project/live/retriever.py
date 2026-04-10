@@ -232,9 +232,12 @@ def _deployment_state_for_matching(
     thesis: PromotedThesis,
     definition: ThesisDefinition | None,
 ) -> str:
+    thesis_state = str(thesis.deployment_state or "").strip().lower()
+    if thesis_state:
+        return thesis_state
     if definition is not None and str(definition.deployment_state or "").strip():
         return str(definition.deployment_state).strip().lower()
-    return str(thesis.deployment_state or "").strip().lower()
+    return ""
 
 
 def _overlap_group_for_matching(

@@ -61,6 +61,7 @@ def test_hypotheses_to_bridge_candidates_respects_configured_bridge_thresholds()
     assert bool(relaxed.iloc[0]["gate_oos_validation"]) is True
     assert float(relaxed.iloc[0]["p_value"]) == 0.04
     assert relaxed.iloc[0]["candidate_id"] != relaxed.iloc[0]["hypothesis_id"]
+    assert relaxed.iloc[0]["research_family"] == relaxed.iloc[0]["canonical_family"]
     assert relaxed.iloc[0]["family_id"] == make_family_id(
         "ALL",
         relaxed.iloc[0]["canonical_event_type"],

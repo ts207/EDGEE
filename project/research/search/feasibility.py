@@ -34,7 +34,11 @@ def _event_family(spec: HypothesisSpec, registry: DomainRegistry) -> str:
     if spec.trigger.trigger_type != TriggerType.EVENT or not spec.trigger.event_id:
         return ""
     event_def = registry.get_event(spec.trigger.event_id)
-    return event_def.canonical_family if event_def is not None else ""
+    return (
+        event_def.research_family or event_def.canonical_family
+        if event_def is not None
+        else ""
+    )
 
 
 def _template_family_reason(spec: HypothesisSpec, registry: DomainRegistry) -> str | None:
@@ -52,12 +56,21 @@ def _template_family_reason(spec: HypothesisSpec, registry: DomainRegistry) -> s
         if spec.template_id in normalized_templates:
             return None
 
-    family_candidates = {event_def.canonical_family}
+    family_candidates = {
+        token
+        for token in (
+            event_def.research_family,
+            event_def.canonical_family,
+            event_def.canonical_regime,
+        )
+        if isinstance(token, str) and token.strip()
+    }
     parameters = raw.get("parameters")
     if isinstance(parameters, Mapping):
-        legacy_family = str(parameters.get("canonical_family", "")).strip()
-        if legacy_family:
-            family_candidates.add(legacy_family)
+        for key in ("research_family", "canonical_family"):
+            legacy_family = str(parameters.get(key, "")).strip()
+            if legacy_family:
+                family_candidates.add(legacy_family)
 
     if family_candidates.isdisjoint(operator.compatible_families):
         return "incompatible_template_family"

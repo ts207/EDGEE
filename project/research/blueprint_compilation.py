@@ -392,7 +392,14 @@ def compile_blueprint(
     canonical_event_type = (
         str(merged_row.get("canonical_event_type", event_type)).strip() or event_type
     )
+    research_family = str(
+        merged_row.get("research_family", merged_row.get("canonical_family", ""))
+    ).strip()
     canonical_family = str(merged_row.get("canonical_family", "")).strip()
+    if not canonical_family:
+        canonical_family = research_family
+    if not research_family:
+        research_family = canonical_family
     canonical_regime = str(
         merged_row.get("canonical_regime", canonical_family or canonical_event_type)
     ).strip()
@@ -461,6 +468,7 @@ def compile_blueprint(
             discovery_end=str(merged_row.get("discovery_end", "")),
             ontology_spec_hash=ontology_spec_hash_value,
             canonical_event_type=canonical_event_type,
+            research_family=research_family,
             canonical_family=canonical_family,
             canonical_regime=canonical_regime,
             subtype=subtype,

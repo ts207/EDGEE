@@ -502,11 +502,13 @@ def _resolve_requested_event_ids(
         if spec is None:
             return
         canonical_regime = str(getattr(spec, "canonical_regime", "") or "").strip().upper()
-        canonical_family = str(getattr(spec, "canonical_family", "") or "").strip().upper()
+        research_family = str(
+            getattr(spec, "research_family", "") or getattr(spec, "canonical_family", "") or ""
+        ).strip().upper()
         subtype = str(getattr(spec, "subtype", "") or "").strip().lower()
         phase = str(getattr(spec, "phase", "") or "").strip().lower()
         evidence_mode = str(getattr(spec, "evidence_mode", "") or "").strip().lower()
-        if requested_regimes and not ({canonical_regime, canonical_family} & set(requested_regimes)):
+        if requested_regimes and not ({canonical_regime, research_family} & set(requested_regimes)):
             raise ValueError(
                 "Explicit event "
                 f"'{event_id}' does not belong to requested canonical_regimes {requested_regimes}; "

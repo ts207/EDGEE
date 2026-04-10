@@ -17,6 +17,34 @@ from project.research.validation.contracts import (
 )
 
 
+PROMOTION_READY_COLUMNS = (
+    "candidate_id",
+    "anchor_summary",
+    "template_id",
+    "direction",
+    "horizon_bars",
+    "validation_stage_version",
+    "validation_status",
+    "validation_run_id",
+    "validation_program_id",
+    "validation_reason_codes",
+    "metric_sample_count",
+    "metric_effective_sample_size",
+    "metric_expectancy",
+    "metric_net_expectancy",
+    "metric_hit_rate",
+    "metric_p_value",
+    "metric_q_value",
+    "metric_stability_score",
+    "metric_cost_sensitivity",
+    "metric_turnover",
+    "metric_regime_support_score",
+    "metric_time_slice_support_score",
+    "metric_negative_control_score",
+    "metric_max_drawdown",
+)
+
+
 def write_validation_bundle(bundle: ValidationBundle, base_dir: Optional[Path] = None) -> Path:
     if base_dir is None:
         base_dir = get_data_root() / "reports" / "validation" / bundle.run_id
@@ -97,9 +125,6 @@ def write_promotion_ready_candidates(bundle: ValidationBundle, base_dir: Optiona
     
     base_dir.mkdir(parents=True, exist_ok=True)
     
-    if not bundle.validated_candidates:
-        return None
-    
     flat_data = []
     for c in bundle.validated_candidates:
         row = {
@@ -119,7 +144,7 @@ def write_promotion_ready_candidates(bundle: ValidationBundle, base_dir: Optiona
             row[f"metric_{k}"] = v
         flat_data.append(row)
     
-    flat_df = pd.DataFrame(flat_data)
+    flat_df = pd.DataFrame(flat_data, columns=PROMOTION_READY_COLUMNS)
     path = base_dir / "promotion_ready_candidates.parquet"
     write_parquet(flat_df, path)
     return path
@@ -127,9 +152,15 @@ def write_promotion_ready_candidates(bundle: ValidationBundle, base_dir: Optiona
 
 def load_validation_bundle(run_id: str, base_dir: Optional[Path] = None) -> Optional[ValidationBundle]:
     if base_dir is None:
-        base_dir = get_data_root() / "reports" / "validation" / run_id
-        
-    bundle_path = base_dir / "validation_bundle.json"
+        resolved_dir = get_data_root() / "reports" / "validation" / run_id
+    else:
+        resolved_dir = Path(base_dir)
+        if not (resolved_dir / "validation_bundle.json").exists():
+            candidate_dir = resolved_dir / run_id
+            if (candidate_dir / "validation_bundle.json").exists():
+                resolved_dir = candidate_dir
+
+    bundle_path = resolved_dir / "validation_bundle.json"
     if not bundle_path.exists():
         return None
         
@@ -156,7 +187,7 @@ def load_validation_bundle(run_id: str, base_dir: Optional[Path] = None) -> Opti
     # Load effect_stability_report with backward-compat fallback
     effect_stability_report = data.get("effect_stability_report", {})
     if not effect_stability_report:
-        stability_path = base_dir / "effect_stability_report.json"
+        stability_path = resolved_dir / "effect_stability_report.json"
         if stability_path.exists():
             try:
                 with stability_path.open("r", encoding="utf-8") as f:

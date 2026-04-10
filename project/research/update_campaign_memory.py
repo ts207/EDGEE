@@ -478,15 +478,15 @@ def _load_regime_conditional_candidates(*, run_id: str, data_root: Path) -> pd.D
     """Phase 4.2 — Load regime_conditional_candidates.parquet for this run.
 
     Written by _write_regime_conditional_candidates() in phase2_search_engine.py
-    or run_hypothesis_search.py. Checks both standard output paths so that
-    either pipeline's artefact is found.
+    or run_hypothesis_search.py. Checks the canonical flat phase-2 output path
+    plus the hypothesis-search output path so either current producer's artifact
+    is found without reviving nested legacy layouts.
     Returns an empty DataFrame when the artifact is absent.
     Raises when the artifact exists but is unreadable/corrupted.
     """
     candidates = [
         data_root / "reports" / "phase2" / run_id / "regime_conditional_candidates.parquet",
         data_root / "reports" / "hypothesis_search" / run_id / "regime_conditional_candidates.parquet",
-        data_root / "reports" / "phase2" / run_id / "search_engine" / "regime_conditional_candidates.parquet",
     ]
     for path in candidates:
         if path.exists():

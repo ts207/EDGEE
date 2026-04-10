@@ -80,7 +80,7 @@ def _canonical_family(event_type: str) -> str:
     spec = _event_spec(event_type)
     family = None
     if isinstance(spec, dict):
-        family = spec.get("canonical_regime") or spec.get("canonical_family")
+        family = spec.get("research_family") or spec.get("canonical_family") or spec.get("canonical_regime")
     if family:
         return str(family)
     # Harden fallback: If not in registry, use 'UNKNOWN_FAMILY' or raise to avoid 'VOL' nonsense

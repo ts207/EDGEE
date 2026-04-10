@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -753,8 +754,12 @@ def _build_thesis(
     if promo_class not in {"seed_promoted", "paper_promoted", "production_promoted"}:
         promo_class = "paper_promoted"
         
-    deploy_state = str(promoted_row.get("deployment_state_default") or promoted_row.get("deployment_state") or "paper_only").lower()
-    if deploy_state not in {"monitor_only", "paper_only", "live_enabled", "retired"}:
+    deploy_state = str(
+        promoted_row.get("deployment_state_default")
+        or promoted_row.get("deployment_state")
+        or "paper_only"
+    ).lower()
+    if deploy_state not in ALL_DEPLOYMENT_STATES:
         deploy_state = "paper_only"
 
     # Compute batch timestamp once for consistency
@@ -1056,7 +1061,7 @@ def export_promoted_theses_for_run(
                     "validation_reason_codes": list(c.decision.reason_codes),
                     "validation_artifact_paths": {a.artifact_type: a.path for a in c.artifact_refs},
                 }
-    except (OSError, json.JSONDecodeError, KeyError, AttributeError, TypeError) as exc:
+    except (OSError, json.JSONDecodeError, KeyError, AttributeError, TypeError, ValueError) as exc:
         logging.warning(
             "Failed to load validation bundle for run %s: %s. Proceeding without validation metadata.",
             run_id,

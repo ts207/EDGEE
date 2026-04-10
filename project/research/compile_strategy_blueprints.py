@@ -486,7 +486,7 @@ def _checklist_decision(run_id: str) -> str:
 
 
 def _load_phase2_table(run_id: str, event_type: str) -> pd.DataFrame:
-    path = phase2_candidates_path(run_id, event_type, DATA_ROOT)
+    path = phase2_candidates_path(run_id, DATA_ROOT)
     if not path.exists():
         return pd.DataFrame()
     if path.suffix == ".parquet":

@@ -196,6 +196,7 @@ class LineageSpec(BaseModel):
     promotion_track: Literal["standard", "fallback_only"] = "standard"
     ontology_spec_hash: str = ""
     canonical_event_type: str = ""
+    research_family: str = ""
     canonical_family: str = ""
     canonical_regime: str = ""
     subtype: str = ""

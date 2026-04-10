@@ -198,6 +198,22 @@ class TestLoadRegimeConditionalCandidates:
         assert len(result) == 1
         assert result.iloc[0]["event_type"] == "VOL_SPIKE"
 
+    def test_loads_parquet_from_hypothesis_search_path(self, tmp_path):
+        rcc_dir = tmp_path / "reports" / "hypothesis_search" / "run_hs"
+        rcc_dir.mkdir(parents=True)
+        df = pd.DataFrame([{
+            "event_type": "VOL_SPIKE", "template_id": "mean_reversion",
+            "direction": "long", "horizon": "12b",
+            "trigger_key": "event:VOL_SPIKE", "t_stat": 1.1,
+            "mean_return_bps": 4.5, "robustness_score": 0.6, "context_json": "{}",
+        }])
+        df.to_parquet(rcc_dir / "regime_conditional_candidates.parquet", index=False)
+
+        result = _load_regime_conditional_candidates(run_id="run_hs", data_root=tmp_path)
+
+        assert len(result) == 1
+        assert result.iloc[0]["event_type"] == "VOL_SPIKE"
+
     def test_raises_on_corrupt_file(self, tmp_path):
         rcc_dir = tmp_path / "reports" / "phase2" / "run_bad"
         rcc_dir.mkdir(parents=True)
@@ -205,22 +221,16 @@ class TestLoadRegimeConditionalCandidates:
         with pytest.raises(DataIntegrityError):
             _load_regime_conditional_candidates(run_id="run_bad", data_root=tmp_path)
 
-    def test_prefers_flat_phase2_artifact_over_legacy_nested_path(self, tmp_path):
-        flat_dir = tmp_path / "reports" / "phase2" / "run_pref" 
-        nested_dir = flat_dir / "search_engine"
-        flat_dir.mkdir(parents=True, exist_ok=True)
+    def test_ignores_legacy_nested_search_engine_path(self, tmp_path):
+        nested_dir = tmp_path / "reports" / "phase2" / "run_pref" / "search_engine"
         nested_dir.mkdir(parents=True, exist_ok=True)
         pd.DataFrame([{"event_type": "NESTED"}]).to_parquet(
             nested_dir / "regime_conditional_candidates.parquet", index=False
         )
-        pd.DataFrame([{"event_type": "FLAT"}]).to_parquet(
-            flat_dir / "regime_conditional_candidates.parquet", index=False
-        )
 
         result = _load_regime_conditional_candidates(run_id="run_pref", data_root=tmp_path)
 
-        assert len(result) == 1
-        assert result.iloc[0]["event_type"] == "FLAT"
+        assert result.empty
 
 
 class TestBuildNextActionsRegimeCandidates:
