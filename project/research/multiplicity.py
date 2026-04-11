@@ -237,6 +237,7 @@ def apply_multiplicity_controls(
             out["is_discovery_cluster"] = out["q_value_cluster"] <= float(max_q)
 
     # 5. Metadata
+    family_row_counts = out.groupby("family_id").size().astype(int).to_dict()
     family_effective_counts = (
         out.assign(_test_weight=test_weights)
         .groupby("family_id")["_test_weight"]
@@ -245,9 +246,21 @@ def apply_multiplicity_controls(
         .to_dict()
     )
 
-    out["num_tests_family"] = out["family_id"].map(family_effective_counts).fillna(0).astype(int)
-    out["num_tests_effective"] = out["num_tests_family"]
-    out["num_tests_campaign"] = int(test_weights.sum())
+    out["num_tests_family"] = out["family_id"].map(family_row_counts).fillna(0).astype(int)
+    out["num_tests_effective"] = out["family_id"].map(family_effective_counts).fillna(0).astype(int)
+
+    # Campaign-level search burden should not understate either layer of the
+    # hierarchical procedure:
+    #   1) outer-family discovery burden (number of tested families), or
+    #   2) inner-family effective burden for the largest family (including
+    #      side_policy='both' counting as two tests).
+    #
+    # This preserves the expected hierarchical semantics in which campaign-level
+    # BH runs over discovered families, while still surfacing a conservative
+    # fallback trial count for DSR when only campaign-level metadata is available.
+    n_tested_families = int(out.loc[out["multiplicity_pool_eligible"], "family_id"].nunique())
+    max_family_effective = max(family_effective_counts.values(), default=0)
+    out["num_tests_campaign"] = max(n_tested_families, int(max_family_effective))
 
     # Backward compatibility aliases for legacy column names
     out["num_tests_primary_event_id"] = out["num_tests_family"]

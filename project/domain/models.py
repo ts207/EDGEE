@@ -8,7 +8,6 @@ from typing import Any, Dict, Mapping
 @dataclass(frozen=True)
 class EventDefinition:
     event_type: str
-    research_family: str
     canonical_family: str
     canonical_regime: str
     legacy_family: str
@@ -16,6 +15,7 @@ class EventDefinition:
     reports_dir: str
     events_file: str
     signal_column: str
+    research_family: str = ""
     subtype: str = ""
     phase: str = ""
     evidence_mode: str = ""

@@ -257,12 +257,24 @@ def read_table_auto(path: Path | str, columns: List[str] | None = None) -> pd.Da
     can use best-effort probing without duplicating csv/parquet branches.
     """
     target = Path(path)
-    if not target.exists():
-        return pd.DataFrame()
-    try:
-        return read_parquet(target, columns=columns)
-    except Exception:
-        return pd.DataFrame()
+    candidates = [target]
+    if target.suffix != ".csv":
+        candidates.append(target.with_suffix(".csv"))
+
+    for candidate in candidates:
+        if not candidate.exists():
+            continue
+        try:
+            if candidate.suffix == ".csv":
+                use_cols = columns if columns else None
+                try:
+                    return pd.read_csv(candidate, usecols=use_cols)
+                except ValueError:
+                    return pd.read_csv(candidate)
+            return read_parquet(candidate, columns=columns)
+        except Exception:
+            continue
+    return pd.DataFrame()
 
 
 def write_parquet(df: pd.DataFrame, path: Path, skip_lock: bool = False) -> Tuple[Path, str]:
@@ -307,6 +319,16 @@ def _write_parquet_impl(df: pd.DataFrame, path: Path) -> Tuple[Path, str]:
     temp_path = path.with_suffix(path.suffix + ".tmp")
     write_parquet_compat(df, temp_path, index=False)
     temp_path.replace(path)
+
+    # Compatibility sidecar for environments without a native parquet engine.
+    # Some lightweight scripts only probe ``.csv`` siblings when ``HAS_PYARROW``
+    # is false; writing this sidecar keeps those paths interoperable while the
+    # canonical logical artifact remains the ``.parquet`` file above.
+    try:
+        csv_path = path.with_suffix('.csv')
+        df.to_csv(csv_path, index=False)
+    except Exception:
+        pass
     return path, "parquet"
 
 

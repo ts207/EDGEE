@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 import pandas as pd
 import yaml
+from project.io.utils import write_parquet
 from project.research import phase2_search_engine
 from project import PROJECT_ROOT
 from project.research.benchmarks.benchmark_modes import get_mode, all_modes, DiscoveryBenchmarkMode
@@ -355,7 +356,7 @@ def run_benchmark_job(
                     current_run_id=run_id,
                     config=resolved_config["ledger"],
                 )
-                df.to_parquet(candidate_paths[0])
+                write_parquet(df, candidate_paths[0])
 
             if mode.shortlist_selection != "disabled":
                 from project.research.services.candidate_diversification import (
@@ -364,9 +365,9 @@ def run_benchmark_job(
                 div_config = search_spec_with_overlays.get("discovery_selection", {})
                 if div_config:
                     df, shortlist_df = annotate_candidates_with_diversification(df, div_config)
-                    df.to_parquet(candidate_paths[0])
+                    write_parquet(df, candidate_paths[0])
                     shortlist_path = out_dir / "shortlist_candidates.parquet"
-                    shortlist_df.to_parquet(shortlist_path)
+                    write_parquet(shortlist_df, shortlist_path)
                     result["artifact_paths"]["shortlist"] = str(shortlist_path)
 
             result["candidate_count"] = len(df)
@@ -535,7 +536,7 @@ def _write_score_decomposition(case_id, merged, out_dir):
 
     decomp = merged.sort_values("B_rank")
 
-    decomp.to_parquet(out_dir / "score_decomposition.parquet")
+    write_parquet(decomp, out_dir / "score_decomposition.parquet")
     decomp.to_csv(out_dir / "score_decomposition.csv", index=False)
 
     md = [f"# Score Decomposition: {case_id}\n"]

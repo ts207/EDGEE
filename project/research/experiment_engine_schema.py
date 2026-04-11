@@ -105,15 +105,75 @@ class RegistryBundle:
     def __init__(self, registry_root: Path):
         self.registry_root = Path(registry_root)
         semantic_views = build_canonical_semantic_registry_views()
-        self.events = semantic_views["events"]
-        self.states = semantic_views["states"]
-        self.templates = semantic_views["templates"]
+
+        # Local registry roots may introduce temporary or program-specific
+        # semantic entries used by bounded tests and campaigns. They should
+        # augment the canonical semantic registry, not override canonical
+        # definitions for existing IDs.
+        local_events = self._load_yaml(self.registry_root / "events.yaml")
+        local_states = self._load_yaml(self.registry_root / "states.yaml")
+        local_templates = self._load_yaml(self.registry_root / "templates.yaml")
+
+        self.events = self._merge_registry_section(
+            semantic_views["events"],
+            local_events,
+            section="events",
+        )
+        self.states = self._merge_registry_section(
+            semantic_views["states"],
+            local_states,
+            section="states",
+        )
+        self.templates = self._merge_templates(
+            semantic_views["templates"],
+            local_templates,
+        )
         self.features = self._load_yaml(self.registry_root / "features.yaml")
         self.contexts = self._load_yaml(self.registry_root / "contexts.yaml")
         self.limits = self._load_yaml(self.registry_root / "search_limits.yaml")
         self.detectors = self._load_yaml(self.registry_root / "detectors.yaml")
         self.semantic_source_paths = canonical_semantic_source_paths()
         self.runtime_config_source_paths = runtime_config_source_paths(self.registry_root)
+
+
+    def _merge_registry_section(
+        self,
+        canonical: Dict[str, Any],
+        local: Dict[str, Any],
+        *,
+        section: str,
+    ) -> Dict[str, Any]:
+        merged = dict(canonical or {})
+        canonical_rows = dict(merged.get(section, {}) or {})
+        local_rows = local.get(section, {}) if isinstance(local, dict) else {}
+        if isinstance(local_rows, dict):
+            for key, value in local_rows.items():
+                canonical_rows.setdefault(key, value)
+        merged[section] = canonical_rows
+        return merged
+
+    def _merge_templates(
+        self,
+        canonical: Dict[str, Any],
+        local: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        merged = dict(canonical or {})
+        canonical_templates = dict(merged.get("templates", {}) or {})
+        canonical_families = dict(merged.get("families", {}) or {})
+
+        local_templates = local.get("templates", {}) if isinstance(local, dict) else {}
+        if isinstance(local_templates, dict):
+            for key, value in local_templates.items():
+                canonical_templates.setdefault(key, value)
+
+        local_families = local.get("families", {}) if isinstance(local, dict) else {}
+        if isinstance(local_families, dict):
+            for key, value in local_families.items():
+                canonical_families.setdefault(key, value)
+
+        merged["templates"] = canonical_templates
+        merged["families"] = canonical_families
+        return merged
 
     def _load_yaml(self, path: Path) -> Dict[str, Any]:
         if not path.exists():

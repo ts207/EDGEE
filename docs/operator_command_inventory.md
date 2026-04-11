@@ -6,7 +6,7 @@ This file is intentionally broader than the old name suggests. It covers:
 
 - canonical lifecycle commands
 - support-plane commands
-- compatibility operator commands
+- retired operator compatibility commands (historical reference only)
 - maintenance and validation targets
 
 ## Use These First
@@ -86,9 +86,9 @@ These are important, but they are not extra lifecycle stages.
 ## Compatibility Operator Commands
 
 > [!WARNING]
-> `edge operator ...` is still supported, but it is a compatibility surface. New documentation should teach the stage verbs first.
+> `edge operator ...` is no longer supported. This document is retained only as a migration/reference map from the retired alias surface to the canonical stage verbs.
 
-Current `operator` commands:
+Retired `operator` commands (for migration reference):
 
 - `edge operator preflight`
 - `edge operator plan`

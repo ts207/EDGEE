@@ -5,8 +5,10 @@ from pathlib import Path
 from typing import List, Optional
 
 from project.research.services.promotion_service import (
+    PROMOTION_CONFIG_DEFAULTS,
     PromotionConfig,
     PromotionServiceResult,
+    build_promotion_config,
     execute_promotion,
 )
 
@@ -16,36 +18,36 @@ def build_promotion_parser() -> argparse.ArgumentParser:
     parser.add_argument("--run_id", required=True)
     parser.add_argument("--symbols", default="")
     parser.add_argument("--out_dir", default=None)
-    parser.add_argument("--max_q_value", type=float, default=0.10)
-    parser.add_argument("--min_events", type=int, default=100)
-    parser.add_argument("--min_stability_score", type=float, default=0.05)
-    parser.add_argument("--min_sign_consistency", type=float, default=0.67)
-    parser.add_argument("--min_cost_survival_ratio", type=float, default=0.75)
-    parser.add_argument("--max_negative_control_pass_rate", type=float, default=0.01)
-    parser.add_argument("--min_tob_coverage", type=float, default=0.60)
-    parser.add_argument("--require_hypothesis_audit", type=int, default=1)
-    parser.add_argument("--allow_missing_negative_controls", type=int, default=0)
-    parser.add_argument("--require_multiplicity_diagnostics", type=int, default=0)
-    parser.add_argument("--min_dsr", type=float, default=0.5)
-    parser.add_argument("--max_overlap_ratio", type=float, default=0.80)
-    parser.add_argument("--max_profile_correlation", type=float, default=0.90)
-    parser.add_argument("--allow_discovery_promotion", type=int, default=0)
-    parser.add_argument("--program_id", default="default_program")
-    parser.add_argument("--retail_profile", default="capital_constrained")
-    parser.add_argument("--objective_name", default="")
+    parser.add_argument("--max_q_value", type=float, default=PROMOTION_CONFIG_DEFAULTS["max_q_value"])
+    parser.add_argument("--min_events", type=int, default=PROMOTION_CONFIG_DEFAULTS["min_events"])
+    parser.add_argument("--min_stability_score", type=float, default=PROMOTION_CONFIG_DEFAULTS["min_stability_score"])
+    parser.add_argument("--min_sign_consistency", type=float, default=PROMOTION_CONFIG_DEFAULTS["min_sign_consistency"])
+    parser.add_argument("--min_cost_survival_ratio", type=float, default=PROMOTION_CONFIG_DEFAULTS["min_cost_survival_ratio"])
+    parser.add_argument("--max_negative_control_pass_rate", type=float, default=PROMOTION_CONFIG_DEFAULTS["max_negative_control_pass_rate"])
+    parser.add_argument("--min_tob_coverage", type=float, default=PROMOTION_CONFIG_DEFAULTS["min_tob_coverage"])
+    parser.add_argument("--require_hypothesis_audit", type=int, default=int(PROMOTION_CONFIG_DEFAULTS["require_hypothesis_audit"]))
+    parser.add_argument("--allow_missing_negative_controls", type=int, default=int(PROMOTION_CONFIG_DEFAULTS["allow_missing_negative_controls"]))
+    parser.add_argument("--require_multiplicity_diagnostics", type=int, default=int(PROMOTION_CONFIG_DEFAULTS["require_multiplicity_diagnostics"]))
+    parser.add_argument("--min_dsr", type=float, default=PROMOTION_CONFIG_DEFAULTS["min_dsr"])
+    parser.add_argument("--max_overlap_ratio", type=float, default=PROMOTION_CONFIG_DEFAULTS["max_overlap_ratio"])
+    parser.add_argument("--max_profile_correlation", type=float, default=PROMOTION_CONFIG_DEFAULTS["max_profile_correlation"])
+    parser.add_argument("--allow_discovery_promotion", type=int, default=int(PROMOTION_CONFIG_DEFAULTS["allow_discovery_promotion"]))
+    parser.add_argument("--program_id", default=PROMOTION_CONFIG_DEFAULTS["program_id"])
+    parser.add_argument("--retail_profile", default=PROMOTION_CONFIG_DEFAULTS["retail_profile"])
+    parser.add_argument("--objective_name", default=PROMOTION_CONFIG_DEFAULTS["objective_name"])
     parser.add_argument("--objective_spec", default=None)
     parser.add_argument("--retail_profiles_spec", default=None)
     parser.add_argument(
         "--promotion_profile",
         choices=["auto", "research", "deploy"],
-        default="auto",
+        default=PROMOTION_CONFIG_DEFAULTS["promotion_profile"],
     )
-    parser.add_argument("--use_compatibility_bridge", type=int, default=0)
+    parser.add_argument("--use_compatibility_bridge", type=int, default=int(PROMOTION_CONFIG_DEFAULTS["use_compatibility_bridge"]))
     return parser
 
 
 def promotion_config_from_namespace(args: argparse.Namespace) -> PromotionConfig:
-    return PromotionConfig(
+    return build_promotion_config(
         run_id=str(args.run_id),
         symbols=str(args.symbols),
         out_dir=Path(args.out_dir) if args.out_dir else None,

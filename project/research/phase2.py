@@ -727,8 +727,25 @@ def _read_csv_or_parquet(path: Path) -> pd.DataFrame:
     if not path.exists():
         return pd.DataFrame()
     try:
-        if path.suffix.lower() == ".parquet" and HAS_PYARROW:
-            return pd.read_parquet(path)
+        if path.suffix.lower() == ".parquet":
+            try:
+                return pd.read_parquet(path)
+            except Exception as parquet_exc:
+                csv_path = path.with_suffix(".csv")
+                if csv_path.exists():
+                    try:
+                        return pd.read_csv(csv_path)
+                    except Exception as csv_exc:
+                        log.warning(
+                            "Failed to read tabular artifact %s via parquet (%s) and CSV fallback %s (%s)",
+                            path,
+                            parquet_exc,
+                            csv_path,
+                            csv_exc,
+                        )
+                        return pd.DataFrame()
+                log.warning("Failed to read tabular artifact %s: %s", path, parquet_exc)
+                return pd.DataFrame()
         return pd.read_csv(path)
     except Exception as exc:
         log.warning("Failed to read tabular artifact %s: %s", path, exc)

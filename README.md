@@ -10,7 +10,6 @@ That four-stage story is the public front door, but the repository now includes 
 
 - a canonical stage CLI in `project/cli.py`
 - a planner-owned orchestration layer in `project/pipelines/run_all.py` for internal bundle flows
-- a compatibility `operator` surface for older bounded-research workflows
 - an explicit thesis export step that writes runtime inventory under `data/live/theses/`
 - a gated live runtime with thesis-state validation, approval metadata, kill switches, and reconciliation
 - an MCP / ChatGPT app interface in `project/apps/chatgpt/` that fronts canonical repo surfaces instead of redefining policy
@@ -87,7 +86,7 @@ python -m project.cli deploy paper --run_id <run_id> --config project/configs/li
 The current repo update that older docs did not explain clearly is:
 
 - `discover`, `validate`, `promote`, and `deploy` are the canonical lifecycle verbs
-- `operator` still exists, but it is a deprecated compatibility façade
+- the legacy `operator` CLI alias has been removed; use the stage verbs directly
 - the old `pipeline run-all` CLI alias has been removed; use `discover run` or explicit Make wrappers
 - `promote export` is the bridge into runtime inventory and writes `data/live/theses/<run_id>/`
 - thesis lifecycle and runtime permissioning are now explicit through `deployment_state`, approval metadata, and `DeploymentGate`
@@ -120,7 +119,7 @@ This boundary matters operationally:
 - `project/live/`: thesis contracts, deployment gate, live runner, reconciliation, kill switch, scoring
 - `project/tests/`: single repo test tree for pytest discovery
 - `project/events/` and `spec/events/`: authored event definitions and compiled registry surfaces
-- `project/apps/chatgpt/`: app / MCP scaffold around canonical operator workflows
+- `project/apps/chatgpt/`: app / MCP scaffold around canonical stage workflows
 - `plugins/edge-agents/`: repo-local plugin scripts for maintenance, validation, hygiene, and operator ergonomics
 
 ## Documentation
@@ -144,8 +143,6 @@ Then use:
 
 ## Compatibility Note
 
-Legacy operator commands remain available for migration support:
-
-- `edge operator ...`
+Legacy `edge operator ...` commands have been removed. Use `discover`, `validate`, `promote`, and `deploy` directly.
 
 They are wrappers around the current model. New documentation and maintenance work should teach the stage verbs and the export/runtime boundary first.

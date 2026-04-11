@@ -105,6 +105,48 @@ class PromotionConfig:
         }
 
 
+PROMOTION_CONFIG_DEFAULTS: Dict[str, Any] = {
+    "max_q_value": 0.10,
+    "min_events": 100,
+    "min_stability_score": 0.05,
+    "min_sign_consistency": 0.67,
+    "min_cost_survival_ratio": 0.75,
+    "max_negative_control_pass_rate": 0.01,
+    "min_tob_coverage": 0.60,
+    "require_hypothesis_audit": True,
+    "allow_missing_negative_controls": False,
+    "require_multiplicity_diagnostics": False,
+    "min_dsr": 0.5,
+    "max_overlap_ratio": 0.80,
+    "max_profile_correlation": 0.90,
+    "allow_discovery_promotion": False,
+    "program_id": "default_program",
+    "retail_profile": "capital_constrained",
+    "objective_name": "",
+    "objective_spec": None,
+    "retail_profiles_spec": None,
+    "promotion_profile": "auto",
+    "use_compatibility_bridge": False,
+}
+
+
+def build_promotion_config(
+    *,
+    run_id: str,
+    symbols: str = "",
+    out_dir: Optional[Path] = None,
+    **overrides: Any,
+) -> PromotionConfig:
+    values = dict(PROMOTION_CONFIG_DEFAULTS)
+    values.update(overrides)
+    values.update({
+        "run_id": str(run_id),
+        "symbols": str(symbols),
+        "out_dir": out_dir,
+    })
+    return PromotionConfig(**values)
+
+
 @dataclass(frozen=True)
 class ResolvedPromotionPolicy:
     promotion_profile: str
@@ -953,6 +995,20 @@ def execute_promotion(config: PromotionConfig) -> PromotionServiceResult:
                     "Canonical validation is mandatory in Sprint 4."
                 )
 
+        canonical_candidate_path = (
+            out_dir.parent.parent / "validation" / config.run_id / "promotion_ready_candidates.parquet"
+        )
+        canonical_candidate_csv_path = canonical_candidate_path.with_suffix(".csv")
+        if (
+            not canonical_candidate_path.exists()
+            and not canonical_candidate_csv_path.exists()
+            and not config.use_compatibility_bridge
+        ):
+            raise FileNotFoundError(
+                f"Canonical promotion-ready candidates not found at {canonical_candidate_path}. "
+                "Set use_compatibility_bridge=True to fall back to legacy table loading."
+            )
+
         if not val_bundle.validated_candidates:
             promotion_input_mode = "canonical_empty"
             audit_df = _empty_artifact_frame(*_EMPTY_PROMOTION_AUDIT_COLUMNS)
@@ -1017,20 +1073,6 @@ def execute_promotion(config: PromotionConfig) -> PromotionServiceResult:
             raise ValueError(
                 f"Promotion blocked for {config.run_id}: source run_mode={source_run_mode}. "
                 "Promotion requires a confirmatory run."
-            )
-
-        canonical_candidate_path = (
-            out_dir.parent.parent / "validation" / config.run_id / "promotion_ready_candidates.parquet"
-        )
-        canonical_candidate_csv_path = canonical_candidate_path.with_suffix(".csv")
-        if (
-            not canonical_candidate_path.exists()
-            and not canonical_candidate_csv_path.exists()
-            and not config.use_compatibility_bridge
-        ):
-            raise FileNotFoundError(
-                f"Canonical promotion-ready candidates not found at {canonical_candidate_path}. "
-                "Set use_compatibility_bridge=True to fall back to legacy table loading."
             )
 
         contract = resolve_objective_profile_contract(

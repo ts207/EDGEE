@@ -87,7 +87,7 @@ def write_validated_candidate_tables(bundle: ValidationBundle, base_dir: Optiona
     
     for name, candidates in groups.items():
         if not candidates:
-            # Still write an empty file if it's the canonical name? 
+            # Still write an empty file if it's the canonical name?
             # Usually better to have the file exist.
             flat_df = pd.DataFrame()
         else:
@@ -111,11 +111,17 @@ def write_validated_candidate_tables(bundle: ValidationBundle, base_dir: Optiona
                     row[f"metric_{k}"] = v
                 flat_data.append(row)
             flat_df = pd.DataFrame(flat_data)
-            
+
         path = base_dir / f"{name}.parquet"
         write_parquet(flat_df, path)
         paths[name] = path
-        
+
+    # Keep the promotion handoff canonical whenever validation tables are written.
+    paths["promotion_ready_candidates"] = write_promotion_ready_candidates(
+        bundle,
+        base_dir=base_dir,
+    )
+
     return paths
 
 

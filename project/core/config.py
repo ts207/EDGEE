@@ -13,7 +13,10 @@ from project.core.exceptions import ConfigurationError
 def get_data_root() -> Path:
     """Resolves the root directory for data storage."""
     # Prioritize environment variable, then fallback to standard project-local path.
-    raw = os.getenv("BACKTEST_DATA_ROOT") or os.getenv("EDGE_DATA_ROOT")
+    # Prefer the explicit Edge session override when both are set. Several
+    # regression tests rely on per-test EDGE_DATA_ROOT to shadow any leaked
+    # BACKTEST_DATA_ROOT from earlier integration runs.
+    raw = os.getenv("EDGE_DATA_ROOT") or os.getenv("BACKTEST_DATA_ROOT")
     if raw:
         return Path(raw).resolve()
     return (PROJECT_ROOT.parent / "data").resolve()

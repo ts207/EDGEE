@@ -98,50 +98,47 @@ def _ignored_feature_columns(
     ignored_nan_columns: set[str] = set()
     ignored_constant_columns = set(_CONSTANT_OK_COLUMNS)
 
+    def _existing_raw_dirs(*, market: str, dataset: str, aliases: tuple[str, ...] = ()) -> list[Path]:
+        results: list[Path] = []
+        seen: set[str] = set()
+        for venue in ("bybit", "binance"):
+            resolved = resolve_raw_dataset_dir(
+                data_root,
+                market=market,
+                symbol=symbol,
+                dataset=dataset,
+                run_id=run_id,
+                venue=venue,
+                aliases=aliases,
+            )
+            if resolved is None:
+                continue
+            key = str(resolved)
+            if key in seen:
+                continue
+            seen.add(key)
+            results.append(resolved)
+        return results
+
     spot_candidates = [
         run_scoped_lake_path(data_root, run_id, "cleaned", "spot", symbol, f"bars_{timeframe}"),
         data_root / "lake" / "cleaned" / "spot" / symbol / f"bars_{timeframe}",
     ]
-    raw_spot_dir = resolve_raw_dataset_dir(
-        data_root,
-        market="spot",
-        symbol=symbol,
-        dataset=f"ohlcv_{timeframe}",
-        run_id=run_id,
-    )
-    if raw_spot_dir is not None:
-        spot_candidates.append(raw_spot_dir)
+    spot_candidates.extend(_existing_raw_dirs(market="spot", dataset=f"ohlcv_{timeframe}"))
     if not _has_source_artifacts(spot_candidates):
         ignored_nan_columns.update(_SPOT_DEPENDENT_COLUMNS)
         ignored_constant_columns.update(_SPOT_DEPENDENT_COLUMNS)
 
     liquidation_candidates = []
     for dataset_name in ("liquidations", "liquidation_snapshot"):
-        resolved = resolve_raw_dataset_dir(
-            data_root,
-            market="perp",
-            symbol=symbol,
-            dataset=dataset_name,
-            run_id=run_id,
-        )
-        if resolved is not None:
-            liquidation_candidates.append(resolved)
+        liquidation_candidates.extend(_existing_raw_dirs(market="perp", dataset=dataset_name))
     if not _has_source_artifacts(liquidation_candidates):
         ignored_nan_columns.update(_LIQUIDATION_DEPENDENT_COLUMNS)
         ignored_constant_columns.update(_LIQUIDATION_DEPENDENT_COLUMNS)
 
     oi_candidates = []
     for dataset_name in ("open_interest",):
-        resolved = resolve_raw_dataset_dir(
-            data_root,
-            market="perp",
-            symbol=symbol,
-            dataset=dataset_name,
-            run_id=run_id,
-            aliases=(timeframe,),
-        )
-        if resolved is not None:
-            oi_candidates.append(resolved)
+        oi_candidates.extend(_existing_raw_dirs(market="perp", dataset=dataset_name, aliases=(timeframe,)))
     if not _has_source_artifacts(oi_candidates):
         ignored_nan_columns.update(_OI_DEPENDENT_COLUMNS)
         ignored_constant_columns.update(_OI_DEPENDENT_COLUMNS)

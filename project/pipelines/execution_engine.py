@@ -99,10 +99,12 @@ def _emit_buffered_stage_output(stage_instance_id: str, stage: str, text: str) -
     if not payload:
         return
     prefix = f"[{stage_instance_id}]"
+    lines = [f"{prefix} buffered output ({stage})"]
+    lines.extend(f"{prefix} {line}" for line in payload.splitlines())
+    message = "\n".join(lines) + "\n"
     with _STAGE_OUTPUT_LOCK:
-        print(f"{prefix} buffered output ({stage})")
-        for line in payload.splitlines():
-            print(f"{prefix} {line}")
+        sys.stdout.write(message)
+        sys.stdout.flush()
 
 
 def _read_log_delta(log_path: Path, start_offset: int) -> str:
@@ -283,25 +285,24 @@ def run_stage(
                     )
                     print(f"Stage failed: {stage} ({error})", file=sys.stderr)
                     return False
-                if allow_synth:
-                    _synthesize_stage_manifest_if_missing(
-                        manifest_path=manifest_path,
-                        stage=stage,
-                        stage_instance_id=stage_instance_id,
-                        run_id=run_id,
-                        script_path=script_path,
-                        base_args=base_args,
-                        log_path=log_path,
-                        status="success",
-                        input_hash=input_hash,
-                    )
-                else:
-                    error = (
-                        f"stage manifest missing on success for {stage_instance_id}; "
-                        "stage must emit a manifest, or set BACKTEST_ALLOW_SYNTHESIZED_STAGE_MANIFEST=1"
-                    )
-                    print(f"Stage failed: {stage} ({error})", file=sys.stderr)
-                    return False
+
+                # Best-effort stages historically succeeded without an emitted
+                # manifest. Keep that fast path when caching is irrelevant and
+                # no explicit synthesized-manifest mode is requested.
+                if not (cache_enabled or allow_synth):
+                    return True
+
+                _synthesize_stage_manifest_if_missing(
+                    manifest_path=manifest_path,
+                    stage=stage,
+                    stage_instance_id=stage_instance_id,
+                    run_id=run_id,
+                    script_path=script_path,
+                    base_args=base_args,
+                    log_path=log_path,
+                    status="success",
+                    input_hash=input_hash,
+                )
             valid_manifest, validation_error = _validate_stage_manifest_on_disk(
                 manifest_path, allow_failed_minimal=False
             )

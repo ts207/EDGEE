@@ -36,6 +36,31 @@ def _safe_read_legacy_ledger(path: Path) -> pd.DataFrame:
         raise DataIntegrityError(f"Failed to read legacy campaign ledger from {path}: {exc}") from exc
 
 
+def _event_series_from_legacy_ledger(legacy_ledger: pd.DataFrame) -> pd.Series:
+    if legacy_ledger.empty:
+        return pd.Series(dtype="object")
+    if "event_type" in legacy_ledger.columns:
+        return legacy_ledger["event_type"].astype(str)
+
+    if "trigger_payload" not in legacy_ledger.columns:
+        return pd.Series("", index=legacy_ledger.index, dtype="object")
+
+    def _extract_event_id(payload: Any) -> str:
+        if payload is None or (isinstance(payload, float) and pd.isna(payload)):
+            return ""
+        if isinstance(payload, dict):
+            return str(payload.get("event_id", "")).strip()
+        try:
+            parsed = json.loads(str(payload))
+        except Exception:
+            return ""
+        if isinstance(parsed, dict):
+            return str(parsed.get("event_id", "")).strip()
+        return ""
+
+    return legacy_ledger["trigger_payload"].map(_extract_event_id).astype(str)
+
+
 def _build_dynamic_quality_weights(
     tested_regions: pd.DataFrame,
     static_weights: Dict[str, float],
@@ -223,9 +248,11 @@ def _build_frontier(
         ]
     else:
         enabled_events = list(default_planning_event_ids(domain_registry.default_executable_event_ids()))
-    tested_events = set(
-        tested_regions.get("event_type", pd.Series(dtype="object")).astype(str).unique()
-    )
+    tested_events = {
+        str(event_id).strip()
+        for event_id in tested_regions.get("event_type", pd.Series(dtype="object")).astype(str).unique()
+        if str(event_id).strip()
+    }
     untested_events_raw = list(set(enabled_events) - tested_events)
 
     # Phase 2.2: sort by descending quality weight; stable within a tier
@@ -234,6 +261,25 @@ def _build_frontier(
         key=lambda e: quality_weights.get(e, DEFAULT_EVENT_PRIORITY_WEIGHT),
         reverse=True,
     )
+
+    family_to_events: Dict[str, list[str]] = {}
+    if isinstance(events, dict) and events:
+        for event_id, cfg in events.items():
+            event_name = str(event_id).strip()
+            if not event_name:
+                continue
+            family = ""
+            if isinstance(cfg, dict):
+                family = str(cfg.get("family", "")).strip()
+            if family:
+                family_to_events.setdefault(family, []).append(event_name)
+
+    partial_families: Dict[str, str] = {}
+    if family_to_events:
+        for family, family_events in family_to_events.items():
+            tested_count = sum(1 for event_id in family_events if event_id in tested_events)
+            if 0 < tested_count < len(family_events):
+                partial_families[family] = f"{tested_count}/{len(family_events)}"
 
     exhausted_events: list[str] = []
     if (
@@ -307,17 +353,19 @@ def _build_frontier(
         next_moves.append(f"complete coverage for regime: {next(iter(partial_regimes))}")
     next_moves.extend(repair_candidates[: int(repair_top_k)])
 
-    return {
+    frontier_payload = {
         "untested_canonical_regimes": untested_regimes[: int(untested_top_k)],
         "canonical_regime_event_fanout": {
             regime: regime_fanout[regime] for regime in untested_regimes[: int(untested_top_k)]
         },
         "untested_registry_events": untested_events_raw[: int(untested_top_k)],
+        "untested_events": untested_events_raw,
         "exhausted_events_to_avoid": exhausted_events,
         "partially_explored_regimes": partial_regimes,
-        "partially_explored_families": partial_regimes,
+        "partially_explored_families": partial_families or partial_regimes,
         "candidate_next_moves": next_moves,
     }
+    return frontier_payload
 
 
 def update_search_intelligence(
@@ -352,11 +400,11 @@ def update_search_intelligence(
 
     if tested_regions.empty:
         legacy_ledger = _safe_read_legacy_ledger(campaign_dir / "tested_ledger.parquet")
-        if not legacy_ledger.empty and "event_type" in legacy_ledger.columns:
+        if not legacy_ledger.empty:
             tested_regions = pd.DataFrame(
                 {
                     "run_id": legacy_ledger.get("run_id", pd.Series(dtype="object")),
-                    "event_type": legacy_ledger.get("event_type", pd.Series(dtype="object")),
+                    "event_type": _event_series_from_legacy_ledger(legacy_ledger),
                     "template_id": legacy_ledger.get("template_id", pd.Series(dtype="object")),
                     "direction": legacy_ledger.get("direction", pd.Series(dtype="object")),
                     "horizon": legacy_ledger.get("horizon", pd.Series(dtype="object")),

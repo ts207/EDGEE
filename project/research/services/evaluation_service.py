@@ -201,12 +201,10 @@ class ValidationService:
         from project.research.validation.result_writer import (
             write_validation_bundle,
             write_validated_candidate_tables,
-            write_promotion_ready_candidates,
         )
         base_dir = self.data_root / "reports" / "validation" / run_id
         write_validation_bundle(bundle, base_dir=base_dir)
         write_validated_candidate_tables(bundle, base_dir=base_dir)
-        write_promotion_ready_candidates(bundle, base_dir=base_dir)
         
         # Sprint 7: Artifact manifest
         from project.research.validation.manifest import RunArtifactManifest
@@ -223,6 +221,7 @@ class ValidationService:
                 "rejection_reasons": "rejection_reasons.parquet",
                 "validation_report": "validation_report.json",
                 "effect_stability_report": "effect_stability_report.json",
+                "promotion_ready_candidates": "promotion_ready_candidates.parquet",
             }
         )
         manifest.persist(base_dir)

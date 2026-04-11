@@ -293,6 +293,8 @@ def _resolve_policy_weights(
         return {}
     if contract.policy.mode == "heuristic":
         return {key: 1.0 for key in ordered}
+    if not contract.policy.strategy_risk_budgets and float(contract.policy.turnover_penalty) <= 0.0:
+        return {key: 1.0 for key in ordered}
 
     requested_frame = pd.DataFrame(requested).fillna(0.0)
     gross_by_strategy = requested_frame.abs().sum(axis=0).reindex(ordered).fillna(0.0)

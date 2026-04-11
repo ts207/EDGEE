@@ -332,7 +332,6 @@ def _stage_allows_zero_outputs(stage_name: str) -> bool:
         "canonicalize_event_episodes",
         "analyze_events",
         "phase1_correlation_clustering",
-        "phase2_search_engine",
         "phase2_conditional_hypotheses",
         "bridge_evaluate_phase2",
         "analyze_interaction_lift",

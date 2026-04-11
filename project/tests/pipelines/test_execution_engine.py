@@ -546,7 +546,7 @@ def test_run_stage_does_not_block_on_descendant_inheriting_stdout(tmp_path):
                 "import sys",
                 "",
                 "subprocess.Popen(",
-                "    [sys.executable, '-c', 'import time; print(\"child-alive\"); time.sleep(2)']",
+                "    [sys.executable, '-c', 'import time; print(\"child-alive\"); time.sleep(10)']",
                 ")",
                 "print('parent-finished')",
                 "sys.exit(0)",
@@ -573,7 +573,11 @@ def test_run_stage_does_not_block_on_descendant_inheriting_stdout(tmp_path):
     elapsed = time.perf_counter() - started
 
     assert ok is True
-    assert elapsed < 1.5
+    # The descendant sleeps long enough that genuine stdout-inheritance
+    # blocking would push this call well past the launcher path. Shared CI load
+    # can still make subprocess startup itself slow, so keep the cutoff focused
+    # on real descendant blocking rather than machine-speed jitter.
+    assert elapsed < 6.0
     log_path = data_root / "runs" / run_id / "build_features_descendant_stdout.log"
     assert "parent-finished" in log_path.read_text(encoding="utf-8")
 

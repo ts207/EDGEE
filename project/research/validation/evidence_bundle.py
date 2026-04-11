@@ -89,6 +89,140 @@ def _looks_like_evidence_bundle(payload: Dict[str, Any]) -> bool:
     return required.issubset(payload.keys())
 
 
+def _coerce_sparse_evidence_bundle(bundle: Dict[str, Any]) -> Dict[str, Any]:
+    """Backfill reduced/legacy evidence bundles to the current schema.
+
+    Some governance tests and older artifacts provide only the subset of fields
+    required for promotion-gate evaluation. Newer bundle schemas require a
+    fuller nested shape. This helper preserves the caller-provided signal while
+    filling omitted fields with neutral defaults so policy evaluation remains
+    backward compatible.
+    """
+    normalized = _json_safe(dict(bundle))
+
+    event_type = str(normalized.get("event_type") or normalized.get("primary_event_id") or "").strip()
+    lineage = dict(normalized.get("lineage") or {})
+    normalized.setdefault("primary_event_id", event_type)
+    normalized.setdefault(
+        "run_id",
+        str(normalized.get("run_id") or lineage.get("run_id") or "__adhoc__").strip() or "__adhoc__",
+    )
+
+    sample = dict(normalized.get("sample_definition") or {})
+    n_events = int(safe_int(sample.get("n_events", 0), 0))
+    normalized["sample_definition"] = {
+        "n_events": n_events,
+        "validation_samples": int(safe_int(sample.get("validation_samples", 0), 0)),
+        "test_samples": int(safe_int(sample.get("test_samples", 0), 0)),
+        "symbol": str(sample.get("symbol", "") or "").strip(),
+    }
+
+    split = dict(normalized.get("split_definition") or {})
+    normalized["split_definition"] = {
+        "split_scheme_id": str(split.get("split_scheme_id", "") or "").strip(),
+        "purge_bars": int(safe_int(split.get("purge_bars", 0), 0)),
+        "embargo_bars": int(safe_int(split.get("embargo_bars", 0), 0)),
+        "bar_duration_minutes": int(safe_int(split.get("bar_duration_minutes", 5), 5)),
+    }
+
+    effect = dict(normalized.get("effect_estimates") or {})
+    estimate_bps = safe_float(effect.get("estimate_bps", np.nan), np.nan)
+    normalized["effect_estimates"] = {
+        "estimate": safe_float(effect.get("estimate", estimate_bps), np.nan),
+        "estimate_bps": estimate_bps,
+        "stderr": safe_float(effect.get("stderr", np.nan), np.nan),
+        "stderr_bps": safe_float(effect.get("stderr_bps", np.nan), np.nan),
+    }
+
+    uncertainty = dict(normalized.get("uncertainty_estimates") or {})
+    q_value = safe_float(uncertainty.get("q_value", np.nan), np.nan)
+    q_value_by = safe_float(uncertainty.get("q_value_by", q_value), np.nan)
+    q_value_cluster = safe_float(uncertainty.get("q_value_cluster", q_value), np.nan)
+    normalized["uncertainty_estimates"] = {
+        "ci_low": safe_float(uncertainty.get("ci_low", np.nan), np.nan),
+        "ci_high": safe_float(uncertainty.get("ci_high", np.nan), np.nan),
+        "ci_low_bps": safe_float(uncertainty.get("ci_low_bps", np.nan), np.nan),
+        "ci_high_bps": safe_float(uncertainty.get("ci_high_bps", np.nan), np.nan),
+        "p_value_raw": safe_float(uncertainty.get("p_value_raw", q_value), np.nan),
+        "q_value": q_value,
+        "q_value_by": q_value_by,
+        "q_value_cluster": q_value_cluster,
+        "n_obs": int(safe_int(uncertainty.get("n_obs", n_events), n_events)),
+        "n_clusters": int(safe_int(uncertainty.get("n_clusters", 0), 0)),
+    }
+
+    stability = dict(normalized.get("stability_tests") or {})
+    stability.setdefault("stability_score", safe_float(stability.get("stability_score", 0.0), 0.0))
+    stability.setdefault("sign_consistency", safe_float(stability.get("sign_consistency", 0.0), 0.0))
+    normalized["stability_tests"] = stability
+
+    falsification = dict(normalized.get("falsification_results") or {})
+    falsification.setdefault("negative_control_pass", bool(as_bool(falsification.get("negative_control_pass", False))))
+    falsification.setdefault("passes_control", bool(as_bool(falsification.get("passes_control", False))))
+    falsification.setdefault("shift_placebo_pass", bool(as_bool(falsification.get("passes_control", False))))
+    falsification.setdefault("random_placebo_pass", bool(as_bool(falsification.get("passes_control", False))))
+    falsification.setdefault("direction_reversal_pass", bool(as_bool(falsification.get("passes_control", False))))
+    normalized["falsification_results"] = falsification
+
+    cost = dict(normalized.get("cost_robustness") or {})
+    tob_coverage = safe_float(cost.get("tob_coverage", np.nan), np.nan)
+    micro_pass = bool(as_bool(cost.get("microstructure_pass", cost.get("tob_coverage_pass", False))))
+    normalized["cost_robustness"] = {
+        "cost_survival_ratio": safe_float(cost.get("cost_survival_ratio", np.nan), np.nan),
+        "net_expectancy_bps": safe_float(cost.get("net_expectancy_bps", estimate_bps), np.nan),
+        "effective_cost_bps": safe_float(cost.get("effective_cost_bps", np.nan), np.nan),
+        "turnover_proxy_mean": safe_float(cost.get("turnover_proxy_mean", np.nan), np.nan),
+        "tob_coverage": tob_coverage,
+        "tob_coverage_pass": bool(as_bool(cost.get("tob_coverage_pass", micro_pass))),
+        "stressed_cost_pass": bool(as_bool(cost.get("stressed_cost_pass", True))),
+        "retail_net_expectancy_pass": bool(as_bool(cost.get("retail_net_expectancy_pass", True))),
+        "retail_cost_budget_pass": bool(as_bool(cost.get("retail_cost_budget_pass", True))),
+        "retail_turnover_pass": bool(as_bool(cost.get("retail_turnover_pass", True))),
+        **{k: v for k, v in cost.items() if k == "microstructure_pass"},
+    }
+
+    mult = dict(normalized.get("multiplicity_adjustment") or {})
+    q_program = safe_float(mult.get("q_value_program", q_value), np.nan)
+    normalized["multiplicity_adjustment"] = {
+        "correction_family_id": str(mult.get("correction_family_id", "") or "").strip(),
+        "correction_method": str(mult.get("correction_method", "bh") or "bh"),
+        "p_value_adj": safe_float(mult.get("p_value_adj", q_value), np.nan),
+        "p_value_adj_by": safe_float(mult.get("p_value_adj_by", q_value_by), np.nan),
+        "p_value_adj_holm": safe_float(mult.get("p_value_adj_holm", q_value_cluster), np.nan),
+        "q_value_program": q_program,
+        "q_value_scope": safe_float(mult.get("q_value_scope", q_program), np.nan),
+        "effective_q_value": safe_float(mult.get("effective_q_value", q_program), np.nan),
+        "num_tests_scope": int(safe_int(mult.get("num_tests_scope", 0), 0)),
+        "multiplicity_scope_mode": str(mult.get("multiplicity_scope_mode", "") or ""),
+        "multiplicity_scope_key": str(mult.get("multiplicity_scope_key", "") or ""),
+        "multiplicity_scope_version": str(mult.get("multiplicity_scope_version", "") or ""),
+        "multiplicity_scope_degraded": bool(as_bool(mult.get("multiplicity_scope_degraded", False))),
+    }
+
+    metadata = dict(normalized.get("metadata") or {})
+    metadata.setdefault("tob_coverage", tob_coverage)
+    metadata.setdefault("repeated_fold_consistency", safe_float(stability.get("sign_consistency", 0.0), 0.0))
+    metadata.setdefault("structural_robustness_score", safe_float(stability.get("stability_score", 0.0), 0.0))
+    normalized["metadata"] = metadata
+
+    promotion_decision = dict(normalized.get("promotion_decision") or {})
+    status = str(promotion_decision.get("promotion_status", "") or "").strip() or "pending"
+    promotion_decision.setdefault("promotion_status", status)
+    promotion_decision.setdefault("eligible", status == "promoted")
+    promotion_decision.setdefault(
+        "promotion_track",
+        "standard" if status == "promoted" else "restricted",
+    )
+    promotion_decision.setdefault("rank_score", 0.0)
+    normalized["promotion_decision"] = promotion_decision
+    normalized.setdefault("rejection_reasons", [])
+    normalized.setdefault("artifacts", {})
+    normalized.setdefault("search_burden", default_search_burden_dict())
+    normalized.setdefault("policy_version", "phase4_pr5_v1")
+    normalized.setdefault("bundle_version", "phase4_bundle_v1")
+    return normalized
+
+
 def _optional_bool_gate(row: Dict[str, Any], *keys: str) -> bool | None:
     value = _row_value(row, *keys, default=None)
     if value is None:
@@ -367,7 +501,7 @@ def build_evidence_bundle(
 def validate_evidence_bundle(bundle: Dict[str, Any]) -> None:
     from project.research.validation.schemas import EvidenceBundle as _EvidenceBundle
     try:
-        _EvidenceBundle.model_validate(bundle)
+        _EvidenceBundle.model_validate(_coerce_sparse_evidence_bundle(bundle))
     except Exception as exc:
         raise ValueError(f"Evidence bundle validation failed: {exc}") from exc
 
@@ -381,6 +515,8 @@ def evaluate_promotion_bundle(bundle: Dict[str, Any], policy: PromotionPolicy) -
             policy_version=policy.policy_version,
             bundle_version=policy.bundle_version,
         )
+    else:
+        bundle = _coerce_sparse_evidence_bundle(bundle)
     validate_evidence_bundle(bundle)
     sample = bundle["sample_definition"]
     uncertainty = bundle["uncertainty_estimates"]

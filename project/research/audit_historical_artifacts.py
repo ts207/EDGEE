@@ -16,7 +16,7 @@ from typing import Any, Dict, List, Optional
 import pandas as pd
 
 from project.core.config import get_data_root
-from project.io.utils import read_parquet
+from project.io.utils import read_parquet, write_parquet
 from project.research.contracts.stat_regime import (
     ArtifactAuditStamp,
     AUDIT_STATUS_CURRENT,
@@ -358,9 +358,9 @@ def write_audit_inventory(
 
     if result.rows:
         df = pd.DataFrame([row.to_dict() for row in result.rows])
-        df.to_parquet(parquet_path, index=False)
+        write_parquet(df, parquet_path)
     else:
-        pd.DataFrame(columns=list(ArtifactInventoryRow.__dataclass_fields__.keys())).to_parquet(parquet_path, index=False)
+        write_parquet(pd.DataFrame(columns=list(ArtifactInventoryRow.__dataclass_fields__.keys())), parquet_path)
 
     json_path.write_text(json.dumps(result.to_dict(), indent=2, sort_keys=True), encoding="utf-8")
 

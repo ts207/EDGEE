@@ -99,9 +99,14 @@ class TestCrossCampaignMultiplicity:
             "multiplicity_pool_eligible": [True, True, True],
         })
         result = apply_multiplicity_controls(df, max_q=0.05)
-        # both should be counted as 2 tests
-        assert result.loc[1, "num_tests_family"] == 3  # f1: 1 + 2 (both)
-        assert result.loc[2, "num_tests_family"] == 1  # f2: 1 (directional only)
+        # Canonical split:
+        # - num_tests_family counts row-level family members
+        # - num_tests_effective counts multiplicity-weighted tests, where
+        #   side_policy='both' contributes two effective tests.
+        assert result.loc[1, "num_tests_family"] == 2  # f1 has two family rows
+        assert result.loc[1, "num_tests_effective"] == 3  # 1 directional + 2 (both)
+        assert result.loc[2, "num_tests_family"] == 1  # f2 has one family row
+        assert result.loc[2, "num_tests_effective"] == 1  # directional only
 
     def test_campaign_scope_key_determinism(self):
         df = pd.DataFrame({

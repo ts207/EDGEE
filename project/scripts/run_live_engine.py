@@ -189,9 +189,7 @@ def validate_live_runtime_environment(
     edge_environment = str(env.get("EDGE_ENVIRONMENT", "")).strip().lower()
     edge_venue = str(env.get("EDGE_VENUE", "")).strip().lower()
     edge_live_config = str(env.get("EDGE_LIVE_CONFIG", "")).strip()
-    resolved_snapshot_path = (
-        snapshot_path or str(config.get("live_state_snapshot_path", "")).strip()
-    )
+    resolved_snapshot_path = str(snapshot_path or "").strip()
     edge_live_snapshot_path = str(env.get("EDGE_LIVE_SNAPSHOT_PATH", "")).strip()
 
     if edge_environment != environment_name:
@@ -212,14 +210,14 @@ def validate_live_runtime_environment(
         )
     if environment_name == "paper":
         if not (str(env.get("EDGE_BINANCE_PAPER_API_KEY", "")).strip() or str(env.get("EDGE_API_KEY", "")).strip()):
-            errors.append("EDGE_API_KEY (or EDGE_BINANCE_PAPER_API_KEY) must be set")
+            errors.append("EDGE_BINANCE_PAPER_API_KEY must be set")
         if not (str(env.get("EDGE_BINANCE_PAPER_API_SECRET", "")).strip() or str(env.get("EDGE_API_SECRET", "")).strip()):
-            errors.append("EDGE_API_SECRET (or EDGE_BINANCE_PAPER_API_SECRET) must be set")
+            errors.append("EDGE_BINANCE_PAPER_API_SECRET must be set")
     if environment_name == "production":
         if not (str(env.get("EDGE_BINANCE_API_KEY", "")).strip() or str(env.get("EDGE_API_KEY", "")).strip()):
-            errors.append("EDGE_API_KEY must be set")
+            errors.append("EDGE_BINANCE_API_KEY must be set")
         if not (str(env.get("EDGE_BINANCE_API_SECRET", "")).strip() or str(env.get("EDGE_API_SECRET", "")).strip()):
-            errors.append("EDGE_API_SECRET must be set")
+            errors.append("EDGE_BINANCE_API_SECRET must be set")
 
 
     if errors:

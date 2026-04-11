@@ -62,7 +62,11 @@ def classify_regime(
                 regime=regime,
                 mode=ClassificationMode.RESEARCH_EXACT,
                 confidence=1.0,
-                metadata={"rv_pct": rv_pct, "ms_trend_state": ms_trend_state}
+                metadata={
+                    "move_bps": move_bps,
+                    "rv_pct": rv_pct,
+                    "ms_trend_state": ms_trend_state,
+                }
             )
 
     # 2. Try Runtime Approx Path

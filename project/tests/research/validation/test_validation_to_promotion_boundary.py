@@ -126,7 +126,8 @@ def test_promotion_uses_canonical_validated_candidates(mock_data_root):
     
     from project.research.validation.result_writer import write_validation_bundle, write_validated_candidate_tables
     write_validation_bundle(bundle, base_dir=mock_data_root / "reports" / "validation" / run_id)
-    write_validated_candidate_tables(bundle, base_dir=mock_data_root / "reports" / "validation" / run_id)
+    paths = write_validated_candidate_tables(bundle, base_dir=mock_data_root / "reports" / "validation" / run_id)
+    assert paths["promotion_ready_candidates"].name == "promotion_ready_candidates.parquet"
     
     config = PromotionConfig(
         run_id=run_id, symbols="BTC", out_dir=None, max_q_value=0.05, min_events=20,
@@ -166,7 +167,8 @@ def test_promoted_result_contains_maturity_fields(mock_data_root):
     
     from project.research.validation.result_writer import write_validation_bundle, write_validated_candidate_tables
     write_validation_bundle(bundle, base_dir=mock_data_root / "reports" / "validation" / run_id)
-    write_validated_candidate_tables(bundle, base_dir=mock_data_root / "reports" / "validation" / run_id)
+    paths = write_validated_candidate_tables(bundle, base_dir=mock_data_root / "reports" / "validation" / run_id)
+    assert paths["promotion_ready_candidates"].name == "promotion_ready_candidates.parquet"
     
     config = PromotionConfig(
         run_id=run_id, symbols="BTC", out_dir=None, max_q_value=0.05, min_events=20,
