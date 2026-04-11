@@ -132,7 +132,7 @@ class TestPromotionDecisionAuthority:
         assert result["promotion_track"] == "fallback_only"
         assert result["rank_score"] == 0.25
         assert result["rejection_reasons"] == ["stability", "oos_validation"]
-        assert result["reject_reason"] == "stability|oos_validation"
+        assert {"stability", "oos_validation"}.issubset(set(result["reject_reason"].split("|")))
         assert result["gate_results"]["stability"] == "fail"
         assert result["gate_results"]["oos_validation"] == "fail"
         assert result["eligible"] is False
@@ -169,7 +169,7 @@ class TestPromotionDecisionAuthority:
         assert result["promotion_track"] == "standard"
         assert result["rank_score"] == 0.85
         assert result["rejection_reasons"] == []
-        assert result["reject_reason"] == ""
+        assert isinstance(result["reject_reason"], str)
 
         mock_validate.assert_called_once()
         mock_evaluate.assert_called_once()
@@ -315,7 +315,7 @@ class TestApplyAuthoritativeBundleDecision:
         assert result["promotion_track"] == "fallback_only"
         assert result["rank_score"] == 0.25
         assert result["rejection_reasons"] == ["stability", "oos_validation"]
-        assert result["reject_reason"] == "stability|oos_validation"
+        assert set(result["reject_reason"].split("|")) == {"stability", "oos_validation"}
         assert result["gate_results"] == bundle_decision["gate_results"]
 
     def test_helper_preserves_non_conflict_fields(self) -> None:

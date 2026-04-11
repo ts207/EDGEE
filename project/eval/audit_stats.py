@@ -3,27 +3,31 @@ import pandas as pd
 from typing import List, Dict, Any
 
 
-def permutation_test(returns: pd.Series, n_permutations: int = 10000) -> float:
+def permutation_test(
+    returns: pd.Series,
+    n_permutations: int = 10000,
+    random_seed: int | None = None,
+) -> float:
     """
     Calculate the p-value of the mean return using a permutation test.
     It randomly flips the signs of the returns to create a null distribution.
     """
     arr = returns.dropna().values
-    if len(arr) == 0:
+    n = len(arr)
+    if n == 0 or n_permutations <= 0:
         return 1.0
 
     observed_mean = np.mean(arr)
+    if random_seed is None:
+        signs = np.random.choice([-1, 1], size=(int(n_permutations), n))
+    else:
+        rng = np.random.default_rng(random_seed)
+        signs = rng.choice([-1, 1], size=(int(n_permutations), n))
+    null_means = (signs * arr).mean(axis=1)
 
-    null_means = []
-    for _ in range(n_permutations):
-        # Randomly flip signs
-        signs = np.random.choice([-1, 1], size=len(arr))
-        null_means.append(np.mean(arr * signs))
-
-    null_means = np.array(null_means)
-
-    # Two-sided p-value
-    p_value = np.mean(np.abs(null_means) >= np.abs(observed_mean))
+    # Two-sided Monte Carlo p-value with +1 correction to avoid impossible zero p-values.
+    exceedances = int(np.count_nonzero(np.abs(null_means) >= abs(observed_mean)))
+    p_value = (exceedances + 1.0) / (float(n_permutations) + 1.0)
     return float(p_value)
 
 

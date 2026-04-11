@@ -40,7 +40,7 @@ def test_docs_presence_and_index_link():
     doc_content = doc_path.read_text()
     assert "# Advanced Trigger Discovery (Internal Research Lane)" in doc_content
     assert "PROPOSAL-GENERATING ONLY" in doc_content
-    assert "Manual Approval" in doc_content
+    assert "manual review" in doc_content.lower()
     
     readme_content = Path("docs/README.md").read_text()
     assert "[93_trigger_discovery.md](93_trigger_discovery.md)" in readme_content

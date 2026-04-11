@@ -7,6 +7,7 @@ from typing import Dict, List, Any
 
 import pandas as pd
 from project.io.utils import write_parquet
+from project.research.trigger_discovery.adoption_store import register_proposals
 
 log = logging.getLogger(__name__)
 

@@ -18,6 +18,13 @@ from project.research.gating import bh_adjust
 log = logging.getLogger(__name__)
 
 
+def _finite_q_value(value: Any, default: float = 1.0) -> float:
+    numeric = pd.to_numeric(pd.Series([value]), errors="coerce").iloc[0]
+    if pd.isna(numeric) or not np.isfinite(numeric):
+        return float(default)
+    return float(np.clip(numeric, 0.0, 1.0))
+
+
 def _resolve_multiplicity_p_value_column(frame: pd.DataFrame) -> str:
     """Return the operative p-value column for multiplicity controls.
 
@@ -230,11 +237,16 @@ def apply_multiplicity_controls(
             out["is_discovery_cluster"] = out["q_value_cluster"] <= float(max_q)
 
     # 5. Metadata
-    family_row_counts = out.groupby("family_id").size().to_dict()
-    family_effective_counts = out.groupby("family_id").apply(lambda g: test_weights.loc[g.index].sum()).to_dict()
-    
-    out["num_tests_family"] = out["family_id"].map(family_row_counts).fillna(0).astype(int)
-    out["num_tests_effective"] = out["family_id"].map(family_effective_counts).fillna(0).astype(int)
+    family_effective_counts = (
+        out.assign(_test_weight=test_weights)
+        .groupby("family_id")["_test_weight"]
+        .sum()
+        .astype(int)
+        .to_dict()
+    )
+
+    out["num_tests_family"] = out["family_id"].map(family_effective_counts).fillna(0).astype(int)
+    out["num_tests_effective"] = out["num_tests_family"]
     out["num_tests_campaign"] = int(test_weights.sum())
 
     # Backward compatibility aliases for legacy column names
@@ -383,7 +395,10 @@ def apply_canonical_cross_campaign_multiplicity(
     q_value_col = "q_value" if "q_value" in out.columns else "q_value_family"
     if q_value_col not in out.columns:
         out[q_value_col] = 1.0
-    
+    else:
+        local_q = out[q_value_col].apply(_finite_q_value)
+        out["q_value_scope"] = np.maximum(out["q_value_scope"].astype(float), local_q.astype(float))
+
     q_program = out.get("q_value_program", pd.Series(1.0, index=out.index))
     q_scope = out["q_value_scope"]
     q_local = out[q_value_col]
@@ -394,9 +409,9 @@ def apply_canonical_cross_campaign_multiplicity(
     # fails if any scope-level correction rejects it. This is conservative by design.
     out["effective_q_value"] = out.apply(
         lambda r: max(
-            float(r.get(q_value_col, 1.0) or 1.0),
-            float(r.get("q_value_scope", 1.0) or 1.0),
-            float(r.get("q_value_program", 1.0) or 1.0),
+            _finite_q_value(r.get(q_value_col, 1.0)),
+            _finite_q_value(r.get("q_value_scope", 1.0)),
+            _finite_q_value(r.get("q_value_program", 1.0)),
         ),
         axis=1
     )
@@ -433,7 +448,7 @@ def merge_historical_candidates(
     out["multiplicity_context"] = "current"
     
     if historical is None or historical.empty:
-        out["multiplicity_scope_degraded"] = True
+        out["multiplicity_scope_degraded"] = pd.Series([True] * len(out), index=out.index, dtype=object)
         out["multiplicity_scope_reason"] = "missing_history"
         return out
     
@@ -449,7 +464,7 @@ def merge_historical_candidates(
         lambda r: resolve_effective_scope_key(r.to_dict(), mode=scope_mode),
         axis=1
     )
-    combined["multiplicity_scope_degraded"] = False
+    combined["multiplicity_scope_degraded"] = pd.Series([False] * len(combined), index=combined.index, dtype=object)
     combined["multiplicity_scope_reason"] = "ok"
     
     return combined

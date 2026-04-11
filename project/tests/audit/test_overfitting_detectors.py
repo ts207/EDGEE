@@ -24,3 +24,9 @@ def test_bootstrap_test_not_implemented():
     """
     # Placeholder for bootstrap implementation
     pass
+
+
+def test_permutation_test_uses_finite_sample_pvalue_correction():
+    returns = pd.Series(np.full(64, 0.01))
+    p_val = permutation_test(returns, n_permutations=10, random_seed=0)
+    assert p_val == pytest.approx(1.0 / 11.0)

@@ -31,8 +31,8 @@ from project.research.validation.evidence_bundle import (
 
 def _apply_authoritative_bundle_decision(
     result: Dict[str, Any],
-    bundle: Dict[str, Any],
-    bundle_decision: Dict[str, Any],
+    bundle: Dict[str, Any] | None,
+    bundle_decision: Dict[str, Any] | None = None,
 ) -> Dict[str, Any]:
     """Apply bundle decision as authority for final promotion outcome fields.
 
@@ -40,6 +40,10 @@ def _apply_authoritative_bundle_decision(
     row-level diagnostics stay attached so promotion audit consumers do not
     lose detailed reject codes or gate snapshots.
     """
+    if bundle_decision is None:
+        bundle_decision = dict(bundle or {})
+        bundle = {}
+
     out = _apply_bundle_policy_result(result, bundle, bundle_decision)
 
     out["eligible"] = bool(bundle_decision["eligible"])

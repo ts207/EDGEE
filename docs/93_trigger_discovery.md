@@ -42,6 +42,10 @@ Triggers discovered by this system progress through a formal state machine track
    - You must manually copy the emitted YAML snippet into `spec/events/`.
    - Once committed to the spec, formalize the state: `edge discover triggers mark-adopted --candidate_id <ID>`.
 
+### Manual Approval
+
+Manual review is required before any discovered trigger can move from proposal state into the canonical registry or any downstream runtime-facing workflow.
+
 ## Current Surface Notes
 
 - This lane is still discover-only. It does not bypass `validate`, `promote`, or deployment-state gating.

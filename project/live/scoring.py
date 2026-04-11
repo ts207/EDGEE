@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from typing import List
 
@@ -17,6 +18,16 @@ class DecisionScore:
     contradiction_penalty: float
     reasons_for: List[str]
     reasons_against: List[str]
+
+
+def _finite_metric(value: object, default: float) -> float:
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        return float(default)
+    if not math.isfinite(numeric):
+        return float(default)
+    return float(numeric)
 
 
 def _execution_quality_score(context: LiveTradeContext) -> tuple[float, list[str], list[str]]:
@@ -50,6 +61,8 @@ def build_decision_score(match: ThesisMatch, context: LiveTradeContext) -> Decis
     execution_quality_score, exec_for, exec_against = _execution_quality_score(context)
 
     evidence = match.thesis.evidence
+    q_value = _finite_metric(evidence.q_value, 1.0)
+    net_expectancy_bps = _finite_metric(evidence.net_expectancy_bps, 0.0)
     thesis_strength_score = 0.0
     reasons_for = list(match.reasons_for)
     reasons_against = list(match.reasons_against)
@@ -61,12 +74,12 @@ def build_decision_score(match: ThesisMatch, context: LiveTradeContext) -> Decis
         reasons_for.append("sample_size_30_plus")
     else:
         reasons_against.append("sample_size_low")
-    if (evidence.q_value or 1.0) <= 0.05:
+    if q_value <= 0.05:
         thesis_strength_score += 0.10
         reasons_for.append("q_value_ok")
     else:
         reasons_against.append("q_value_weak")
-    if (evidence.net_expectancy_bps or 0.0) > 0.0:
+    if net_expectancy_bps > 0.0:
         thesis_strength_score += 0.10
         reasons_for.append("net_expectancy_positive")
     else:

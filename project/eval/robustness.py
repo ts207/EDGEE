@@ -12,6 +12,23 @@ from project.core.constants import BARS_PER_YEAR_BY_TIMEFRAME
 _DEFAULT_RANDOM_SEED = 0
 
 
+def _max_drawdown(equity: np.ndarray, *, fallback_absolute: bool = False) -> float:
+    path = np.asarray(equity, dtype=float)
+    path = path[np.isfinite(path)]
+    if path.size == 0:
+        return 0.0
+    peak = np.maximum.accumulate(path)
+    drawdown = peak - path
+    if fallback_absolute:
+        dd = drawdown.copy()
+        positive_peak = peak > 0.0
+        dd[positive_peak] = drawdown[positive_peak] / peak[positive_peak]
+    else:
+        safe_peak = np.where(peak > 0.0, peak, 1.0)
+        dd = drawdown / safe_peak
+    return float(np.max(dd))
+
+
 def block_bootstrap_pnl(
     pnl_series: pd.Series,
     block_size_bars: int = 576,
@@ -52,14 +69,11 @@ def block_bootstrap_pnl(
         annualized_returns.append(ann_ret)
 
         if pnl_mode == "return":
-            equity = np.cumprod(1.0 + bootstrapped_pnl)
+            equity = np.concatenate([[1.0], np.cumprod(1.0 + bootstrapped_pnl)])
+            max_drawdowns.append(_max_drawdown(equity))
         else:
-            equity = np.cumsum(bootstrapped_pnl)
-            equity = equity - equity[0]
-        peak = np.maximum.accumulate(equity)
-        safe_peak = np.where(peak > 0.0, peak, 1.0)
-        dd = np.where(peak > 0.0, (peak - equity) / safe_peak, 0.0)
-        max_drawdowns.append(float(np.max(dd)))
+            equity = np.concatenate([[0.0], np.cumsum(bootstrapped_pnl)])
+            max_drawdowns.append(_max_drawdown(equity, fallback_absolute=True))
 
     return {
         "bootstrap_return_p05": float(np.percentile(annualized_returns, 5)),

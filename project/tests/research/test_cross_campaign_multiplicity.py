@@ -101,7 +101,7 @@ class TestCrossCampaignMultiplicity:
         result = apply_multiplicity_controls(df, max_q=0.05)
         # both should be counted as 2 tests
         assert result.loc[1, "num_tests_family"] == 3  # f1: 1 + 2 (both)
-        assert result.loc[2, "num_tests_family"] == 2  # f2: 1 (directional only)
+        assert result.loc[2, "num_tests_family"] == 1  # f2: 1 (directional only)
 
     def test_campaign_scope_key_determinism(self):
         df = pd.DataFrame({
@@ -173,6 +173,24 @@ class TestCrossCampaignMultiplicity:
             assert effective_q >= local_q
             assert effective_q >= scope_q * 0.99
             assert effective_q >= prog_q * 0.99
+
+    def test_effective_q_value_preserves_zero_q_values(self):
+        df = pd.DataFrame({
+            "candidate_id": ["a", "b"],
+            "p_value_for_fdr": [0.0, 0.02],
+            "family_id": ["f1", "f1"],
+            "campaign_id": ["camp_001", "camp_001"],
+            "q_value": [0.0, np.nan],
+            "q_value_program": [0.0, 0.04],
+            "run_id": ["r1", "r1"],
+            "side_policy": ["directional", "directional"],
+            "multiplicity_pool_eligible": [True, True],
+        })
+
+        result = apply_canonical_cross_campaign_multiplicity(df, max_q=0.10)
+
+        assert result.loc[0, "effective_q_value"] == pytest.approx(0.0, abs=1e-12)
+        assert np.isfinite(result.loc[1, "effective_q_value"])
 
     def test_scope_mode_variations(self):
         df = pd.DataFrame({

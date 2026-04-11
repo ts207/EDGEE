@@ -48,6 +48,12 @@ class TriggerFeatureColumns:
         """Return the list of injected column names."""
         return list(self.columns.keys())
 
+    def __getitem__(self, key: str) -> pd.Series:
+        return self.columns[key]
+
+    def __contains__(self, key: str) -> bool:
+        return key in self.columns
+
 
 class TriggerProposal:
     """Wrapper that tracks a mined candidate trigger along with its metadata."""
