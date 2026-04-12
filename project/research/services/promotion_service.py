@@ -1443,8 +1443,9 @@ def execute_promotion(config: PromotionConfig) -> PromotionServiceResult:
         thesis_export = export_promoted_theses_for_run(
             config.run_id,
             data_root=get_data_root(),
-            bundles=evidence_bundles,
+            bundles=[] if promoted_df.empty else evidence_bundles,
             promoted_df=promoted_df,
+            allow_bundle_only_export=bool(promoted_df.empty),
             compatibility_mode=bool(diagnostics.get("compat_mode_used", False)),
         )
         diagnostics["live_thesis_export"] = {

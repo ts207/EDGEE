@@ -54,6 +54,11 @@ def _rng(seed: int) -> np.random.Generator:
     return np.random.default_rng(int(seed))
 
 
+def _stable_symbol_seed(symbol: str) -> int:
+    digest = hashlib.sha256(str(symbol).encode("utf-8")).digest()
+    return int.from_bytes(digest[:4], "big")
+
+
 def _write_df(df: pd.DataFrame, path: Path) -> Path:
     actual, _ = write_parquet(df, path)
     return Path(actual)
@@ -62,7 +67,7 @@ def _write_df(df: pd.DataFrame, path: Path) -> Path:
 def build_smoke_bars(
     symbol: str, *, periods: int = SMOKE_BAR_PERIODS, freq: str = "5min", seed: int = 0
 ) -> pd.DataFrame:
-    rng = _rng(seed + abs(hash(symbol)) % 1000)
+    rng = _rng(seed + (_stable_symbol_seed(symbol) % 1000))
     ts = pd.date_range("2024-01-01", periods=periods, freq=freq, tz="UTC")
     base = 100.0 if symbol == "BTCUSDT" else 60.0
     trend = np.linspace(0.0, 3.0 if symbol == "BTCUSDT" else 0.4, periods)
@@ -91,7 +96,7 @@ def build_smoke_bars(
 def build_smoke_events(
     symbol: str, *, periods: int = SMOKE_EVENT_PERIODS, freq: str = "15min", seed: int = 0
 ) -> pd.DataFrame:
-    rng = _rng(seed + abs(hash(symbol)) % 1000)
+    rng = _rng(seed + (_stable_symbol_seed(symbol) % 1000))
     ts = pd.date_range("2024-01-01", periods=periods, freq=freq, tz="UTC")
     strong = symbol == "BTCUSDT"
     base_ret = 0.0015 if strong else -0.0002

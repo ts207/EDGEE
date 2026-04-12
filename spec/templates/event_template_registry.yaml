@@ -70,6 +70,16 @@ defaults:
       - 3.0
       - 5.0
 families:
+  LIQUIDITY_STRESS:
+    templates:
+    - mean_reversion
+    - continuation
+    - stop_run_repair
+    - overshoot_repair
+    - only_if_liquidity
+    - slippage_aware_filter
+    - only_if_regime
+    - only_if_highvol
   LIQUIDITY_DISLOCATION:
     templates:
     - mean_reversion

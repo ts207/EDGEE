@@ -95,6 +95,16 @@ families:
     - overshoot_repair
     - only_if_liquidity
     - slippage_aware_filter
+  LIQUIDITY_STRESS:
+    allowed_templates:
+    - mean_reversion
+    - continuation
+    - stop_run_repair
+    - overshoot_repair
+    - only_if_liquidity
+    - slippage_aware_filter
+    - only_if_regime
+    - only_if_highvol
   POSITIONING_EXTREMES:
     allowed_templates:
     - reversal_or_squeeze

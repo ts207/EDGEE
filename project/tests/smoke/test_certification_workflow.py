@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 
 from project.scripts.run_certification_workflow import run_certification_workflow
@@ -38,3 +39,56 @@ def test_certification_workflow_runs_end_to_end(tmp_path: Path) -> None:
     assert certification_manifest["control_plane"]["store_thesis_count"] == 0
     assert certification_summary["live_state_snapshot_path"] == str(live_state_snapshot_path)
     assert certification_manifest["live_state"]["snapshot_path"] == str(live_state_snapshot_path)
+
+
+def test_certification_workflow_persists_benchmark_status(tmp_path: Path, monkeypatch) -> None:
+    config_path = tmp_path / "golden_certification_benchmark.yaml"
+    config_path.write_text(
+        "\n".join(
+            [
+                "workflow_id: golden_certification_v1",
+                "golden_workflow_config: project/configs/golden_workflow.yaml",
+                "runtime_run_id: smoke_run",
+                "stale_threshold_sec: 60.0",
+                "freshness_streams:",
+                "  - symbol: BTCUSDT",
+                "    stream: kline_5m",
+                "  - symbol: ETHUSDT",
+                "    stream: kline_5m",
+                "oms_lineage:",
+                "  order_source: smoke_oms",
+                "  session_id: golden-certification-session",
+                "live_state_snapshot_path: reliability/live_state.json",
+                "required_outputs:",
+                "  - reliability/runtime_certification_manifest.json",
+                "benchmark_matrix_path: spec/benchmarks/regime_shakeout_matrix.yaml",
+                "enforce_benchmark_certification: true",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    real_run = subprocess.run
+
+    def patched_run(cmd, *args, **kwargs):
+        if (
+            isinstance(cmd, (list, tuple))
+            and len(cmd) >= 3
+            and cmd[1] == "-m"
+            and cmd[2] == "project.scripts.run_benchmark_matrix"
+        ):
+            class Result:
+                returncode = 0
+
+            return Result()
+        return real_run(cmd, *args, **kwargs)
+
+    monkeypatch.setattr(subprocess, "run", patched_run)
+
+    payload = run_certification_workflow(root=tmp_path, config_path=config_path)
+    certification_manifest_path = tmp_path / "reliability" / "runtime_certification_manifest.json"
+    certification_manifest = json.loads(certification_manifest_path.read_text(encoding="utf-8"))
+
+    assert payload["runtime_certification"]["benchmark_certification_passed"] is True
+    assert certification_manifest["benchmark_certification_passed"] is True

@@ -197,7 +197,7 @@ class LiveEngineRunner:
         self.risk_enforcer = RiskEnforcer(risk_caps)
         self.decay_monitor = DecayMonitor(decay_rules or _default_decay_rules())
         self.thesis_manager = ThesisStateManager()
-        self._portfolio_policy = PortfolioAdmissionPolicy(family_budgets=dict(family_budgets))
+        self._family_budgets = dict(family_budgets)
 
         # Workstream 1: Deploy admission control
         self._thesis_store = self._load_thesis_store()
@@ -1354,7 +1354,7 @@ class LiveEngineRunner:
             portfolio_state=self._get_portfolio_state_for_sizing(),
             execution_env=self._build_execution_env_snapshot(),
             active_groups=active_groups,
-            family_budgets=self._portfolio_policy.family_budgets,
+            family_budgets=self._family_budgets,
         )
         outcome = decide_trade_intent(
             context=context,

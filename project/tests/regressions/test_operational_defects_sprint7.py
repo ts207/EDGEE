@@ -31,6 +31,7 @@ from project.pipelines.execution_engine_support import (
 )
 from project.research.validation.result_writer import (
     write_promotion_ready_candidates,
+    write_validation_bundle,
 )
 from project.research.validation.schemas import (
     EvidenceBundle,
@@ -204,10 +205,56 @@ class TestLiveExportFailClosed:
         )
         assert result.thesis_count == 0
 
-    def test_empty_promoted_df_with_bundles_exports_zero_theses(self, tmp_path):
+    def test_empty_promoted_df_with_bundles_exports_bundle_lineage(self, tmp_path):
         run_id = "test_empty_promoted_with_bundles"
         data_root = tmp_path / "data"
         data_root.mkdir(parents=True)
+
+        from project.research.validation.contracts import (
+            ValidationBundle,
+            ValidatedCandidateRecord,
+            ValidationDecision,
+            ValidationMetrics,
+        )
+
+        validation_dir = data_root / "reports" / "validation" / run_id
+        validation_dir.mkdir(parents=True)
+        bundle = ValidationBundle(
+            run_id=run_id,
+            created_at="2024-01-01T00:00:00Z",
+            validated_candidates=[
+                ValidatedCandidateRecord(
+                    candidate_id="cand_1",
+                    decision=ValidationDecision(
+                        status="validated",
+                        candidate_id="cand_1",
+                        run_id=run_id,
+                        program_id="test_program",
+                        reason_codes=["PASS"],
+                    ),
+                    metrics=ValidationMetrics(
+                        sample_count=100,
+                        expectancy=0.005,
+                        stability_score=0.8,
+                        net_expectancy=50.0,
+                        p_value=0.01,
+                        q_value=0.05,
+                        cost_sensitivity=0.9,
+                    ),
+                    anchor_summary="test_anchor",
+                    template_id="test_template",
+                    direction="long",
+                    horizon_bars=12,
+                    artifact_refs=[],
+                    validation_stage_version="v1",
+                )
+            ],
+            rejected_candidates=[],
+            inconclusive_candidates=[],
+            summary_stats={"total": 1, "validated": 1},
+            effect_stability_report={},
+        )
+        write_validation_bundle(bundle, base_dir=validation_dir)
 
         promotion_dir = data_root / "reports" / "promotions" / run_id
         promotion_dir.mkdir(parents=True)
@@ -228,8 +275,9 @@ class TestLiveExportFailClosed:
             bundles=[evidence_bundle],
             promoted_df=pd.DataFrame(),
             allow_bundle_only_export=True,
+            compatibility_mode=True,
         )
-        assert result.thesis_count == 0
+        assert result.thesis_count == 1
 
 
 class TestManifestSuccessCriteria:

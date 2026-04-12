@@ -114,12 +114,16 @@ def _certify_promotion_export_boundary(
         export_result = export_promoted_theses_for_run(
             run_id,
             data_root=root,
+            bundles=[] if promoted_rows == 0 else None,
+            promoted_df=pd.DataFrame() if promoted_rows == 0 else None,
             allow_bundle_only_export=True,
         )
     except CompatibilityRequiredError:
         export_result = export_promoted_theses_for_run(
             run_id,
             data_root=root,
+            bundles=[] if promoted_rows == 0 else None,
+            promoted_df=pd.DataFrame() if promoted_rows == 0 else None,
             allow_bundle_only_export=True,
             compatibility_mode=True,
         )
@@ -212,14 +216,6 @@ def run_certification_workflow(*, root: Path, config_path: Path) -> Dict[str, An
         else "failed"
     )
 
-    reliability_dir = root / "reliability"
-    reliability_dir.mkdir(parents=True, exist_ok=True)
-    manifest_path = reliability_dir / "runtime_certification_manifest.json"
-    manifest_path.write_text(
-        json.dumps(certification_manifest, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
-    )
-
     benchmark_path = config.get("benchmark_matrix_path")
     if benchmark_path and config.get("enforce_benchmark_certification", False):
         import subprocess
@@ -246,6 +242,14 @@ def run_certification_workflow(*, root: Path, config_path: Path) -> Dict[str, An
         if result.returncode != 0:
             raise RuntimeError(f"Benchmark certification failed (exit code {result.returncode})")
         certification_manifest["benchmark_certification_passed"] = True
+
+    reliability_dir = root / "reliability"
+    reliability_dir.mkdir(parents=True, exist_ok=True)
+    manifest_path = reliability_dir / "runtime_certification_manifest.json"
+    manifest_path.write_text(
+        json.dumps(certification_manifest, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
 
     payload = {
         "workflow_id": str(config.get("workflow_id", "golden_certification_v1")),

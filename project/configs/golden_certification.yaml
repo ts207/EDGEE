@@ -23,5 +23,5 @@ required_outputs:
   - reliability/golden_workflow_summary.json
   - reliability/runtime_certification_manifest.json
   - reliability/golden_certification_summary.json
-benchmark_matrix_path: spec/benchmarks/retail_m0_matrix.yaml
+benchmark_matrix_path: spec/benchmarks/regime_shakeout_matrix.yaml
 enforce_benchmark_certification: false
