@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set
 
 _LOG = logging.getLogger(__name__)
 
@@ -39,7 +39,8 @@ class CapBreachEvent:
     thesis_id: str
     symbol: str
     # gross|symbol|family|count|per_thesis_notional|per_thesis_daily_loss|
-    # per_thesis_positions|per_thesis_orders|order_notional|global_daily_loss
+    # per_thesis_positions|per_thesis_orders|order_notional|global_daily_loss|
+    # overlap_group_exclusive
     cap_type: str
     attempted_value: float
     cap_value: float
@@ -155,6 +156,8 @@ class RiskEnforcer:
         timestamp: str,
         active_order_count_by_thesis: Optional[Dict[str, int]] = None,
         active_position_count_by_thesis: Optional[Dict[str, int]] = None,
+        thesis_overlap_group: Optional[str] = None,
+        active_overlap_groups: Optional[Set[str]] = None,
     ) -> tuple[float, Optional[CapBreachEvent]]:
         """
         Enforce risk caps on a single trade intent.
@@ -167,6 +170,7 @@ class RiskEnforcer:
           4. per-thesis active orders
           5. per-thesis active positions
           6. max active theses (count)
+          6b. overlap group exclusivity (unified policy)
           7. per-symbol cap
           8. per-family cap
           9. gross exposure cap
@@ -273,6 +277,19 @@ class RiskEnforcer:
                     "count",
                     float(len(active_thesis_ids) + 1),
                     float(self.caps.max_active_theses),
+                )
+
+        # 6b. Overlap Group Exclusivity
+        group_id = str(thesis_overlap_group or "").strip()
+        if group_id and active_overlap_groups and thesis_id not in active_thesis_ids:
+            if group_id in active_overlap_groups:
+                return 0.0, self._reject(
+                    timestamp,
+                    thesis_id,
+                    symbol,
+                    "overlap_group_exclusive",
+                    1.0,
+                    0.0,
                 )
 
         # 7. Per-Symbol Cap
