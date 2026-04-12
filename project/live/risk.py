@@ -29,6 +29,8 @@ class RuntimeRiskCaps:
     max_order_notional: float = 50_000.0  # hard per-order ceiling (all theses)
     max_daily_loss: float = 0.0  # global daily loss limit (0 = no limit)
     reject_on_breach: bool = True  # If False, clip to cap
+    # Per-family risk budgets
+    per_family_caps: Dict[str, float] = field(default_factory=dict)
     # Per-thesis overrides indexed by thesis_id
     per_thesis: Dict[str, PerThesisCap] = field(default_factory=dict)
 
@@ -172,8 +174,9 @@ class RiskEnforcer:
           6. max active theses (count)
           6b. overlap group exclusivity (unified policy)
           7. per-symbol cap
-          8. per-family cap
-          9. gross exposure cap
+          8. per-family notional cap (specific budget)
+          9. global family exposure cap
+          10. gross exposure cap
         """
         effective_notional = float(attempted_notional)
         per = self.caps.per_thesis.get(thesis_id)
@@ -307,7 +310,7 @@ class RiskEnforcer:
                     self.caps.max_symbol_exposure,
                 )
             effective_notional = available
-            self._clip(
+            return effective_notional, self._clip(
                 timestamp,
                 thesis_id,
                 symbol,
@@ -316,7 +319,33 @@ class RiskEnforcer:
                 self.caps.max_symbol_exposure,
             )
 
-        # 8. Per-Family Cap
+        # 8. Per-Family Notional Cap (Specific Budget)
+        family_cap = self.caps.per_family_caps.get(family, 0.0)
+        if family_cap > 0.0:
+            current_family_notional = portfolio_state.get("family_exposures", {}).get(family, 0.0)
+            total_family_notional = abs(current_family_notional) + abs(effective_notional)
+            if total_family_notional > family_cap:
+                available = max(0.0, family_cap - abs(current_family_notional))
+                if self.caps.reject_on_breach:
+                    return 0.0, self._reject(
+                        timestamp,
+                        thesis_id,
+                        symbol,
+                        "per_family_notional",
+                        total_family_notional,
+                        family_cap,
+                    )
+                effective_notional = available
+                return effective_notional, self._clip(
+                    timestamp,
+                    thesis_id,
+                    symbol,
+                    "per_family_notional",
+                    total_family_notional,
+                    family_cap,
+                )
+
+        # 9. Global Family Cap
         current_family_notional = portfolio_state.get("family_exposures", {}).get(family, 0.0)
         total_family_notional = abs(current_family_notional) + abs(effective_notional)
         if total_family_notional > self.caps.max_family_exposure:
@@ -331,7 +360,7 @@ class RiskEnforcer:
                     self.caps.max_family_exposure,
                 )
             effective_notional = available
-            self._clip(
+            return effective_notional, self._clip(
                 timestamp,
                 thesis_id,
                 symbol,
@@ -340,7 +369,7 @@ class RiskEnforcer:
                 self.caps.max_family_exposure,
             )
 
-        # 9. Max Gross Exposure
+        # 10. Max Gross Exposure
         current_gross = portfolio_state.get("gross_exposure", 0.0)
         total_gross = current_gross + abs(effective_notional)
         if total_gross > self.caps.max_gross_exposure:
@@ -350,7 +379,7 @@ class RiskEnforcer:
                     timestamp, thesis_id, symbol, "gross", total_gross, self.caps.max_gross_exposure
                 )
             effective_notional = available
-            self._clip(
+            return effective_notional, self._clip(
                 timestamp, thesis_id, symbol, "gross", total_gross, self.caps.max_gross_exposure
             )
 

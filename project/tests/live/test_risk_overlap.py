@@ -1,6 +1,7 @@
 import pytest
 from project.live.risk import RiskEnforcer, RuntimeRiskCaps, PerThesisCap
 
+
 class TestRiskOverlapExclusivity:
     def _make_enforcer(self, **kwargs) -> RiskEnforcer:
         caps = RuntimeRiskCaps(**kwargs)
@@ -17,7 +18,7 @@ class TestRiskOverlapExclusivity:
             active_thesis_ids=[],
             timestamp="2026-04-12T10:00:00",
             thesis_overlap_group=None,
-            active_overlap_groups={"G1"}
+            active_overlap_groups={"G1"},
         )
         assert notional == 1000.0
         assert breach is None
@@ -33,7 +34,7 @@ class TestRiskOverlapExclusivity:
             active_thesis_ids=[],
             timestamp="2026-04-12T10:00:00",
             thesis_overlap_group="G1",
-            active_overlap_groups={"G2"}
+            active_overlap_groups={"G2"},
         )
         assert notional == 1000.0
         assert breach is None
@@ -50,7 +51,7 @@ class TestRiskOverlapExclusivity:
             active_thesis_ids=["T1"],
             timestamp="2026-04-12T10:00:00",
             thesis_overlap_group="G1",
-            active_overlap_groups={"G1"}
+            active_overlap_groups={"G1"},
         )
         assert notional == 1000.0
         assert breach is None
@@ -64,10 +65,10 @@ class TestRiskOverlapExclusivity:
             family="VOL",
             attempted_notional=1000.0,
             portfolio_state={},
-            active_thesis_ids=["T1"], # T1 is active
+            active_thesis_ids=["T1"],  # T1 is active
             timestamp="2026-04-12T10:00:00",
             thesis_overlap_group="G1",
-            active_overlap_groups={"G1"} # G1 is active
+            active_overlap_groups={"G1"},  # G1 is active
         )
         assert notional == 0.0
         assert breach is not None
@@ -84,8 +85,8 @@ class TestRiskOverlapExclusivity:
             portfolio_state={},
             active_thesis_ids=[],
             timestamp="2026-04-12T10:00:00",
-            thesis_overlap_group="  ", # Empty after strip
-            active_overlap_groups={"G1"}
+            thesis_overlap_group="  ",  # Empty after strip
+            active_overlap_groups={"G1"},
         )
         assert notional == 1000.0
         assert breach is None
@@ -101,7 +102,7 @@ class TestRiskOverlapExclusivity:
             active_thesis_ids=[],
             timestamp="2026-04-12T10:00:00",
             thesis_overlap_group="G1",
-            active_overlap_groups=None
+            active_overlap_groups=None,
         )
         assert notional == 1000.0
         assert breach is None

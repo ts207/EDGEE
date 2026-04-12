@@ -43,6 +43,8 @@ def build_live_trade_context(
     market_features: Mapping[str, Any],
     portfolio_state: Mapping[str, Any],
     execution_env: Mapping[str, Any],
+    active_groups: set[str] | None = None,
+    family_budgets: Dict[str, float] | None = None,
 ) -> LiveTradeContext:
     move_bps = float(detected_event.features.get("move_bps", 0.0) or 0.0)
     detected_regime = str(detected_event.canonical_regime or "").strip().upper()
@@ -114,4 +116,6 @@ def build_live_trade_context(
         contradiction_event_families=contradiction_event_families,
         contradiction_event_ids=contradiction_event_ids,
         episode_snapshot=episode_snapshot,
+        active_groups=active_groups or set(),
+        family_budgets=family_budgets or {},
     )

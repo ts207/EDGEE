@@ -190,9 +190,14 @@ class LiveEngineRunner:
         self._auto_order_sequence = 0
 
         # Sprint 6: Risk and Decay components
-        self.risk_enforcer = RiskEnforcer(risk_caps or RuntimeRiskCaps())
+        family_budgets = self.strategy_runtime.get("family_risk_budgets", {})
+        if not risk_caps:
+            risk_caps = RuntimeRiskCaps(per_family_caps=dict(family_budgets))
+        
+        self.risk_enforcer = RiskEnforcer(risk_caps)
         self.decay_monitor = DecayMonitor(decay_rules or _default_decay_rules())
         self.thesis_manager = ThesisStateManager()
+        self._portfolio_policy = PortfolioAdmissionPolicy(family_budgets=dict(family_budgets))
 
         # Workstream 1: Deploy admission control
         self._thesis_store = self._load_thesis_store()
@@ -1220,6 +1225,14 @@ class LiveEngineRunner:
             and str(o.metadata.get("thesis_id", ""))
         })
 
+        # Portfolio Orchestration: Pass active overlap groups to risk enforcer
+        active_overlap_groups = self._get_active_overlap_groups()
+        thesis_overlap_group = ""
+        if self._thesis_store:
+            theses = self._thesis_store.filter(thesis_id=thesis_id)
+            if theses:
+                thesis_overlap_group = theses[0].overlap_group_id
+
         effective_notional, breach = self.risk_enforcer.check_and_apply_caps(
             thesis_id=outcome.trade_intent.thesis_id,
             symbol=outcome.trade_intent.symbol,
@@ -1228,6 +1241,8 @@ class LiveEngineRunner:
             portfolio_state=outcome.context.portfolio_state,
             active_thesis_ids=active_thesis_ids,
             timestamp=outcome.context.timestamp,
+            active_overlap_groups=active_overlap_groups,
+            thesis_overlap_group=thesis_overlap_group,
         )
 
         if effective_notional <= 0:
@@ -1255,6 +1270,22 @@ class LiveEngineRunner:
             min_depth_usd=float(self.strategy_runtime.get("min_depth_usd", 25_000.0) or 25_000.0),
             min_tob_coverage=float(self.strategy_runtime.get("min_tob_coverage", 0.80) or 0.80),
         )
+
+    def _get_active_overlap_groups(self) -> set[str]:
+        active_groups = set()
+        if not self._thesis_store:
+            return active_groups
+        
+        for thesis_id, state in self.thesis_manager.states.items():
+            if state.state == "active":
+                # Find the thesis in the store to get its overlap_group_id
+                # (This is slightly inefficient, but okay for small thesis sets)
+                theses = self._thesis_store.filter(thesis_id=thesis_id)
+                if theses:
+                    group_id = theses[0].overlap_group_id
+                    if group_id:
+                        active_groups.add(group_id)
+        return active_groups
 
     def _next_auto_order_id(self, symbol: str) -> str:
         self._auto_order_sequence += 1
@@ -1310,14 +1341,20 @@ class LiveEngineRunner:
             return
 
         market_state = market_state | dict(detector.features)
+
+        # Portfolio Orchestration: Pass active overlap groups to retrieval
+        active_groups = self._get_active_overlap_groups()
+
         context = build_live_trade_context(
             timestamp=str(timestamp),
             symbol=symbol,
             timeframe=timeframe,
             detected_event=detector,
-            market_features=market_state | dict(detector.features),
+            market_features=market_state,
             portfolio_state=self._get_portfolio_state_for_sizing(),
             execution_env=self._build_execution_env_snapshot(),
+            active_groups=active_groups,
+            family_budgets=self._portfolio_policy.family_budgets,
         )
         outcome = decide_trade_intent(
             context=context,

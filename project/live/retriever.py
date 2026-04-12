@@ -7,6 +7,7 @@ from typing import Dict, List
 from project.domain.models import ThesisDefinition
 from project.live.contracts import PromotedThesis
 from project.live.contracts.live_trade_context import LiveTradeContext
+from project.live.portfolio_policy import PortfolioAdmissionPolicy
 from project.live.thesis_specs import resolve_promoted_thesis_definition
 from project.live.thesis_store import ThesisStore
 from project.research.meta_ranking import thesis_meta_quality_score
@@ -379,40 +380,6 @@ def _trade_trigger_eligible(thesis: PromotedThesis, definition: ThesisDefinition
     return bool(definition.governance.get("trade_trigger_eligible", False))
 
 
-def _apply_overlap_suppression(results: list[ThesisMatch]) -> list[ThesisMatch]:
-    winners: Dict[str, ThesisMatch] = {}
-    adjusted: list[ThesisMatch] = []
-    for match in sorted(
-        results,
-        key=lambda item: (
-            int(item.eligibility_passed),
-            item.support_score - item.contradiction_penalty,
-            item.thesis.evidence.sample_size,
-        ),
-        reverse=True,
-    ):
-        overlap_group_id = str(match.thesis.governance.overlap_group_id or "").strip()
-        if not overlap_group_id or overlap_group_id not in winners:
-            if overlap_group_id and match.eligibility_passed:
-                winners[overlap_group_id] = match
-            adjusted.append(match)
-            continue
-        winner = winners[overlap_group_id]
-        reasons_against = list(match.reasons_against)
-        reasons_against.append(f"overlap_suppressed:{overlap_group_id}:{winner.thesis.thesis_id}")
-        adjusted.append(
-            ThesisMatch(
-                thesis=match.thesis,
-                eligibility_passed=False,
-                support_score=match.support_score,
-                contradiction_penalty=min(1.0, match.contradiction_penalty + 0.30),
-                reasons_for=list(match.reasons_for),
-                reasons_against=reasons_against,
-            )
-        )
-    return adjusted
-
-
 def retrieve_ranked_theses(
     *,
     thesis_store: ThesisStore,
@@ -431,6 +398,8 @@ def retrieve_ranked_theses(
     ).strip().upper()
 
     results: list[ThesisMatch] = []
+    policy = PortfolioAdmissionPolicy(family_budgets=context.family_budgets)
+
     for thesis in candidates:
         if thesis.status == "pending_blueprint" and not include_pending:
             continue
@@ -448,6 +417,17 @@ def retrieve_ranked_theses(
         if governance_declared and not _trade_trigger_eligible(thesis, definition):
             reasons_against.append("thesis_not_trade_trigger_eligible")
             eligibility_passed = False
+
+        # Sprint 6: Family Budget Admissibility
+        family = thesis.event_family or thesis.primary_event_id
+        family_result = policy.is_family_admissible(
+            family, context.portfolio_state.get("family_exposures", {})
+        )
+        if not family_result.admissible:
+            reasons_against.append(family_result.reason)
+            eligibility_passed = False
+        else:
+            reasons_for.append(family_result.reason)
 
         requirements = _requirements_for_matching(thesis, definition)
 
@@ -590,7 +570,87 @@ def retrieve_ranked_theses(
             )
         )
 
-    results = _apply_overlap_suppression(results)
+    # Replace _apply_overlap_suppression(results) with PortfolioAdmissionPolicy().resolve_overlap_winners
+    policy = PortfolioAdmissionPolicy(family_budgets=dict(context.family_budgets))
+    eligible_dicts = []
+    
+    # Pre-filter by family budget
+    family_exposures = context.portfolio_state.get("family_exposures", {})
+    
+    updated_results = []
+    for m in results:
+        if m.eligibility_passed:
+            family = str(m.thesis.event_family or m.thesis.primary_event_id).strip().upper()
+            admission = policy.is_family_admissible(family, family_exposures)
+            
+            if not admission.admissible:
+                reasons_against = list(m.reasons_against)
+                reasons_against.append(f"blocked_by_family_budget:{admission.reason}")
+                m = ThesisMatch(
+                    thesis=m.thesis,
+                    eligibility_passed=False,
+                    support_score=m.support_score,
+                    contradiction_penalty=m.contradiction_penalty,
+                    reasons_for=list(m.reasons_for),
+                    reasons_against=reasons_against
+                )
+        
+        updated_results.append(m)
+        
+        if m.eligibility_passed:
+            eligible_dicts.append({
+                "thesis_id": m.thesis.thesis_id,
+                "support_score": m.support_score,
+                "contradiction_penalty": m.contradiction_penalty,
+                "sample_size": m.thesis.evidence.sample_size,
+                "overlap_group_id": str(m.thesis.governance.overlap_group_id or "").strip(),
+                "_match": m
+            })
+    
+    results = updated_results
+    
+    winners = policy.resolve_overlap_winners(eligible_dicts, set(context.active_groups))
+    winner_ids = {w["thesis_id"] for w in winners}
+    
+    # Identify winners per group for reason reporting
+    group_winners: Dict[str, str] = {w["overlap_group_id"]: w["thesis_id"] for w in winners if w["overlap_group_id"]}
+    
+    final_results: list[ThesisMatch] = []
+    for m in results:
+        overlap_group_id = str(m.thesis.governance.overlap_group_id or "").strip()
+        
+        # If it was already ineligible, keep it
+        if not m.eligibility_passed:
+            final_results.append(m)
+            continue
+            
+        # If it's a winner, keep it
+        if m.thesis.thesis_id in winner_ids:
+            final_results.append(m)
+            continue
+            
+        # If it's not a winner, it's suppressed
+        reasons_against = list(m.reasons_against)
+        if overlap_group_id in context.active_groups:
+            reasons_against.append(f"overlap_suppressed:{overlap_group_id}")
+        elif overlap_group_id in group_winners:
+            reasons_against.append(f"overlap_suppressed:{overlap_group_id}:{group_winners[overlap_group_id]}")
+        else:
+            # Should not happen given policy logic, but for safety:
+            reasons_against.append(f"overlap_suppressed:{overlap_group_id}")
+            
+        final_results.append(
+            ThesisMatch(
+                thesis=m.thesis,
+                eligibility_passed=False,
+                support_score=m.support_score,
+                contradiction_penalty=min(1.0, m.contradiction_penalty + 0.30),
+                reasons_for=list(m.reasons_for),
+                reasons_against=reasons_against,
+            )
+        )
+
+    results = final_results
     results.sort(
         key=lambda match: (
             int(match.eligibility_passed),

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Dict, List, Set
 
 
@@ -11,6 +11,9 @@ class AdmissionResult:
     winner_id: str | None = None
 
 class PortfolioAdmissionPolicy:
+    def __init__(self, family_budgets: Dict[str, float] | None = None):
+        self.family_budgets = family_budgets or {}
+
     def resolve_overlap_winners(
         self,
         candidates: List[Dict[str, Any]],
@@ -53,3 +56,18 @@ class PortfolioAdmissionPolicy:
         if group_id and group_id in active_groups:
             return AdmissionResult(False, "blocked_by_active_group_member")
         return AdmissionResult(True, "selected_as_group_winner", winner_id=thesis_id)
+
+    def is_family_admissible(
+        self,
+        family: str,
+        family_exposures: Dict[str, float]
+    ) -> AdmissionResult:
+        budget = self.family_budgets.get(family, 0.0)
+        if budget <= 0.0:
+            return AdmissionResult(True, "no_family_budget_limit")
+        
+        current_exposure = abs(family_exposures.get(family, 0.0))
+        if current_exposure >= budget:
+            return AdmissionResult(False, f"family_budget_exhausted:{family}:{current_exposure:.0f}>={budget:.0f}")
+        
+        return AdmissionResult(True, "family_budget_available")

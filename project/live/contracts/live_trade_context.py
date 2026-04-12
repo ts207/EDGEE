@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Set
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator, model_validator
 
@@ -24,6 +24,8 @@ class LiveTradeContext(BaseModel):
     active_event_families: List[str] = Field(default_factory=list)
     active_event_ids: List[str] = Field(default_factory=list)
     active_episode_ids: List[str] = Field(default_factory=list)
+    active_groups: Set[str] = Field(default_factory=set)
+    family_budgets: Dict[str, float] = Field(default_factory=dict)
     contradiction_event_families: List[str] = Field(default_factory=list)
     contradiction_event_ids: List[str] = Field(default_factory=list)
     episode_snapshot: Dict[str, Any] = Field(default_factory=dict)
@@ -67,4 +69,5 @@ class LiveTradeContext(BaseModel):
             "event_side": self.event_side,
             "active_event_ids": list(self.active_event_ids),
             "active_episode_ids": list(self.active_episode_ids),
+            "active_groups": list(self.active_groups),
         }
