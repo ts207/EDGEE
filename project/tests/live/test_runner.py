@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from types import SimpleNamespace
 
 import pandas as pd
 import pytest
@@ -263,6 +264,44 @@ def test_live_runner_does_not_shutdown_if_kill_switch_unwind_fails() -> None:
     assert data_manager.stop_calls == 0
     assert order_manager.cancel_calls == 1
     assert order_manager.flatten_calls == 0
+
+
+def test_reconcile_thesis_batch_reports_degraded_state_in_monitor_only(monkeypatch) -> None:
+    runner = LiveEngineRunner(["btcusdt"], data_manager=_DummyDataManager())
+    runner._thesis_store = SimpleNamespace()
+
+    def _boom(**_kwargs):
+        raise ValueError("metadata unreadable")
+
+    monkeypatch.setattr("project.live.runner.reconcile_thesis_batch", _boom)
+
+    runner._reconcile_thesis_batch()
+
+    snapshot = runner.state_store.get_kill_switch_snapshot()
+    assert snapshot["is_active"] is False
+    assert snapshot["reason"] == "thesis_batch_reconciliation_degraded"
+    assert "metadata unreadable" in snapshot["message"]
+    assert runner.state_store.account.exchange_status == "DEGRADED"
+
+
+def test_reconcile_thesis_batch_raises_typed_error_for_trading_runtime(monkeypatch) -> None:
+    runner = LiveEngineRunner(
+        ["btcusdt"],
+        data_manager=_DummyDataManager(),
+        runtime_mode="trading",
+        strategy_runtime={"implemented": True},
+    )
+    runner._thesis_store = SimpleNamespace()
+
+    def _boom(**_kwargs):
+        raise ValueError("metadata unreadable")
+
+    monkeypatch.setattr("project.live.runner.reconcile_thesis_batch", _boom)
+
+    with pytest.raises(Exception, match="metadata unreadable") as excinfo:
+        runner._reconcile_thesis_batch()
+
+    assert excinfo.type.__name__ == "ThesisBatchReconciliationError"
 
 
 def test_live_runner_monitor_only_kill_switch_does_not_mutate_venue() -> None:
@@ -1117,6 +1156,7 @@ def test_live_runner_monitor_only_processes_thesis_runtime_events(tmp_path) -> N
             "auto_submit": False,
             "supported_event_ids": ["VOL_SHOCK"],
             "memory_root": str(tmp_path / "memory"),
+            "persist_dir": str(tmp_path / "live" / "persist"),
         },
     )
     runner._latest_book_ticker_by_symbol["BTCUSDT"] = {
@@ -1341,6 +1381,7 @@ def test_live_runner_persists_runtime_metrics_snapshot_with_market_state_and_dec
             "auto_submit": False,
             "supported_event_ids": ["VOL_SHOCK", "LIQUIDATION_CASCADE"],
             "memory_root": str(tmp_path / "memory"),
+            "persist_dir": str(tmp_path / "live" / "persist"),
         },
         market_feature_fetcher=_fetch_market_features,
     )

@@ -297,6 +297,12 @@ def test_run_promotion_service_fails_closed_when_promoted_row_lacks_evidence_bun
             {
                 "candidate_id": "cand_1",
                 "event_type": "VOL_SHOCK",
+                "family": "VOL_SHOCK",
+                "n_events": 100,
+                "stability_score": 0.8,
+                "sign_consistency": 0.9,
+                "cost_survival_ratio": 1.0,
+                "net_expectancy_bps": 6.0,
                 "q_value": 0.01,
                 "confirmatory_locked": True,
                 "frozen_spec_hash": "hash",
@@ -624,6 +630,28 @@ def test_read_csv_or_parquet_does_not_swallow_unexpected_runtime_errors(monkeypa
         svc._read_csv_or_parquet(path)
 
 
+def test_load_hypothesis_index_records_degraded_state_for_unreadable_registry(monkeypatch, tmp_path):
+    run_id = "r1"
+    phase2_root = tmp_path / "reports" / "phase2" / run_id
+    phase2_root.mkdir(parents=True, exist_ok=True)
+    path = phase2_root / "hypothesis_registry.csv"
+    path.write_text("broken", encoding="utf-8")
+
+    def _boom(_path):
+        raise ValueError("bad hypothesis registry")
+
+    monkeypatch.setattr(svc, "_read_csv_or_parquet", _boom)
+    diagnostics: dict[str, object] = {}
+
+    out = svc._load_hypothesis_index(run_id=run_id, data_root=tmp_path, diagnostics=diagnostics)
+
+    assert out == {}
+    degraded_states = diagnostics["degraded_states"]
+    assert isinstance(degraded_states, list)
+    assert degraded_states[0]["code"] == "hypothesis_registry_unreadable"
+    assert "bad hypothesis registry" in degraded_states[0]["message"]
+
+
 def test_confirmatory_run_missing_lock_column_fails_cleanly(monkeypatch, tmp_path):
     monkeypatch.setattr(svc, "get_data_root", lambda: tmp_path)
     monkeypatch.setattr(
@@ -660,6 +688,96 @@ def test_confirmatory_run_missing_lock_column_fails_cleanly(monkeypatch, tmp_pat
     assert result.exit_code == 1
     assert result.audit_df.empty
     assert result.promoted_df.empty
+
+
+def test_execute_promotion_records_degraded_state_when_manifest_persist_fails(monkeypatch, tmp_path):
+    RunArtifactManifest = __import__(
+        "project.research.validation.manifest",
+        fromlist=["RunArtifactManifest"],
+    ).RunArtifactManifest
+
+    monkeypatch.setattr(svc, "get_data_root", lambda: tmp_path)
+    monkeypatch.setattr(validation_writer, "get_data_root", lambda: tmp_path)
+    monkeypatch.setattr(
+        svc,
+        "load_run_manifest",
+        lambda run_id: {"run_mode": "confirmatory", "discovery_profile": "standard"},
+    )
+    monkeypatch.setattr(
+        svc,
+        "resolve_objective_profile_contract",
+        lambda **kwargs: SimpleNamespace(
+            min_net_expectancy_bps=5.0,
+            max_fee_plus_slippage_bps=10.0,
+            max_daily_turnover_multiple=5.0,
+            require_retail_viability=False,
+            require_low_capital_contract=False,
+        ),
+    )
+    monkeypatch.setattr(svc, "ontology_spec_hash", lambda root: "hash")
+    monkeypatch.setattr(svc, "_load_gates_spec", lambda root: {"promotion_confirmatory_gates": {}})
+    monkeypatch.setattr(svc, "_load_negative_control_summary", lambda run_id: {})
+    monkeypatch.setattr(svc, "_load_dynamic_min_events_by_event", lambda run_id: {})
+
+    cand_path = tmp_path / "reports" / "edge_candidates" / "r1"
+    cand_path.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(
+        [
+            {
+                "candidate_id": "cand_1",
+                "event_type": "VOL_SHOCK",
+                "family": "VOL_SHOCK",
+                "n_events": 100,
+                "stability_score": 0.8,
+                "sign_consistency": 0.9,
+                "cost_survival_ratio": 1.0,
+                "net_expectancy_bps": 6.0,
+                "q_value": 0.01,
+                "confirmatory_locked": True,
+                "frozen_spec_hash": "hash",
+            }
+        ]
+    ).to_csv(cand_path / "edge_candidates_normalized.csv", index=False)
+    _write_validated_candidate_artifacts(tmp_path, "r1", "cand_1")
+
+    audit_df = pd.DataFrame(
+        [
+            {
+                "candidate_id": "cand_1",
+                "event_type": "VOL_SHOCK",
+                "promotion_decision": "promoted",
+                "promotion_track": "standard",
+                "promotion_metrics_trace": "{}",
+                "evidence_bundle_json": _valid_evidence_bundle_json(
+                    run_id="r1", candidate_id="cand_1"
+                ),
+            }
+        ]
+    )
+    promoted_df = pd.DataFrame(
+        [{"candidate_id": "cand_1", "event_type": "VOL_SHOCK", "status": "PROMOTED"}]
+    )
+    monkeypatch.setattr(
+        svc,
+        "promote_candidates",
+        lambda **kwargs: (audit_df.copy(), promoted_df.copy(), {"promoted": 1}),
+    )
+    monkeypatch.setattr(svc, "build_promotion_statistical_audit", lambda **kwargs: audit_df.copy())
+    monkeypatch.setattr(
+        svc, "stabilize_promoted_output_schema", lambda promoted_df, audit_df: promoted_df.copy()
+    )
+
+    def _fail_persist(self, base_dir):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(RunArtifactManifest, "persist", _fail_persist)
+
+    result = _run_promotion(tmp_path)
+
+    assert result.exit_code == 0
+    degraded_states = result.diagnostics["degraded_states"]
+    assert degraded_states[-1]["code"] == "artifact_manifest_persist_failed"
+    assert "disk full" in degraded_states[-1]["message"]
 
 
 def test_resolve_promotion_policy_research_relaxes_deploy_only_controls():

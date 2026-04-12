@@ -15,7 +15,10 @@ from project.contracts.schemas import normalize_dataframe_for_schema
 from project.core.config import get_data_root
 from project.core.coercion import as_bool, safe_int
 from project.core.exceptions import (
+    ArtifactPersistenceError,
+    ArtifactReadError,
     CompatibilityRequiredError,
+    DataIntegrityError,
     IncompleteLineageError,
     MissingArtifactError,
     SchemaMismatchError,
@@ -199,6 +202,27 @@ class PromotionServiceResult:
     audit_df: pd.DataFrame = field(default_factory=pd.DataFrame)
     promoted_df: pd.DataFrame = field(default_factory=pd.DataFrame)
     diagnostics: Dict[str, Any] = field(default_factory=dict)
+
+
+def _record_degraded_state(
+    diagnostics: Dict[str, Any],
+    *,
+    code: str,
+    message: str,
+    details: Dict[str, Any] | None = None,
+) -> None:
+    states = diagnostics.setdefault("degraded_states", [])
+    if not isinstance(states, list):
+        states = []
+        diagnostics["degraded_states"] = states
+    payload: Dict[str, Any] = {
+        "code": str(code).strip(),
+        "status": "degraded",
+        "message": str(message).strip(),
+    }
+    if details:
+        payload["details"] = dict(details)
+    states.append(payload)
 
 
 def _empty_artifact_frame(*columns: str) -> pd.DataFrame:
@@ -576,7 +600,12 @@ def _canonicalize_candidate_audit_keys(candidates_df: pd.DataFrame) -> pd.DataFr
     return out
 
 
-def _load_hypothesis_index(*, run_id: str, data_root: Path) -> Dict[str, Dict[str, Any]]:
+def _load_hypothesis_index(
+    *,
+    run_id: str,
+    data_root: Path,
+    diagnostics: Dict[str, Any] | None = None,
+) -> Dict[str, Dict[str, Any]]:
     phase2_root = data_root / "reports" / "phase2" / run_id
     if not phase2_root.exists():
         return {}
@@ -597,8 +626,27 @@ def _load_hypothesis_index(*, run_id: str, data_root: Path) -> Dict[str, Dict[st
         seen_paths.add(registry_path)
         try:
             registry_df = _read_csv_or_parquet(registry_path)
-        except Exception:
-            logging.warning("Failed loading hypothesis registry: %s", registry_path)
+        except (
+            ArtifactReadError,
+            ImportError,
+            OSError,
+            UnicodeDecodeError,
+            ValueError,
+            pd.errors.ParserError,
+        ) as exc:
+            wrapped = (
+                exc
+                if isinstance(exc, ArtifactReadError)
+                else ArtifactReadError(f"Failed loading hypothesis registry {registry_path}: {exc}")
+            )
+            logging.warning("%s", wrapped)
+            if diagnostics is not None:
+                _record_degraded_state(
+                    diagnostics,
+                    code="hypothesis_registry_unreadable",
+                    message=str(wrapped),
+                    details={"path": str(registry_path)},
+                )
             continue
         if registry_df.empty:
             continue
@@ -992,6 +1040,7 @@ def execute_promotion(config: PromotionConfig) -> PromotionServiceResult:
         diagnostics["compat_reason"] = ""
         diagnostics["compat_source_artifacts"] = []
         diagnostics["canonical_contract_bypassed"] = False
+        diagnostics["degraded_states"] = []
 
         val_bundle = load_validation_bundle(
             config.run_id,
@@ -1241,7 +1290,11 @@ def execute_promotion(config: PromotionConfig) -> PromotionServiceResult:
         ontology_hash = ontology_spec_hash(PROJECT_ROOT.parent)
         gate_spec = _load_gates_spec(PROJECT_ROOT.parent)
         promotion_confirmatory_gates = gate_spec.get("promotion_confirmatory_gates", {})
-        hypothesis_index = _load_hypothesis_index(run_id=config.run_id, data_root=data_root)
+        hypothesis_index = _load_hypothesis_index(
+            run_id=config.run_id,
+            data_root=data_root,
+            diagnostics=diagnostics,
+        )
         promotion_spec = {
             "run_id": config.run_id,
             "ontology_spec_hash": ontology_hash,
@@ -1495,21 +1548,50 @@ def execute_promotion(config: PromotionConfig) -> PromotionServiceResult:
                 }
             )
             artifact_manifest.persist(out_dir)
-        except Exception as exc:
-            logging.warning("Failed to persist artifact manifest: %s", exc)
+        except (OSError, TypeError, ValueError) as exc:
+            wrapped = ArtifactPersistenceError(
+                f"Failed to persist artifact manifest for promotion run {config.run_id}: {exc}"
+            )
+            logging.warning("%s", wrapped)
+            _record_degraded_state(
+                diagnostics,
+                code="artifact_manifest_persist_failed",
+                message=str(wrapped),
+                details={"run_id": config.run_id, "output_dir": str(out_dir)},
+            )
 
         finalize_manifest(manifest, "success", stats=diagnostics)
         return PromotionServiceResult(0, out_dir, audit_df, promoted_df, diagnostics)
-    except Exception as exc:
+    except MissingArtifactError as exc:
         err_msg = str(exc)
-        # Known graceful cases (0-candidate discover run) → warning only, no traceback.
-        if "missing validation bundle" in err_msg or "No candidates found" in err_msg:
-            logging.warning("Promotion skipped: %s", err_msg)
-            finalize_manifest(manifest, "warning", error=err_msg)
-        else:
-            logging.exception("Promotion failed: %s", exc)
-            finalize_manifest(manifest, "failed", error=err_msg)
+        logging.warning("Promotion skipped: %s", err_msg)
+        _record_degraded_state(
+            diagnostics,
+            code="promotion_inputs_missing",
+            message=err_msg,
+            details={"run_id": config.run_id},
+        )
+        finalize_manifest(manifest, "warning", error=err_msg)
         diagnostics["error"] = err_msg
-        if isinstance(exc, FileNotFoundError):
-            raise
+        return PromotionServiceResult(1, out_dir, audit_df, promoted_df, diagnostics)
+    except FileNotFoundError:
+        raise
+    except (
+        CompatibilityRequiredError,
+        DataIntegrityError,
+        IncompleteLineageError,
+        RuntimeError,
+        SchemaMismatchError,
+        ValueError,
+    ) as exc:
+        err_msg = str(exc)
+        logging.exception("Promotion failed: %s", exc)
+        _record_degraded_state(
+            diagnostics,
+            code="promotion_stage_failed",
+            message=err_msg,
+            details={"run_id": config.run_id, "exception_type": type(exc).__name__},
+        )
+        finalize_manifest(manifest, "failed", error=err_msg)
+        diagnostics["error"] = err_msg
         return PromotionServiceResult(1, out_dir, audit_df, promoted_df, diagnostics)

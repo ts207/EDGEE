@@ -83,3 +83,15 @@ class ArtifactWriteError(EdgeError):
     """Raised when generated artifacts cannot be written or verified."""
 
     pass
+
+
+class ArtifactReadError(DataIntegrityError):
+    """Raised when an artifact cannot be read from disk in the expected format."""
+
+    pass
+
+
+class ArtifactPersistenceError(ArtifactWriteError):
+    """Raised when an artifact cannot be durably persisted to disk."""
+
+    pass

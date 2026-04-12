@@ -34,7 +34,11 @@ from project.live.oms import (
 from project.live.order_planner import build_order_plan
 from project.live.risk import RiskEnforcer, RuntimeRiskCaps
 from project.live.state import LiveStateStore
-from project.live.thesis_reconciliation import reconcile_thesis_batch
+from project.live.thesis_reconciliation import (
+    RECONCILIATION_DEGRADED_EXCEPTIONS,
+    ThesisBatchReconciliationError,
+    reconcile_thesis_batch,
+)
 from project.live.thesis_state import ThesisStateManager
 from project.live.thesis_store import ThesisStore
 from project.portfolio.incubation import IncubationLedger
@@ -565,7 +569,7 @@ class LiveEngineRunner:
             thesis_id: state.state
             for thesis_id, state in self.thesis_manager.states.items()
         }
-        
+
         try:
             result = reconcile_thesis_batch(
                 current_store=self._thesis_store,
@@ -598,10 +602,26 @@ class LiveEngineRunner:
                     len(result.diff.superseded),
                     len(result.diff.downgraded),
                 )
-        except Exception as exc:
-            _LOG.exception("Thesis batch reconciliation failed with unexpected error: %s", exc)
-            if bool(self.strategy_runtime.get("implemented", False)):
-                raise RuntimeError("Thesis batch reconciliation is required for live trading") from exc
+        except RECONCILIATION_DEGRADED_EXCEPTIONS as exc:
+            wrapped = ThesisBatchReconciliationError(
+                f"Thesis batch reconciliation failed in degraded mode: {exc}"
+            )
+            self._report_reconciliation_degraded_state(error=wrapped)
+            _LOG.exception("%s", wrapped)
+            if self.runtime_mode == "trading" and bool(
+                self.strategy_runtime.get("implemented", False)
+            ):
+                raise wrapped
+
+    def _report_reconciliation_degraded_state(self, *, error: ThesisBatchReconciliationError) -> None:
+        snapshot = {
+            "is_active": bool(self.strategy_runtime.get("implemented", False)),
+            "reason": "thesis_batch_reconciliation_degraded",
+            "triggered_at": datetime.now(timezone.utc).isoformat(),
+            "message": str(error),
+        }
+        self.state_store.update_from_exchange_snapshot({"exchange_status": "DEGRADED"})
+        self.state_store.set_kill_switch_snapshot(snapshot)
 
     def _strategy_runtime_enabled(self) -> bool:
         return (

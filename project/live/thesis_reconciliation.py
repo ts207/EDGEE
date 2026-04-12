@@ -7,12 +7,28 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Set
 
-from project.core.exceptions import DataIntegrityError, MalformedReconciliationMetadataError
+from project.core.exceptions import (
+    DataIntegrityError,
+    MalformedReconciliationMetadataError,
+    StageExecutionError,
+)
 from project.io.utils import atomic_write_json
 from project.live.contracts import PromotedThesis
 from project.live.thesis_store import ThesisStore
 
 _LOG = logging.getLogger(__name__)
+
+
+class ThesisBatchReconciliationError(StageExecutionError):
+    """Raised when thesis-batch reconciliation cannot complete safely."""
+
+
+RECONCILIATION_DEGRADED_EXCEPTIONS = (
+    DataIntegrityError,
+    MalformedReconciliationMetadataError,
+    OSError,
+    ValueError,
+)
 
 
 @dataclass
