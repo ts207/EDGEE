@@ -19,3 +19,13 @@ class PortfolioContext(BaseModel):
 
 class TargetPortfolioState(BaseModel):
     allocations: Dict[str, float]
+
+def calculate_priority_score(intent: ThesisIntent, diversification_multiplier: float) -> float:
+    return (
+        intent.setup_match *
+        intent.thesis_strength *
+        intent.freshness *
+        intent.execution_quality *
+        intent.capital_efficiency *
+        diversification_multiplier
+    )
