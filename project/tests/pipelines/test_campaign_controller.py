@@ -11,7 +11,11 @@ from project.research.campaign_controller import (
     CampaignSummary,
     CampaignMemoryIntegrityError,
 )
-from project.research.knowledge.memory import ensure_memory_store, read_memory_table, write_memory_table
+from project.research.knowledge.memory import (
+    ensure_memory_store,
+    read_memory_table,
+    write_memory_table,
+)
 
 
 @pytest.fixture
@@ -27,8 +31,16 @@ def test_env(tmp_path):
                     "E2": {"enabled": True, "family": "F1", "instrument_classes": ["crypto"]},
                     "E3": {"enabled": True, "family": "F2", "instrument_classes": ["crypto"]},
                     "E4": {"enabled": True, "family": "F2", "instrument_classes": ["crypto"]},
-                    "VOL_SHOCK": {"enabled": True, "family": "VOL", "instrument_classes": ["crypto"]},
-                    "ZSCORE_STRETCH": {"enabled": True, "family": "STAT", "instrument_classes": ["crypto"]},
+                    "VOL_SHOCK": {
+                        "enabled": True,
+                        "family": "VOL",
+                        "instrument_classes": ["crypto"],
+                    },
+                    "ZSCORE_STRETCH": {
+                        "enabled": True,
+                        "family": "STAT",
+                        "instrument_classes": ["crypto"],
+                    },
                 }
             }
         )
@@ -279,6 +291,79 @@ def test_step_repair_uses_stage_default_before_global_fallback(test_env):
 
     assert proposal is not None
     assert proposal["trigger_space"]["events"]["include"] == ["VOL_SHOCK"]
+
+
+def test_propose_next_request_honors_repair_focus_with_actionable_queue(test_env):
+    controller = test_env
+    paths = ensure_memory_store("test_campaign", data_root=controller.data_root)
+    paths.belief_state.write_text(
+        json.dumps(
+            {
+                "current_focus": "repair_pipeline",
+                "avoid_regions": [],
+                "promising_regions": [],
+                "open_repairs": [
+                    {
+                        "stage": "build_event_registry",
+                        "failure_class": "mechanical",
+                        "failure_detail": "detector truth broke for VOL_SHOCK",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    paths.next_actions.write_text(
+        json.dumps(
+            {
+                "repair": [
+                    {
+                        "reason": "mechanical failure detected",
+                        "priority": "high",
+                        "failure_detail": "detector truth broke for VOL_SHOCK",
+                        "proposed_scope": {
+                            "stage": "build_event_registry",
+                            "failure_class": "mechanical",
+                            "failure_detail": "detector truth broke for VOL_SHOCK",
+                        },
+                    }
+                ],
+                "exploit": [],
+                "explore_adjacent": [],
+                "hold": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    proposal = controller._propose_next_request()
+
+    assert proposal is not None
+    assert proposal["trigger_space"]["events"]["include"] == ["VOL_SHOCK"]
+    assert proposal["promotion"]["enabled"] is False
+
+
+def test_propose_next_request_fails_closed_when_repair_focus_has_no_action(test_env):
+    controller = test_env
+    paths = ensure_memory_store("test_campaign", data_root=controller.data_root)
+    paths.belief_state.write_text(
+        json.dumps(
+            {
+                "current_focus": "repair_pipeline",
+                "avoid_regions": [],
+                "promising_regions": [],
+                "open_repairs": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+    paths.next_actions.write_text(
+        json.dumps({"repair": [], "exploit": [], "explore_adjacent": [], "hold": []}),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(CampaignMemoryIntegrityError, match="current_focus=repair_pipeline"):
+        controller._propose_next_request()
 
 
 def test_context_for_proposal_uses_registry_dimensions(test_env):

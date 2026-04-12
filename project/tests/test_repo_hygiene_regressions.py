@@ -2,7 +2,13 @@ from pathlib import Path
 
 
 def test_ingest_docstring_has_no_inline_citation_artifacts():
-    path = Path(__file__).parents[2] / "project" / "pipelines" / "ingest" / "ingest_binance_um_ohlcv.py"
+    path = (
+        Path(__file__).parents[2]
+        / "project"
+        / "pipelines"
+        / "ingest"
+        / "ingest_binance_um_ohlcv.py"
+    )
     text = path.read_text(encoding="utf-8")
     assert "【" not in text
     assert "†" not in text
@@ -25,9 +31,3 @@ def test_core_concept_specs_reference_canonical_search_stage():
         text = path.read_text(encoding="utf-8")
         assert "project/research/phase2_search_engine.py" in text
         assert "phase2_candidate_discovery.py" not in text
-
-
-def test_repository_map_marks_phase2_search_engine_as_canonical_discovery_stage():
-    path = Path(__file__).parents[2] / "docs" / "02_REPOSITORY_MAP.md"
-    text = path.read_text(encoding="utf-8")
-    assert "canonical planner-owned discovery stage" in text

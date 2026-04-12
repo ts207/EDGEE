@@ -84,7 +84,9 @@ def _validate_exported_thesis_payload(payload: Any) -> None:
     if payload["thesis_count"] != len(payload["theses"]):
         raise SchemaMismatchError("promoted_theses.json thesis_count does not match theses payload")
     active_count = sum(
-        1 for thesis in payload["theses"] if isinstance(thesis, dict) and thesis.get("status") == "active"
+        1
+        for thesis in payload["theses"]
+        if isinstance(thesis, dict) and thesis.get("status") == "active"
     )
     pending_count = sum(
         1
@@ -117,7 +119,9 @@ def _validate_thesis_index_payload(payload: Any) -> None:
                 f"index.json field {field_name!r} must be {field_type.__name__}"
             )
     if payload["schema_version"] != "promoted_thesis_index_v1":
-        raise SchemaMismatchError(f"Unsupported thesis index schema_version {payload['schema_version']!r}")
+        raise SchemaMismatchError(
+            f"Unsupported thesis index schema_version {payload['schema_version']!r}"
+        )
     latest_run_id = str(payload.get("latest_run_id", "")).strip()
     if latest_run_id and latest_run_id not in payload["runs"]:
         raise SchemaMismatchError("index.json latest_run_id is not present in runs metadata")
@@ -127,7 +131,9 @@ def _fallback_authored_definition_for_event(*event_tokens: str):
     from project.domain.compiled_registry import get_domain_registry
 
     registry = get_domain_registry()
-    normalized = [str(token or "").strip().upper() for token in event_tokens if str(token or "").strip()]
+    normalized = [
+        str(token or "").strip().upper() for token in event_tokens if str(token or "").strip()
+    ]
     if not normalized:
         return None
     for definition in registry.thesis_definitions.values():
@@ -139,6 +145,7 @@ def _fallback_authored_definition_for_event(*event_tokens: str):
         if any(token and token in {primary, family, *triggers} for token in normalized):
             return definition
     return None
+
 
 def _utc_now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
@@ -152,7 +159,9 @@ def _json_load(path: Path) -> dict[str, Any]:
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise DataIntegrityError(f"Failed to read live thesis json artifact {path}: {exc}") from exc
     if not isinstance(payload, dict):
-        raise DataIntegrityError(f"Live thesis json artifact {path} did not contain an object payload")
+        raise DataIntegrityError(
+            f"Live thesis json artifact {path} did not contain an object payload"
+        )
     return payload
 
 
@@ -164,7 +173,9 @@ def _load_table(path: Path) -> pd.DataFrame:
             if path.suffix.lower() == ".csv":
                 return pd.read_csv(path)
         except Exception as exc:
-            raise DataIntegrityError(f"Failed to read live thesis tabular artifact {path}: {exc}") from exc
+            raise DataIntegrityError(
+                f"Failed to read live thesis tabular artifact {path}: {exc}"
+            ) from exc
     return pd.DataFrame()
 
 
@@ -231,6 +242,72 @@ def _row_by_candidate_id(frame: pd.DataFrame) -> dict[str, dict[str, Any]]:
         if candidate_id and candidate_id not in rows:
             rows[candidate_id] = dict(row)
     return rows
+
+
+def _promoted_candidate_ids(frame: pd.DataFrame) -> set[str]:
+    if frame.empty:
+        return set()
+    if "candidate_id" not in frame.columns:
+        raise SchemaMismatchError(
+            "Promoted candidates artifact missing required candidate_id column."
+        )
+    promoted_ids: set[str] = set()
+    for row in frame.to_dict(orient="records"):
+        candidate_id = str(row.get("candidate_id", "")).strip()
+        if not candidate_id:
+            continue
+        status = (
+            str(row.get("status", "")).strip()
+            or str(row.get("promotion_status", "")).strip()
+            or str(row.get("promotion_decision", "")).strip()
+            or "PROMOTED"
+        )
+        if "PROMOT" in status.upper():
+            promoted_ids.add(candidate_id)
+    return promoted_ids
+
+
+def _validate_promotion_evidence_alignment(
+    *,
+    run_id: str,
+    bundles: Sequence[Mapping[str, Any]],
+    promoted_df: pd.DataFrame,
+) -> None:
+    promoted_ids = _promoted_candidate_ids(promoted_df)
+    if not promoted_ids:
+        return
+    evidence_ids = {
+        str(bundle.get("candidate_id", "")).strip()
+        for bundle in bundles
+        if str(bundle.get("candidate_id", "")).strip()
+    }
+    promoted_bundle_ids = {
+        str(bundle.get("candidate_id", "")).strip()
+        for bundle in bundles
+        if str(bundle.get("candidate_id", "")).strip()
+        and str(
+            (bundle.get("promotion_decision", {}) or {}).get("promotion_status", "")
+            if isinstance(bundle.get("promotion_decision", {}), Mapping)
+            else ""
+        )
+        .strip()
+        .lower()
+        == "promoted"
+    }
+    missing_evidence = sorted(promoted_ids - evidence_ids)
+    unselected_promoted_evidence = sorted(promoted_bundle_ids - promoted_ids)
+    if missing_evidence or unselected_promoted_evidence:
+        details = []
+        if missing_evidence:
+            details.append("promoted candidates missing evidence: " + ", ".join(missing_evidence))
+        if unselected_promoted_evidence:
+            details.append(
+                "evidence bundles marked promoted but absent from promoted candidates: "
+                + ", ".join(unselected_promoted_evidence)
+            )
+        raise IncompleteLineageError(
+            f"Promotion/evidence lineage mismatch for run {run_id}: " + "; ".join(details)
+        )
 
 
 def _blueprint_by_candidate_id(rows: Sequence[Mapping[str, Any]]) -> dict[str, dict[str, Any]]:
@@ -390,29 +467,45 @@ def _build_governance(
     authored_def: Any | None = None,
     primary_event_id: str = "",
 ) -> ThesisGovernance:
-    event_id = str(primary_event_id or bundle.get("event_type", "") or promoted_row.get("event_type", "")).strip()
+    event_id = str(
+        primary_event_id or bundle.get("event_type", "") or promoted_row.get("event_type", "")
+    ).strip()
     meta = get_event_governance_metadata(event_id) if event_id else {}
     authored_governance = authored_def.governance if authored_def is not None else {}
     if not isinstance(authored_governance, Mapping):
         authored_governance = {}
     return ThesisGovernance(
         tier=str(authored_governance.get("tier", meta.get("tier", ""))).strip(),
-        operational_role=str(authored_governance.get("operational_role", meta.get("operational_role", ""))).strip(),
-        deployment_disposition=str(
-            authored_governance.get("deployment_disposition", meta.get("deployment_disposition", ""))
+        operational_role=str(
+            authored_governance.get("operational_role", meta.get("operational_role", ""))
         ).strip(),
-        evidence_mode=str(authored_governance.get("evidence_mode", meta.get("evidence_mode", ""))).strip(),
-        overlap_group_id=str(overlap_group_id or authored_governance.get("overlap_group_id", "")).strip(),
+        deployment_disposition=str(
+            authored_governance.get(
+                "deployment_disposition", meta.get("deployment_disposition", "")
+            )
+        ).strip(),
+        evidence_mode=str(
+            authored_governance.get("evidence_mode", meta.get("evidence_mode", ""))
+        ).strip(),
+        overlap_group_id=str(
+            overlap_group_id or authored_governance.get("overlap_group_id", "")
+        ).strip(),
         trade_trigger_eligible=bool(
-            authored_governance.get("trade_trigger_eligible", meta.get("trade_trigger_eligible", False))
+            authored_governance.get(
+                "trade_trigger_eligible", meta.get("trade_trigger_eligible", False)
+            )
         ),
         requires_stronger_evidence=bool(
-            authored_governance.get("requires_stronger_evidence", meta.get("requires_stronger_evidence", False))
+            authored_governance.get(
+                "requires_stronger_evidence", meta.get("requires_stronger_evidence", False)
+            )
         ),
     )
 
 
-def _episode_ids_from_metadata(bundle: Mapping[str, Any], promoted_row: Mapping[str, Any], metadata: Mapping[str, Any]) -> list[str]:
+def _episode_ids_from_metadata(
+    bundle: Mapping[str, Any], promoted_row: Mapping[str, Any], metadata: Mapping[str, Any]
+) -> list[str]:
     payloads = [metadata, bundle, promoted_row]
     out: list[str] = []
     seen: set[str] = set()
@@ -433,23 +526,35 @@ def _episode_ids_from_metadata(bundle: Mapping[str, Any], promoted_row: Mapping[
     return out
 
 
-def _build_requirements(bundle: Mapping[str, Any], promoted_row: Mapping[str, Any]) -> ThesisRequirements:
+def _build_requirements(
+    bundle: Mapping[str, Any], promoted_row: Mapping[str, Any]
+) -> ThesisRequirements:
     return _build_requirements_from_contract(
         bundle=bundle,
         promoted_row=promoted_row,
-        metadata=bundle.get("metadata", {}) if isinstance(bundle.get("metadata", {}), Mapping) else {},
+        metadata=bundle.get("metadata", {})
+        if isinstance(bundle.get("metadata", {}), Mapping)
+        else {},
         authored_def=None,
         event_contract_ids=None,
         episode_contract_ids=None,
     )
 
 
-def _build_source(bundle: Mapping[str, Any], promoted_row: Mapping[str, Any], metadata: Mapping[str, Any]) -> ThesisSource:
+def _build_source(
+    bundle: Mapping[str, Any], promoted_row: Mapping[str, Any], metadata: Mapping[str, Any]
+) -> ThesisSource:
     event_id = str(bundle.get("event_type", "") or promoted_row.get("event_type", "")).strip()
-    campaign_id = str(metadata.get("campaign_id", "") or promoted_row.get("campaign_id", "")).strip()
+    campaign_id = str(
+        metadata.get("campaign_id", "") or promoted_row.get("campaign_id", "")
+    ).strip()
     program_id = str(metadata.get("program_id", "") or promoted_row.get("program_id", "")).strip()
-    source_run_mode = str(metadata.get("source_run_mode", "") or promoted_row.get("source_run_mode", "")).strip()
-    objective_name = str(metadata.get("objective_name", "") or promoted_row.get("objective_name", "")).strip()
+    source_run_mode = str(
+        metadata.get("source_run_mode", "") or promoted_row.get("source_run_mode", "")
+    ).strip()
+    objective_name = str(
+        metadata.get("objective_name", "") or promoted_row.get("objective_name", "")
+    ).strip()
     return ThesisSource(
         source_program_id=program_id,
         source_campaign_id=campaign_id,
@@ -483,8 +588,16 @@ def _contract_ids(
 ) -> tuple[list[str], list[str]]:
     if authored_def is not None:
         return (
-            [str(token).strip().upper() for token in authored_def.source_event_contract_ids if str(token).strip()],
-            [str(token).strip().upper() for token in authored_def.source_episode_contract_ids if str(token).strip()],
+            [
+                str(token).strip().upper()
+                for token in authored_def.source_event_contract_ids
+                if str(token).strip()
+            ],
+            [
+                str(token).strip().upper()
+                for token in authored_def.source_episode_contract_ids
+                if str(token).strip()
+            ],
         )
     event_contract_ids = (
         _normalize_tokens(metadata.get("event_contract_ids"))
@@ -531,7 +644,9 @@ def _build_requirements_from_contract(
     episode_contract_ids: Sequence[str] | None,
 ) -> ThesisRequirements:
     event_id = str(bundle.get("event_type", "") or promoted_row.get("event_type", "")).strip()
-    primary_event_id = str((event_contract_ids or [event_id])[:1][0] if (event_contract_ids or [event_id]) else "").strip()
+    primary_event_id = str(
+        (event_contract_ids or [event_id])[:1][0] if (event_contract_ids or [event_id]) else ""
+    ).strip()
     meta = get_event_governance_metadata(primary_event_id) if primary_event_id else {}
     disallowed = bundle.get("disabled_regimes") or promoted_row.get("disabled_regimes") or []
     if isinstance(disallowed, str):
@@ -546,10 +661,26 @@ def _build_requirements_from_contract(
         episode_contract_ids=resolved_episode_contract_ids,
     )
     if authored_def is not None:
-        trigger_events = [str(token).strip().upper() for token in authored_def.trigger_events if str(token).strip()]
-        confirmation_events = [str(token).strip().upper() for token in authored_def.confirmation_events if str(token).strip()]
-        required_episodes = [str(token).strip().upper() for token in authored_def.required_episodes if str(token).strip()]
-        disallowed_regimes = [str(token).strip().upper() for token in authored_def.disallowed_regimes if str(token).strip()]
+        trigger_events = [
+            str(token).strip().upper()
+            for token in authored_def.trigger_events
+            if str(token).strip()
+        ]
+        confirmation_events = [
+            str(token).strip().upper()
+            for token in authored_def.confirmation_events
+            if str(token).strip()
+        ]
+        required_episodes = [
+            str(token).strip().upper()
+            for token in authored_def.required_episodes
+            if str(token).strip()
+        ]
+        disallowed_regimes = [
+            str(token).strip().upper()
+            for token in authored_def.disallowed_regimes
+            if str(token).strip()
+        ]
     else:
         if sequence_mode == "event_plus_confirm":
             trigger_events = resolved_event_contract_ids[:1]
@@ -561,7 +692,9 @@ def _build_requirements_from_contract(
             trigger_events = resolved_event_contract_ids
             confirmation_events = []
         required_episodes = resolved_episode_contract_ids
-        disallowed_regimes = [str(value).strip().upper() for value in disallowed if str(value).strip()]
+        disallowed_regimes = [
+            str(value).strip().upper() for value in disallowed if str(value).strip()
+        ]
     return ThesisRequirements(
         trigger_events=trigger_events,
         confirmation_events=confirmation_events,
@@ -580,17 +713,27 @@ def _build_source_from_contract(
     event_contract_ids: Sequence[str],
     episode_contract_ids: Sequence[str],
 ) -> ThesisSource:
-    campaign_id = str(metadata.get("campaign_id", "") or promoted_row.get("campaign_id", "")).strip()
+    campaign_id = str(
+        metadata.get("campaign_id", "") or promoted_row.get("campaign_id", "")
+    ).strip()
     program_id = str(metadata.get("program_id", "") or promoted_row.get("program_id", "")).strip()
-    source_run_mode = str(metadata.get("source_run_mode", "") or promoted_row.get("source_run_mode", "")).strip()
-    objective_name = str(metadata.get("objective_name", "") or promoted_row.get("objective_name", "")).strip()
+    source_run_mode = str(
+        metadata.get("source_run_mode", "") or promoted_row.get("source_run_mode", "")
+    ).strip()
+    objective_name = str(
+        metadata.get("objective_name", "") or promoted_row.get("objective_name", "")
+    ).strip()
     return ThesisSource(
         source_program_id=program_id,
         source_campaign_id=campaign_id,
         source_run_mode=source_run_mode,
         objective_name=objective_name,
-        event_contract_ids=[str(token).strip().upper() for token in event_contract_ids if str(token).strip()],
-        episode_contract_ids=[str(token).strip().upper() for token in episode_contract_ids if str(token).strip()],
+        event_contract_ids=[
+            str(token).strip().upper() for token in event_contract_ids if str(token).strip()
+        ],
+        episode_contract_ids=[
+            str(token).strip().upper() for token in episode_contract_ids if str(token).strip()
+        ],
     )
 
 
@@ -633,7 +776,9 @@ def _contract_row(thesis: PromotedThesis) -> dict[str, Any]:
         "status": thesis.status,
         "promotion_class": thesis.promotion_class,
         "deployment_state": thesis.deployment_state,
-        "primary_event_id": str(thesis.primary_event_id or thesis.event_family or "").strip().upper(),
+        "primary_event_id": str(thesis.primary_event_id or thesis.event_family or "")
+        .strip()
+        .upper(),
         "compat_event_family": str(thesis.event_family or "").strip().upper(),
         "timeframe": str(thesis.timeframe or "").strip(),
         "trigger_events": list(thesis.requirements.trigger_events),
@@ -734,7 +879,8 @@ def _status_for_blueprint(blueprint: Mapping[str, Any] | None) -> str:
 
 
 def _build_thesis(
-    *,run_id: str,
+    *,
+    run_id: str,
     bundle: Mapping[str, Any],
     promoted_row: Mapping[str, Any],
     blueprint: Mapping[str, Any] | None,
@@ -846,7 +992,7 @@ def _build_thesis(
     promo_class = str(promoted_row.get("promotion_class") or "paper_promoted").lower()
     if promo_class not in {"paper_promoted", "production_promoted"}:
         promo_class = "paper_promoted"
-        
+
     deploy_state = str(
         promoted_row.get("deployment_state_default")
         or promoted_row.get("deployment_state")
@@ -902,7 +1048,9 @@ def _build_thesis(
             stability_score=_finite_or_none(stability.get("stability_score")),
             cost_survival_ratio=_finite_or_none(cost.get("cost_survival_ratio")),
             tob_coverage=_finite_or_none(cost.get("tob_coverage")),
-            rank_score=_finite_or_none(decision.get("rank_score", promoted_row.get("selection_score"))),
+            rank_score=_finite_or_none(
+                decision.get("rank_score", promoted_row.get("selection_score"))
+            ),
             promotion_track=track,
             policy_version=str(bundle.get("policy_version", "")).strip(),
             bundle_version=str(bundle.get("bundle_version", "")).strip(),
@@ -913,7 +1061,9 @@ def _build_thesis(
         lineage=ThesisLineage(
             run_id=run_id,
             candidate_id=candidate_id,
-            hypothesis_id=str(metadata.get("hypothesis_id", promoted_row.get("hypothesis_id", ""))).strip(),
+            hypothesis_id=str(
+                metadata.get("hypothesis_id", promoted_row.get("hypothesis_id", ""))
+            ).strip(),
             plan_row_id=str(metadata.get("plan_row_id", "")).strip(),
             blueprint_id=blueprint_id,
             proposal_id=proposal_id,
@@ -972,19 +1122,13 @@ def build_promoted_theses(
 ) -> list[PromotedThesis]:
     promoted_frame = promoted_df.copy() if promoted_df is not None else pd.DataFrame()
     promoted_rows = _row_by_candidate_id(promoted_frame)
-    promoted_ids = {
-        str(row.get("candidate_id", "")).strip()
-        for row in promoted_frame.to_dict(orient="records")
-        if "candidate_id" in promoted_frame.columns
-        and "PROMOT" in str(row.get("status", "PROMOTED")).upper()
-    }
+    promoted_ids = _promoted_candidate_ids(promoted_frame)
     blueprint_rows = _blueprint_by_candidate_id(blueprints or [])
     theses: list[PromotedThesis] = []
     failures: list[str] = []
     for bundle in bundles:
         candidate_id = str(bundle.get("candidate_id", "")).strip()
-        decision_status = str(bundle.get("promotion_decision", {}).get("promotion_status", "")).strip().lower()
-        if promoted_ids and candidate_id not in promoted_ids and decision_status != "promoted":
+        if promoted_ids and candidate_id not in promoted_ids:
             continue
         promoted_row = promoted_rows.get(candidate_id, {})
         try:
@@ -1020,9 +1164,7 @@ def _write_thesis_payload(
         "generated_at_utc": _utc_now(),
         "thesis_count": len(theses),
         "active_thesis_count": sum(1 for thesis in theses if thesis.status == "active"),
-        "pending_thesis_count": sum(
-            1 for thesis in theses if thesis.status == "pending_blueprint"
-        ),
+        "pending_thesis_count": sum(1 for thesis in theses if thesis.status == "pending_blueprint"),
         "theses": [thesis.model_dump() for thesis in theses],
     }
     atomic_write_json(output_path, payload, validator=_validate_exported_thesis_payload)
@@ -1090,9 +1232,7 @@ def _update_thesis_index(
         "output_path": str(output_path),
         "thesis_count": len(theses),
         "active_thesis_count": sum(1 for thesis in theses if thesis.status == "active"),
-        "pending_thesis_count": sum(
-            1 for thesis in theses if thesis.status == "pending_blueprint"
-        ),
+        "pending_thesis_count": sum(1 for thesis in theses if thesis.status == "pending_blueprint"),
         "updated_at_utc": _utc_now(),
     }
     runtime_registrations = index.get("runtime_registrations", {})
@@ -1131,17 +1271,30 @@ def export_promoted_theses_for_run(
     compatibility_mode: bool = False,
 ) -> PromotedThesisExportResult:
     resolved_root = Path(data_root) if data_root is not None else get_data_root()
-    effective_bundles = list(bundles) if bundles is not None else _load_evidence_bundles(run_id, resolved_root)
+    effective_bundles = (
+        list(bundles) if bundles is not None else _load_evidence_bundles(run_id, resolved_root)
+    )
     effective_promoted = (
-        promoted_df.copy() if promoted_df is not None else _load_promoted_candidates(run_id, resolved_root)
+        promoted_df.copy()
+        if promoted_df is not None
+        else _load_promoted_candidates(run_id, resolved_root)
     )
     if effective_promoted.empty and not allow_bundle_only_export:
         raise DataIntegrityError(
             f"Promoted candidates DataFrame is empty for run {run_id}. "
             "Set allow_bundle_only_export=True to proceed with bundle-only export."
         )
-    effective_blueprints = list(blueprints) if blueprints is not None else _load_blueprints(run_id, resolved_root)
-    skip_validation_lineage = allow_bundle_only_export and effective_promoted.empty and not effective_bundles
+    effective_blueprints = (
+        list(blueprints) if blueprints is not None else _load_blueprints(run_id, resolved_root)
+    )
+    skip_validation_lineage = (
+        allow_bundle_only_export and effective_promoted.empty and not effective_bundles
+    )
+    _validate_promotion_evidence_alignment(
+        run_id=run_id,
+        bundles=effective_bundles,
+        promoted_df=effective_promoted,
+    )
 
     validation_metadata: dict[str, dict[str, Any]] = {}
     from project.research.validation.result_writer import load_validation_bundle
@@ -1155,7 +1308,9 @@ def export_promoted_theses_for_run(
         )
         if val_bundle:
             all_candidates = (
-                val_bundle.validated_candidates + val_bundle.rejected_candidates + val_bundle.inconclusive_candidates
+                val_bundle.validated_candidates
+                + val_bundle.rejected_candidates
+                + val_bundle.inconclusive_candidates
             )
             for c in all_candidates:
                 validation_metadata[c.candidate_id] = {

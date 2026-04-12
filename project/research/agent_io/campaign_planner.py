@@ -13,6 +13,7 @@ import pandas as pd
 import yaml
 
 from project.core.config import get_data_root
+from project.core.exceptions import DataIntegrityError
 from project.events.event_specs import EVENT_REGISTRY_SPECS
 from project.events.governance import event_matches_filters, get_event_governance_metadata
 from project.io.utils import atomic_write_text
@@ -27,38 +28,47 @@ from project.spec_registry.search_space import (
 )
 
 _LOG = logging.getLogger(__name__)
-
-
-def _safe_float(value: Any, default: float = 0.0) -> float:
-    try:
-        if value is None or isinstance(value, bool):
-            return float(default)
-        return float(value)
-    except Exception:
-        return float(default)
+_DEFAULT_TARGET_CONTEXT_LABELS: Dict[str, tuple[str, ...]] = {
+    "vol_regime": ("low", "high"),
+}
 
 
 def _normalize_key(value: Any) -> str:
     return str(value or "").strip()
 
 
-def _load_json_object(value: Any) -> Dict[str, Any]:
+def _load_json_object(value: Any, *, source: str = "context_json") -> Dict[str, Any]:
     if isinstance(value, dict):
         return dict(value)
+    if value is None:
+        return {}
+    try:
+        if pd.isna(value):
+            return {}
+    except (TypeError, ValueError):
+        pass
     if isinstance(value, str):
         raw = value.strip()
         if not raw or raw == "{}":
             return {}
         try:
             payload = json.loads(raw)
-        except json.JSONDecodeError:
-            return {}
-        return payload if isinstance(payload, dict) else {}
-    return {}
+        except json.JSONDecodeError as exc:
+            raise DataIntegrityError(
+                f"Malformed planner memory {source}: expected JSON object"
+            ) from exc
+        if not isinstance(payload, dict):
+            raise DataIntegrityError(
+                f"Malformed planner memory {source}: expected JSON object, got {type(payload).__name__}"
+            )
+        return payload
+    raise DataIntegrityError(
+        f"Malformed planner memory {source}: expected JSON object, got {type(value).__name__}"
+    )
 
 
-def _load_contexts(value: Any) -> Dict[str, List[str]]:
-    payload = _load_json_object(value)
+def _load_contexts(value: Any, *, source: str = "context_json") -> Dict[str, List[str]]:
+    payload = _load_json_object(value, source=source)
     out: Dict[str, List[str]] = {}
     for key, raw in payload.items():
         family = _normalize_key(key)
@@ -85,7 +95,9 @@ def _family_from_event_type(event_type: str, registry_events: Dict[str, Any]) ->
 
 
 def _allowed_templates_for_family(family: str, registry_templates: Dict[str, Any]) -> List[str]:
-    families = registry_templates.get("families", {}) if isinstance(registry_templates, dict) else {}
+    families = (
+        registry_templates.get("families", {}) if isinstance(registry_templates, dict) else {}
+    )
     meta = families.get(family, {}) if isinstance(families, dict) else {}
     allowed = meta.get("allowed_templates", []) if isinstance(meta, dict) else []
     if isinstance(allowed, str):
@@ -111,22 +123,98 @@ def _tested_region_columns(df: pd.DataFrame) -> pd.DataFrame:
     for column in ["event_type", "template_id", "direction", "horizon", "entry_lag", "region_key"]:
         if column not in out.columns:
             out[column] = ""
-    for column, default in [("failure_cause_class", ""), ("failure_confidence", 0.0), ("failure_sample_size", 0)]:
+    for column, default in [
+        ("failure_cause_class", ""),
+        ("failure_confidence", 0.0),
+        ("failure_sample_size", 0),
+    ]:
         if column not in out.columns:
             out[column] = default
     return out
 
 
-def _count_contexts(tested_regions: pd.DataFrame) -> Dict[str, Counter]:
-    counts: Dict[str, Counter] = defaultdict(Counter)
-    if tested_regions.empty or "context_json" not in tested_regions.columns:
+def _count_contexts_by_event(tested_regions: pd.DataFrame) -> Dict[str, Dict[str, Counter]]:
+    counts: Dict[str, Dict[str, Counter]] = defaultdict(lambda: defaultdict(Counter))
+    if (
+        tested_regions.empty
+        or "event_type" not in tested_regions.columns
+        or "context_json" not in tested_regions.columns
+    ):
         return counts
-    for payload in tested_regions["context_json"].tolist():
-        contexts = _load_contexts(payload)
+    for row_number, row in enumerate(
+        tested_regions[["event_type", "context_json"]].to_dict(orient="records")
+    ):
+        event_type = str(row.get("event_type", "")).strip()
+        if not event_type:
+            continue
+        contexts = _load_contexts(
+            row.get("context_json"),
+            source=f"tested_regions.context_json[row={row_number},event_type={event_type}]",
+        )
         for family, labels in contexts.items():
             for label in labels:
-                counts[family][label] += 1
+                counts[event_type][family][label] += 1
     return counts
+
+
+def _regime_gap_for_event(
+    *,
+    event_type: str,
+    event_count: int,
+    event_context_counts: Dict[str, Dict[str, Counter]],
+    target_contexts: Sequence[str],
+    threshold: int,
+) -> tuple[float, Dict[str, list[str]], Dict[str, Any]]:
+    if event_count <= 0:
+        return 0.0, {}, {"event_type": event_type, "undercovered_contexts": {}}
+
+    score = 0.0
+    context_payload: Dict[str, list[str]] = {}
+    undercovered: Dict[str, Any] = {}
+    per_event_counts = event_context_counts.get(event_type, {})
+    resolved_threshold = max(int(threshold), 0)
+
+    for context_name in target_contexts:
+        counts = Counter(per_event_counts.get(context_name, Counter()))
+        expected_labels = list(_DEFAULT_TARGET_CONTEXT_LABELS.get(context_name, ()))
+        for label in counts:
+            if label not in expected_labels:
+                expected_labels.append(label)
+        if not expected_labels:
+            continue
+        for label in expected_labels:
+            counts.setdefault(label, 0)
+        min_count = min(int(value) for value in counts.values())
+        context_score = (
+            1.0
+            if resolved_threshold == 0 and min_count == 0
+            else max(0.0, 1.0 - (min_count / max(resolved_threshold, 1)))
+        )
+        if context_score <= 0.0:
+            continue
+        ordered_labels = expected_labels + [
+            label for label in sorted(counts) if label not in set(expected_labels)
+        ]
+        low_labels = [label for label in ordered_labels if int(counts[label]) == min_count]
+        if low_labels:
+            context_payload[context_name] = low_labels[:2]
+            score = max(score, context_score)
+            undercovered[context_name] = {
+                "labels": low_labels[:2],
+                "counts": {label: int(counts[label]) for label in sorted(counts)},
+                "min_count": int(min_count),
+                "threshold": int(resolved_threshold),
+                "score": float(context_score),
+            }
+
+    return (
+        score,
+        context_payload,
+        {
+            "event_type": event_type,
+            "undercovered_contexts": undercovered,
+        },
+    )
 
 
 def _family_counts(tested_regions: pd.DataFrame, event_to_family: Dict[str, str]) -> Counter:
@@ -151,21 +239,62 @@ def _event_counts(tested_regions: pd.DataFrame) -> Counter:
 def _mechanical_exclusions(tested_regions: pd.DataFrame) -> set[str]:
     if tested_regions.empty or "failure_cause_class" not in tested_regions.columns:
         return set()
-    mechanical = tested_regions[tested_regions["failure_cause_class"].astype(str).str.strip().str.lower() == "mechanical"]
+    mechanical = tested_regions[
+        tested_regions["failure_cause_class"].astype(str).str.strip().str.lower() == "mechanical"
+    ]
     if "region_key" not in mechanical.columns:
         return set()
     return set(mechanical["region_key"].astype(str).tolist())
 
 
-def _mechanical_event_types(tested_regions: pd.DataFrame) -> set[str]:
-    if tested_regions.empty or "failure_cause_class" not in tested_regions.columns or "event_type" not in tested_regions.columns:
-        return set()
-    mechanical = tested_regions[tested_regions["failure_cause_class"].astype(str).str.strip().str.lower() == "mechanical"]
-    return set(mechanical["event_type"].astype(str).tolist())
+_FAILURE_CLASS_PENALTY_WEIGHTS = {
+    "mechanical": 3.0,
+    "market": 0.95,
+    "cost": 0.8,
+    "overfitting": 1.15,
+    "trust_degraded": 1.6,
+    "requires_revalidation": 2.2,
+    "exhausted": 1.4,
+    "insufficient_sample": 0.25,
+    "regime_shift": 0.1,
+    "decay": 0.1,
+}
+
+_RETEST_WORTHY_FAILURE_CLASSES = frozenset(
+    {
+        "insufficient_sample",
+        "regime_shift",
+        "decay",
+        "retest_worthy",
+    }
+)
+
+_TRUST_DEGRADED_FAILURE_CLASSES = frozenset(
+    {
+        "trust_degraded",
+        "degraded_artifact",
+        "requires_revalidation",
+    }
+)
 
 
-def _failure_penalties(tested_regions: pd.DataFrame) -> Dict[str, float]:
-    penalties: Dict[str, float] = {}
+def _empty_failure_penalty() -> dict[str, float]:
+    return {
+        "total_penalty": 0.0,
+        "mechanical": 0.0,
+        "market": 0.0,
+        "insufficient_sample": 0.0,
+        "cost": 0.0,
+        "overfitting": 0.0,
+        "trust_degraded": 0.0,
+        "requires_revalidation": 0.0,
+        "exhausted": 0.0,
+        "retest_bonus": 0.0,
+    }
+
+
+def _failure_penalty_components(tested_regions: pd.DataFrame) -> Dict[str, dict[str, float]]:
+    penalties: Dict[str, dict[str, float]] = {}
     if tested_regions.empty or "failure_cause_class" not in tested_regions.columns:
         return penalties
     for event_type, frame in tested_regions.groupby("event_type", dropna=False):
@@ -175,19 +304,183 @@ def _failure_penalties(tested_regions: pd.DataFrame) -> Dict[str, float]:
         classes = frame["failure_cause_class"].astype(str).str.strip().str.lower()
         if classes.empty:
             continue
-        mechanical_share = float((classes == "mechanical").mean())
-        insufficient_share = float((classes == "insufficient_sample").mean())
-        market_share = float((classes == "market").mean())
-        cost_share = float((classes == "cost").mean())
-        overfit_share = float((classes == "overfitting").mean())
-        penalties[event_key] = (
-            2.5 * mechanical_share
-            + 0.75 * insufficient_share
-            + 0.45 * market_share
-            + 0.65 * cost_share
-            + 0.9 * overfit_share
+        components = _empty_failure_penalty()
+        for class_name in (
+            "mechanical",
+            "market",
+            "insufficient_sample",
+            "cost",
+            "overfitting",
+            "requires_revalidation",
+            "exhausted",
+        ):
+            share = float((classes == class_name).mean())
+            components[class_name] = share * _FAILURE_CLASS_PENALTY_WEIGHTS[class_name]
+        trust_share = float(classes.isin(_TRUST_DEGRADED_FAILURE_CLASSES).mean())
+        components["trust_degraded"] = (
+            trust_share * _FAILURE_CLASS_PENALTY_WEIGHTS["trust_degraded"]
         )
+        retest_share = float(classes.isin(_RETEST_WORTHY_FAILURE_CLASSES).mean())
+        components["retest_bonus"] = 0.15 * retest_share
+        components["total_penalty"] = max(
+            0.0,
+            sum(
+                value
+                for key, value in components.items()
+                if key not in {"total_penalty", "retest_bonus"}
+            )
+            - components["retest_bonus"],
+        )
+        penalties[event_key] = components
     return penalties
+
+
+def _normalize_horizon(value: Any) -> str:
+    token = str(value or "").strip().lower()
+    return token[:-1] if token.endswith("b") and token[:-1].isdigit() else token
+
+
+def _normalize_entry_lag(value: Any) -> str:
+    try:
+        return str(int(float(str(value).strip())))
+    except Exception:
+        return str(value or "").strip()
+
+
+def _tested_scope_keys(
+    tested_regions: pd.DataFrame,
+) -> set[tuple[str, str, str, str, str, str]]:
+    if tested_regions.empty:
+        return set()
+    required = {
+        "event_type",
+        "template_id",
+        "direction",
+        "horizon",
+        "entry_lag",
+        "context_json",
+    }
+    if not required.issubset(set(tested_regions.columns)):
+        return set()
+    keys: set[tuple[str, str, str, str, str, str]] = set()
+    for row_number, row in enumerate(tested_regions.to_dict(orient="records")):
+        event_type = str(row.get("event_type", "")).strip()
+        template_id = str(row.get("template_id", "")).strip()
+        direction = str(row.get("direction", "")).strip()
+        horizon = _normalize_horizon(row.get("horizon"))
+        entry_lag = _normalize_entry_lag(row.get("entry_lag"))
+        contexts = _load_contexts(
+            row.get("context_json"),
+            source=f"tested_regions.context_json[row={row_number},event_type={event_type}]",
+        )
+        context_json = canonical_json(contexts)
+        if event_type and template_id and direction and horizon and entry_lag:
+            keys.add((event_type, template_id, direction, horizon, entry_lag, context_json))
+    return keys
+
+
+def _proposal_scope_keys(
+    *,
+    event_type: str,
+    templates: Sequence[str],
+    directions: Sequence[str],
+    horizons: Sequence[int],
+    entry_lags: Sequence[int],
+    contexts: Dict[str, list[str]],
+) -> set[tuple[str, str, str, str, str, str]]:
+    context_json = canonical_json(contexts)
+    return {
+        (
+            str(event_type).strip(),
+            str(template).strip(),
+            str(direction).strip(),
+            _normalize_horizon(horizon),
+            _normalize_entry_lag(entry_lag),
+            context_json,
+        )
+        for template in templates
+        for direction in directions
+        for horizon in horizons
+        for entry_lag in entry_lags
+        if str(template).strip() and str(direction).strip()
+    }
+
+
+def _region_keys_for_scope_keys(
+    *,
+    program_id: str,
+    symbols: Sequence[str],
+    scope_keys: Sequence[tuple[str, str, str, str, str, str]],
+) -> list[str]:
+    symbol_scope = ",".join(
+        str(symbol).strip().upper() for symbol in symbols if str(symbol).strip()
+    )
+    return [
+        region_key(
+            {
+                "program_id": program_id,
+                "symbol_scope": symbol_scope,
+                "event_type": event_type,
+                "trigger_type": "EVENT",
+                "template_id": template_id,
+                "direction": direction,
+                "horizon": horizon,
+                "entry_lag": entry_lag,
+                "context_hash": context_json,
+            }
+        )
+        for event_type, template_id, direction, horizon, entry_lag, context_json in scope_keys
+    ]
+
+
+def _dominant_score_factors(
+    components: Dict[str, float],
+    *,
+    positive: bool,
+    limit: int = 3,
+) -> list[dict[str, float]]:
+    rows: list[tuple[str, float]] = []
+    for key, raw_value in components.items():
+        value = float(raw_value or 0.0)
+        if positive and value > 0:
+            rows.append((key, value))
+        elif not positive and value < 0:
+            rows.append((key, value))
+    rows.sort(key=lambda item: abs(item[1]), reverse=True)
+    return [{"factor": key, "contribution": value} for key, value in rows[:limit]]
+
+
+def _build_selection_rationale(
+    ranked: Sequence[PlannedCampaignProposal],
+) -> dict[str, Any]:
+    if not ranked:
+        return {}
+    selected = ranked[0]
+    selected_components = dict(selected.rationale.get("score_components", {}))
+    runner_up = ranked[1] if len(ranked) > 1 else None
+    score_margin = float(selected.score - runner_up.score) if runner_up is not None else None
+    payload: dict[str, Any] = {
+        "selected_event_type": selected.event_type,
+        "selected_score": float(selected.score),
+        "dominant_positive_factors": _dominant_score_factors(
+            selected_components,
+            positive=True,
+        ),
+        "dominant_penalties": _dominant_score_factors(
+            selected_components,
+            positive=False,
+        ),
+        "runner_up_event_type": runner_up.event_type if runner_up is not None else "",
+        "runner_up_score": float(runner_up.score) if runner_up is not None else None,
+        "score_margin": score_margin,
+    }
+    if runner_up is not None:
+        runner_components = dict(runner_up.rationale.get("score_components", {}))
+        payload["runner_up_dominant_penalties"] = _dominant_score_factors(
+            runner_components,
+            positive=False,
+        )
+    return payload
 
 
 def _default_date_scope(lookback_days: int) -> tuple[str, str]:
@@ -270,6 +563,8 @@ class CampaignPlanner:
             "search_limits": self._load_yaml(self.registry_root / "search_limits.yaml"),
         }
         self.event_weights = self._event_priority_weights(self.search_space_path)
+        self._last_duplicate_excluded_region_keys: set[str] = set()
+        self._last_duplicate_exclusion_details: list[dict[str, Any]] = []
 
     def _load_yaml(self, path: Path) -> Dict[str, Any]:
         if not path.exists():
@@ -289,27 +584,48 @@ class CampaignPlanner:
 
     def _memory(self) -> Dict[str, pd.DataFrame]:
         return {
-            "tested_regions": _tested_region_columns(read_memory_table(self.config.program_id, "tested_regions", data_root=self.data_root)),
-            "failures": read_memory_table(self.config.program_id, "failures", data_root=self.data_root),
-            "region_statistics": read_memory_table(self.config.program_id, "region_statistics", data_root=self.data_root),
-            "event_statistics": read_memory_table(self.config.program_id, "event_statistics", data_root=self.data_root),
-            "template_statistics": read_memory_table(self.config.program_id, "template_statistics", data_root=self.data_root),
-            "context_statistics": read_memory_table(self.config.program_id, "context_statistics", data_root=self.data_root),
-            "reflections": read_memory_table(self.config.program_id, "reflections", data_root=self.data_root),
+            "tested_regions": _tested_region_columns(
+                read_memory_table(
+                    self.config.program_id, "tested_regions", data_root=self.data_root
+                )
+            ),
+            "failures": read_memory_table(
+                self.config.program_id, "failures", data_root=self.data_root
+            ),
+            "region_statistics": read_memory_table(
+                self.config.program_id, "region_statistics", data_root=self.data_root
+            ),
+            "event_statistics": read_memory_table(
+                self.config.program_id, "event_statistics", data_root=self.data_root
+            ),
+            "template_statistics": read_memory_table(
+                self.config.program_id, "template_statistics", data_root=self.data_root
+            ),
+            "context_statistics": read_memory_table(
+                self.config.program_id, "context_statistics", data_root=self.data_root
+            ),
+            "reflections": read_memory_table(
+                self.config.program_id, "reflections", data_root=self.data_root
+            ),
         }
 
     def _candidate_events(self, tested_regions: pd.DataFrame) -> list[dict[str, Any]]:
         events_registry = self.registry.get("events", {}).get("events", {})
-        event_to_family = {event_type: _family_from_event_type(event_type, events_registry) for event_type in events_registry}
+        event_to_family = {
+            event_type: _family_from_event_type(event_type, events_registry)
+            for event_type in events_registry
+        }
         event_counts = _event_counts(tested_regions)
         family_counts = _family_counts(tested_regions, event_to_family)
-        regime_counts = _count_contexts(tested_regions)
+        event_context_counts = _count_contexts_by_event(tested_regions)
         mechanical_region_keys = _mechanical_exclusions(tested_regions)
-        mechanical_event_types = _mechanical_event_types(tested_regions)
-        penalties = _failure_penalties(tested_regions)
+        penalties = _failure_penalty_components(tested_regions)
+        tested_scope_keys = _tested_scope_keys(tested_regions)
         weights = self.event_weights
         max_weight = max(weights.values(), default=DEFAULT_EVENT_PRIORITY_WEIGHT)
         candidates: list[dict[str, Any]] = []
+        self._last_duplicate_excluded_region_keys = set()
+        self._last_duplicate_exclusion_details = []
 
         for event_type, meta in events_registry.items():
             if not bool(meta.get("enabled", True)):
@@ -326,7 +642,10 @@ class CampaignPlanner:
             family = event_to_family.get(event_type, "")
             event_count = int(event_counts.get(event_type, 0))
             family_count = int(family_counts.get(family, 0))
-            if self.config.min_region_test_count > 0 and event_count >= self.config.min_region_test_count:
+            if (
+                self.config.min_region_test_count > 0
+                and event_count >= self.config.min_region_test_count
+            ):
                 continue
 
             weight = float(weights.get(event_type, DEFAULT_EVENT_PRIORITY_WEIGHT))
@@ -334,38 +653,57 @@ class CampaignPlanner:
             family_gap_score = 1.0 / (1.0 + family_count)
             event_gap_score = 1.0 / (1.0 + event_count)
 
-            regime_score = 0.0
-            context_payload: Dict[str, list[str]] = {}
-            for context_name in self.config.target_contexts:
-                counts = regime_counts.get(context_name, Counter())
-                if not counts:
-                    continue
-                min_count = min(int(v) for v in counts.values()) if counts else 0
-                if min_count <= self.config.regime_gap_threshold:
-                    regime_score = max(regime_score, 1.0 - (min_count / max(self.config.regime_gap_threshold, 1)))
-                    low_labels = [label for label, value in counts.items() if int(value) == min_count]
-                    if low_labels:
-                        context_payload[context_name] = low_labels[:2]
+            regime_score, context_payload, regime_gap = _regime_gap_for_event(
+                event_type=event_type,
+                event_count=event_count,
+                event_context_counts=event_context_counts,
+                target_contexts=self.config.target_contexts,
+                threshold=self.config.regime_gap_threshold,
+            )
 
             if not context_payload and "vol_regime" in self.config.target_contexts:
                 context_payload = {"vol_regime": ["low", "high"]}
 
-            mechanical_penalty = 1.0 if event_type in mechanical_event_types else 0.0
-            history_penalty = penalties.get(event_type, 0.0)
+            failure_penalty = penalties.get(event_type, _empty_failure_penalty())
+            history_penalty = float(failure_penalty.get("total_penalty", 0.0))
             maturity_bonus = 0.4 if governance["tier"] == "A" else 0.15
             governance_penalty = float(governance.get("rank_penalty", 0.0)) * 0.35
-            score = (
-                1.8 * priority_score
-                + 1.2 * family_gap_score
-                + 0.9 * event_gap_score
-                + 0.8 * regime_score
-                + maturity_bonus
-                - 2.5 * mechanical_penalty
-                - history_penalty
-                - governance_penalty
-            )
+            score_components = {
+                "priority_score": 1.8 * priority_score,
+                "family_gap_score": 1.2 * family_gap_score,
+                "event_gap_score": 0.9 * event_gap_score,
+                "regime_score": 0.8 * regime_score,
+                "maturity_bonus": maturity_bonus,
+                "history_penalty": -history_penalty,
+                "governance_penalty": -governance_penalty,
+            }
+            score = sum(score_components.values())
 
             templates = _allowed_templates_for_family(family, self.registry.get("templates", {}))
+            proposal_scope_keys = _proposal_scope_keys(
+                event_type=event_type,
+                templates=templates,
+                directions=self.config.directions,
+                horizons=self.config.horizon_bars,
+                entry_lags=self.config.entry_lags,
+                contexts=context_payload,
+            )
+            if proposal_scope_keys and proposal_scope_keys.issubset(tested_scope_keys):
+                excluded_keys = _region_keys_for_scope_keys(
+                    program_id=self.config.program_id,
+                    symbols=self.config.symbols,
+                    scope_keys=sorted(proposal_scope_keys),
+                )
+                self._last_duplicate_excluded_region_keys.update(excluded_keys)
+                self._last_duplicate_exclusion_details.append(
+                    {
+                        "event_type": event_type,
+                        "reason": "all_proposed_scope_combinations_already_tested",
+                        "tested_scope_count": len(proposal_scope_keys),
+                        "excluded_region_keys": excluded_keys[:10],
+                    }
+                )
+                continue
             proposal = self._build_proposal_payload(
                 event_type=event_type,
                 family=family,
@@ -380,6 +718,9 @@ class CampaignPlanner:
                 family_gap_score=family_gap_score,
                 event_gap_score=event_gap_score,
                 history_penalty=history_penalty,
+                failure_penalty=failure_penalty,
+                score_components=score_components,
+                regime_gap=regime_gap,
                 governance=governance,
                 excluded_region_keys=mechanical_region_keys,
             )
@@ -405,6 +746,9 @@ class CampaignPlanner:
         family_gap_score: float,
         event_gap_score: float,
         history_penalty: float,
+        failure_penalty: Dict[str, float],
+        score_components: Dict[str, float],
+        regime_gap: Dict[str, Any],
         governance: Dict[str, Any],
         excluded_region_keys: set[str] | None = None,
     ) -> Dict[str, Any] | None:
@@ -421,10 +765,15 @@ class CampaignPlanner:
                 "events": {"include": [event_type]},
                 "tiers": list(self.config.event_tiers),
                 "operational_roles": list(self.config.operational_roles),
-                "deployment_dispositions": [str(governance.get("deployment_disposition", "")).strip()] if str(governance.get("deployment_disposition", "")).strip() else [],
+                "deployment_dispositions": [
+                    str(governance.get("deployment_disposition", "")).strip()
+                ]
+                if str(governance.get("deployment_disposition", "")).strip()
+                else [],
             },
             "templates": list(dict.fromkeys(templates))[:4],
-            "description": f"Autonomous campaign proposal for {event_type}" + (f" (family={family})" if family else ""),
+            "description": f"Autonomous campaign proposal for {event_type}"
+            + (f" (family={family})" if family else ""),
             "run_mode": self.config.run_mode,
             "objective_name": self.config.objective_name,
             "promotion_profile": self.config.promotion_profile,
@@ -453,7 +802,10 @@ class CampaignPlanner:
             "family_gap_score": family_gap_score,
             "event_gap_score": event_gap_score,
             "regime_score": regime_score,
+            "regime_gap": dict(regime_gap),
             "history_penalty": history_penalty,
+            "failure_penalty": dict(failure_penalty),
+            "score_components": dict(score_components),
             "event_count": event_count,
             "family_count": family_count,
             "governance": {
@@ -508,18 +860,27 @@ class CampaignPlanner:
             "top_event_type": ranked[0].event_type if ranked else "",
             "top_family": ranked[0].family if ranked else "",
             "search_space_path": str(self.search_space_path),
+            "duplicate_region_exclusions": len(self._last_duplicate_exclusion_details),
+            "duplicate_exclusion_reasons": list(self._last_duplicate_exclusion_details[:5]),
+            "selection_rationale": _build_selection_rationale(ranked),
         }
         return CampaignPlanResult(
             program_id=self.config.program_id,
             ranked_proposals=ranked,
-            excluded_region_keys=sorted(self._excluded_region_keys(tested_regions)),
+            excluded_region_keys=sorted(
+                self._excluded_region_keys(tested_regions)
+                | self._last_duplicate_excluded_region_keys
+            ),
             summary=summary,
         )
 
     def _excluded_region_keys(self, tested_regions: pd.DataFrame) -> set[str]:
         if tested_regions.empty or "failure_cause_class" not in tested_regions.columns:
             return set()
-        mask = tested_regions["failure_cause_class"].astype(str).str.strip().str.lower() == "mechanical"
+        mask = (
+            tested_regions["failure_cause_class"].astype(str).str.strip().str.lower()
+            == "mechanical"
+        )
         if not mask.any() or "region_key" not in tested_regions.columns:
             return set()
         return set(tested_regions.loc[mask, "region_key"].astype(str).tolist())

@@ -7,9 +7,10 @@ import pandas as pd
 import pytest
 
 from project.core.exceptions import DataIntegrityError
+from project.core.exceptions import IncompleteLineageError
 from project.core.exceptions import SchemaMismatchError
-from project.live.contracts import PromotedThesis
 from project.live.deployment import check_thesis
+from project.live.thesis_store import ThesisStore
 from project.research.live_export import export_promoted_theses_for_run
 from project.research.validation.contracts import (
     ValidationArtifactRef,
@@ -102,6 +103,25 @@ def _write_validation_lineage(
     base_dir = root / "reports" / "validation" / run_id
     write_validation_bundle(bundle, base_dir=base_dir)
     write_promotion_ready_candidates(bundle, base_dir=base_dir)
+
+
+def _write_promotion_artifacts(
+    root: Path,
+    *,
+    run_id: str,
+    bundles: list[dict],
+    promoted_rows: list[dict],
+) -> None:
+    promotion_dir = root / "reports" / "promotions" / run_id
+    promotion_dir.mkdir(parents=True, exist_ok=True)
+    (promotion_dir / "evidence_bundles.jsonl").write_text(
+        "".join(json.dumps(bundle, sort_keys=True) + "\n" for bundle in bundles),
+        encoding="utf-8",
+    )
+    pd.DataFrame(promoted_rows).to_parquet(
+        promotion_dir / "promoted_candidates.parquet",
+        index=False,
+    )
 
 
 def test_export_promoted_theses_pending_then_active_with_blueprint(tmp_path: Path) -> None:
@@ -206,7 +226,9 @@ def test_export_promoted_theses_fails_on_corrupted_existing_index(tmp_path: Path
         )
 
 
-def test_export_promoted_theses_uses_authored_thesis_definition_from_lineage(tmp_path: Path) -> None:
+def test_export_promoted_theses_uses_authored_thesis_definition_from_lineage(
+    tmp_path: Path,
+) -> None:
     _write_validation_lineage(tmp_path, run_id="run_1", candidate_id="cand_1")
     promoted_df = pd.DataFrame(
         [
@@ -241,11 +263,16 @@ def test_export_promoted_theses_uses_authored_thesis_definition_from_lineage(tmp
     assert thesis["requirements"]["confirmation_events"] == ["LIQUIDITY_VACUUM"]
     assert thesis["requirements"]["sequence_mode"] == "event_plus_confirm"
     assert thesis["source"]["event_contract_ids"] == ["VOL_SHOCK", "LIQUIDITY_VACUUM"]
-    assert contract_payload["contracts"][0]["authored_contract_id"] == "THESIS_VOL_SHOCK_LIQUIDITY_CONFIRM"
+    assert (
+        contract_payload["contracts"][0]["authored_contract_id"]
+        == "THESIS_VOL_SHOCK_LIQUIDITY_CONFIRM"
+    )
     assert contract_payload["contracts"][0]["authored_contract_linked"] is True
 
 
-def test_export_promoted_theses_derives_multi_clause_requirements_from_metadata(tmp_path: Path) -> None:
+def test_export_promoted_theses_derives_multi_clause_requirements_from_metadata(
+    tmp_path: Path,
+) -> None:
     _write_validation_lineage(tmp_path, run_id="run_1", candidate_id="cand_structural")
     promoted_df = pd.DataFrame(
         [
@@ -389,6 +416,48 @@ def test_export_promoted_theses_loads_validation_lineage_from_canonical_validati
     assert thesis["lineage"]["validation_artifact_paths"] == {
         "validation_report": "reports/validation/run_1/validation_report.json"
     }
+
+
+def test_canonical_export_certifies_promotion_evidence_lineage_and_runtime_gate(
+    tmp_path: Path,
+) -> None:
+    _write_validation_lineage(tmp_path, run_id="run_green", candidate_id="cand_1")
+    green_bundle = _bundle()
+    _write_promotion_artifacts(
+        tmp_path,
+        run_id="run_green",
+        bundles=[green_bundle],
+        promoted_rows=[{"candidate_id": "cand_1", "event_type": "VOL_SHOCK", "status": "PROMOTED"}],
+    )
+
+    result = export_promoted_theses_for_run("run_green", data_root=tmp_path)
+    loaded = ThesisStore.from_run_id("run_green", data_root=tmp_path).all()
+
+    assert result.thesis_count == 1
+    assert loaded[0].lineage.validation_run_id == "run_green"
+    assert loaded[0].lineage.candidate_id == "cand_1"
+    assert loaded[0].deployment_state == "paper_only"
+    assert check_thesis(loaded[0]) == []
+
+    red_bundle = _bundle()
+    red_bundle["candidate_id"] = "cand_evidence"
+    _write_validation_lineage(tmp_path, run_id="run_red", candidate_id="cand_evidence")
+    _write_promotion_artifacts(
+        tmp_path,
+        run_id="run_red",
+        bundles=[red_bundle],
+        promoted_rows=[
+            {
+                "candidate_id": "cand_promoted",
+                "event_type": "VOL_SHOCK",
+                "status": "PROMOTED",
+            }
+        ],
+    )
+
+    with pytest.raises(IncompleteLineageError, match="Promotion/evidence lineage mismatch"):
+        export_promoted_theses_for_run("run_red", data_root=tmp_path)
+    assert not (tmp_path / "live" / "theses" / "run_red" / "promoted_theses.json").exists()
 
 
 def test_export_promoted_theses_fails_closed_on_malformed_validation_bundle(tmp_path: Path) -> None:

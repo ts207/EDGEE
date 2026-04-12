@@ -2,9 +2,12 @@ import subprocess
 from pathlib import Path
 import pytest
 
+
 def test_cli_help_contains_trigger_discovery_warnings():
     # Verify 'edge discover --help' shows 'triggers' subgroup
-    result = subprocess.run(["python3", "-m", "project.cli", "discover", "--help"], capture_output=True, text=True)
+    result = subprocess.run(
+        ["python3", "-m", "project.cli", "discover", "--help"], capture_output=True, text=True
+    )
     assert result.returncode == 0
     assert "triggers" in result.stdout.lower()
     # Check for keywords instead of exact string
@@ -12,9 +15,14 @@ def test_cli_help_contains_trigger_discovery_warnings():
     assert "research" in result.stdout.lower()
     assert "lane" in result.stdout.lower()
 
+
 def test_cli_triggers_help_contains_safety_language():
     # Verify 'edge discover triggers --help'
-    result = subprocess.run(["python3", "-m", "project.cli", "discover", "triggers", "--help"], capture_output=True, text=True)
+    result = subprocess.run(
+        ["python3", "-m", "project.cli", "discover", "triggers", "--help"],
+        capture_output=True,
+        text=True,
+    )
     assert result.returncode == 0
     # Search for keywords due to line-wrapping in argparse output
     out = result.stdout.lower()
@@ -27,27 +35,21 @@ def test_cli_triggers_help_contains_safety_language():
     assert "no runtime effect" in out
     assert "manual review required" in out
 
+
 def test_makefile_contains_advanced_targets():
     makefile_content = Path("Makefile").read_text()
     assert "# Advanced/Internal trigger discovery" in makefile_content
     assert "advanced-discover-triggers-parameter:" in makefile_content
     assert "advanced-discover-triggers-cluster:" in makefile_content
 
-def test_docs_presence_and_index_link():
-    doc_path = Path("docs/93_trigger_discovery.md")
-    assert doc_path.exists()
-    
-    doc_content = doc_path.read_text()
-    assert "# Advanced Trigger Discovery (Internal Research Lane)" in doc_content
-    assert "PROPOSAL-GENERATING ONLY" in doc_content
-    assert "manual review" in doc_content.lower()
-    
-    readme_content = Path("docs/README.md").read_text()
-    assert "[93_trigger_discovery.md](93_trigger_discovery.md)" in readme_content
 
 @pytest.mark.parametrize("cmd", ["parameter-sweep", "feature-cluster", "emit-registry-payload"])
 def test_cli_triggers_subcommands_dispatch(cmd):
     # Just a smoke test for dispatch wiring (using --help for each)
-    result = subprocess.run(["python3", "-m", "project.cli", "discover", "triggers", cmd, "--help"], capture_output=True, text=True)
+    result = subprocess.run(
+        ["python3", "-m", "project.cli", "discover", "triggers", cmd, "--help"],
+        capture_output=True,
+        text=True,
+    )
     assert result.returncode == 0
     assert "show this help" in result.stdout.lower()

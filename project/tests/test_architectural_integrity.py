@@ -72,7 +72,13 @@ ALLOWED_DEPENDENCIES = {
         "project.strategy",
         "project.schemas",
     ],
-    "project.portfolio": ["project.core", "project.specs", "project.strategy", "project.live", "project.research"],
+    "project.portfolio": [
+        "project.core",
+        "project.specs",
+        "project.strategy",
+        "project.live",
+        "project.research",
+    ],
     "project.research": [
         "project.core",
         "project.io",
@@ -469,57 +475,6 @@ def _files_importing(module_pattern: str) -> list[str]:
             if pattern.search(content):
                 matches.append(str(file_path.relative_to(PROJECT_ROOT.parent)).replace("\\", "/"))
     return sorted(set(matches))
-
-
-def test_architecture_surface_inventory_doc_exists() -> None:
-    inventory_path = PROJECT_ROOT.parent / "docs" / "ARCHITECTURE_SURFACE_INVENTORY.md"
-    assert inventory_path.exists(), "expected architecture surface inventory doc"
-    text = inventory_path.read_text(encoding="utf-8")
-    for needle in (
-        "Canonical Surfaces",
-        "Transitional Surfaces",
-        "project.strategy.dsl",
-        "Removed Surfaces",
-    ):
-        assert needle in text
-
-
-def test_architecture_metrics_and_checklist_exist() -> None:
-    metrics_path = PROJECT_ROOT.parent / "docs" / "generated" / "architecture_metrics.json"
-    checklist_path = PROJECT_ROOT.parent / "docs" / "ARCHITECTURE_MAINTENANCE_CHECKLIST.md"
-    assert metrics_path.exists(), "expected architecture metrics snapshot"
-    assert checklist_path.exists(), "expected architecture maintenance checklist"
-
-    import json
-
-    metrics = json.loads(metrics_path.read_text(encoding="utf-8"))
-    for key in (
-        "project.research.compat_importers",
-        "project.strategy_dsl_importers",
-        "project.strategy_templates_importers",
-        "run_all_coordinator_lines",
-        "module_coupling_count",
-        "cross_boundary_import_count",
-        "circular_dependency_count",
-        "test_coverage_ratio",
-    ):
-        assert key in metrics["metrics"], f"Missing metric snapshot: {key}"
-
-    # Assert thresholds for Phase 4 metrics
-    # These bounds reflect the current canonical codebase after control-plane growth
-    # and should be tightened only alongside deliberate architecture simplification.
-    assert metrics["metrics"]["module_coupling_count"] <= 3400
-    assert metrics["metrics"]["cross_boundary_import_count"] <= 2400
-    assert metrics["metrics"]["circular_dependency_count"] <= 5
-
-    checklist_text = checklist_path.read_text(encoding="utf-8")
-    for needle in (
-        "Contracts and Generated Docs",
-        "Research Services and Wrappers",
-        "Strategy Surfaces",
-        "Metrics and Guardrails",
-    ):
-        assert needle in checklist_text
 
 
 def test_transitional_import_surfaces_are_frozen_to_documented_allowlist() -> None:

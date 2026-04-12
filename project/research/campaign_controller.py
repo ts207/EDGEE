@@ -31,6 +31,7 @@ from project.spec_registry.search_space import (
     QUALITY_SCORES as _QUALITY_SCORES_MAP,
     DEFAULT_EVENT_PRIORITY_WEIGHT as _DEFAULT_QUALITY,
 )
+
 _LOG = logging.getLogger(__name__)
 
 _QUALITY_SCORES: Dict[str, float] = _QUALITY_SCORES_MAP
@@ -58,6 +59,7 @@ def _merge_proposal_rows(existing: pd.DataFrame, incoming: pd.DataFrame) -> pd.D
         return existing.copy()
     out = pd.concat([existing, incoming], ignore_index=True)
     return out.drop_duplicates(subset=["proposal_id"], keep="last").reset_index(drop=True)
+
 
 def _load_event_quality_weights(search_space_path: Path) -> Dict[str, float]:
     """Backward-compatible shim for quality weight loading."""
@@ -121,9 +123,7 @@ class CampaignConfig:
             self.proposal_context_dimensions = ["vol_regime", "carry_state"]
         else:
             self.proposal_context_dimensions = [
-                str(dim).strip()
-                for dim in self.proposal_context_dimensions
-                if str(dim).strip()
+                str(dim).strip() for dim in self.proposal_context_dimensions if str(dim).strip()
             ]
 
 
@@ -216,7 +216,9 @@ class CampaignController:
             max_consecutive_no_signal=self.config.max_consecutive_no_signal,
             research_mode=self.config.research_mode,
         ).to_dict()
-        self.contract_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        self.contract_path.write_text(
+            json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
 
     def _plan_payload(self, plan: Any) -> dict[str, Any]:
         return {
@@ -231,9 +233,21 @@ class CampaignController:
         payload = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
         instrument_scope = payload.get("instrument_scope", {}) if isinstance(payload, dict) else {}
         symbols = instrument_scope.get("symbols", []) if isinstance(instrument_scope, dict) else []
-        start = str(instrument_scope.get("start", "")).strip() if isinstance(instrument_scope, dict) else ""
-        end = str(instrument_scope.get("end", "")).strip() if isinstance(instrument_scope, dict) else ""
-        timeframe = str(instrument_scope.get("timeframe", "")).strip() if isinstance(instrument_scope, dict) else ""
+        start = (
+            str(instrument_scope.get("start", "")).strip()
+            if isinstance(instrument_scope, dict)
+            else ""
+        )
+        end = (
+            str(instrument_scope.get("end", "")).strip()
+            if isinstance(instrument_scope, dict)
+            else ""
+        )
+        timeframe = (
+            str(instrument_scope.get("timeframe", "")).strip()
+            if isinstance(instrument_scope, dict)
+            else ""
+        )
         cmd = [
             sys.executable,
             "-m",
@@ -252,7 +266,12 @@ class CampaignController:
             self.config.program_id,
         ]
         if symbols:
-            cmd.extend(["--symbols", ",".join(str(symbol).strip() for symbol in symbols if str(symbol).strip())])
+            cmd.extend(
+                [
+                    "--symbols",
+                    ",".join(str(symbol).strip() for symbol in symbols if str(symbol).strip()),
+                ]
+            )
         if start:
             cmd.extend(["--start", start])
         if end:
@@ -290,8 +309,14 @@ class CampaignController:
             "dry_run": False,
             "returncode": int(returncode),
             "objective_name": str(payload.get("objective_name", "") or ""),
-            "promotion_profile": "research" if bool(promotion.get("enabled", False)) else "exploratory_only",
-            "symbols": ",".join(str(symbol).strip() for symbol in list(instrument_scope.get("symbols", []) or []) if str(symbol).strip()),
+            "promotion_profile": "research"
+            if bool(promotion.get("enabled", False))
+            else "exploratory_only",
+            "symbols": ",".join(
+                str(symbol).strip()
+                for symbol in list(instrument_scope.get("symbols", []) or [])
+                if str(symbol).strip()
+            ),
             "command_json": canonical_json(command),
             "validated_plan_json": canonical_json(self._plan_payload(plan)),
             "bounded_json": "",
@@ -315,7 +340,9 @@ class CampaignController:
     # ------------------------------------------------------------------
 
     def run_campaign(self):
-        _LOG.info("Starting campaign: %s (mode=%s)", self.config.program_id, self.config.research_mode)
+        _LOG.info(
+            "Starting campaign: %s (mode=%s)", self.config.program_id, self.config.research_mode
+        )
 
         # Phase 4.1 — Run MI scan once before the first proposal cycle so the
         # controller has fresh data-driven predicate candidates from the start.
@@ -424,6 +451,15 @@ class CampaignController:
         repair_proposal = self._step_repair(mem)
         if repair_proposal is not None:
             return repair_proposal
+        current_focus = str(mem.get("belief_state", {}).get("current_focus", "")).strip()
+        if current_focus == "repair_pipeline":
+            message = (
+                "belief_state.json current_focus=repair_pipeline but next_actions.json "
+                "has no actionable repair entry; refusing to issue unrelated proposal"
+            )
+            if self.config.strict_memory_integrity:
+                raise CampaignMemoryIntegrityError(message)
+            _LOG.warning("Campaign memory consistency warning: %s", message)
 
         # ── Step 2: EXPLOIT ───────────────────────────────────────────────────
         # In exploit mode only propose from promising_regions; otherwise check
@@ -463,7 +499,9 @@ class CampaignController:
         def _record_memory_error(path: Path, message: str, *, exc_info: bool = False) -> None:
             detail = f"{path}: {message}"
             integrity_errors.append(detail)
-            _LOG.error("Campaign memory integrity failure at %s: %s", path, message, exc_info=exc_info)
+            _LOG.error(
+                "Campaign memory integrity failure at %s: %s", path, message, exc_info=exc_info
+            )
 
         def _json(path: Path) -> Dict[str, Any]:
             if path.exists():
@@ -473,7 +511,9 @@ class CampaignController:
                         return payload
                     _record_memory_error(path, "expected JSON object payload, got non-object")
                 except Exception:
-                    _record_memory_error(path, "failed to parse JSON memory artifact", exc_info=True)
+                    _record_memory_error(
+                        path, "failed to parse JSON memory artifact", exc_info=True
+                    )
                     return {}
             return {}
 
@@ -482,7 +522,9 @@ class CampaignController:
                 try:
                     return read_parquet(path)
                 except Exception:
-                    _record_memory_error(path, "failed to read Parquet memory artifact", exc_info=True)
+                    _record_memory_error(
+                        path, "failed to read Parquet memory artifact", exc_info=True
+                    )
                     return pd.DataFrame()
             return pd.DataFrame()
 
@@ -499,9 +541,9 @@ class CampaignController:
                     "reflections memory artifact is missing required column created_at",
                 )
             else:
-                latest_reflection = reflections.sort_values(
-                    "created_at", ascending=False
-                ).iloc[0].to_dict()
+                latest_reflection = (
+                    reflections.sort_values("created_at", ascending=False).iloc[0].to_dict()
+                )
 
         # Avoid regions from belief_state: list of dicts with region metadata
         avoid_region_keys: Set[str] = {
@@ -525,9 +567,11 @@ class CampaignController:
             )
             if not failures_df.empty and "superseded_by_run_id" in failures_df.columns:
                 superseded_stages = set(
-                    failures_df[
-                        failures_df["superseded_by_run_id"].astype(str).str.strip() != ""
-                    ]["stage"].astype(str).unique()
+                    failures_df[failures_df["superseded_by_run_id"].astype(str).str.strip() != ""][
+                        "stage"
+                    ]
+                    .astype(str)
+                    .unique()
                 )
         except Exception:
             _record_memory_error(
@@ -573,7 +617,8 @@ class CampaignController:
         # Phase 2.4 — filter superseded repairs from the queue before acting
         superseded_stages: Set[str] = mem.get("superseded_stages", set())
         open_repairs = [
-            r for r in repair_queue
+            r
+            for r in repair_queue
             if str(r.get("proposed_scope", {}).get("stage", "")) not in superseded_stages
         ]
         if not open_repairs:
@@ -905,11 +950,17 @@ class CampaignController:
             from project.research.feature_mi_scan import run_feature_mi_scan
             from project.research.phase2 import load_features
 
-            symbols = [s.strip().upper() for s in self.config.mi_scan_symbols.split(",") if s.strip()]
+            symbols = [
+                s.strip().upper() for s in self.config.mi_scan_symbols.split(",") if s.strip()
+            ]
             parts = []
             for sym in symbols:
-                df = load_features(self.data_root, self.config.program_id, sym,
-                                   timeframe=self.config.mi_scan_timeframe)
+                df = load_features(
+                    self.data_root,
+                    self.config.program_id,
+                    sym,
+                    timeframe=self.config.mi_scan_timeframe,
+                )
                 if not df.empty:
                     df = df.copy()
                     df["symbol"] = sym
@@ -920,18 +971,23 @@ class CampaignController:
                 return
 
             import pandas as _pd
+
             features = _pd.concat(parts, ignore_index=True)
 
             out_dir = self.data_root / "reports" / "feature_mi" / self.config.program_id
             result = run_feature_mi_scan(features, out_dir=out_dir)
             _LOG.info(
                 "MI scan pre-step complete: %d MI rows, %d candidate predicates → %s",
-                result["mi_rows"], result["candidate_predicates"], result["out_dir"],
+                result["mi_rows"],
+                result["candidate_predicates"],
+                result["out_dir"],
             )
         except Exception as exc:
             _LOG.warning("MI scan pre-step failed (non-fatal): %s", exc)
 
-    def _execute_pipeline(self, config_path: Path, run_id: str, *, command: list[str] | None = None):
+    def _execute_pipeline(
+        self, config_path: Path, run_id: str, *, command: list[str] | None = None
+    ):
         _LOG.info("Executing pipeline for %s...", run_id)
         cmd = command or self._pipeline_command(config_path, run_id)
         _LOG.info("Command: %s", " ".join(cmd))
@@ -969,17 +1025,20 @@ class CampaignController:
             total_runs=int(df["run_id"].nunique()) if "run_id" in df.columns else 0,
             total_generated=len(df),
             total_evaluated=int((df["eval_status"] == "evaluated").sum())
-            if "eval_status" in df.columns else 0,
+            if "eval_status" in df.columns
+            else 0,
             total_empty_sample=int((df["eval_status"] == "empty_sample").sum())
-            if "eval_status" in df.columns else 0,
+            if "eval_status" in df.columns
+            else 0,
             total_insufficient_sample=int((df["eval_status"] == "insufficient_sample").sum())
-            if "eval_status" in df.columns else 0,
-            total_unsupported=int(
-                (df["eval_status"] == "unsupported_trigger_evaluator").sum()
-            ) if "eval_status" in df.columns else 0,
-            total_skipped=int(
-                (df["eval_status"] == "not_executed_or_missing_data").sum()
-            ) if "eval_status" in df.columns else 0,
+            if "eval_status" in df.columns
+            else 0,
+            total_unsupported=int((df["eval_status"] == "unsupported_trigger_evaluator").sum())
+            if "eval_status" in df.columns
+            else 0,
+            total_skipped=int((df["eval_status"] == "not_executed_or_missing_data").sum())
+            if "eval_status" in df.columns
+            else 0,
         )
 
         if not df.empty and "expectancy" in df.columns and "eval_status" in df.columns:
@@ -1012,6 +1071,7 @@ class CampaignController:
             tested_events |= set(df["event_type"].dropna().astype(str))
 
         if "trigger_payload" in df.columns:
+
             def _payload_event_id(payload: object) -> Optional[str]:
                 try:
                     parsed = json.loads(str(payload))
@@ -1020,7 +1080,9 @@ class CampaignController:
                 value = str(parsed.get("event_id", "")).strip()
                 return value or None
 
-            tested_events |= set(df["trigger_payload"].apply(_payload_event_id).dropna().astype(str))
+            tested_events |= set(
+                df["trigger_payload"].apply(_payload_event_id).dropna().astype(str)
+            )
 
         untested_events = [eid for eid in enabled_events if eid not in tested_events]
         partially_explored_families: List[str] = []
@@ -1079,11 +1141,16 @@ def main():
         default="scan",
         help="Proposal strategy: scan=frontier, exploit=promising regions, explore=adjacent",
     )
-    parser.add_argument("--report", action="store_true", help="Print campaign health report and exit")
+    parser.add_argument(
+        "--report", action="store_true", help="Print campaign health report and exit"
+    )
     args = parser.parse_args()
 
     if args.report:
-        from project.research.services.campaign_memory_rollup_service import build_campaign_memory_rollup
+        from project.research.services.campaign_memory_rollup_service import (
+            build_campaign_memory_rollup,
+        )
+
         rollup = build_campaign_memory_rollup(
             program_id=args.program_id,
             data_root=get_data_root(),

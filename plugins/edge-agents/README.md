@@ -43,7 +43,6 @@ These wrappers should remain thin around:
 - `edge operator lint|explain|preflight|plan|run|diagnose|regime-report|compare`
 - `edge validate report`
 - `python -m project.scripts.run_researcher_verification`
-- the approved `docs/generated/` contract/reference outputs
 
 They are convenience surfaces, not policy owners.
 
@@ -64,15 +63,9 @@ The plugin now helps route common developer change types:
 - `scripts/edge_validate_repo.sh contracts|minimum-green|all` routes repo validation to the correct surface
 - `scripts/edge_sync_plugin.sh targets|check|sync [target_dir]` discovers or updates known installed plugin targets
 
-## Relationship to docs
+## Canonical Command Surface
 
-See:
-
-- `docs/README.md`
-- `docs/00_overview.md`
-- `docs/02_REPOSITORY_MAP.md`
-- `docs/03_promote.md`
-- `docs/04_deploy.md`
-- `docs/90_architecture.md`
-- `docs/92_assurance_and_benchmarks.md`
-- `docs/operator_command_inventory.md`
+- `make discover|promote|export|deploy-paper`
+- `edge_validate_repo.sh contracts|minimum-green|all`
+- `edge_sync_plugin.sh targets|check|sync`
+- `edge_export_theses.sh`
