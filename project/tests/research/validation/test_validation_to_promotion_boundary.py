@@ -36,11 +36,14 @@ def _create_mock_candidates_table(mock_data_root, run_id, candidate_ids):
         rows.append({
             "candidate_id": cid,
             "event_type": "VOL_SHOCK",
+            "family": "VOL_SHOCK",
             "rule_template": "tpl1",
             "direction": "long",
             "horizon": 12,
+            "n_events": 100,
             "n_obs": 100,
             "expectancy": 0.1,
+            "net_expectancy_bps": 8.0,
             "q_value": 0.01,
             "p_value": 0.01,
             "stability_score": 0.8,
@@ -74,10 +77,10 @@ def test_promotion_fails_without_bundle_by_default(mock_data_root):
     
     with patch("project.research.services.promotion_service.get_data_root", return_value=mock_data_root):
         with patch("project.research.validation.result_writer.get_data_root", return_value=mock_data_root):
-            with patch("project.research.services.promotion_service.load_run_manifest", return_value={"run_mode": "confirmatory"}):
-                result = execute_promotion(config)
-                assert result.exit_code != 0
-                assert "missing validation bundle" in result.diagnostics.get("error", "")
+                with patch("project.research.services.promotion_service.load_run_manifest", return_value={"run_mode": "confirmatory"}):
+                    result = execute_promotion(config)
+                    assert result.exit_code != 0
+                    assert "Missing required validation artifact" in result.diagnostics.get("error", "")
 
 
 def test_promotion_opt_in_compatibility_bridge(mock_data_root):

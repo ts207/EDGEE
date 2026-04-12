@@ -12,6 +12,7 @@ import numpy as np
 
 from project.core.config import get_data_root
 from project.core.exceptions import DataIntegrityError
+from project.io.utils import atomic_write_json
 from project.research.search_intelligence import update_search_intelligence
 from project.research.knowledge.memory import (
     build_failures_snapshot,
@@ -129,9 +130,10 @@ def mark_failures_superseded(
 
 
 def _write_json(path: Path, payload: Dict[str, Any]) -> None:
-    path.write_text(
-        json.dumps(payload, indent=2, sort_keys=True, default=_json_default) + "\n",
-        encoding="utf-8",
+    atomic_write_json(
+        path,
+        payload,
+        default=_json_default,
     )
 
 

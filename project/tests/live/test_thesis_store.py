@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from project.artifacts import live_thesis_index_path, promoted_theses_path
-from project.core.exceptions import DataIntegrityError
+from project.core.exceptions import CompatibilityRequiredError, DataIntegrityError
 from project.live.thesis_store import ThesisStore
 
 
@@ -129,6 +129,7 @@ def _write_store_fixture(root: Path, run_id: str) -> None:
             {
                 "schema_version": "promoted_thesis_index_v1",
                 "latest_run_id": run_id,
+                "default_resolution_disabled": True,
                 "runs": {
                     run_id: {
                         "output_path": str(thesis_path),
@@ -223,9 +224,42 @@ def test_thesis_store_raises_on_corrupted_payload(tmp_path: Path) -> None:
         ThesisStore.from_run_id("run_bad", data_root=tmp_path)
 
 
+def test_thesis_store_rejects_legacy_but_interpretable_payload(tmp_path: Path) -> None:
+    thesis_path = promoted_theses_path("run_legacy", tmp_path)
+    thesis_path.parent.mkdir(parents=True, exist_ok=True)
+    thesis_path.write_text(
+        json.dumps(
+            {
+                "run_id": "run_legacy",
+                "theses": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(CompatibilityRequiredError, match="legacy_but_interpretable"):
+        ThesisStore.from_run_id("run_legacy", data_root=tmp_path)
+
+
 def test_thesis_store_raises_on_corrupted_latest_index(tmp_path: Path) -> None:
     live_thesis_index_path(tmp_path).parent.mkdir(parents=True, exist_ok=True)
     live_thesis_index_path(tmp_path).write_text("{not-json", encoding="utf-8")
 
     with pytest.raises(DataIntegrityError):
+        ThesisStore.latest(data_root=tmp_path, allow_implicit_latest=True)
+
+
+def test_thesis_store_rejects_legacy_latest_index(tmp_path: Path) -> None:
+    live_thesis_index_path(tmp_path).parent.mkdir(parents=True, exist_ok=True)
+    live_thesis_index_path(tmp_path).write_text(
+        json.dumps(
+            {
+                "latest_run_id": "run_1",
+                "runs": {"run_1": {"output_path": "missing.json"}},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(CompatibilityRequiredError, match="legacy_but_interpretable"):
         ThesisStore.latest(data_root=tmp_path, allow_implicit_latest=True)

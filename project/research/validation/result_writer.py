@@ -7,7 +7,19 @@ from typing import Any, Dict, List, Optional
 import pandas as pd
 
 from project.core.config import get_data_root
-from project.io.utils import write_parquet
+from project.core.exceptions import (
+    CompatibilityRequiredError,
+    DataIntegrityError,
+    MalformedArtifactError,
+    MissingArtifactError,
+    SchemaMismatchError,
+)
+from project.io.utils import atomic_write_json, write_parquet
+from project.research.contracts.historical_trust import (
+    HISTORICAL_TRUST_LEGACY,
+    HISTORICAL_TRUST_REQUIRES_REVALIDATION,
+)
+from project.research.historical_trust import inspect_artifact_trust
 from project.research.validation.contracts import (
     ValidationBundle,
     ValidatedCandidateRecord,
@@ -45,6 +57,37 @@ PROMOTION_READY_COLUMNS = (
 )
 
 
+def _validate_mapping_payload(payload: Any, *, artifact_name: str) -> None:
+    if not isinstance(payload, dict):
+        raise SchemaMismatchError(f"{artifact_name} must be a JSON object payload")
+
+
+def _validate_validation_bundle_payload(payload: Any) -> None:
+    _validate_mapping_payload(payload, artifact_name="validation_bundle.json")
+    required = {
+        "run_id": str,
+        "created_at": str,
+        "validated_candidates": list,
+        "rejected_candidates": list,
+        "inconclusive_candidates": list,
+        "summary_stats": dict,
+        "effect_stability_report": dict,
+    }
+    for field_name, field_type in required.items():
+        if field_name not in payload:
+            raise SchemaMismatchError(
+                f"validation_bundle.json missing required field {field_name!r}"
+            )
+        if not isinstance(payload[field_name], field_type):
+            raise SchemaMismatchError(
+                f"validation_bundle.json field {field_name!r} must be {field_type.__name__}"
+            )
+    if not str(payload.get("run_id", "")).strip():
+        raise SchemaMismatchError("validation_bundle.json run_id must be non-empty")
+    if not str(payload.get("created_at", "")).strip():
+        raise SchemaMismatchError("validation_bundle.json created_at must be non-empty")
+
+
 def write_validation_bundle(bundle: ValidationBundle, base_dir: Optional[Path] = None) -> Path:
     if base_dir is None:
         base_dir = get_data_root() / "reports" / "validation" / bundle.run_id
@@ -52,18 +95,31 @@ def write_validation_bundle(bundle: ValidationBundle, base_dir: Optional[Path] =
     base_dir.mkdir(parents=True, exist_ok=True)
     
     bundle_path = base_dir / "validation_bundle.json"
-    with bundle_path.open("w", encoding="utf-8") as f:
-        json.dump(bundle.to_dict(), f, indent=2)
+    atomic_write_json(
+        bundle_path,
+        bundle.to_dict(),
+        validator=_validate_validation_bundle_payload,
+    )
     
     # Canonical: validation_report.json
     summary_path = base_dir / "validation_report.json"
-    with summary_path.open("w", encoding="utf-8") as f:
-        json.dump(bundle.summary_stats, f, indent=2)
+    atomic_write_json(
+        summary_path,
+        bundle.summary_stats,
+        validator=lambda payload: _validate_mapping_payload(
+            payload, artifact_name="validation_report.json"
+        ),
+    )
         
     # Canonical: effect_stability_report.json
     stability_path = base_dir / "effect_stability_report.json"
-    with stability_path.open("w", encoding="utf-8") as f:
-        json.dump(bundle.effect_stability_report, f, indent=2)
+    atomic_write_json(
+        stability_path,
+        bundle.effect_stability_report,
+        validator=lambda payload: _validate_mapping_payload(
+            payload, artifact_name="effect_stability_report.json"
+        ),
+    )
 
     return bundle_path
 
@@ -156,7 +212,13 @@ def write_promotion_ready_candidates(bundle: ValidationBundle, base_dir: Optiona
     return path
 
 
-def load_validation_bundle(run_id: str, base_dir: Optional[Path] = None) -> Optional[ValidationBundle]:
+def load_validation_bundle(
+    run_id: str,
+    base_dir: Optional[Path] = None,
+    *,
+    strict: bool = False,
+    compatibility_mode: bool = False,
+) -> Optional[ValidationBundle]:
     if base_dir is None:
         resolved_dir = get_data_root() / "reports" / "validation" / run_id
     else:
@@ -168,10 +230,31 @@ def load_validation_bundle(run_id: str, base_dir: Optional[Path] = None) -> Opti
 
     bundle_path = resolved_dir / "validation_bundle.json"
     if not bundle_path.exists():
+        if strict and not compatibility_mode:
+            raise MissingArtifactError(
+                f"Missing required validation artifact {bundle_path}. "
+                "Enable compatibility_mode=True for legacy callers."
+            )
         return None
-        
-    with bundle_path.open("r", encoding="utf-8") as f:
-        data = json.load(f)
+
+    try:
+        with bundle_path.open("r", encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise MalformedArtifactError(
+            f"Failed to read validation bundle {bundle_path}: {exc}"
+        ) from exc
+    _validate_validation_bundle_payload(data)
+    if strict and not compatibility_mode:
+        trust = inspect_artifact_trust("validation_bundle", bundle_path)
+        if trust.historical_trust_status == HISTORICAL_TRUST_LEGACY:
+            raise CompatibilityRequiredError(
+                f"Validation artifact {bundle_path} is legacy_but_interpretable and cannot be reused on the canonical path"
+            )
+        if trust.historical_trust_status == HISTORICAL_TRUST_REQUIRES_REVALIDATION:
+            raise DataIntegrityError(
+                f"Validation artifact {bundle_path} requires revalidation before reuse on the canonical path"
+            )
         
     def _parse_candidate(c_data: Dict[str, Any]) -> ValidatedCandidateRecord:
         decision = ValidationDecision(**c_data["decision"])
@@ -192,7 +275,7 @@ def load_validation_bundle(run_id: str, base_dir: Optional[Path] = None) -> Opti
 
     # Load effect_stability_report with backward-compat fallback
     effect_stability_report = data.get("effect_stability_report", {})
-    if not effect_stability_report:
+    if not effect_stability_report and compatibility_mode:
         stability_path = resolved_dir / "effect_stability_report.json"
         if stability_path.exists():
             try:

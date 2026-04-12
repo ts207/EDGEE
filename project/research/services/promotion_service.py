@@ -14,8 +14,15 @@ from project import PROJECT_ROOT
 from project.contracts.schemas import normalize_dataframe_for_schema
 from project.core.config import get_data_root
 from project.core.coercion import as_bool, safe_int
+from project.core.exceptions import (
+    CompatibilityRequiredError,
+    IncompleteLineageError,
+    MissingArtifactError,
+    SchemaMismatchError,
+)
 from project.io.parquet_compat import read_parquet_compat
-from project.io.utils import ensure_dir, read_parquet, write_parquet
+from project.io.utils import atomic_write_json, atomic_write_text, ensure_dir, read_parquet, write_parquet
+from project.research.audit_historical_artifacts import build_run_historical_trust_summary
 from project.research.promotion import (
     build_promotion_statistical_audit,
     promote_candidates,
@@ -821,6 +828,7 @@ def _write_promotion_lineage_audit(
     evidence_bundles: list[dict[str, Any]],
     promoted_df: pd.DataFrame,
     live_export_diagnostics: Mapping[str, Any] | None = None,
+    historical_trust: Mapping[str, Any] | None = None,
 ) -> dict[str, str]:
     rows: list[dict[str, Any]] = []
     promoted_ids = {
@@ -861,8 +869,9 @@ def _write_promotion_lineage_audit(
         "run_id": run_id,
         "rows": rows,
         "live_export": dict(live_export_diagnostics or {}),
+        "historical_trust": dict(historical_trust or {}),
     }
-    json_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    atomic_write_json(json_path, payload)
     md_lines = [
         "# Promotion lineage audit",
         "",
@@ -872,6 +881,9 @@ def _write_promotion_lineage_audit(
         f"- live_thesis_store: `{str((live_export_diagnostics or {}).get('output_path', ''))}`",
         f"- live_contract_json: `{str((live_export_diagnostics or {}).get('contract_json_path', ''))}`",
         f"- live_contract_md: `{str((live_export_diagnostics or {}).get('contract_md_path', ''))}`",
+        f"- historical_trust_status: `{str((historical_trust or {}).get('historical_trust_status', ''))}`",
+        f"- canonical_reuse_allowed: `{bool((historical_trust or {}).get('canonical_reuse_allowed', False))}`",
+        f"- compat_reuse_allowed: `{bool((historical_trust or {}).get('compat_reuse_allowed', False))}`",
         "",
         "| candidate_id | event_type | promotion_status | promotion_track | program_id | campaign_id | live_exported |",
         "| --- | --- | --- | --- | --- | --- | --- |",
@@ -880,7 +892,7 @@ def _write_promotion_lineage_audit(
         md_lines.append(
             "| {candidate_id} | {event_type} | {promotion_status} | {promotion_track} | {program_id} | {campaign_id} | {live_exported} |".format(**row)
         )
-    md_path.write_text("\n".join(md_lines) + "\n", encoding="utf-8")
+    atomic_write_text(md_path, "\n".join(md_lines) + "\n")
     return {"json_path": str(json_path), "md_path": str(md_path)}
 
 
@@ -889,7 +901,7 @@ def _write_multiplicity_scope_diagnostics(out_dir: Path, diag: Dict[str, Any]) -
     json_path = out_dir / "multiplicity_scope_diagnostics.json"
     md_path = out_dir / "multiplicity_scope_diagnostics.md"
 
-    json_path.write_text(json.dumps(diag, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    atomic_write_json(json_path, diag)
 
     md_lines = [
         "# Multiplicity Scope Diagnostics",
@@ -928,7 +940,7 @@ def _write_multiplicity_scope_diagnostics(out_dir: Path, diag: Dict[str, Any]) -
             md_lines.append(f"- {reason}: `{count}`")
 
     md_lines.append("")
-    md_path.write_text("\n".join(md_lines) + "\n", encoding="utf-8")
+    atomic_write_text(md_path, "\n".join(md_lines) + "\n")
 
     return {"json_path": str(json_path), "md_path": str(md_path)}
 
@@ -975,21 +987,34 @@ def execute_promotion(config: PromotionConfig) -> PromotionServiceResult:
         from project.research.validation.result_writer import load_validation_bundle
         from project.research.services.evaluation_service import ValidationService
         from project.research.validation.contracts import PromotionReasonCodes
-        
-        val_bundle = load_validation_bundle(config.run_id)
+
+        diagnostics["compat_mode_used"] = False
+        diagnostics["compat_reason"] = ""
+        diagnostics["compat_source_artifacts"] = []
+        diagnostics["canonical_contract_bypassed"] = False
+
+        val_bundle = load_validation_bundle(
+            config.run_id,
+            strict=not config.use_compatibility_bridge,
+            compatibility_mode=config.use_compatibility_bridge,
+        )
         if val_bundle is None:
             if config.use_compatibility_bridge:
                 # Fallback to compatibility bridge only if explicitly requested
                 val_svc = ValidationService(data_root=data_root)
                 val_bundle = val_svc.build_validation_bundle_from_legacy_run(config.run_id)
                 if val_bundle:
+                    diagnostics["compat_mode_used"] = True
+                    diagnostics["compat_reason"] = "legacy_validation_bundle_bridge"
+                    diagnostics["compat_source_artifacts"] = ["legacy_validation_tables"]
+                    diagnostics["canonical_contract_bypassed"] = True
                     logging.info(
                         "Using compatibility bridge for validation bundle for run %s", 
                         config.run_id
                     )
             
             if val_bundle is None:
-                raise ValueError(
+                raise MissingArtifactError(
                     f"Promotion rejected for {config.run_id}: "
                     f"missing validation bundle. {PromotionReasonCodes.NOT_VALIDATED}. "
                     "Canonical validation is mandatory in Sprint 4."
@@ -1004,7 +1029,7 @@ def execute_promotion(config: PromotionConfig) -> PromotionServiceResult:
             and not canonical_candidate_csv_path.exists()
             and not config.use_compatibility_bridge
         ):
-            raise FileNotFoundError(
+            raise MissingArtifactError(
                 f"Canonical promotion-ready candidates not found at {canonical_candidate_path}. "
                 "Set use_compatibility_bridge=True to fall back to legacy table loading."
             )
@@ -1102,14 +1127,13 @@ def execute_promotion(config: PromotionConfig) -> PromotionServiceResult:
                     break
             
             if source_candidates_df.empty:
-                logging.warning(
-                    "Canonical promotion-ready candidates found but source tables empty for run %s",
-                    config.run_id
+                raise IncompleteLineageError(
+                    f"Canonical promotion input for run {config.run_id} had validation metadata "
+                    "but no source candidate tables."
                 )
             elif validation_meta_df.empty:
-                logging.warning(
-                    "Canonical promotion-ready candidates file is empty for run %s",
-                    config.run_id
+                raise SchemaMismatchError(
+                    f"Canonical promotion-ready candidates file is empty for run {config.run_id}."
                 )
             else:
                 validated_ids = set(validation_meta_df["candidate_id"].dropna().astype(str))
@@ -1124,32 +1148,39 @@ def execute_promotion(config: PromotionConfig) -> PromotionServiceResult:
                         )[col].values
                 
                 if candidates_df.empty and not validation_meta_df.empty:
-                    logging.warning(
-                        "No matching candidates found between validation metadata and source tables for run %s",
-                        config.run_id
+                    raise IncompleteLineageError(
+                        "No matching candidates found between validation metadata and source "
+                        f"tables for run {config.run_id}."
                     )
-                    candidates_df = pd.DataFrame()
             
             if not candidates_df.empty:
-                    missing_fields = _diagnose_missing_fields(candidates_df)
-                    if missing_fields:
-                        diagnostics["canonical_missing_fields"] = missing_fields
-                        logging.warning(
-                            "Canonical promotion input missing required fields: %s",
-                            ", ".join(missing_fields)
-                        )
-                    logging.info(
-                        "Loaded %d candidates via canonical path for run %s",
-                        len(candidates_df),
-                        config.run_id
+                missing_fields = _diagnose_missing_fields(candidates_df)
+                if missing_fields:
+                    diagnostics["canonical_missing_fields"] = missing_fields
+                    raise SchemaMismatchError(
+                        "Canonical promotion input missing required fields: "
+                        + ", ".join(missing_fields)
                     )
+                logging.info(
+                    "Loaded %d candidates via canonical path for run %s",
+                    len(candidates_df),
+                    config.run_id
+                )
         else:
             if not config.use_compatibility_bridge:
-                raise FileNotFoundError(
+                raise CompatibilityRequiredError(
                     f"Canonical promotion-ready candidates not found at {canonical_candidate_path}. "
                     "Set use_compatibility_bridge=True to fall back to legacy table loading."
                 )
             promotion_input_mode = "compatibility_fallback"
+            diagnostics["compat_mode_used"] = True
+            diagnostics["compat_reason"] = "legacy_candidate_table_fallback"
+            diagnostics["compat_source_artifacts"] = [
+                "edge_candidates",
+                "promotion_audit",
+                "phase2_candidates",
+            ]
+            diagnostics["canonical_contract_bypassed"] = True
             logging.warning(
                 "Canonical promotion-ready candidates not found for run %s; falling back to legacy table loading",
                 config.run_id
@@ -1162,13 +1193,15 @@ def execute_promotion(config: PromotionConfig) -> PromotionServiceResult:
                     break
             
             if candidates_df.empty:
-                 raise FileNotFoundError(f"Missing required candidates tables for run {config.run_id}")
+                 raise MissingArtifactError(f"Missing required candidates tables for run {config.run_id}")
 
             validated_ids = {c.candidate_id for c in val_bundle.validated_candidates}
             candidates_df = candidates_df[candidates_df["candidate_id"].isin(validated_ids)].copy()
             
             if candidates_df.empty and val_bundle.validated_candidates:
-                 logging.warning("No validated candidates from bundle found in source tables for run %s", config.run_id)
+                 raise IncompleteLineageError(
+                     f"No validated candidates from bundle found in source tables for run {config.run_id}"
+                 )
         
         diagnostics["promotion_input_mode"] = promotion_input_mode
 
@@ -1412,6 +1445,7 @@ def execute_promotion(config: PromotionConfig) -> PromotionServiceResult:
             data_root=get_data_root(),
             bundles=evidence_bundles,
             promoted_df=promoted_df,
+            compatibility_mode=bool(diagnostics.get("compat_mode_used", False)),
         )
         diagnostics["live_thesis_export"] = {
             "output_path": str(thesis_export.output_path),
@@ -1427,6 +1461,19 @@ def execute_promotion(config: PromotionConfig) -> PromotionServiceResult:
             evidence_bundles=evidence_bundles,
             promoted_df=promoted_df,
             live_export_diagnostics=diagnostics.get("live_thesis_export"),
+        )
+        diagnostics["historical_trust"] = build_run_historical_trust_summary(
+            run_id=config.run_id,
+            data_root=get_data_root(),
+        )
+        atomic_write_json(out_dir / "promotion_diagnostics.json", diagnostics)
+        diagnostics["promotion_lineage_audit"] = _write_promotion_lineage_audit(
+            out_dir=out_dir,
+            run_id=config.run_id,
+            evidence_bundles=evidence_bundles,
+            promoted_df=promoted_df,
+            live_export_diagnostics=diagnostics.get("live_thesis_export"),
+            historical_trust=diagnostics.get("historical_trust"),
         )
         
         # Sprint 7: Artifact manifest

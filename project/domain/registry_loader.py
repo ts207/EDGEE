@@ -84,10 +84,23 @@ def _generated_at_utc() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace('+00:00', 'Z')
 
 
+def _detector_ownership() -> Dict[str, str]:
+    payload = load_yaml_relative("project/configs/registries/detectors.yaml")
+    raw = payload.get("detector_ownership", {}) if isinstance(payload, dict) else {}
+    if not isinstance(raw, dict):
+        return {}
+    return {
+        str(event_type).strip().upper(): str(detector_name).strip()
+        for event_type, detector_name in raw.items()
+        if str(event_type).strip() and str(detector_name).strip()
+    }
+
+
 def _merge_event_rows(unified: Dict[str, Any]) -> Dict[str, EventDefinition]:
     defaults = unified.get("defaults", {})
     families = unified.get("families", {})
     unified_events = unified.get("events", {})
+    detector_ownership = _detector_ownership()
     out: Dict[str, EventDefinition] = {}
 
     event_types = set()
@@ -164,7 +177,10 @@ def _merge_event_rows(unified: Dict[str, Any]) -> Dict[str, EventDefinition]:
             maturity=str(row.get("maturity", "")).strip(),
             default_executable=bool(row.get("default_executable", True)),
             enabled=bool(row.get("enabled", True)),
-            detector_name=str(row.get("detector_name", "")).strip(),
+            detector_name=(
+                str(row.get("detector_name", "")).strip()
+                or detector_ownership.get(event_type, "")
+            ),
             instrument_classes=tuple(str(item).strip() for item in row.get("instrument_classes", []) if str(item).strip()),
             requires_features=tuple(str(item).strip() for item in row.get("requires_features", []) if str(item).strip()),
             runtime_tags=tuple(str(item).strip() for item in row.get("runtime_tags", []) if str(item).strip()),

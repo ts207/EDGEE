@@ -109,10 +109,13 @@ def test_write_operator_outputs_for_run_writes_summary_and_ledger(monkeypatch, t
 
     summary = write_operator_outputs_for_run(run_id=run_id, program_id=program_id, data_root=data_root)
     summary_md = data_root / "reports" / "operator" / run_id / "operator_summary.md"
+    summary_json = data_root / "reports" / "operator" / run_id / "operator_summary.json"
     ledger = read_memory_table(program_id, "evidence_ledger", data_root=data_root)
 
     assert summary_md.exists()
+    assert summary_json.exists()
     assert summary["top_candidate"]["label"].startswith("VOL_SHOCK / mean_reversion")
+    assert "historical_trust_status" in summary["historical_trust"]
     assert len(ledger) == 1
     assert ledger.iloc[0]["run_id"] == run_id
     assert ledger.iloc[0]["verdict"] == "KEEP_RESEARCH"

@@ -68,6 +68,9 @@ def test_domain_registry_exposes_runtime_metadata_from_event_specs():
     assert depth_collapse.event_kind == "market_event"
     assert depth_collapse.default_executable is True
 
+    absorption_proxy = registry.event_definitions["ABSORPTION_PROXY"]
+    assert absorption_proxy.detector_name == "AbsorptionProxyDetector"
+
     high_vol = registry.state_definitions["HIGH_VOL_REGIME"]
     assert high_vol.state_engine == "VolatilityRegimeEngine"
     assert high_vol.instrument_classes == ("crypto", "equities", "futures")

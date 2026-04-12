@@ -6,9 +6,21 @@ from pathlib import Path
 from typing import Iterable, List
 
 from project.artifacts import live_thesis_index_path, promoted_theses_path
-from project.core.exceptions import DataIntegrityError
+from project.core.exceptions import (
+    AmbiguousLatestResolutionError,
+    CompatibilityRequiredError,
+    DataIntegrityError,
+    MalformedArtifactError,
+    MissingArtifactError,
+    SchemaMismatchError,
+)
 from project.live.contracts import PromotedThesis
 from project.live.deployment import DeploymentGate
+from project.research.contracts.historical_trust import (
+    HISTORICAL_TRUST_LEGACY,
+    HISTORICAL_TRUST_REQUIRES_REVALIDATION,
+)
+from project.research.historical_trust import inspect_artifact_trust
 
 _LOG = logging.getLogger(__name__)
 
@@ -19,10 +31,77 @@ def _load_payload(path: Path) -> dict:
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise DataIntegrityError(f"Failed to read thesis artifact {path}: {exc}") from exc
+        raise MalformedArtifactError(f"Failed to read thesis artifact {path}: {exc}") from exc
     if not isinstance(payload, dict):
-        raise DataIntegrityError(f"Thesis artifact {path} did not contain a JSON object payload")
+        raise SchemaMismatchError(f"Thesis artifact {path} did not contain a JSON object payload")
     return payload
+
+
+def _validate_store_payload(payload: dict, *, path: Path) -> None:
+    required = {
+        "schema_version": str,
+        "run_id": str,
+        "generated_at_utc": str,
+        "thesis_count": int,
+        "active_thesis_count": int,
+        "pending_thesis_count": int,
+        "theses": list,
+    }
+    for field_name, field_type in required.items():
+        if field_name not in payload:
+            raise SchemaMismatchError(f"Thesis artifact {path} missing required field {field_name!r}")
+        if not isinstance(payload[field_name], field_type):
+            raise SchemaMismatchError(
+                f"Thesis artifact {path} field {field_name!r} must be {field_type.__name__}"
+            )
+    if payload["schema_version"] != "promoted_theses_v1":
+        raise SchemaMismatchError(
+            f"Unsupported thesis artifact schema_version {payload['schema_version']!r} at {path}"
+        )
+    if payload["thesis_count"] != len(payload["theses"]):
+        raise SchemaMismatchError(f"Thesis artifact {path} thesis_count does not match theses payload")
+    active_count = sum(
+        1 for thesis in payload["theses"] if isinstance(thesis, dict) and thesis.get("status") == "active"
+    )
+    pending_count = sum(
+        1
+        for thesis in payload["theses"]
+        if isinstance(thesis, dict) and thesis.get("status") == "pending_blueprint"
+    )
+    if payload["active_thesis_count"] != active_count:
+        raise SchemaMismatchError(
+            f"Thesis artifact {path} active_thesis_count does not match thesis statuses"
+        )
+    if payload["pending_thesis_count"] != pending_count:
+        raise SchemaMismatchError(
+            f"Thesis artifact {path} pending_thesis_count does not match thesis statuses"
+        )
+
+
+def _validate_index_payload(payload: dict, *, path: Path) -> None:
+    required = {
+        "schema_version": str,
+        "latest_run_id": str,
+        "default_resolution_disabled": bool,
+        "runs": dict,
+    }
+    for field_name, field_type in required.items():
+        if field_name not in payload:
+            raise SchemaMismatchError(f"Thesis index {path} missing required field {field_name!r}")
+        if not isinstance(payload[field_name], field_type):
+            raise SchemaMismatchError(
+                f"Thesis index {path} field {field_name!r} must be {field_type.__name__}"
+            )
+    if payload["schema_version"] != "promoted_thesis_index_v1":
+        raise SchemaMismatchError(
+            f"Unsupported thesis index schema_version {payload['schema_version']!r} at {path}"
+        )
+    latest_run_id = str(payload.get("latest_run_id", "")).strip()
+    runs = payload.get("runs", {})
+    if latest_run_id and latest_run_id not in runs:
+        raise AmbiguousLatestResolutionError(
+            f"Thesis index {path} latest_run_id={latest_run_id!r} is missing from runs metadata"
+        )
 
 
 def _matches_symbol(thesis: PromotedThesis, symbol: str) -> bool:
@@ -85,7 +164,18 @@ class ThesisStore:
         *,
         strict_live_gate: bool = True,
     ) -> "ThesisStore":
-        payload = _load_payload(Path(path))
+        resolved_path = Path(path)
+        payload = _load_payload(resolved_path)
+        trust = inspect_artifact_trust("promoted_theses", resolved_path)
+        if trust.historical_trust_status == HISTORICAL_TRUST_LEGACY:
+            raise CompatibilityRequiredError(
+                f"Promoted thesis artifact {resolved_path} is legacy_but_interpretable and cannot be reused on the canonical path"
+            )
+        if trust.historical_trust_status == HISTORICAL_TRUST_REQUIRES_REVALIDATION:
+            raise DataIntegrityError(
+                f"Promoted thesis artifact {resolved_path} requires revalidation before reuse on the canonical path"
+            )
+        _validate_store_payload(payload, path=resolved_path)
         theses = [
             PromotedThesis.model_validate(item)
             for item in payload.get("theses", [])
@@ -98,7 +188,7 @@ class ThesisStore:
         return cls(
             theses,
             run_id=str(payload.get("run_id", "")).strip(),
-            source_path=path,
+            source_path=resolved_path,
             schema_version=str(payload.get("schema_version", "")).strip(),
             generated_at_utc=str(payload.get("generated_at_utc", "")).strip(),
         )
@@ -120,11 +210,26 @@ class ThesisStore:
                 "Use ThesisStore.from_run_id(...), ThesisStore.from_path(...), "
                 "or pass allow_implicit_latest=True for compatibility-only callers."
             )
-        index = _load_payload(live_thesis_index_path(data_root))
+        index_path = live_thesis_index_path(data_root)
+        index = _load_payload(index_path)
+        trust = inspect_artifact_trust("live_thesis_index", index_path)
+        if trust.historical_trust_status == HISTORICAL_TRUST_LEGACY:
+            raise CompatibilityRequiredError(
+                f"Thesis index {index_path} is legacy_but_interpretable and cannot be reused on the canonical path"
+            )
+        if trust.historical_trust_status == HISTORICAL_TRUST_REQUIRES_REVALIDATION:
+            raise DataIntegrityError(
+                f"Thesis index {index_path} requires revalidation before reuse on the canonical path"
+            )
+        _validate_index_payload(index, path=index_path)
         latest_run_id = str(index.get("latest_run_id", "")).strip()
         if latest_run_id:
             return cls.from_run_id(latest_run_id, data_root=data_root)
-        raise FileNotFoundError("No live thesis index is available.")
+        if index.get("runs"):
+            raise AmbiguousLatestResolutionError(
+                f"Thesis index {index_path} contains runs metadata but no latest_run_id"
+            )
+        raise MissingArtifactError("No live thesis index is available.")
 
     def all(self) -> List[PromotedThesis]:
         return list(self._theses)

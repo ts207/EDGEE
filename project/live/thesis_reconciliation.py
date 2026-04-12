@@ -7,7 +7,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Set
 
-from project.core.exceptions import DataIntegrityError
+from project.core.exceptions import DataIntegrityError, MalformedReconciliationMetadataError
+from project.io.utils import atomic_write_json
 from project.live.contracts import PromotedThesis
 from project.live.thesis_store import ThesisStore
 
@@ -54,9 +55,13 @@ def _load_previous_batch_metadata(persist_dir: Path) -> Dict[str, str]:
     try:
         payload = json.loads(meta_path.read_text(encoding="utf-8"))
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise DataIntegrityError(f"Failed to read thesis batch metadata {meta_path}: {exc}") from exc
+        raise MalformedReconciliationMetadataError(
+            f"Failed to read thesis batch metadata {meta_path}: {exc}"
+        ) from exc
     if not isinstance(payload, dict):
-        raise DataIntegrityError(f"Thesis batch metadata {meta_path} must be a JSON object")
+        raise MalformedReconciliationMetadataError(
+            f"Thesis batch metadata {meta_path} must be a JSON object"
+        )
     return payload
 
 
@@ -70,7 +75,7 @@ def _save_current_batch_metadata(persist_dir: Path, store: ThesisStore) -> None:
         "thesis_ids": sorted([t.thesis_id for t in store.all()]),
         "saved_at": datetime.now(timezone.utc).isoformat(),
     }
-    meta_path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+    atomic_write_json(meta_path, payload)
 
 
 def _is_downgrade(old_state: str, new_state: str) -> bool:
@@ -193,7 +198,9 @@ def reconcile_thesis_batch(
         try:
             previous_store = ThesisStore.from_run_id(prev_run_id, data_root=persist_dir.parent.parent)
         except FileNotFoundError:
-            _LOG.warning("Previous batch run_id=%s metadata found but store missing", prev_run_id)
+            raise DataIntegrityError(
+                f"Previous batch metadata references run_id={prev_run_id} but the thesis store is missing"
+            )
 
     diff = classify_thesis_diff(previous_store, current_store)
     blocked_reasons = check_reconciliation_safety(
@@ -247,5 +254,5 @@ def _write_audit_log(audit_log_path: Path, result: ReconciliationResult) -> None
         "safe_to_proceed": result.safe_to_proceed,
         "logged_at": result.logged_at,
     }
-    audit_log_path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+    atomic_write_json(audit_log_path, payload)
     _LOG.info("Wrote thesis reconciliation audit log to %s", audit_log_path)

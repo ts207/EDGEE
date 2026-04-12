@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+from project.core.exceptions import CompatibilityRequiredError
 from project.research.validation.contracts import (
     ValidationBundle,
     ValidatedCandidateRecord,
@@ -13,6 +14,7 @@ from project.research.validation.contracts import (
 )
 from project.research.validation.result_writer import (
     write_validation_bundle,
+    write_validated_candidate_tables,
     load_validation_bundle,
 )
 
@@ -86,3 +88,47 @@ def test_invalid_status():
             candidate_id="cand_3",
             run_id="run_3"
         )
+
+
+def test_strict_validation_bundle_rejects_legacy_without_promotion_ready_candidates(tmp_path):
+    run_id = "legacy_validation_run"
+    bundle = ValidationBundle(
+        run_id=run_id,
+        created_at=datetime.now().isoformat(),
+        validated_candidates=[],
+        summary_stats={},
+    )
+    write_validation_bundle(bundle, base_dir=tmp_path)
+
+    with pytest.raises(CompatibilityRequiredError, match="legacy_but_interpretable"):
+        load_validation_bundle(run_id, base_dir=tmp_path, strict=True)
+
+
+def test_strict_validation_bundle_accepts_current_contract_with_companion(tmp_path):
+    run_id = "current_validation_run"
+    decision = ValidationDecision(
+        status="validated",
+        candidate_id="cand_current",
+        run_id=run_id,
+        reason_codes=[],
+    )
+    metrics = ValidationMetrics(sample_count=100, expectancy=0.05, q_value=0.01, stability_score=0.9, net_expectancy=0.04)
+    candidate = ValidatedCandidateRecord(
+        candidate_id="cand_current",
+        decision=decision,
+        metrics=metrics,
+        template_id="tpl_current",
+        direction="long",
+        horizon_bars=12,
+    )
+    bundle = ValidationBundle(
+        run_id=run_id,
+        created_at=datetime.now().isoformat(),
+        validated_candidates=[candidate],
+        summary_stats={},
+    )
+    write_validation_bundle(bundle, base_dir=tmp_path)
+    write_validated_candidate_tables(bundle, base_dir=tmp_path)
+
+    loaded = load_validation_bundle(run_id, base_dir=tmp_path, strict=True)
+    assert loaded.run_id == run_id

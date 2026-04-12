@@ -26,6 +26,8 @@ from typing import Any, Dict, List, Optional, Sequence
 import pandas as pd
 
 from project.core.config import get_data_root
+from project.core.exceptions import DataIntegrityError
+from project.io.utils import atomic_write_json, atomic_write_text
 from project.research.agent_io.campaign_planner import (
     CampaignPlanner,
     CampaignPlannerConfig,
@@ -116,7 +118,7 @@ class CampaignCycleRunner:
             try:
                 return json.loads(path.read_text(encoding="utf-8"))
             except Exception as e:
-                _LOG.warning("Failed to load belief state: %s", e)
+                raise DataIntegrityError(f"Failed to load belief state {path}: {e}") from e
         return {
             "current_focus": "",
             "avoid_regions": [],
@@ -126,9 +128,9 @@ class CampaignCycleRunner:
         }
 
     def _save_belief_state(self, belief_state: Dict[str, Any]) -> None:
-        self.paths.belief_state.write_text(
-            json.dumps(belief_state, indent=2, sort_keys=True) + "\n",
-            encoding="utf-8",
+        atomic_write_json(
+            self.paths.belief_state,
+            belief_state,
         )
 
     def _load_next_actions(self) -> Dict[str, List[str]]:
@@ -137,13 +139,13 @@ class CampaignCycleRunner:
             try:
                 return json.loads(path.read_text(encoding="utf-8"))
             except Exception as e:
-                _LOG.warning("Failed to load next actions: %s", e)
+                raise DataIntegrityError(f"Failed to load next actions {path}: {e}") from e
         return {"repair": [], "exploit": [], "explore_adjacent": [], "hold": []}
 
     def _save_next_actions(self, next_actions: Dict[str, List[str]]) -> None:
-        self.paths.next_actions.write_text(
-            json.dumps(next_actions, indent=2, sort_keys=True) + "\n",
-            encoding="utf-8",
+        atomic_write_json(
+            self.paths.next_actions,
+            next_actions,
         )
 
     def _build_reflection(self, run_id: str) -> Optional[Dict[str, Any]]:
@@ -368,9 +370,7 @@ class CampaignCycleRunner:
             proposal_path = self.paths.proposals_dir / self.cycle_id / "proposal.yaml"
             proposal_path.parent.mkdir(parents=True, exist_ok=True)
             import yaml
-            proposal_path.write_text(
-                yaml.safe_dump(proposal_dict, sort_keys=False), encoding="utf-8"
-            )
+            atomic_write_text(proposal_path, yaml.safe_dump(proposal_dict, sort_keys=False))
 
             _LOG.info("Executing proposal for %s (run_id=%s)", top_proposal.event_type, run_id)
 

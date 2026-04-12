@@ -26,6 +26,7 @@ def mock_pipeline_data(tmp_path):
 
 def test_golden_pipeline_end_to_end(mock_pipeline_data):
     run_id = "golden_run"
+    persist_dir = mock_pipeline_data / "live" / "persist"
     
     # 1. DISCOVER (Mocked)
     candidates_path = mock_pipeline_data / "reports" / "edge_candidates" / run_id / "edge_candidates_normalized.parquet"
@@ -38,11 +39,14 @@ def test_golden_pipeline_end_to_end(mock_pipeline_data):
     df = pd.DataFrame([{
         "candidate_id": "cand_golden",
         "event_type": "VOL_SHOCK",
+        "family": "VOL_SHOCK",
         "rule_template": "tpl1",
         "direction": "long",
         "horizon": 12,
         "n_obs": 100,
+        "n_events": 100,
         "expectancy": 0.1,
+        "net_expectancy_bps": 5.0,
         "q_value": 0.01,
         "p_value": 0.01,
         "stability_score": 0.8,
@@ -135,7 +139,8 @@ def test_golden_pipeline_end_to_end(mock_pipeline_data):
             strategy_runtime={
                 "implemented": True,
                 "thesis_run_id": run_id,
-                "auto_submit": False
+                "auto_submit": False,
+                "persist_dir": str(persist_dir),
             }
         )
         

@@ -83,6 +83,17 @@ families:
     - overshoot_repair
     - only_if_liquidity
     - slippage_aware_filter
+  LIQUIDITY_STRESS:
+    parameters: {}
+    templates:
+    - mean_reversion
+    - continuation
+    - stop_run_repair
+    - overshoot_repair
+    - only_if_liquidity
+    - slippage_aware_filter
+    - only_if_regime
+    - only_if_highvol
   ORDERFLOW:
     parameters: {}
   POSITIONING_EXTREMES:
@@ -368,7 +379,7 @@ events:
     deployment_disposition: secondary_or_confirm
     runtime_category: active_runtime_event
     enabled: true
-    detector_name: ''
+    detector_name: AbsorptionProxyDetector
     runtime_tags: []
     instrument_classes: []
     requires_features: []
@@ -1450,7 +1461,7 @@ events:
     deployment_disposition: secondary_or_confirm
     runtime_category: active_runtime_event
     enabled: true
-    detector_name: ''
+    detector_name: DepthStressProxyDetector
     runtime_tags: []
     instrument_classes: []
     requires_features: []
@@ -1746,7 +1757,7 @@ events:
     deployment_disposition: secondary_or_confirm
     runtime_category: active_runtime_event
     enabled: true
-    detector_name: ''
+    detector_name: FlowExhaustionDetector
     runtime_tags: []
     instrument_classes: []
     requires_features: []
@@ -3211,7 +3222,7 @@ events:
     deployment_disposition: secondary_or_confirm
     runtime_category: active_runtime_event
     enabled: true
-    detector_name: ''
+    detector_name: DirectLiquidityStressDetector
     runtime_tags: []
     instrument_classes: []
     requires_features: []
@@ -3280,7 +3291,7 @@ events:
     deployment_disposition: secondary_or_confirm
     runtime_category: active_runtime_event
     enabled: true
-    detector_name: ''
+    detector_name: ProxyLiquidityStressDetector
     runtime_tags: []
     instrument_classes: []
     requires_features: []
@@ -3965,7 +3976,7 @@ events:
     deployment_disposition: secondary_or_confirm
     runtime_category: active_runtime_event
     enabled: true
-    detector_name: ''
+    detector_name: PostDeleveragingReboundDetector
     runtime_tags: []
     instrument_classes: []
     requires_features: []
@@ -4055,7 +4066,7 @@ events:
     deployment_disposition: secondary_or_confirm
     runtime_category: active_runtime_event
     enabled: true
-    detector_name: ''
+    detector_name: PriceVolImbalanceProxyDetector
     runtime_tags: []
     instrument_classes: []
     requires_features: []
@@ -6090,7 +6101,7 @@ events:
     deployment_disposition: secondary_or_confirm
     runtime_category: active_runtime_event
     enabled: true
-    detector_name: ''
+    detector_name: WickReversalProxyDetector
     runtime_tags: []
     instrument_classes: []
     requires_features: []

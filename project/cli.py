@@ -618,10 +618,13 @@ def main() -> int:
             )
             print(f"Scanned {len(result.scanned_artifact_paths)} artifacts")
             print(f"Total rows: {len(result.rows)}")
+            print(f"Historical trust: {dict(result.trust_status_counts)}")
             print(f"Stat regimes: {dict(result.stat_regime_counts)}")
             print(f"Audit statuses: {dict(result.audit_status_counts)}")
             print(f"Requires repromotion: {result.requires_repromotion_count}")
             print(f"Requires manual review: {result.requires_manual_review_count}")
+            print(f"Canonical reuse blocked: {result.canonical_reuse_blocked_count}")
+            print(f"Compat reuse blocked: {result.compat_reuse_blocked_count}")
             if bool(args.emit_inventory):
                 output_dir = (data_root or Path("data")) / "reports" / "audit"
                 paths = write_audit_inventory(result, output_dir)

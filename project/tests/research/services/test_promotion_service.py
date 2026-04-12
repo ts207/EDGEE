@@ -358,18 +358,17 @@ def test_run_promotion_service_treats_zero_validated_candidates_as_success(
 
     run_id = "r1"
     validation_dir = tmp_path / "reports" / "validation" / run_id
-    write_validation_bundle(
-        ValidationBundle(
-            run_id=run_id,
-            created_at="2026-01-01T00:00:00Z",
-            validated_candidates=[],
-            rejected_candidates=[],
-            inconclusive_candidates=[],
-            summary_stats={"total": 1, "validated": 0},
-            effect_stability_report={},
-        ),
-        base_dir=validation_dir,
+    bundle = ValidationBundle(
+        run_id=run_id,
+        created_at="2026-01-01T00:00:00Z",
+        validated_candidates=[],
+        rejected_candidates=[],
+        inconclusive_candidates=[],
+        summary_stats={"total": 1, "validated": 0},
+        effect_stability_report={},
     )
+    write_validation_bundle(bundle, base_dir=validation_dir)
+    write_promotion_ready_candidates(bundle, base_dir=validation_dir)
 
     result = _run_promotion(tmp_path)
 

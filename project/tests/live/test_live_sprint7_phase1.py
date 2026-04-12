@@ -552,7 +552,12 @@ class TestDeploymentStateBoundaries:
         # Build a minimal thesis JSON with live_enabled but no approval
         bad_thesis = _make_thesis("t_bad", deployment_state="live_enabled")
         artifact = {
+            "schema_version": "promoted_theses_v1",
             "run_id": "run1",
+            "generated_at_utc": "2026-04-04T10:00:00Z",
+            "thesis_count": 1,
+            "active_thesis_count": 0,
+            "pending_thesis_count": 1,
             "theses": [bad_thesis.model_dump(mode="json")],
         }
         path = tmp_path / "theses.json"
@@ -566,7 +571,12 @@ class TestDeploymentStateBoundaries:
     def test_thesis_store_accepts_live_enabled_with_full_approval(self, tmp_path):
         approved = _approved_thesis("t_ok")
         artifact = {
+            "schema_version": "promoted_theses_v1",
             "run_id": "run1",
+            "generated_at_utc": "2026-04-04T10:00:00Z",
+            "thesis_count": 1,
+            "active_thesis_count": 0,
+            "pending_thesis_count": 1,
             "theses": [approved.model_dump(mode="json")],
         }
         path = tmp_path / "theses.json"
@@ -580,7 +590,12 @@ class TestDeploymentStateBoundaries:
     def test_thesis_store_non_strict_loads_despite_violations(self, tmp_path):
         bad_thesis = _make_thesis("t_bad", deployment_state="live_enabled")
         artifact = {
+            "schema_version": "promoted_theses_v1",
             "run_id": "run1",
+            "generated_at_utc": "2026-04-04T10:00:00Z",
+            "thesis_count": 1,
+            "active_thesis_count": 0,
+            "pending_thesis_count": 1,
             "theses": [bad_thesis.model_dump(mode="json")],
         }
         path = tmp_path / "theses.json"

@@ -4,7 +4,7 @@ metadata:
   status: generated
   graph_role: runtime_read_model
   schema_version: 2
-  generated_at_utc: '2026-04-10T06:47:51Z'
+  generated_at_utc: '2026-04-12T04:59:59Z'
   notes: Compiled runtime read model. Semantic nodes are normalized for direct runtime/search
     loading.
 events:
@@ -40,7 +40,7 @@ events:
     maturity: standard
     default_executable: true
     enabled: true
-    detector_name: ''
+    detector_name: AbsorptionProxyDetector
     instrument_classes: []
     requires_features: []
     runtime_tags: []
@@ -1296,7 +1296,7 @@ events:
     maturity: standard
     default_executable: true
     enabled: true
-    detector_name: ''
+    detector_name: DepthStressProxyDetector
     instrument_classes: []
     requires_features: []
     runtime_tags: []
@@ -1644,7 +1644,7 @@ events:
     maturity: standard
     default_executable: true
     enabled: true
-    detector_name: ''
+    detector_name: FlowExhaustionDetector
     instrument_classes: []
     requires_features: []
     runtime_tags: []
@@ -3333,7 +3333,7 @@ events:
     maturity: ''
     default_executable: true
     enabled: true
-    detector_name: ''
+    detector_name: DirectLiquidityStressDetector
     instrument_classes: []
     requires_features: []
     runtime_tags: []
@@ -3417,7 +3417,7 @@ events:
     maturity: standard
     default_executable: true
     enabled: true
-    detector_name: ''
+    detector_name: ProxyLiquidityStressDetector
     instrument_classes: []
     requires_features: []
     runtime_tags: []
@@ -4204,7 +4204,7 @@ events:
     maturity: ''
     default_executable: true
     enabled: true
-    detector_name: ''
+    detector_name: PostDeleveragingReboundDetector
     instrument_classes: []
     requires_features: []
     runtime_tags: []
@@ -4307,7 +4307,7 @@ events:
     maturity: standard
     default_executable: true
     enabled: true
-    detector_name: ''
+    detector_name: PriceVolImbalanceProxyDetector
     instrument_classes: []
     requires_features: []
     runtime_tags: []
@@ -6685,7 +6685,7 @@ events:
     maturity: standard
     default_executable: true
     enabled: true
-    detector_name: ''
+    detector_name: WickReversalProxyDetector
     instrument_classes: []
     requires_features: []
     runtime_tags: []
@@ -9389,8 +9389,8 @@ theses:
         lookback_window: 288
         cooldown_bars: 12
         min_basis_bps: 10.0
-    notes: Founding basis dislocation thesis uses canonical feature-schema basis fields
-      when spot-perp paired raw bars are not available as a dedicated bootstrap input.
+    notes: Basis dislocation thesis uses canonical feature-schema basis fields when
+      spot-perp paired raw bars are not available as a dedicated input dataset.
     spec_path: spec/theses/thesis_registry.yaml
   THESIS_FND_DISLOC:
     thesis_id: THESIS_FND_DISLOC
@@ -9445,9 +9445,8 @@ theses:
         alignment_window: 3
         cooldown_bars: 12
         min_basis_bps: 5.0
-    notes: Founding funding dislocation thesis uses canonical basis and funding features
-      from the feature schema when bootstrap raw inputs are not sufficient on their
-      own.
+    notes: Funding dislocation thesis uses canonical basis and funding features from
+      the feature schema when dedicated raw inputs are not sufficient on their own.
     spec_path: spec/theses/thesis_registry.yaml
   THESIS_LIQUIDATION_CASCADE:
     thesis_id: THESIS_LIQUIDATION_CASCADE
@@ -10020,6 +10019,17 @@ runtime:
         - overshoot_repair
         - only_if_liquidity
         - slippage_aware_filter
+      LIQUIDITY_STRESS:
+        parameters: {}
+        templates:
+        - mean_reversion
+        - continuation
+        - stop_run_repair
+        - overshoot_repair
+        - only_if_liquidity
+        - slippage_aware_filter
+        - only_if_regime
+        - only_if_highvol
       ORDERFLOW:
         parameters: {}
       POSITIONING_EXTREMES:

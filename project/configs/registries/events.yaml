@@ -1,6 +1,6 @@
 events:
   ABSORPTION_PROXY:
-    detector: ''
+    detector: AbsorptionProxyDetector
     enabled: true
     family: ABSORPTION_PROXY
     instrument_classes: []
@@ -144,7 +144,7 @@ events:
     tags:
     - liquidity_stress
   DEPTH_STRESS_PROXY:
-    detector: ''
+    detector: DepthStressProxyDetector
     enabled: true
     family: DEPTH_STRESS_PROXY
     instrument_classes: []
@@ -186,7 +186,7 @@ events:
     tags:
     - execution_cost
   FLOW_EXHAUSTION_PROXY:
-    detector: ''
+    detector: FlowExhaustionDetector
     enabled: true
     family: FLOW_EXHAUSTION_PROXY
     instrument_classes: []
@@ -365,7 +365,7 @@ events:
     - liquidity_stress
     - high_urgency
   LIQUIDITY_STRESS_DIRECT:
-    detector: ''
+    detector: DirectLiquidityStressDetector
     enabled: true
     family: LIQUIDITY_STRESS_DIRECT
     instrument_classes: []
@@ -373,7 +373,7 @@ events:
     sequence_eligible: true
     tags: []
   LIQUIDITY_STRESS_PROXY:
-    detector: ''
+    detector: ProxyLiquidityStressDetector
     enabled: true
     family: LIQUIDITY_STRESS_PROXY
     instrument_classes: []
@@ -460,7 +460,7 @@ events:
     tags:
     - statistical_stretch
   POST_DELEVERAGING_REBOUND:
-    detector: ''
+    detector: PostDeleveragingReboundDetector
     enabled: true
     family: POST_DELEVERAGING_REBOUND
     instrument_classes: []
@@ -468,7 +468,7 @@ events:
     sequence_eligible: true
     tags: []
   PRICE_VOL_IMBALANCE_PROXY:
-    detector: ''
+    detector: PriceVolImbalanceProxyDetector
     enabled: true
     family: PRICE_VOL_IMBALANCE_PROXY
     instrument_classes: []
@@ -767,7 +767,7 @@ events:
     - vol_regime
     - high_urgency
   WICK_REVERSAL_PROXY:
-    detector: ''
+    detector: WickReversalProxyDetector
     enabled: true
     family: WICK_REVERSAL_PROXY
     instrument_classes: []

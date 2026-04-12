@@ -4,6 +4,16 @@ from pathlib import Path
 import pandas as pd
 
 from project.research.live_export import export_promoted_theses_for_run
+from project.research.validation.contracts import (
+    ValidationBundle,
+    ValidatedCandidateRecord,
+    ValidationDecision,
+    ValidationMetrics,
+)
+from project.research.validation.result_writer import (
+    write_promotion_ready_candidates,
+    write_validation_bundle,
+)
 
 
 def _bundle() -> dict:
@@ -30,6 +40,28 @@ def _bundle() -> dict:
 
 
 def test_export_promoted_theses_includes_governance_and_source(tmp_path: Path) -> None:
+    bundle = ValidationBundle(
+        run_id="run_1",
+        created_at="2026-01-01T00:00:00Z",
+        validated_candidates=[
+            ValidatedCandidateRecord(
+                candidate_id="cand_1",
+                decision=ValidationDecision(
+                    status="validated",
+                    candidate_id="cand_1",
+                    run_id="run_1",
+                ),
+                metrics=ValidationMetrics(sample_count=120, stability_score=0.8),
+            )
+        ],
+        rejected_candidates=[],
+        inconclusive_candidates=[],
+        summary_stats={"total": 1, "validated": 1},
+        effect_stability_report={},
+    )
+    validation_dir = tmp_path / "reports" / "validation" / "run_1"
+    write_validation_bundle(bundle, base_dir=validation_dir)
+    write_promotion_ready_candidates(bundle, base_dir=validation_dir)
     promoted_df = pd.DataFrame([
         {"candidate_id": "cand_1", "event_type": "VOL_SHOCK", "status": "PROMOTED"}
     ])

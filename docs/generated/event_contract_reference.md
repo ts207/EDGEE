@@ -201,7 +201,7 @@
 
 ### ABSORPTION_PROXY
 
-- Detector: `unwired` | enabled=`True` | default_executable=`True`
+- Detector: `AbsorptionProxyDetector` | enabled=`True` | default_executable=`True`
 - Family: canonical=`LIQUIDITY_DISLOCATION` | legacy=`ABSORPTION_PROXY`
 - Shape: subtype=`absorption` | phase=`persistence` | evidence=`hybrid` | layer=`canonical` | disposition=`merge`
 - Scope: asset=`single_asset` | venue=`single_venue` | research_only=`False` | composite=`False` | context_tag=`False`
@@ -222,7 +222,7 @@
 
 ### DEPTH_STRESS_PROXY
 
-- Detector: `unwired` | enabled=`True` | default_executable=`True`
+- Detector: `DepthStressProxyDetector` | enabled=`True` | default_executable=`True`
 - Family: canonical=`LIQUIDITY_DISLOCATION` | legacy=`DEPTH_STRESS_PROXY`
 - Shape: subtype=`depth_collapse` | phase=`collapse` | evidence=`hybrid` | layer=`canonical` | disposition=`merge`
 - Scope: asset=`single_asset` | venue=`single_venue` | research_only=`False` | composite=`False` | context_tag=`False`
@@ -254,7 +254,7 @@
 
 ### LIQUIDITY_STRESS_DIRECT
 
-- Detector: `unwired` | enabled=`True` | default_executable=`True`
+- Detector: `DirectLiquidityStressDetector` | enabled=`True` | default_executable=`True`
 - Family: canonical=`LIQUIDITY_DISLOCATION` | legacy=`LIQUIDITY_STRESS_DIRECT`
 - Shape: subtype=`liquidity_stress` | phase=`shock` | evidence=`direct` | layer=`canonical` | disposition=`merge`
 - Scope: asset=`single_asset` | venue=`single_venue` | research_only=`False` | composite=`False` | context_tag=`False`
@@ -264,7 +264,7 @@
 
 ### LIQUIDITY_STRESS_PROXY
 
-- Detector: `unwired` | enabled=`True` | default_executable=`True`
+- Detector: `ProxyLiquidityStressDetector` | enabled=`True` | default_executable=`True`
 - Family: canonical=`LIQUIDITY_DISLOCATION` | legacy=`LIQUIDITY_STRESS_PROXY`
 - Shape: subtype=`liquidity_stress` | phase=`shock` | evidence=`hybrid` | layer=`canonical` | disposition=`merge`
 - Scope: asset=`single_asset` | venue=`single_venue` | research_only=`False` | composite=`False` | context_tag=`False`
@@ -296,7 +296,7 @@
 
 ### PRICE_VOL_IMBALANCE_PROXY
 
-- Detector: `unwired` | enabled=`True` | default_executable=`True`
+- Detector: `PriceVolImbalanceProxyDetector` | enabled=`True` | default_executable=`True`
 - Family: canonical=`LIQUIDITY_DISLOCATION` | legacy=`PRICE_VOL_IMBALANCE_PROXY`
 - Shape: subtype=`price_vol_imbalance` | phase=`shock` | evidence=`hybrid` | layer=`canonical` | disposition=`merge`
 - Scope: asset=`single_asset` | venue=`single_venue` | research_only=`False` | composite=`False` | context_tag=`False`
@@ -339,7 +339,7 @@
 
 ### WICK_REVERSAL_PROXY
 
-- Detector: `unwired` | enabled=`True` | default_executable=`True`
+- Detector: `WickReversalProxyDetector` | enabled=`True` | default_executable=`True`
 - Family: canonical=`LIQUIDITY_DISLOCATION` | legacy=`WICK_REVERSAL_PROXY`
 - Shape: subtype=`wick_reversal` | phase=`recovery` | evidence=`hybrid` | layer=`canonical` | disposition=`merge`
 - Scope: asset=`single_asset` | venue=`single_venue` | research_only=`False` | composite=`False` | context_tag=`False`
@@ -408,7 +408,7 @@
 
 ### POST_DELEVERAGING_REBOUND
 
-- Detector: `unwired` | enabled=`True` | default_executable=`True`
+- Detector: `PostDeleveragingReboundDetector` | enabled=`True` | default_executable=`True`
 - Family: canonical=`FORCED_FLOW_AND_EXHAUSTION` | legacy=`POST_DELEVERAGING_REBOUND`
 - Shape: subtype=`post_deleveraging_rebound` | phase=`recovery` | evidence=`hybrid` | layer=`canonical` | disposition=`merge`
 - Scope: asset=`single_asset` | venue=`single_venue` | research_only=`False` | composite=`False` | context_tag=`False`
@@ -659,7 +659,7 @@
 
 ### FLOW_EXHAUSTION_PROXY
 
-- Detector: `unwired` | enabled=`True` | default_executable=`True`
+- Detector: `FlowExhaustionDetector` | enabled=`True` | default_executable=`True`
 - Family: canonical=`FORCED_FLOW_AND_EXHAUSTION` | legacy=`FLOW_EXHAUSTION_PROXY`
 - Shape: subtype=`flow_exhaustion` | phase=`exhaustion` | evidence=`hybrid` | layer=`canonical` | disposition=`merge`
 - Scope: asset=`single_asset` | venue=`single_venue` | research_only=`False` | composite=`False` | context_tag=`False`

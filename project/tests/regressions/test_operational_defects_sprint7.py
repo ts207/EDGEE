@@ -462,6 +462,20 @@ class TestValidationMetadataPreload:
         
         import json
         (validation_dir / "validation_bundle.json").write_text(json.dumps(bundle.to_dict()))
+        pd.DataFrame(
+            [
+                {
+                    "candidate_id": "cand_1",
+                    "validation_status": "validated",
+                    "validation_run_id": run_id,
+                    "validation_program_id": "test_program",
+                    "metric_sample_count": 100,
+                    "metric_q_value": 0.01,
+                    "metric_stability_score": 0.8,
+                    "metric_net_expectancy": 0.005,
+                }
+            ]
+        ).to_parquet(validation_dir / "promotion_ready_candidates.parquet", index=False)
         
         promotion_dir = data_root / "reports" / "promotions" / run_id
         promotion_dir.mkdir(parents=True)
@@ -692,8 +706,9 @@ class TestCanonicalPromotionArtifactConsumption:
             use_compatibility_bridge=False,
         )
 
-        with pytest.raises(FileNotFoundError, match="Canonical promotion-ready candidates not found"):
-            execute_promotion(config)
+        result = execute_promotion(config)
+        assert result.exit_code == 1
+        assert "legacy_but_interpretable" in result.diagnostics["error"]
 
 
 class TestCanonicalPromotionArtifact:

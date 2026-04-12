@@ -42,6 +42,18 @@ def _load_yaml(path: Path) -> Dict[str, Any]:
     return payload if isinstance(payload, dict) else {}
 
 
+def _load_detector_ownership(repo_root: Path) -> Dict[str, str]:
+    payload = _load_yaml(repo_root / "project" / "configs" / "registries" / "detectors.yaml")
+    raw = payload.get("detector_ownership", {}) if isinstance(payload, dict) else {}
+    if not isinstance(raw, dict):
+        return {}
+    return {
+        str(event_type).strip().upper(): str(detector_name).strip()
+        for event_type, detector_name in raw.items()
+        if str(event_type).strip() and str(detector_name).strip()
+    }
+
+
 def _mapping(value: Any) -> Dict[str, Any]:
     return dict(value) if isinstance(value, dict) else {}
 
@@ -256,6 +268,7 @@ def _canonical_regime_fanout(rows: Dict[str, Dict[str, Any]]) -> Dict[str, tuple
 def build_unified_registry(repo_root: Path) -> Dict[str, Any]:
     spec_root = repo_root / "spec"
     events_root = spec_root / "events"
+    detector_ownership = _load_detector_ownership(repo_root)
 
     event_defaults = _load_yaml(events_root / "_defaults.yaml")
     event_family_defaults = _load_yaml(events_root / "_families.yaml")
@@ -413,6 +426,7 @@ def build_unified_registry(repo_root: Path) -> Dict[str, Any]:
                 _present(runtime, "detector"),
                 _present(runtime, "detector_name"),
                 _present(runtime, "detector_class"),
+                detector_ownership.get(event_type, _MISSING),
                 default="",
             ),
             "runtime_tags": _list_value(

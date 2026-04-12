@@ -13,8 +13,14 @@ import pandas as pd
 from project.artifacts import live_thesis_index_path, promoted_theses_path
 from project.core.coercion import safe_float, safe_int
 from project.core.config import get_data_root
-from project.core.exceptions import DataIntegrityError
-from project.io.utils import ensure_dir, read_parquet
+from project.core.exceptions import (
+    DataIntegrityError,
+    IncompleteLineageError,
+    MalformedArtifactError,
+    MissingArtifactError,
+    SchemaMismatchError,
+)
+from project.io.utils import atomic_write_json, atomic_write_text, ensure_dir, read_parquet
 from project.events.governance import get_event_governance_metadata
 from project.live.contracts import (
     ALL_DEPLOYMENT_STATES,
@@ -46,6 +52,75 @@ class PromotedThesisExportResult:
     pending_count: int
     contract_json_path: Path | None = None
     contract_md_path: Path | None = None
+
+
+def _validate_object_payload(payload: Any, *, artifact_name: str) -> None:
+    if not isinstance(payload, dict):
+        raise SchemaMismatchError(f"{artifact_name} must be a JSON object payload")
+
+
+def _validate_exported_thesis_payload(payload: Any) -> None:
+    _validate_object_payload(payload, artifact_name="promoted_theses.json")
+    required = {
+        "schema_version": str,
+        "run_id": str,
+        "generated_at_utc": str,
+        "thesis_count": int,
+        "active_thesis_count": int,
+        "pending_thesis_count": int,
+        "theses": list,
+    }
+    for field_name, field_type in required.items():
+        if field_name not in payload:
+            raise SchemaMismatchError(f"promoted_theses.json missing required field {field_name!r}")
+        if not isinstance(payload[field_name], field_type):
+            raise SchemaMismatchError(
+                f"promoted_theses.json field {field_name!r} must be {field_type.__name__}"
+            )
+    if payload["schema_version"] != "promoted_theses_v1":
+        raise SchemaMismatchError(
+            f"Unsupported promoted thesis schema_version {payload['schema_version']!r}"
+        )
+    if payload["thesis_count"] != len(payload["theses"]):
+        raise SchemaMismatchError("promoted_theses.json thesis_count does not match theses payload")
+    active_count = sum(
+        1 for thesis in payload["theses"] if isinstance(thesis, dict) and thesis.get("status") == "active"
+    )
+    pending_count = sum(
+        1
+        for thesis in payload["theses"]
+        if isinstance(thesis, dict) and thesis.get("status") == "pending_blueprint"
+    )
+    if payload["active_thesis_count"] != active_count:
+        raise SchemaMismatchError(
+            "promoted_theses.json active_thesis_count does not match thesis statuses"
+        )
+    if payload["pending_thesis_count"] != pending_count:
+        raise SchemaMismatchError(
+            "promoted_theses.json pending_thesis_count does not match thesis statuses"
+        )
+
+
+def _validate_thesis_index_payload(payload: Any) -> None:
+    _validate_object_payload(payload, artifact_name="index.json")
+    required = {
+        "schema_version": str,
+        "latest_run_id": str,
+        "default_resolution_disabled": bool,
+        "runs": dict,
+    }
+    for field_name, field_type in required.items():
+        if field_name not in payload:
+            raise SchemaMismatchError(f"index.json missing required field {field_name!r}")
+        if not isinstance(payload[field_name], field_type):
+            raise SchemaMismatchError(
+                f"index.json field {field_name!r} must be {field_type.__name__}"
+            )
+    if payload["schema_version"] != "promoted_thesis_index_v1":
+        raise SchemaMismatchError(f"Unsupported thesis index schema_version {payload['schema_version']!r}")
+    latest_run_id = str(payload.get("latest_run_id", "")).strip()
+    if latest_run_id and latest_run_id not in payload["runs"]:
+        raise SchemaMismatchError("index.json latest_run_id is not present in runs metadata")
 
 
 def _fallback_authored_definition_for_event(*event_tokens: str):
@@ -636,8 +711,14 @@ def _write_contract_artifacts(
         "thesis_count": len(rows),
         "contracts": rows,
     }
-    json_path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
-    md_path.write_text(_render_contract_markdown(run_id=run_id, rows=rows), encoding="utf-8")
+    atomic_write_json(
+        json_path,
+        payload,
+        validator=lambda data: _validate_object_payload(
+            data, artifact_name="promoted_thesis_contracts.json"
+        ),
+    )
+    atomic_write_text(md_path, _render_contract_markdown(run_id=run_id, rows=rows))
     return json_path, md_path
 
 
@@ -658,6 +739,7 @@ def _build_thesis(
     promoted_row: Mapping[str, Any],
     blueprint: Mapping[str, Any] | None,
     validation_metadata: Mapping[str, Mapping[str, Any]] | None = None,
+    require_validation_lineage: bool = True,
 ) -> PromotedThesis:
     sample = bundle.get("sample_definition", {})
     split = bundle.get("split_definition", {})
@@ -748,6 +830,17 @@ def _build_thesis(
             validation_status = str(val_meta.get("validation_status", "")).strip()
             validation_reasons = list(val_meta.get("validation_reason_codes", []))
             validation_artifacts = dict(val_meta.get("validation_artifact_paths", {}))
+    if require_validation_lineage:
+        missing_lineage = []
+        if not validation_run_id:
+            missing_lineage.append("validation_run_id")
+        if not validation_status:
+            missing_lineage.append("validation_status")
+        if missing_lineage:
+            raise IncompleteLineageError(
+                f"Candidate {candidate_id} missing required validation lineage: "
+                + ", ".join(missing_lineage)
+            )
 
     # Sprint 4: Extract explicit promotion fields
     promo_class = str(promoted_row.get("promotion_class") or "paper_promoted").lower()
@@ -875,6 +968,7 @@ def build_promoted_theses(
     promoted_df: pd.DataFrame | None = None,
     blueprints: Sequence[Mapping[str, Any]] | None = None,
     validation_metadata: Mapping[str, Mapping[str, Any]] | None = None,
+    require_validation_lineage: bool = True,
 ) -> list[PromotedThesis]:
     promoted_frame = promoted_df.copy() if promoted_df is not None else pd.DataFrame()
     promoted_rows = _row_by_candidate_id(promoted_frame)
@@ -900,6 +994,7 @@ def build_promoted_theses(
                 promoted_row=promoted_row,
                 blueprint=blueprint_rows.get(candidate_id),
                 validation_metadata=validation_metadata,
+                require_validation_lineage=require_validation_lineage,
             )
             theses.append(thesis)
         except DataIntegrityError as exc:
@@ -930,7 +1025,7 @@ def _write_thesis_payload(
         ),
         "theses": [thesis.model_dump() for thesis in theses],
     }
-    output_path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+    atomic_write_json(output_path, payload, validator=_validate_exported_thesis_payload)
 
 
 def _deployment_state_counts(theses: Sequence[PromotedThesis]) -> dict[str, int]:
@@ -1020,7 +1115,7 @@ def _update_thesis_index(
     }
     if runtime_registrations:
         payload["runtime_registrations"] = runtime_registrations
-    index_path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+    atomic_write_json(index_path, payload, validator=_validate_thesis_index_payload)
 
 
 def export_promoted_theses_for_run(
@@ -1033,6 +1128,7 @@ def export_promoted_theses_for_run(
     deployment_state_overrides: Mapping[str, str] | None = None,
     register_runtime_name: str | None = None,
     allow_bundle_only_export: bool = False,
+    compatibility_mode: bool = False,
 ) -> PromotedThesisExportResult:
     resolved_root = Path(data_root) if data_root is not None else get_data_root()
     effective_bundles = list(bundles) if bundles is not None else _load_evidence_bundles(run_id, resolved_root)
@@ -1045,11 +1141,18 @@ def export_promoted_theses_for_run(
             "Set allow_bundle_only_export=True to proceed with bundle-only export."
         )
     effective_blueprints = list(blueprints) if blueprints is not None else _load_blueprints(run_id, resolved_root)
+    skip_validation_lineage = allow_bundle_only_export and effective_promoted.empty and not effective_bundles
 
     validation_metadata: dict[str, dict[str, Any]] = {}
-    try:
-        from project.research.validation.result_writer import load_validation_bundle
-        val_bundle = load_validation_bundle(run_id, resolved_root / "reports" / "validation")
+    from project.research.validation.result_writer import load_validation_bundle
+
+    if not skip_validation_lineage:
+        val_bundle = load_validation_bundle(
+            run_id,
+            resolved_root / "reports" / "validation",
+            strict=not compatibility_mode,
+            compatibility_mode=compatibility_mode,
+        )
         if val_bundle:
             all_candidates = (
                 val_bundle.validated_candidates + val_bundle.rejected_candidates + val_bundle.inconclusive_candidates
@@ -1061,12 +1164,10 @@ def export_promoted_theses_for_run(
                     "validation_reason_codes": list(c.decision.reason_codes),
                     "validation_artifact_paths": {a.artifact_type: a.path for a in c.artifact_refs},
                 }
-    except (OSError, json.JSONDecodeError, KeyError, AttributeError, TypeError, ValueError) as exc:
-        logging.warning(
-            "Failed to load validation bundle for run %s: %s. Proceeding without validation metadata.",
-            run_id,
-            exc,
-        )
+        elif not compatibility_mode:
+            raise MissingArtifactError(
+                f"Canonical export for run {run_id} requires validation lineage metadata."
+            )
 
     theses = build_promoted_theses(
         run_id=run_id,
@@ -1074,6 +1175,7 @@ def export_promoted_theses_for_run(
         promoted_df=effective_promoted,
         blueprints=effective_blueprints,
         validation_metadata=validation_metadata,
+        require_validation_lineage=not compatibility_mode and not skip_validation_lineage,
     )
     theses = _apply_deployment_state_overrides(theses, deployment_state_overrides)
     contract_json_path, contract_md_path = _write_contract_artifacts(
@@ -1091,6 +1193,9 @@ def export_promoted_theses_for_run(
         theses=theses,
         register_runtime_name=register_runtime_name,
     )
+    from project.live.thesis_store import ThesisStore
+
+    ThesisStore.from_path(output_path, strict_live_gate=True)
     return PromotedThesisExportResult(
         run_id=run_id,
         output_path=output_path,

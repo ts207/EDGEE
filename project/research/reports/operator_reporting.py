@@ -9,8 +9,9 @@ from typing import Any
 import pandas as pd
 
 from project.core.config import get_data_root
-from project.io.utils import read_table_auto
+from project.io.utils import atomic_write_json, atomic_write_text, read_table_auto
 from project.operator.stability import write_sprint4_outputs_for_run
+from project.research.audit_historical_artifacts import build_run_historical_trust_summary
 from project.research.knowledge.memory import read_memory_table, write_memory_table
 from project.research.knowledge.reflection import build_run_reflection
 from project.research.knowledge.schemas import canonical_json
@@ -281,6 +282,10 @@ def build_operator_summary(*, run_id: str, program_id: str | None = None, data_r
         "recommended_next_experiment": str(reflection.get("recommended_next_experiment", "") or ""),
         "market_findings": str(reflection.get("market_findings", "") or ""),
         "system_findings": str(reflection.get("system_findings", "") or ""),
+        "historical_trust": build_run_historical_trust_summary(
+            run_id=run_id,
+            data_root=resolved,
+        ),
     }
     summary["verdict"] = _verdict(summary)
     if not summary["recommended_next_action"]:
@@ -290,6 +295,7 @@ def build_operator_summary(*, run_id: str, program_id: str | None = None, data_r
 
 def _summary_markdown(summary: dict[str, Any]) -> str:
     top = summary.get("top_candidate", {}) or {}
+    trust = summary.get("historical_trust", {}) or {}
     lines = [
         f"# Operator summary — {summary.get('run_id', '')}",
         "",
@@ -317,6 +323,13 @@ def _summary_markdown(summary: dict[str, Any]) -> str:
         f"- Metric: `{top.get('metric_name', '')}` = `{top.get('metric_value')}`",
         f"- Primary fail gate: `{summary.get('primary_fail_gate', top.get('primary_fail_gate', ''))}`",
         "",
+        "## Historical trust",
+        "",
+        f"- Status: `{trust.get('historical_trust_status', '')}`",
+        f"- Reason: `{trust.get('historical_trust_reason', '')}`",
+        f"- Canonical reuse allowed: `{trust.get('canonical_reuse_allowed', False)}`",
+        f"- Compat reuse allowed: `{trust.get('compat_reuse_allowed', False)}`",
+        "",
         "## Decision",
         "",
         f"- Verdict: `{summary.get('verdict', '')}`",
@@ -331,8 +344,8 @@ def write_operator_summary(*, run_id: str, program_id: str | None = None, data_r
     summary = build_operator_summary(run_id=run_id, program_id=program_id, data_root=resolved)
     paths = operator_summary_paths(run_id, data_root=resolved)
     paths.root.mkdir(parents=True, exist_ok=True)
-    paths.json_path.write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    paths.markdown_path.write_text(_summary_markdown(summary), encoding="utf-8")
+    atomic_write_json(paths.json_path, summary)
+    atomic_write_text(paths.markdown_path, _summary_markdown(summary))
     summary["summary_json_path"] = str(paths.json_path)
     summary["summary_markdown_path"] = str(paths.markdown_path)
     return summary

@@ -6,15 +6,23 @@ import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
+import pandas as pd
 import pytest
 
 from project.research.audit_historical_artifacts import (
     ArtifactInventoryRow,
     AuditInventoryResult,
+    build_run_historical_trust_summary,
     scan_historical_artifacts,
     write_artifact_audit_stamp_sidecar,
     write_audit_inventory,
     rewrite_audit_stamp_sidecars,
+)
+from project.research.contracts.historical_trust import (
+    HISTORICAL_TRUST_LEGACY,
+    HISTORICAL_TRUST_REQUIRES_REVALIDATION,
+    HISTORICAL_TRUST_TRUSTED,
+    trusted_under_current_rules,
 )
 from project.research.contracts.stat_regime import (
     AUDIT_STATUS_CURRENT,
@@ -41,6 +49,39 @@ def _write_parquet_artifact(data_root: Path, run_id: str, filename: str, records
     df = pd.DataFrame(records)
     df.to_parquet(path, index=False)
     return path
+
+
+def _write_validation_bundle_artifact(data_root: Path, run_id: str) -> None:
+    validation_dir = data_root / "reports" / "validation" / run_id
+    validation_dir.mkdir(parents=True, exist_ok=True)
+    (validation_dir / "validation_bundle.json").write_text(
+        json.dumps(
+            {
+                "run_id": run_id,
+                "created_at": "2026-04-12T00:00:00Z",
+                "validated_candidates": [],
+                "rejected_candidates": [],
+                "inconclusive_candidates": [],
+                "summary_stats": {},
+                "effect_stability_report": {},
+            }
+        ),
+        encoding="utf-8",
+    )
+    pd.DataFrame(
+        [
+            {
+                "candidate_id": "cand_1",
+                "validation_status": "validated",
+                "validation_run_id": run_id,
+                "validation_program_id": "prog_1",
+                "metric_sample_count": 100,
+                "metric_q_value": 0.01,
+                "metric_stability_score": 0.9,
+                "metric_net_expectancy": 5.0,
+            }
+        ]
+    ).to_parquet(validation_dir / "promotion_ready_candidates.parquet", index=False)
 
 
 class TestScanHistoricalArtifacts:
@@ -74,6 +115,7 @@ class TestScanHistoricalArtifacts:
         assert len(result.scanned_artifact_paths) == 1
         assert result.rows[0].stat_regime == STAT_REGIME_POST_AUDIT
         assert result.rows[0].audit_status == AUDIT_STATUS_CURRENT
+        assert result.rows[0].historical_trust_status == HISTORICAL_TRUST_LEGACY
 
     def test_scan_filters_by_run_id(self, temp_data_root):
         _write_parquet_artifact(
@@ -107,6 +149,23 @@ class TestScanHistoricalArtifacts:
         assert result.rows[0].stat_regime == STAT_REGIME_UNKNOWN
         assert result.rows[0].audit_status == AUDIT_STATUS_UNKNOWN
         assert result.rows[0].requires_manual_review is True
+        assert result.rows[0].historical_trust_status == HISTORICAL_TRUST_LEGACY
+
+    def test_scan_validation_bundle_classifies_current_contract_trust(self, temp_data_root):
+        _write_validation_bundle_artifact(temp_data_root, "run_001")
+        result = scan_historical_artifacts(data_root=temp_data_root, run_id="run_001")
+        trust_rows = [row for row in result.rows if row.artifact_type == "validation_bundle"]
+        assert trust_rows
+        assert trust_rows[0].historical_trust_status == HISTORICAL_TRUST_TRUSTED
+
+    def test_scan_promoted_theses_malformed_requires_revalidation(self, temp_data_root):
+        thesis_dir = temp_data_root / "live" / "theses" / "run_bad"
+        thesis_dir.mkdir(parents=True, exist_ok=True)
+        (thesis_dir / "promoted_theses.json").write_text("{not-json", encoding="utf-8")
+        result = scan_historical_artifacts(data_root=temp_data_root, run_id="run_bad")
+        assert result.errors
+        summary = build_run_historical_trust_summary(run_id="run_bad", data_root=temp_data_root, result=result)
+        assert summary["historical_trust_status"] == HISTORICAL_TRUST_REQUIRES_REVALIDATION
 
 
 class TestWriteAuditInventory:
@@ -164,11 +223,16 @@ class TestWriteArtifactAuditStampSidecar:
             requires_manual_review=False,
             inference_confidence="high",
         )
-        sidecar_path = write_artifact_audit_stamp_sidecar(artifact_path, stamp)
+        sidecar_path = write_artifact_audit_stamp_sidecar(
+            artifact_path,
+            stamp,
+            trusted_under_current_rules("test_current"),
+        )
         assert sidecar_path.exists()
         payload = json.loads(sidecar_path.read_text())
         assert payload["stat_regime"] == STAT_REGIME_POST_AUDIT
         assert payload["audit_status"] == AUDIT_STATUS_CURRENT
+        assert payload["historical_trust_status"] == HISTORICAL_TRUST_TRUSTED
 
 
 class TestRewriteAuditStampSidecars:
@@ -206,6 +270,7 @@ class TestRewriteAuditStampSidecars:
         assert sidecar_path.exists()
         payload = json.loads(sidecar_path.read_text())
         assert payload["stat_regime"] == STAT_REGIME_POST_AUDIT
+        assert payload["historical_trust_status"] == HISTORICAL_TRUST_LEGACY
 
     def test_rewrite_with_manual_review_takes_precedence(self, temp_data_root):
         records = [
@@ -225,3 +290,4 @@ class TestRewriteAuditStampSidecars:
         payload = json.loads(sidecar_path.read_text())
         assert payload["audit_status"] == AUDIT_STATUS_MANUAL_REVIEW_REQUIRED
         assert payload["stat_regime"] == STAT_REGIME_UNKNOWN
+        assert payload["historical_trust_status"] == HISTORICAL_TRUST_LEGACY

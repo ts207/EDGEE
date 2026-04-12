@@ -3,318 +3,971 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Edge Research Platform</title>
+<title>Edge — Research Platform</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet"/>
 <style>
-/* ─── Variables ──────────────────────────────────────────────────────────── */
-:root{
-  --paper:#f7f0e3; --wash:#dbe7eb;
-  --panel:rgba(255,252,246,.93); --panel-s:rgba(255,248,236,.97);
-  --ink:#18313b; --muted:#61767f;
-  --line:rgba(24,49,59,.11); --line2:rgba(24,49,59,.05);
-  --accent:#ad4d19; --accent-s:rgba(173,77,25,.10); --accent-ss:rgba(173,77,25,.05);
-  --ok:#2f6f4e; --ok-s:rgba(47,111,78,.11);
-  --warn:#8b6317; --warn-s:rgba(139,99,23,.11);
-  --fail:#8b3131; --fail-s:rgba(139,49,49,.11);
-  --sidebar-w:220px; --top-h:50px;
-  --r:18px; --rr:12px; --rrr:8px;
-  --shadow:0 8px 32px rgba(24,49,59,.10);
+/* ─── Design Tokens ──────────────────────────────────────────────────────── */
+:root {
+  --bg:       #080c12;
+  --bg2:      #0d1117;
+  --bg3:      #111820;
+  --bg4:      #16202c;
+  --surface:  #111820;
+  --surface2: #16202c;
+  --surface3: #1b2838;
+  --line:   rgba(255,255,255,.06);
+  --line2:  rgba(255,255,255,.035);
+  --ink:    #e8edf2;
+  --ink2:   #9aaabb;
+  --ink3:   #5d7280;
+  --accent:    #00d4ff;
+  --accent-d:  #00aacc;
+  --accent-bg: rgba(0,212,255,.07);
+  --accent-bd: rgba(0,212,255,.18);
+  --ok:     #22c55e;
+  --ok-bg:  rgba(34,197,94,.08);
+  --ok-bd:  rgba(34,197,94,.2);
+  --warn:   #f59e0b;
+  --warn-bg:rgba(245,158,11,.08);
+  --warn-bd:rgba(245,158,11,.2);
+  --fail:   #f43f5e;
+  --fail-bg:rgba(244,63,94,.08);
+  --fail-bd:rgba(244,63,94,.2);
+  --sid-w:  224px;
+  --top-h:  52px;
+  --mono:   'JetBrains Mono', 'Fira Code', monospace;
+  --sans:   'Inter', system-ui, sans-serif;
+  --r:  14px;
+  --rr: 10px;
+  --rrr: 7px;
+  --shadow: 0 4px 24px rgba(0,0,0,.45);
+  --shadow-lg: 0 8px 40px rgba(0,0,0,.6);
 }
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-html,body{height:100%}
-body{
-  font-family:"IBM Plex Sans","Segoe UI",system-ui,sans-serif;
-  font-size:13.5px;line-height:1.5;color:var(--ink);
-  background:
-    radial-gradient(circle at 0% 0%,rgba(173,77,25,.14) 0%,transparent 35%),
-    radial-gradient(circle at 100% 0%,rgba(24,49,59,.07) 0%,transparent 28%),
-    linear-gradient(170deg,var(--paper) 0%,var(--wash) 100%);
-  background-attachment:fixed;overflow:hidden;
+*,*::before,*::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+
+body {
+  font-family: var(--sans);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink);
+  background: var(--bg);
+  overflow: hidden;
 }
-body::before{
-  content:"";position:fixed;inset:0;pointer-events:none;
+
+/* Subtle grid texture */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
   background-image:
-    linear-gradient(rgba(24,49,59,.022) 1px,transparent 1px),
-    linear-gradient(90deg,rgba(24,49,59,.022) 1px,transparent 1px);
-  background-size:28px 28px;
+    linear-gradient(rgba(0,212,255,.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,212,255,.025) 1px, transparent 1px);
+  background-size: 40px 40px;
+  z-index: 0;
 }
 
-/* ─── Layout ─────────────────────────────────────────────────────────────── */
-#app{display:flex;height:100vh}
+/* ─── Layout ──────────────────────────────────────────────────────────────── */
+#app { display: flex; height: 100vh; position: relative; z-index: 1; }
 
-/* Sidebar */
-#sidebar{
-  width:var(--sidebar-w);flex-shrink:0;
-  background:rgba(20,38,46,.96);backdrop-filter:blur(20px);
-  border-right:1px solid rgba(255,255,255,.055);
-  display:flex;flex-direction:column;overflow-y:auto;z-index:10;
+/* ─── Sidebar ─────────────────────────────────────────────────────────────── */
+#sidebar {
+  width: var(--sid-w);
+  flex-shrink: 0;
+  background: var(--bg2);
+  border-right: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overflow-x: hidden;
+  z-index: 20;
+  /* subtle right-edge glow toward content */
+  box-shadow: 1px 0 0 var(--line), 4px 0 16px rgba(0,0,0,.3);
 }
-.s-logo{padding:18px 16px 14px;border-bottom:1px solid rgba(255,255,255,.07)}
-.s-eyebrow{font-size:9.5px;letter-spacing:.17em;text-transform:uppercase;color:var(--accent);margin-bottom:3px}
-.s-name{font-size:18px;font-weight:800;color:#fff;letter-spacing:-.02em}
-.s-sub{font-size:10.5px;color:rgba(255,255,255,.32);margin-top:1px}
+#sidebar::-webkit-scrollbar { width: 2px; }
+#sidebar::-webkit-scrollbar-thumb { background: rgba(0,212,255,.2); border-radius: 2px; }
 
-.s-section{padding:12px 8px 2px}
-.s-label{font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;color:rgba(255,255,255,.28);padding:0 8px;margin-bottom:3px}
-.nav{
-  display:flex;align-items:center;gap:9px;
-  padding:7.5px 10px;border-radius:10px;cursor:pointer;
-  color:rgba(255,255,255,.5);font-size:12.5px;font-weight:500;
-  transition:background .14s,color .14s;user-select:none;
+.s-logo {
+  padding: 18px 16px 14px;
+  border-bottom: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(0,212,255,.04) 0%, transparent 100%);
 }
-.nav:hover{background:rgba(255,255,255,.055);color:rgba(255,255,255,.82)}
-.nav.active{background:rgba(173,77,25,.22);color:#fff}
-.nav.active .ni{color:var(--accent)}
-.ni{font-size:15px;width:18px;text-align:center;flex-shrink:0}
-.nb{margin-left:auto;background:rgba(173,77,25,.28);color:var(--accent);
-    font-size:9.5px;font-weight:700;padding:2px 6px;border-radius:99px}
-
-.s-footer{
-  margin:auto 10px 12px;padding:10px 11px;
-  background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.055);border-radius:11px;
+.s-eyebrow {
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: .22em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 5px;
+  opacity: .8;
 }
-.sf-label{font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.28);margin-bottom:3px}
-.sf-val{font-size:11.5px;color:rgba(255,255,255,.65)}
-.dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--ok);margin-right:5px;vertical-align:middle}
-
-/* Main */
-#main{flex:1;display:flex;flex-direction:column;overflow:hidden}
-
-/* Topbar */
-#topbar{
-  height:var(--top-h);flex-shrink:0;
-  display:flex;align-items:center;gap:10px;padding:0 22px;
-  border-bottom:1px solid var(--line);
-  background:rgba(247,240,227,.72);backdrop-filter:blur(14px);
+.s-name {
+  font-size: 24px;
+  font-weight: 900;
+  color: var(--ink);
+  letter-spacing: -.05em;
+  line-height: 1;
 }
-#page-title{font-size:14.5px;font-weight:700}
-#page-sub{font-size:11.5px;color:var(--muted);margin-left:3px}
-.t-spacer{flex:1}
-.t-time{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums;letter-spacing:.03em}
-.t-btn{
-  padding:5px 13px;border:1px solid var(--line);border-radius:8px;
-  background:var(--panel);font-size:11.5px;cursor:pointer;color:var(--ink);
-  font-family:inherit;transition:background .14s;
+.s-sub {
+  font-size: 10px;
+  color: var(--ink3);
+  margin-top: 4px;
+  line-height: 1.4;
 }
-.t-btn:hover{background:rgba(219,231,235,.7)}
-.t-dot{width:7px;height:7px;border-radius:50%;background:var(--ok);flex-shrink:0;
-       animation:pulse 2.2s ease-in-out infinite}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}
 
-/* Content */
-#content{flex:1;overflow-y:auto;padding:20px 22px 48px}
-#content::-webkit-scrollbar{width:5px}
-#content::-webkit-scrollbar-thumb{background:rgba(24,49,59,.13);border-radius:3px}
+.s-section { padding: 16px 8px 4px; }
+.s-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: var(--ink3);
+  padding: 0 10px;
+  margin-bottom: 4px;
+}
 
-/* Views */
-.view{display:none;animation:fadeUp .22s ease}
-.view.active{display:block}
-@keyframes fadeUp{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:none}}
+.nav {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 10px 6px 12px;
+  border-radius: var(--rr);
+  cursor: pointer;
+  color: var(--ink3);
+  font-size: 12.5px;
+  font-weight: 500;
+  border: 1px solid transparent;
+  border-left: 2px solid transparent;
+  transition: all .12s;
+  user-select: none;
+  margin-bottom: 1px;
+  position: relative;
+}
+.nav:hover {
+  background: var(--surface2);
+  color: var(--ink2);
+  border-color: var(--line);
+  border-left-color: rgba(255,255,255,.1);
+}
+.nav.active {
+  background: var(--accent-bg);
+  border-color: var(--accent-bd);
+  border-left-color: var(--accent);
+  color: var(--accent);
+}
+.nav.active .ni { color: var(--accent); }
+.ni { font-size: 12px; width: 15px; text-align: center; flex-shrink: 0; opacity: .55; transition: opacity .12s; }
+.nav:hover .ni { opacity: .8; }
+.nav.active .ni { opacity: 1; }
+.nb {
+  margin-left: auto;
+  background: rgba(255,255,255,.06);
+  color: var(--ink3);
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 99px;
+  font-family: var(--mono);
+  min-width: 20px;
+  text-align: center;
+}
+.nav.active .nb { background: rgba(0,212,255,.18); color: var(--accent); }
+.nav:hover .nb { color: var(--ink2); }
 
-/* ─── Cards ──────────────────────────────────────────────────────────────── */
-.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;backdrop-filter:blur(6px)}
-.card-head{display:flex;align-items:center;gap:9px;padding:13px 17px 11px;border-bottom:1px solid var(--line)}
-.ch-title{font-size:11.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
-.ch-note{font-size:11px;color:var(--muted);margin-left:auto}
-.card-body{padding:15px 17px}
+.s-footer {
+  margin: auto 10px 14px;
+  padding: 10px 12px;
+  background: var(--surface2);
+  border: 1px solid var(--line);
+  border-radius: var(--rr);
+}
+.sf-label { font-size: 9px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--ink3); margin-bottom: 4px; }
+.sf-val { font-size: 11px; color: var(--ink2); }
+.dot {
+  display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+  background: var(--ok); margin-right: 5px; vertical-align: middle;
+  animation: pulse 2.5s ease-in-out infinite;
+}
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
 
-/* ─── Metric grid ─────────────────────────────────────────────────────────── */
-.metric-grid{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));margin-bottom:18px}
-.mc{background:var(--panel-s);border:1px solid var(--line);border-radius:var(--rr);padding:13px 15px}
-.mc.accent{border-color:rgba(173,77,25,.22);background:rgba(255,247,236,.97)}
-.mc .ml{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
-.mc .mv{font-size:24px;font-weight:800;line-height:1.1;margin-top:4px}
-.mc.accent .mv{color:var(--accent)}
-.mc .ms{font-size:11px;color:var(--muted);margin-top:2px}
+/* ─── Main ────────────────────────────────────────────────────────────────── */
+#main { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
+
+/* ─── Topbar ──────────────────────────────────────────────────────────────── */
+#topbar {
+  height: var(--top-h);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(13,17,23,.95);
+  backdrop-filter: blur(20px);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+.topbar-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+#page-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--ink);
+  letter-spacing: -.02em;
+}
+.topbar-sep {
+  color: var(--ink3);
+  font-size: 12px;
+  opacity: .4;
+}
+#page-sub {
+  font-size: 11.5px;
+  color: var(--ink3);
+}
+.t-spacer { flex: 1; }
+.t-time {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink3);
+  letter-spacing: .06em;
+  background: var(--surface2);
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+}
+.t-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--rr);
+  background: var(--surface2);
+  font-size: 11px;
+  cursor: pointer;
+  color: var(--ink3);
+  font-family: var(--sans);
+  font-weight: 500;
+  transition: all .12s;
+  white-space: nowrap;
+}
+.t-btn:hover {
+  background: var(--surface3);
+  border-color: var(--accent-bd);
+  color: var(--accent);
+}
+.t-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--ok); flex-shrink: 0;
+  box-shadow: 0 0 6px var(--ok);
+  animation: pulse 2.5s ease-in-out infinite;
+}
+
+/* ─── Context Bar ─────────────────────────────────────────────────────────── */
+.contextbar {
+  display: flex;
+  gap: 0;
+  align-items: stretch;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg2);
+  padding: 0 20px;
+  overflow-x: auto;
+  flex-shrink: 0;
+}
+.contextbar::-webkit-scrollbar { height: 0; }
+.context-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px 6px 0;
+  border: none;
+  background: transparent;
+  white-space: nowrap;
+  border-right: 1px solid var(--line);
+  margin-right: 14px;
+}
+.context-chip:last-child { border-right: none; margin-right: 0; }
+.context-chip .k {
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--ink3);
+}
+.context-chip .sep { color: var(--ink3); opacity: .3; font-size: 10px; }
+.context-chip .v { font-size: 11px; font-weight: 600; color: var(--ink2); }
+
+/* ─── Status Banner ───────────────────────────────────────────────────────── */
+.status-banner {
+  display: none;
+  margin: 8px 20px 0;
+  padding: 9px 13px;
+  border: 1px solid var(--warn-bd);
+  background: var(--warn-bg);
+  color: var(--warn);
+  border-radius: var(--rr);
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+.status-banner.show { display: block; }
+
+/* ─── Content ─────────────────────────────────────────────────────────────── */
+#content { flex: 1; overflow-y: auto; padding: 16px 20px 48px; scroll-behavior: smooth; }
+#content::-webkit-scrollbar { width: 4px; }
+#content::-webkit-scrollbar-track { background: transparent; }
+#content::-webkit-scrollbar-thumb { background: rgba(255,255,255,.08); border-radius: 4px; }
+#content::-webkit-scrollbar-thumb:hover { background: rgba(0,212,255,.25); }
+
+/* ─── Views ───────────────────────────────────────────────────────────────── */
+.view { display: none; animation: fadeUp .15s ease; }
+.view.active { display: block; }
+@keyframes fadeUp { from{opacity:0;transform:translateY(5px)} to{opacity:1;transform:none} }
+
+/* ─── Cards ───────────────────────────────────────────────────────────────── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+  transition: border-color .15s, box-shadow .15s;
+  /* inner top-edge highlight */
+  box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,.04);
+}
+.card:hover {
+  border-color: rgba(255,255,255,.09);
+  box-shadow: 0 6px 32px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.06);
+}
+.card-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(255,255,255,.018);
+}
+.ch-title {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--ink3);
+}
+.ch-note { font-size: 10.5px; color: var(--ink3); margin-left: auto; opacity: .7; }
+.card-body { padding: 14px 16px; }
+
+/* ─── Metric Grid ─────────────────────────────────────────────────────────── */
+.metric-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  margin-bottom: 14px;
+}
+.mc {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--rr);
+  padding: 13px 14px;
+  position: relative;
+  overflow: hidden;
+  transition: border-color .15s;
+}
+.mc::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.04), transparent);
+}
+.mc:hover { border-color: rgba(255,255,255,.1); }
+.mc.accent { border-color: var(--accent-bd); }
+.mc.accent::before { background: linear-gradient(90deg, transparent, var(--accent), transparent); opacity: .3; }
+.mc .ml { font-size: 9.5px; font-weight: 600; letter-spacing: .09em; text-transform: uppercase; color: var(--ink3); }
+.mc .mv {
+  font-size: 26px; font-weight: 800; line-height: 1.1; margin-top: 5px;
+  letter-spacing: -.04em; color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.mc.accent .mv { color: var(--accent); }
+.mc .ms { font-size: 10.5px; color: var(--ink3); margin-top: 2px; }
 
 /* ─── Grid layouts ────────────────────────────────────────────────────────── */
-.g2{display:grid;gap:14px;grid-template-columns:1fr 1fr;margin-bottom:14px}
-.g3{display:grid;gap:14px;grid-template-columns:1fr 1fr 1fr;margin-bottom:14px}
-.g2l{display:grid;gap:14px;grid-template-columns:1.4fr 1fr;margin-bottom:14px}
-.mb{margin-bottom:14px}
-@media(max-width:900px){.g2,.g3,.g2l{grid-template-columns:1fr}}
+.g2  { display: grid; gap: 10px; grid-template-columns: 1fr 1fr; margin-bottom: 10px; }
+.g3  { display: grid; gap: 10px; grid-template-columns: 1fr 1fr 1fr; margin-bottom: 10px; }
+.g2l { display: grid; gap: 10px; grid-template-columns: 1.4fr 1fr; margin-bottom: 10px; }
+.mb  { margin-bottom: 10px; }
+@media(max-width:900px) { .g2,.g3,.g2l { grid-template-columns:1fr } }
 
 /* ─── Tables ──────────────────────────────────────────────────────────────── */
-.tbl-wrap{overflow-x:auto}
-table{width:100%;border-collapse:collapse;font-size:12px}
-th{
-  padding:7px 11px;text-align:left;
-  font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;
-  color:var(--muted);border-bottom:1px solid var(--line);
-  white-space:nowrap;cursor:pointer;user-select:none;
+.tbl-wrap { overflow-x: auto; }
+.tbl-wrap::-webkit-scrollbar { height: 3px; }
+.tbl-wrap::-webkit-scrollbar-thumb { background: rgba(255,255,255,.08); border-radius: 2px; }
+table { width: 100%; border-collapse: collapse; font-size: 12px; }
+thead { position: sticky; top: 0; z-index: 2; }
+th {
+  padding: 7px 12px;
+  text-align: left;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--ink3);
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+  background: var(--surface);
+  transition: color .1s;
 }
-th:hover{color:var(--ink)}
-th.sorted{color:var(--accent)}
-th.sorted::after{content:" ↓"}
-th.sorted.asc::after{content:" ↑"}
-td{padding:7.5px 11px;border-bottom:1px solid var(--line2);vertical-align:middle}
-tr:last-child td{border-bottom:none}
-tr:hover td{background:rgba(24,49,59,.027)}
-tr.expanded td{background:rgba(173,77,25,.04)}
+th:hover { color: var(--ink2); }
+th.sorted { color: var(--accent); }
+th.sorted::after { content: " ↓"; font-size: 8px; }
+th.sorted.asc::after { content: " ↑"; font-size: 8px; }
+td {
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--line2);
+  vertical-align: middle;
+  transition: background .08s;
+}
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: rgba(255,255,255,.025); }
+tr.expanded td { background: rgba(0,212,255,.05); }
+/* subtle alternating rows */
+tbody tr:nth-child(even) td { background: rgba(255,255,255,.012); }
+tbody tr:nth-child(even):hover td { background: rgba(255,255,255,.03); }
+tbody tr.expanded:nth-child(even) td { background: rgba(0,212,255,.05); }
 
-.mono{font-family:"IBM Plex Mono",monospace;font-size:11px}
-.num{font-variant-numeric:tabular-nums;text-align:right}
-.bps{font-weight:700;font-variant-numeric:tabular-nums;text-align:right}
-.t5{color:#1a5c36}.t4{color:#2f6f4e}.t3{color:#5a7a1a}
-.t2{color:var(--warn)}.t1{color:var(--muted)}.tn{color:var(--fail)}
+.mono { font-family: var(--mono); font-size: 11px; }
+.num { font-variant-numeric: tabular-nums; text-align: right; font-family: var(--mono); font-size: 11px; }
+.bps { font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; font-family: var(--mono); font-size: 11.5px; }
+.t5{color:#22c55e}.t4{color:#4ade80}.t3{color:#86efac}
+.t2{color:var(--warn)}.t1{color:var(--ink3)}.tn{color:var(--fail)}
 
 /* Expand row */
-.xrow{display:none}
-.xrow.open{display:table-row}
-.xrow td{padding:0;border-bottom:1px solid var(--line)}
-.xbody{padding:13px 17px;background:rgba(173,77,25,.035)}
-.sym-grid{display:grid;gap:9px;grid-template-columns:repeat(auto-fit,minmax(210px,1fr))}
-.sym-card{background:var(--panel);border:1px solid var(--line);border-radius:var(--rr);padding:10px 12px}
-.sc-t{font-size:11px;font-weight:700;margin-bottom:6px}
-.kv{display:flex;justify-content:space-between;font-size:11px;padding:2px 0}
-.kv .k{color:var(--muted)}.kv .v{font-weight:600;font-variant-numeric:tabular-nums}
+.xrow { display: none; }
+.xrow.open { display: table-row; }
+.xrow td { padding: 0; border-bottom: 1px solid var(--line); }
+.xbody { padding: 12px 16px; background: rgba(0,212,255,.03); }
+.sym-grid { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+.sym-card {
+  background: var(--surface2);
+  border: 1px solid var(--line);
+  border-radius: var(--rr);
+  padding: 10px 12px;
+}
+.sc-t { font-size: 11px; font-weight: 700; color: var(--ink2); margin-bottom: 6px; font-family: var(--mono); }
+.kv { display: flex; justify-content: space-between; font-size: 11px; padding: 2.5px 0; }
+.kv .k { color: var(--ink3); }
+.kv .v { font-weight: 600; font-variant-numeric: tabular-nums; color: var(--ink); }
 
 /* ─── Chips ───────────────────────────────────────────────────────────────── */
-.chip{display:inline-flex;align-items:center;padding:2.5px 8px;border-radius:99px;font-size:10.5px;font-weight:600;letter-spacing:.03em}
-.ok{background:var(--ok-s);color:var(--ok);border:1px solid rgba(47,111,78,.17)}
-.warn{background:var(--warn-s);color:var(--warn);border:1px solid rgba(139,99,23,.18)}
-.fail{background:var(--fail-s);color:var(--fail);border:1px solid rgba(139,49,49,.2)}
-.neutral{background:rgba(24,49,59,.07);color:var(--muted);border:1px solid var(--line)}
-.ac{background:var(--accent-s);color:var(--accent);border:1px solid rgba(173,77,25,.18)}
-
-/* ─── Filter bar ──────────────────────────────────────────────────────────── */
-.fbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
-.fbar select,.fbar input{
-  padding:6px 10px;border:1px solid var(--line);border-radius:8px;
-  background:var(--panel-s);font-family:inherit;font-size:12px;
-  color:var(--ink);outline:none;transition:border-color .14s;
+.chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 99px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .03em;
+  white-space: nowrap;
 }
-.fbar select:focus,.fbar input:focus{border-color:var(--accent)}
-.fbar-label{font-size:10.5px;color:var(--muted)}
+.ok      { background: var(--ok-bg);   color: var(--ok);   border: 1px solid var(--ok-bd); }
+.warn    { background: var(--warn-bg); color: var(--warn); border: 1px solid var(--warn-bd); }
+.fail    { background: var(--fail-bg); color: var(--fail); border: 1px solid var(--fail-bd); }
+.neutral { background: rgba(255,255,255,.04); color: var(--ink3); border: 1px solid var(--line); }
+.ac      { background: var(--accent-bg); color: var(--accent); border: 1px solid var(--accent-bd); }
 
-/* ─── Funnel bars ─────────────────────────────────────────────────────────── */
-.funnel-row{display:flex;align-items:center;gap:9px;margin-bottom:9px}
-.funnel-lbl{width:100px;font-size:10.5px;color:var(--muted);text-align:right;flex-shrink:0}
-.funnel-track{flex:1;background:rgba(24,49,59,.07);border-radius:4px;height:19px;overflow:hidden}
-.funnel-fill{height:100%;border-radius:4px;transition:width .65s cubic-bezier(.16,1,.3,1)}
-.funnel-num{width:76px;font-size:11.5px;font-weight:700;font-variant-numeric:tabular-nums;flex-shrink:0}
+/* ─── Filter Bar ──────────────────────────────────────────────────────────── */
+.fbar { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; padding: 10px 14px; background: var(--surface2); border: 1px solid var(--line); border-radius: var(--rr); }
+.fbar select, .fbar input {
+  padding: 5px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--rr);
+  background: var(--surface);
+  font-family: var(--sans);
+  font-size: 12px;
+  color: var(--ink);
+  outline: none;
+  transition: border-color .12s;
+}
+.fbar select:focus, .fbar input:focus { border-color: var(--accent-bd); }
+.fbar-label { font-size: 10.5px; color: var(--ink3); }
 
-/* ─── Pipeline stages ─────────────────────────────────────────────────────── */
-.pipeline-flow{
-  display:grid;grid-template-columns:1fr 28px 1fr 28px 1fr 28px 1fr;
-  gap:0;align-items:center;margin-bottom:18px;
-}
-.pipe-stage{
-  background:var(--panel-s);border:1px solid var(--line);
-  border-radius:var(--rr);padding:14px 16px;position:relative;
-}
-.pipe-stage.active-stage{border-color:rgba(173,77,25,.35);background:rgba(255,247,236,.97)}
-.pipe-arrow{text-align:center;color:var(--muted);font-size:18px;line-height:1}
-.ps-num{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
-.ps-name{font-size:14px;font-weight:800;margin-bottom:6px}
-.ps-desc{font-size:11px;color:var(--muted);line-height:1.5;margin-bottom:10px}
-.ps-stats{display:grid;gap:5px}
-.ps-stat{display:flex;justify-content:space-between;font-size:11px}
-.ps-stat .k{color:var(--muted)}.ps-stat .v{font-weight:700;font-variant-numeric:tabular-nums}
-.ps-status{margin-top:10px}
+/* ─── Funnel Bars ─────────────────────────────────────────────────────────── */
+.funnel-row { display: flex; align-items: center; gap: 9px; margin-bottom: 7px; }
+.funnel-lbl { width: 96px; font-size: 10.5px; color: var(--ink3); text-align: right; flex-shrink: 0; }
+.funnel-track { flex: 1; background: rgba(255,255,255,.04); border-radius: 3px; height: 16px; overflow: hidden; }
+.funnel-fill { height: 100%; border-radius: 3px; transition: width .6s cubic-bezier(.16,1,.3,1); }
+.funnel-num { width: 64px; font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; flex-shrink: 0; font-family: var(--mono); }
 
-/* ─── Proposal builder ────────────────────────────────────────────────────── */
-.pb-form{display:grid;gap:14px}
-.pb-section{background:var(--panel-s);border:1px solid var(--line);border-radius:var(--rr);overflow:hidden}
-.pb-section-head{padding:10px 14px;border-bottom:1px solid var(--line);font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
-.pb-section-body{padding:14px}
-.pb-fields{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
-.pb-field{display:flex;flex-direction:column;gap:5px}
-.pb-field label{font-size:10.5px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
-.pb-field input,.pb-field select,.pb-field textarea{
-  padding:7px 10px;border:1px solid var(--line);border-radius:8px;
-  background:rgba(255,255,255,.7);font-family:inherit;font-size:12.5px;color:var(--ink);
-  outline:none;transition:border-color .14s;
+/* ─── Pipeline Stages ─────────────────────────────────────────────────────── */
+.pipeline-flow {
+  display: grid;
+  grid-template-columns: 1fr 24px 1fr 24px 1fr 24px 1fr;
+  gap: 0;
+  align-items: center;
+  margin-bottom: 14px;
 }
-.pb-field input:focus,.pb-field select:focus,.pb-field textarea:focus{border-color:var(--accent)}
-.pb-preview{
-  background:rgba(24,49,59,.94);color:#b8d4dc;
-  font-family:"IBM Plex Mono",monospace;font-size:12px;line-height:1.65;
-  padding:16px;border-radius:var(--rr);overflow:auto;max-height:340px;
-  white-space:pre;tab-size:2;
+.pipe-stage {
+  background: var(--surface2);
+  border: 1px solid var(--line);
+  border-radius: var(--rr);
+  padding: 14px 14px;
+  position: relative;
+  transition: border-color .15s;
 }
-.pb-actions{display:flex;gap:10px;align-items:center;padding-top:4px}
-.btn{
-  padding:8px 18px;border-radius:9px;font-family:inherit;font-size:12.5px;
-  font-weight:600;cursor:pointer;transition:all .14s;border:none;
-}
-.btn-primary{background:var(--accent);color:#fff}
-.btn-primary:hover{background:#923f14}
-.btn-secondary{background:var(--panel-s);color:var(--ink);border:1px solid var(--line)}
-.btn-secondary:hover{background:var(--wash)}
-.pb-msg{font-size:12px;padding:8px 12px;border-radius:8px}
-.pb-msg.ok{background:var(--ok-s);color:var(--ok)}
-.pb-msg.fail{background:var(--fail-s);color:var(--fail)}
+.pipe-stage:hover { border-color: rgba(255,255,255,.1); }
+.pipe-stage.active-stage { border-color: var(--accent-bd); background: var(--accent-bg); }
+.pipe-arrow { text-align: center; color: var(--ink3); font-size: 14px; }
+.ps-num { font-size: 9px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--ink3); margin-bottom: 4px; }
+.ps-name { font-size: 14px; font-weight: 800; margin-bottom: 6px; letter-spacing: -.02em; }
+.pipe-stage.active-stage .ps-name { color: var(--accent); }
+.ps-desc { font-size: 10.5px; color: var(--ink3); line-height: 1.55; margin-bottom: 10px; }
+.ps-stats { display: grid; gap: 4px; }
+.ps-stat { display: flex; justify-content: space-between; font-size: 10.5px; }
+.ps-stat .k { color: var(--ink3); }
+.ps-stat .v { font-weight: 700; font-variant-numeric: tabular-nums; font-family: var(--mono); }
+.ps-status { margin-top: 10px; }
 
-/* ─── Event specs ─────────────────────────────────────────────────────────── */
-.ev-grid{display:grid;gap:9px;grid-template-columns:repeat(auto-fill,minmax(260px,1fr))}
-.ev-card{
-  background:var(--panel-s);border:1px solid var(--line);border-radius:var(--rr);
-  padding:12px 14px;cursor:pointer;transition:border-color .14s,box-shadow .14s;
+/* ─── Proposal Builder ────────────────────────────────────────────────────── */
+.pb-form { display: grid; gap: 10px; }
+.pb-section {
+  background: var(--surface2);
+  border: 1px solid var(--line);
+  border-radius: var(--rr);
+  overflow: hidden;
 }
-.ev-card:hover{border-color:rgba(173,77,25,.28);box-shadow:var(--shadow)}
-.ev-card.selected{border-color:var(--accent);background:rgba(255,247,236,.98)}
-.ec-top{display:flex;align-items:center;gap:7px;margin-bottom:6px}
-.ec-name{font-size:12.5px;font-weight:700;font-family:"IBM Plex Mono",monospace;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.ec-meta{font-size:10.5px;color:var(--muted);line-height:1.55}
-.ec-chips{display:flex;gap:5px;flex-wrap:wrap;margin-top:7px}
-
-/* ─── Run cards ───────────────────────────────────────────────────────────── */
-.run-grid{display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(240px,1fr))}
-.rc{
-  background:var(--panel-s);border:1px solid var(--line);border-radius:var(--rr);
-  padding:13px 15px;cursor:pointer;transition:border-color .14s,box-shadow .14s;
+.pb-section-head {
+  padding: 8px 13px;
+  border-bottom: 1px solid var(--line);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--ink3);
+  background: rgba(255,255,255,.02);
 }
-.rc:hover{border-color:rgba(173,77,25,.28);box-shadow:var(--shadow)}
-.rc.sel{border-color:var(--accent);background:rgba(255,247,236,.98)}
-.rc-name{font-size:12.5px;font-weight:700;font-family:"IBM Plex Mono",monospace;margin-bottom:5px}
-.rc-meta{font-size:10.5px;color:var(--muted);margin-bottom:7px}
-.mini-funnel{display:flex;gap:3px;align-items:flex-end;height:28px}
-.mfb{flex:1;border-radius:3px 3px 0 0;min-height:3px;background:rgba(173,77,25,.25)}
+.pb-section-body { padding: 12px 13px; }
+.pb-fields { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(185px, 1fr)); }
+.pb-field { display: flex; flex-direction: column; gap: 4px; }
+.pb-field label {
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--ink3);
+}
+.pb-field input, .pb-field select, .pb-field textarea {
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--rr);
+  background: var(--surface3);
+  font-family: var(--sans);
+  font-size: 12.5px;
+  color: var(--ink);
+  outline: none;
+  transition: border-color .12s;
+}
+.pb-field input:focus, .pb-field select:focus, .pb-field textarea:focus {
+  border-color: var(--accent-bd);
+}
+.pb-preview {
+  background: var(--bg);
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  line-height: 1.65;
+  padding: 14px;
+  border-radius: var(--rr);
+  overflow: auto;
+  max-height: 340px;
+  white-space: pre;
+  tab-size: 2;
+  border: 1px solid var(--line);
+}
+.pb-actions { display: flex; gap: 8px; align-items: center; padding-top: 4px; }
 
-/* Run detail */
-.rd-funnel-bars{display:flex;gap:6px;align-items:flex-end;height:72px;padding-bottom:4px}
-.fb-col{display:flex;flex-direction:column;align-items:center;flex:1;gap:3px}
-.fb-bar{width:100%;border-radius:4px 4px 0 0;background:rgba(173,77,25,.25);min-height:3px}
-.fb-val{font-size:10px;font-weight:700;font-variant-numeric:tabular-nums}
-.fb-lbl{font-size:9px;color:var(--muted);text-align:center;white-space:nowrap}
+/* ─── Buttons ─────────────────────────────────────────────────────────────── */
+.btn {
+  padding: 7px 16px;
+  border-radius: var(--rr);
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all .12s;
+  border: none;
+  white-space: nowrap;
+}
+.btn-primary {
+  background: var(--accent);
+  color: var(--bg);
+  box-shadow: 0 0 20px rgba(0,212,255,.2);
+}
+.btn-primary:hover {
+  background: #1af0ff;
+  box-shadow: 0 0 28px rgba(0,212,255,.35);
+  transform: translateY(-1px);
+}
+.btn-secondary {
+  background: var(--surface2);
+  color: var(--ink2);
+  border: 1px solid var(--line);
+}
+.btn-secondary:hover {
+  background: var(--surface3);
+  border-color: rgba(255,255,255,.1);
+  color: var(--ink);
+}
+.pb-msg { font-size: 11.5px; padding: 6px 10px; border-radius: 7px; }
+.pb-msg.ok { background: var(--ok-bg); color: var(--ok); }
+.pb-msg.fail { background: var(--fail-bg); color: var(--fail); }
 
-/* ─── Campaign cards ──────────────────────────────────────────────────────── */
-.cmp-grid{display:grid;gap:14px}
-.cmp{background:var(--panel-s);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
-.cmp-hd{padding:16px 18px 13px;border-bottom:1px solid var(--line);display:flex;gap:12px;align-items:flex-start}
-.cmp-title{font-size:14.5px;font-weight:800;font-family:"IBM Plex Mono",monospace}
-.cmp-sub{font-size:11px;color:var(--muted);margin-top:3px}
-.cmp-body{padding:15px 18px}
-.cmp-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:7px;margin-bottom:13px}
-.cmp-stat{background:rgba(24,49,59,.04);border-radius:9px;padding:8px 10px}
-.cmp-stat .k{font-size:9.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
-.cmp-stat .v{font-size:13.5px;font-weight:700;margin-top:1px}
-.cmp-reason{font-size:12px;color:var(--muted);line-height:1.65;padding:9px 12px;background:rgba(24,49,59,.03);border-radius:9px;border-left:3px solid var(--line)}
-.cmp-watch{margin-top:9px;font-size:11.5px;color:var(--accent);font-style:italic}
-.cond-tbl{width:100%;border-collapse:collapse;font-size:11.5px;margin-top:12px}
-.cond-tbl th{padding:5px 8px;text-align:left;font-size:9.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);border-bottom:1px solid var(--line)}
-.cond-tbl td{padding:5px 8px;border-bottom:1px solid var(--line2);font-variant-numeric:tabular-nums}
-.rob-fill{display:inline-block;height:5px;border-radius:3px;background:var(--accent);vertical-align:middle;margin-right:5px}
-.rob-gate-line{display:inline-block;height:5px;border-radius:3px;background:rgba(24,49,59,.11);vertical-align:middle}
+/* ─── Event Spec Cards ────────────────────────────────────────────────────── */
+.ev-grid { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+.ev-card {
+  background: var(--surface2);
+  border: 1px solid var(--line);
+  border-radius: var(--rr);
+  padding: 11px 13px;
+  cursor: pointer;
+  transition: all .14s;
+}
+.ev-card:hover { border-color: rgba(255,255,255,.1); transform: translateY(-1px); }
+.ev-card.selected { border-color: var(--accent-bd); background: var(--accent-bg); }
+.ec-top { display: flex; align-items: center; gap: 7px; margin-bottom: 6px; }
+.ec-name {
+  font-size: 11.5px;
+  font-weight: 700;
+  font-family: var(--mono);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink);
+}
+.ec-meta { font-size: 10.5px; color: var(--ink3); line-height: 1.55; }
+.ec-chips { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 7px; }
+
+/* ─── Run Cards ───────────────────────────────────────────────────────────── */
+.run-grid { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+.rc {
+  background: var(--surface2);
+  border: 1px solid var(--line);
+  border-radius: var(--rr);
+  padding: 12px 14px;
+  cursor: pointer;
+  transition: all .14s;
+}
+.rc:hover { border-color: rgba(255,255,255,.1); transform: translateY(-1px); }
+.rc.sel { border-color: var(--accent-bd); background: var(--accent-bg); }
+.rc-name {
+  font-size: 11.5px;
+  font-weight: 700;
+  font-family: var(--mono);
+  margin-bottom: 4px;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rc-meta { font-size: 10.5px; color: var(--ink3); margin-bottom: 7px; }
+.mini-funnel { display: flex; gap: 3px; align-items: flex-end; height: 24px; }
+.mfb { flex: 1; border-radius: 2px 2px 0 0; min-height: 3px; background: rgba(0,212,255,.2); }
+
+/* Run Detail Funnel */
+.rd-funnel-bars { display: flex; gap: 6px; align-items: flex-end; height: 72px; padding-bottom: 4px; }
+.fb-col { display: flex; flex-direction: column; align-items: center; flex: 1; gap: 3px; }
+.fb-bar { width: 100%; border-radius: 3px 3px 0 0; background: rgba(0,212,255,.2); min-height: 3px; }
+.fb-val { font-size: 9.5px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--ink2); font-family: var(--mono); }
+.fb-lbl { font-size: 8.5px; color: var(--ink3); text-align: center; white-space: nowrap; }
+
+/* ─── Campaign Cards ──────────────────────────────────────────────────────── */
+.cmp-grid { display: grid; gap: 10px; }
+.cmp {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  overflow: hidden;
+  transition: border-color .15s;
+}
+.cmp:hover { border-color: rgba(255,255,255,.09); }
+.cmp-hd {
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  background: rgba(255,255,255,.01);
+}
+.cmp-title { font-size: 13px; font-weight: 700; font-family: var(--mono); color: var(--ink); }
+.cmp-sub { font-size: 10.5px; color: var(--ink3); margin-top: 3px; }
+.cmp-body { padding: 13px 16px; }
+.cmp-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.cmp-stat {
+  background: var(--surface2);
+  border-radius: var(--rrr);
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+}
+.cmp-stat .k { font-size: 9px; text-transform: uppercase; letter-spacing: .08em; color: var(--ink3); font-weight: 600; }
+.cmp-stat .v { font-size: 13px; font-weight: 700; margin-top: 2px; font-variant-numeric: tabular-nums; }
+.cmp-reason {
+  font-size: 11.5px;
+  color: var(--ink3);
+  line-height: 1.65;
+  padding: 9px 12px;
+  background: rgba(255,255,255,.025);
+  border-radius: var(--rrr);
+  border-left: 2px solid var(--accent-bd);
+}
+.cmp-watch { margin-top: 9px; font-size: 11px; color: var(--accent); font-style: italic; }
+.cond-tbl { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 10px; }
+.cond-tbl th {
+  padding: 5px 8px;
+  text-align: left;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--ink3);
+  border-bottom: 1px solid var(--line);
+}
+.cond-tbl td { padding: 4px 8px; border-bottom: 1px solid var(--line2); font-variant-numeric: tabular-nums; }
+.rob-fill { display: inline-block; height: 4px; border-radius: 2px; background: var(--accent); vertical-align: middle; margin-right: 5px; }
+.rob-gate-line { display: inline-block; height: 4px; border-radius: 2px; background: rgba(255,255,255,.08); vertical-align: middle; }
 
 /* ─── Lake ────────────────────────────────────────────────────────────────── */
-.lake-grid{display:grid;gap:9px;grid-template-columns:repeat(auto-fill,minmax(190px,1fr))}
-.lc{background:var(--panel-s);border:1px solid var(--line);border-radius:var(--rr);padding:11px 13px}
-.lc-name{font-size:11.5px;font-weight:700;font-family:"IBM Plex Mono",monospace;margin-bottom:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.lc-meta{font-size:11px;color:var(--muted)}
+.lake-grid { display: grid; gap: 7px; grid-template-columns: repeat(auto-fill, minmax(175px, 1fr)); }
+.lc {
+  background: var(--surface2);
+  border: 1px solid var(--line);
+  border-radius: var(--rr);
+  padding: 10px 12px;
+}
+.lc-name {
+  font-size: 11px;
+  font-weight: 700;
+  font-family: var(--mono);
+  margin-bottom: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink);
+}
+.lc-meta { font-size: 10.5px; color: var(--ink3); }
 
 /* ─── Heatmap ─────────────────────────────────────────────────────────────── */
-.hm-wrap{overflow-x:auto;padding-bottom:4px}
-.hm-grid{display:inline-grid;gap:3px}
-.hm-cell{border-radius:5px;font-size:10.5px;font-weight:700;text-align:center;padding:5px 7px;font-variant-numeric:tabular-nums}
-.hm-hdr{font-size:9px;color:var(--muted);padding:3px 6px;text-align:center;white-space:nowrap}
-.hm-sym{font-size:10.5px;font-weight:600;padding:5px 8px;display:flex;align-items:center}
+.hm-wrap { overflow-x: auto; padding-bottom: 4px; }
+.hm-grid { display: inline-grid; gap: 2px; }
+.hm-cell {
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  text-align: center;
+  padding: 5px 7px;
+  font-variant-numeric: tabular-nums;
+  font-family: var(--mono);
+}
+.hm-hdr { font-size: 8.5px; color: var(--ink3); padding: 3px 6px; text-align: center; white-space: nowrap; font-weight: 600; letter-spacing: .05em; }
+.hm-sym { font-size: 10px; font-weight: 700; padding: 5px 8px; display: flex; align-items: center; font-family: var(--mono); color: var(--ink2); }
 
 /* ─── Misc ────────────────────────────────────────────────────────────────── */
-.empty{padding:28px;text-align:center;color:var(--muted);font-size:12.5px}
-.spin{display:inline-block;width:13px;height:13px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:sp .55s linear infinite;margin-right:7px;vertical-align:middle}
-@keyframes sp{to{transform:rotate(360deg)}}
-.section-title{font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);margin-bottom:9px}
+.empty {
+  padding: 28px;
+  text-align: center;
+  color: var(--ink3);
+  font-size: 12px;
+  line-height: 1.7;
+}
+.spin {
+  display: inline-block;
+  width: 12px; height: 12px;
+  border: 2px solid var(--line);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: sp .55s linear infinite;
+  margin-right: 7px;
+  vertical-align: middle;
+}
+@keyframes sp { to{transform:rotate(360deg)} }
+.section-title {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--ink3);
+  margin-bottom: 8px;
+}
+
+/* ─── Workflow Cards ──────────────────────────────────────────────────────── */
+.workflow-grid { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
+.workflow-card {
+  background: var(--surface2);
+  border: 1px solid var(--line);
+  border-radius: var(--rr);
+  padding: 13px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  transition: border-color .15s;
+}
+.workflow-card:hover { border-color: rgba(255,255,255,.1); }
+.workflow-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.workflow-name { font-size: 15px; font-weight: 800; letter-spacing: -.03em; color: var(--ink); }
+.workflow-note { font-size: 11px; color: var(--ink3); line-height: 1.6; }
+.workflow-list { display: grid; gap: 4px; }
+.workflow-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 10.5px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  background: rgba(255,255,255,.025);
+}
+.workflow-item .k { color: var(--ink3); }
+.workflow-item .v { color: var(--ink2); font-weight: 500; }
+.hero-list { display: grid; gap: 7px; }
+.hero-item {
+  display: flex;
+  gap: 11px;
+  align-items: flex-start;
+  padding: 9px 11px;
+  border-radius: var(--rr);
+  border: 1px solid var(--line);
+  background: var(--surface2);
+}
+.hero-item strong { display: block; font-size: 11px; margin-bottom: 2px; color: var(--ink); }
+.hero-item div:last-child { font-size: 11px; color: var(--ink3); line-height: 1.6; }
+.stack { display: grid; gap: 8px; }
+.inline-actions { display: flex; gap: 7px; flex-wrap: wrap; }
+.helper-text { font-size: 11px; color: var(--ink3); line-height: 1.65; }
+
+/* ─── Surface Placeholder ─────────────────────────────────────────────────── */
+.surface-placeholder {
+  display: grid;
+  place-items: center;
+  min-height: 180px;
+  text-align: center;
+  color: var(--ink3);
+  font-size: 12px;
+  padding: 24px;
+  line-height: 1.7;
+}
+.surface-placeholder .btn { margin-top: 10px; }
+
+/* ─── Operator Layout ─────────────────────────────────────────────────────── */
+.op-layout { display: grid; gap: 10px; grid-template-columns: 1.35fr .95fr; }
+.op-side { display: grid; gap: 10px; }
+@media(max-width:1100px){.op-layout{grid-template-columns:1fr}}
+
+/* ─── Command Cards ───────────────────────────────────────────────────────── */
+.cmd-grid { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
+.cmd-card {
+  background: var(--surface2);
+  border: 1px solid var(--line);
+  border-radius: var(--rr);
+  padding: 11px 13px;
+}
+.cmd-title { font-size: 11.5px; font-weight: 700; margin-bottom: 4px; color: var(--ink); }
+.cmd-note { font-size: 10.5px; color: var(--ink3); line-height: 1.55; }
+.cmd-actions { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 9px; }
+
+/* ─── Op Message ──────────────────────────────────────────────────────────── */
+.op-msg { margin-top: 10px; min-height: 18px; font-size: 11.5px; }
+.op-msg.ok { color: var(--ok); }
+.op-msg.fail { color: var(--fail); }
+
+/* ─── Job Items ───────────────────────────────────────────────────────────── */
+.job-list { display: grid; gap: 6px; }
+.job-item {
+  background: var(--surface2);
+  border: 1px solid var(--line);
+  border-radius: var(--rr);
+  padding: 9px 11px;
+  cursor: pointer;
+  transition: all .14s;
+}
+.job-item:hover { border-color: rgba(255,255,255,.1); transform: translateY(-1px); }
+.job-item.sel { border-color: var(--accent-bd); background: var(--accent-bg); }
+.job-title { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 700; color: var(--ink); }
+.job-meta { margin-top: 4px; font-size: 10px; color: var(--ink3); line-height: 1.55; }
+
+/* ─── Job Log ─────────────────────────────────────────────────────────────── */
+.job-log {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink2);
+  font-family: var(--mono);
+  font-size: 10.5px;
+  line-height: 1.6;
+  padding: 14px;
+  border-radius: var(--rr);
+  min-height: 320px;
+  max-height: 480px;
+  overflow: auto;
+  white-space: pre-wrap;
+  border: 1px solid var(--line);
+}
+
+/* ─── Artifact Cards ──────────────────────────────────────────────────────── */
+.art-grid { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+.art-card {
+  background: var(--surface2);
+  border: 1px solid var(--line);
+  border-radius: var(--rr);
+  padding: 11px 13px;
+  transition: border-color .15s;
+}
+.art-card.clickable { cursor: pointer; }
+.art-card.clickable:hover { border-color: rgba(255,255,255,.1); transform: translateY(-1px); }
+.art-card.sel { border-color: var(--accent-bd); background: var(--accent-bg); }
+.art-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11.5px;
+  font-weight: 700;
+  margin-bottom: 6px;
+  color: var(--ink);
+}
+.art-note { font-size: 10.5px; color: var(--ink3); line-height: 1.55; margin-bottom: 7px; }
+.art-list { display: grid; gap: 3px; margin-top: 7px; }
+.art-list div {
+  font-size: 10px;
+  color: var(--ink3);
+  font-family: var(--mono);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.kv-stack { display: grid; gap: 4px; }
+.preview-code {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink2);
+  font-family: var(--mono);
+  font-size: 10px;
+  line-height: 1.55;
+  padding: 10px;
+  border-radius: var(--rrr);
+  overflow: auto;
+  white-space: pre-wrap;
+  border: 1px solid var(--line);
+  margin-top: 6px;
+}
 </style>
 </head>
 <body>
@@ -333,50 +986,79 @@ tr.expanded td{background:rgba(173,77,25,.04)}
     <div class="nav active" data-view="overview"><span class="ni">◈</span>Overview</div>
     <div class="nav" data-view="signals"><span class="ni">⚡</span>Signals<span class="nb" id="b-sig">—</span></div>
     <div class="nav" data-view="events"><span class="ni">◉</span>Events<span class="nb" id="b-ev">—</span></div>
+    <div class="nav" data-view="campaigns"><span class="ni">⊞</span>Campaigns</div>
   </div>
 
   <div class="s-section">
-    <div class="s-label">Pipeline</div>
+    <div class="s-label">Operations</div>
     <div class="nav" data-view="pipeline"><span class="ni">▶</span>Pipeline</div>
     <div class="nav" data-view="runs"><span class="ni">⊟</span>Runs<span class="nb" id="b-run">—</span></div>
-    <div class="nav" data-view="campaigns"><span class="ni">⊞</span>Campaigns</div>
+    <div class="nav" data-view="operator"><span class="ni">⌘</span>Operator</div>
+  </div>
+
+  <div class="s-section">
+    <div class="s-label">Inventory</div>
+    <div class="nav" data-view="artifacts"><span class="ni">▣</span>Artifacts<span class="nb" id="b-art">—</span></div>
+    <div class="nav" data-view="registries"><span class="ni">☷</span>Registries</div>
+    <div class="nav" data-view="runtime"><span class="ni">◇</span>Runtime</div>
+    <div class="nav" data-view="theses"><span class="ni">◆</span>Theses</div>
+    <div class="nav" data-view="lake"><span class="ni">⬡</span>Data Lake</div>
   </div>
 
   <div class="s-section">
     <div class="s-label">Workspace</div>
     <div class="nav" data-view="proposal"><span class="ni">✎</span>Proposal Builder</div>
     <div class="nav" data-view="event-spec"><span class="ni">☰</span>Event Registry<span class="nb" id="b-es">—</span></div>
-    <div class="nav" data-view="theses"><span class="ni">◆</span>Theses</div>
-  </div>
-
-  <div class="s-section">
-    <div class="s-label">Infrastructure</div>
-    <div class="nav" data-view="lake"><span class="ni">⬡</span>Data Lake</div>
   </div>
 
   <div class="s-footer">
     <div class="sf-label">System</div>
     <div class="sf-val"><span class="dot"></span>Online · BTC+ETH</div>
-    <div class="sf-val" style="margin-top:4px;font-size:10.5px">2021–2024 cached</div>
+    <div class="sf-val" style="margin-top:3px;font-size:10px">2021–2024 cached</div>
   </div>
 </nav>
 
-<!-- ─── Main ───────────────────────────────────────────────────────────────── -->
+<!-- ─── Main ──────────────────────────────────────────────────────────────── -->
 <div id="main">
   <div id="topbar">
-    <span id="page-title">Overview</span>
-    <span id="page-sub"></span>
+    <div class="topbar-breadcrumb">
+      <span id="page-title">Overview</span>
+      <span class="topbar-sep" id="page-sep" style="display:none">/</span>
+      <span id="page-sub"></span>
+    </div>
     <div class="t-spacer"></div>
     <span class="t-dot"></span>
     <span class="t-time" id="t-time"></span>
-    <button class="t-btn" onclick="loadAll()"><span id="ref-icon">↺</span> Refresh</button>
+    <button class="t-btn" onclick="reloadPlatform()"><span id="ref-icon">↺</span> Refresh</button>
   </div>
+  <div id="contextbar" class="contextbar"></div>
+  <div id="status-banner" class="status-banner"></div>
 
   <div id="content">
 
     <!-- OVERVIEW ─────────────────────────────────────────────────────────── -->
     <div class="view active" id="view-overview">
       <div id="ov-metrics" class="metric-grid"></div>
+      <div class="g2l">
+        <div class="card mb">
+          <div class="card-head"><span class="ch-title">Command Center</span><span class="ch-note">Recommended next moves across the full platform</span></div>
+          <div class="card-body" id="ov-command"></div>
+        </div>
+        <div class="card mb">
+          <div class="card-head"><span class="ch-title">Active Context</span><span class="ch-note">Current run, proposal, jobs, and loaded surfaces</span></div>
+          <div class="card-body" id="ov-context"></div>
+        </div>
+      </div>
+      <div class="g2">
+        <div class="card mb">
+          <div class="card-head"><span class="ch-title">Recent Jobs</span><span class="ch-note">Operator activity and state transitions</span></div>
+          <div class="card-body" id="ov-jobs"></div>
+        </div>
+        <div class="card mb">
+          <div class="card-head"><span class="ch-title">Recent Changes</span><span class="ch-note">Git activity and artifact momentum</span></div>
+          <div class="card-body" id="ov-commits"></div>
+        </div>
+      </div>
       <div class="g2">
         <div class="card mb">
           <div class="card-head"><span class="ch-title">Pipeline Funnel</span><span class="ch-note" id="ov-funnel-note"></span></div>
@@ -410,9 +1092,9 @@ tr.expanded td{background:rgba(173,77,25,.04)}
           <option value="ETHUSDT">ETHUSDT</option>
         </select>
         <select id="sf-cat" onchange="renderSignals()"></select>
-        <input id="sf-bps" type="number" placeholder="Min bps" step="0.5" style="width:100px"
+        <input id="sf-bps" type="number" placeholder="Min bps" step="0.5" style="width:95px"
                oninput="renderSignals()"/>
-        <input id="sf-q" type="text" placeholder="Search…" style="width:150px"
+        <input id="sf-q" type="text" placeholder="Search…" style="width:140px"
                oninput="renderSignals()"/>
       </div>
       <div class="card">
@@ -493,9 +1175,142 @@ tr.expanded td{background:rgba(173,77,25,.04)}
       </div>
     </div>
 
+    <!-- OPERATOR ───────────────────────────────────────────────────────── -->
+    <div class="view" id="view-operator">
+      <div class="card mb">
+        <div class="card-head"><span class="ch-title">Workflow Intents</span><span class="ch-note">Full project capability organized by common operator paths</span></div>
+        <div class="card-body" id="op-workflows"></div>
+      </div>
+      <div class="op-layout mb">
+        <div class="card">
+          <div class="card-head"><span class="ch-title">Execution Context</span><span class="ch-note">Proposal, run, market window, and ingest scope</span></div>
+          <div class="card-body">
+            <div class="stack">
+              <div class="pb-section">
+                <div class="pb-section-head">Research Context</div>
+                <div class="pb-section-body">
+                  <div class="pb-fields">
+                    <div class="pb-field">
+                      <label>Proposal</label>
+                      <select id="op-proposal"></select>
+                    </div>
+                    <div class="pb-field">
+                      <label>Run</label>
+                      <select id="op-run-select" onchange="syncOperatorRun()"></select>
+                    </div>
+                    <div class="pb-field">
+                      <label>Run ID</label>
+                      <input id="op-run-id" type="text" placeholder="run_id"/>
+                    </div>
+                    <div class="pb-field">
+                      <label>Symbols</label>
+                      <input id="op-symbols" type="text" value="BTCUSDT,ETHUSDT"/>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="pb-section">
+                <div class="pb-section-head">Market Window</div>
+                <div class="pb-section-body">
+                  <div class="pb-fields">
+                    <div class="pb-field">
+                      <label>Start</label>
+                      <input id="op-start" type="text" value="2021-01-01"/>
+                    </div>
+                    <div class="pb-field">
+                      <label>End</label>
+                      <input id="op-end" type="text" value="2024-12-31"/>
+                    </div>
+                    <div class="pb-field">
+                      <label>Ingest Timeframe</label>
+                      <select id="op-timeframe">
+                        <option value="5m" selected>5m</option>
+                        <option value="1m">1m</option>
+                        <option value="15m">15m</option>
+                        <option value="1h">1h</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="pb-section">
+                <div class="pb-section-head">Ingest Scope</div>
+                <div class="pb-section-body">
+                  <div class="pb-fields">
+                    <div class="pb-field">
+                      <label>Exchange</label>
+                      <select id="op-exchange">
+                        <option value="bybit" selected>bybit</option>
+                        <option value="binance">binance</option>
+                      </select>
+                    </div>
+                    <div class="pb-field">
+                      <label>Data Type</label>
+                      <select id="op-data-type">
+                        <option value="ohlcv" selected>ohlcv</option>
+                        <option value="funding">funding</option>
+                        <option value="oi">oi</option>
+                        <option value="mark_price">mark_price</option>
+                        <option value="index_price">index_price</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div id="op-msg" class="op-msg"></div>
+          </div>
+        </div>
+        <div class="op-side">
+          <div class="card">
+            <div class="card-head"><span class="ch-title">Preflight</span><span class="ch-note">Validate the current selection before launch</span></div>
+            <div class="card-body" id="op-preflight"></div>
+          </div>
+          <div class="card">
+            <div class="card-head"><span class="ch-title">Selected Context</span><span class="ch-note">What the next command will use</span></div>
+            <div class="card-body" id="op-selection"></div>
+          </div>
+        </div>
+      </div>
+      <div class="g2l">
+        <div class="card">
+          <div class="card-head"><span class="ch-title">Jobs</span><span class="ch-note" id="job-note">No background jobs</span></div>
+          <div class="card-body"><div id="job-list" class="job-list"></div></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><span class="ch-title">Job Log</span><span class="ch-note" id="job-log-note">Select a job</span></div>
+          <div class="card-body" style="padding:14px"><pre id="job-log" class="job-log">No job selected.</pre></div>
+        </div>
+      </div>
+    </div>
+
     <!-- CAMPAIGNS ───────────────────────────────────────────────────────── -->
     <div class="view" id="view-campaigns">
       <div class="cmp-grid" id="cmp-grid"></div>
+    </div>
+
+    <!-- ARTIFACTS ───────────────────────────────────────────────────────── -->
+    <div class="view" id="view-artifacts">
+      <div id="artifact-metrics" class="metric-grid"></div>
+      <div class="g2l">
+        <div class="card mb">
+          <div class="card-head"><span class="ch-title">Artifact Inventory</span><span class="ch-note">Validation, candidate, promotion, and memory surfaces</span></div>
+          <div class="card-body"><div id="artifact-grid" class="art-grid"></div></div>
+        </div>
+        <div class="card mb">
+          <div class="card-head"><span class="ch-title">Artifact Detail</span><span class="ch-note" id="artifact-detail-note">Select a section</span></div>
+          <div class="card-body" id="artifact-detail"><div class="empty">Select an artifact section to inspect recent file previews.</div></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="ch-title">Research Changelog</span><span class="ch-note">Recent git activity</span></div>
+        <div class="tbl-wrap"><table>
+          <thead><tr><th>Date</th><th>Hash</th><th>Subject</th></tr></thead>
+          <tbody id="git-body"></tbody>
+        </table></div>
+      </div>
     </div>
 
     <!-- PROPOSAL BUILDER ────────────────────────────────────────────────── -->
@@ -635,7 +1450,7 @@ tr.expanded td{background:rgba(173,77,25,.04)}
       </div>
 
       <!-- Existing proposals -->
-      <div class="card mt" style="margin-top:14px">
+      <div class="card mt" style="margin-top:10px">
         <div class="card-head"><span class="ch-title">Existing Proposals</span><span class="ch-note" id="proposals-note"></span></div>
         <div class="card-body" id="proposals-list"></div>
       </div>
@@ -652,7 +1467,7 @@ tr.expanded td{background:rgba(173,77,25,.04)}
           <option value="D">Tier D</option>
         </select>
         <select id="es-regime" onchange="renderEventSpecs()"></select>
-        <input id="es-q" type="text" placeholder="Search event…" style="width:180px" oninput="renderEventSpecs()"/>
+        <input id="es-q" type="text" placeholder="Search event…" style="width:170px" oninput="renderEventSpecs()"/>
       </div>
       <div class="card mb">
         <div class="card-head"><span class="ch-title">Event Registry</span><span class="ch-note" id="es-note"></span></div>
@@ -665,6 +1480,48 @@ tr.expanded td{background:rgba(173,77,25,.04)}
     <!-- THESES ──────────────────────────────────────────────────────────── -->
     <div class="view" id="view-theses">
       <div id="theses-content"></div>
+    </div>
+
+    <!-- REGISTRIES ─────────────────────────────────────────────────────── -->
+    <div class="view" id="view-registries">
+      <div id="registry-metrics" class="metric-grid"></div>
+      <div class="g2l">
+        <div class="card">
+          <div class="card-head"><span class="ch-title">Domain Graph Events</span><span class="ch-note" id="domain-note">Event ontology summary</span></div>
+          <div class="tbl-wrap"><table>
+            <thead><tr><th>Event</th><th>Family</th><th>Regime</th><th>Detector</th><th>Tier</th></tr></thead>
+            <tbody id="domain-body"></tbody>
+          </table></div>
+        </div>
+        <div>
+          <div class="card mb">
+            <div class="card-head"><span class="ch-title">Template Families</span><span class="ch-note" id="template-note">Spec template registry</span></div>
+            <div class="card-body"><div id="template-grid" class="art-grid"></div></div>
+          </div>
+          <div class="card">
+            <div class="card-head"><span class="ch-title">Feature Catalog</span><span class="ch-note" id="feature-note">Registry-backed features</span></div>
+            <div class="card-body"><div id="feature-grid" class="art-grid"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RUNTIME ────────────────────────────────────────────────────────── -->
+    <div class="view" id="view-runtime">
+      <div class="g2 mb">
+        <div class="card">
+          <div class="card-head"><span class="ch-title">Thesis Reconciliation</span><span class="ch-note">live/persist/thesis_reconciliation.json</span></div>
+          <div class="card-body" id="runtime-recon"></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><span class="ch-title">Batch Metadata</span><span class="ch-note">live/persist/thesis_batch_metadata.json</span></div>
+          <div class="card-body" id="runtime-batch"></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="ch-title">Campaign Memory</span><span class="ch-note" id="memory-note">Belief state and next actions</span></div>
+        <div class="card-body"><div id="memory-grid" class="art-grid"></div></div>
+      </div>
     </div>
 
     <!-- LAKE ────────────────────────────────────────────────────────────── -->
@@ -691,9 +1548,19 @@ tr.expanded td{background:rgba(173,77,25,.04)}
 
 <script>
 /* ─── State ──────────────────────────────────────────────────────────────── */
-let D = {overview:{},signals:[],runs:[],events:[],eventSpecs:[],campaigns:[],lake:{}};
+let D = {
+  overview:{},signals:[],runs:[],events:[],eventSpecs:[],campaigns:[],lake:{},
+  templates:{families:[],defaults:{}},features:[],liveState:{},
+  domain:{events:[],families:[],regimes:[]},artifacts:{sections:[]},
+  gitActivity:[],jobs:[],proposals:[],artifactDetails:{}
+};
 let sigCol="best_bps", sigAsc=false;
 let selRun=null;
+let selJob=null;
+let selArtifactSection=null;
+let loadErrors=[];
+let activeView="overview";
+let lazyLoaded={artifacts:false,registries:false};
 
 /* ─── Helpers ────────────────────────────────────────────────────────────── */
 const $=id=>document.getElementById(id);
@@ -701,8 +1568,8 @@ const el=(tag,cls,txt)=>{const e=document.createElement(tag);if(cls)e.className=
 const fmt=(v,d=1)=>(v===null||v===undefined)?"—":(typeof v==="number"?v.toFixed(d):v);
 const fmtN=n=>(!n&&n!==0)?"—":n.toLocaleString();
 const bpsClass=v=>v>=12?"t5":v>=8?"t4":v>=5?"t3":v>=2?"t2":v>=0?"t1":"tn";
-const bpsColor=v=>v>=12?"#1a5c36":v>=8?"#2f6f4e":v>=5?"#5a7a1a":v>=2?"#8b6317":v>=0?"#61767f":"#8b3131";
-const chip=(t,c)=>`<span class="chip ${c}" style="font-size:10px">${t}</span>`;
+const bpsColor=v=>v>=12?"#22c55e":v>=8?"#4ade80":v>=5?"#86efac":v>=2?"#f59e0b":v>=0?"#5d7280":"#f43f5e";
+const chip=(t,c)=>`<span class="chip ${c}" style="font-size:9.5px">${t}</span>`;
 
 async function api(path){
   const r=await fetch(path);
@@ -710,36 +1577,97 @@ async function api(path){
   return r.json();
 }
 
+async function post(path,body){
+  const r=await fetch(path,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body||{})});
+  if(!r.ok) throw new Error(r.statusText);
+  return r.json();
+}
+
+async function loadResource(path, fallback){
+  try{
+    return await api(path);
+  }catch(e){
+    console.warn(`Failed to load ${path}:`, e);
+    loadErrors.push(path);
+    return fallback;
+  }
+}
+
 /* ─── Load ───────────────────────────────────────────────────────────────── */
 async function loadAll(){
   $("ref-icon").innerHTML='<span class="spin"></span>';
+  loadErrors=[];
   try{
-    const [overview,signals,runs,events,eventSpecs,campaigns,lake]=await Promise.all([
-      api("/api/overview"),api("/api/signals"),api("/api/runs"),
-      api("/api/events"),api("/api/event-specs"),
-      api("/api/campaigns"),api("/api/lake"),
+    const [
+      overview,signals,runs,events,eventSpecs,campaigns,lake,
+      liveState,gitActivity,jobs,proposals
+    ]=await Promise.all([
+      loadResource("/api/overview", {}),
+      loadResource("/api/signals", []),
+      loadResource("/api/runs", []),
+      loadResource("/api/events", []),
+      loadResource("/api/event-specs", []),
+      loadResource("/api/campaigns", []),
+      loadResource("/api/lake", {}),
+      loadResource("/api/live-state", {}),
+      loadResource("/api/git-activity", []),
+      loadResource("/api/jobs", []),
+      loadResource("/api/proposals", []),
     ]);
-    D={overview,signals,runs,events,eventSpecs,campaigns,lake};
+    lazyLoaded={artifacts:false,registries:false};
+    D={
+      overview,signals,runs,events,eventSpecs,campaigns,lake,
+      templates:{families:[],defaults:{}},features:[],liveState,
+      domain:{events:[],families:[],regimes:[]},
+      artifacts:{sections:[],total_sections:0,populated_sections:0,total_files:0},
+      gitActivity,jobs,proposals,artifactDetails:{}
+    };
     $("b-sig").textContent=signals.length;
     $("b-ev").textContent=events.length;
     $("b-run").textContent=runs.length;
     $("b-es").textContent=eventSpecs.length;
+    $("b-art").textContent="⋯";
     renderAll();
+    ensureViewData(activeView);
   }catch(e){console.error(e)}
   $("ref-icon").textContent="↺";
 }
 
+async function reloadPlatform(){
+  $("ref-icon").innerHTML='<span class="spin"></span>';
+  try{await post("/api/reload",{});}catch(e){console.warn(e);}
+  await loadAll();
+}
+
 function renderAll(){
+  renderStatusBanner();
+  renderContextBar();
   renderOverview();
   renderSignals();
   renderEvents();
   renderPipeline();
   renderRunGrid();
+  renderOperator();
   renderCampaigns();
+  renderArtifacts();
   renderEventSpecs();
   renderProposals();
+  renderRegistries();
+  renderRuntime();
   renderTheses();
   renderLake();
+  buildProposal();
+}
+
+function renderStatusBanner(){
+  const banner=$("status-banner");
+  if(!loadErrors.length){
+    banner.classList.remove("show");
+    banner.textContent="";
+    return;
+  }
+  banner.classList.add("show");
+  banner.innerHTML=`Loaded with partial fallbacks. Unavailable endpoints: <span class="mono">${loadErrors.join(", ")}</span>`;
 }
 
 /* ─── Navigation ─────────────────────────────────────────────────────────── */
@@ -749,29 +1677,92 @@ const VIEW_META={
   events:   ["Events","Event families & performance heatmap"],
   pipeline: ["Pipeline","4-stage research lifecycle"],
   runs:     ["Runs","Discovery run explorer"],
+  operator: ["Operator","Canonical command runner with job logs"],
   campaigns:["Campaigns","Research campaign status & decisions"],
+  artifacts:["Artifacts","Validation, candidate, memory, and export inventory"],
   proposal: ["Proposal Builder","Compose & save discovery proposals"],
   "event-spec":["Event Registry","75 event specifications"],
+  registries:["Registries","Templates, features, and domain ontology"],
+  runtime:  ["Runtime","Live reconciliation and campaign memory"],
   theses:   ["Theses","Promoted thesis inventory"],
   lake:     ["Data Lake","Cached data availability"],
 };
 
+function switchView(v){
+  activeView=v;
+  document.querySelectorAll(".nav").forEach(n=>n.classList.toggle("active", n.dataset.view===v));
+  document.querySelectorAll(".view").forEach(v2=>v2.classList.remove("active"));
+  $(`view-${v}`).classList.add("active");
+  const [t,s]=VIEW_META[v]||["",""];
+  $("page-title").textContent=t;
+  $("page-sub").textContent=s;
+  const sep=$("page-sep");
+  if(sep) sep.style.display=s?"":"none";
+  ensureViewData(v);
+  renderContextBar();
+}
+
 document.querySelectorAll(".nav").forEach(item=>{
-  item.addEventListener("click",()=>{
-    const v=item.dataset.view;
-    document.querySelectorAll(".nav").forEach(n=>n.classList.remove("active"));
-    item.classList.add("active");
-    document.querySelectorAll(".view").forEach(v2=>v2.classList.remove("active"));
-    $(`view-${v}`).classList.add("active");
-    const [t,s]=VIEW_META[v]||["",""];
-    $("page-title").textContent=t;
-    $("page-sub").textContent=s;
-  });
+  item.addEventListener("click",()=>switchView(item.dataset.view));
 });
+
+async function ensureViewData(view, force=false){
+  if(view==="artifacts" && (!lazyLoaded.artifacts || force)) await loadArtifactsView(force);
+  if(view==="registries" && (!lazyLoaded.registries || force)) await loadRegistriesView(force);
+}
+
+async function loadArtifactsView(force=false){
+  if(lazyLoaded.artifacts && !force) return;
+  $("artifact-grid").innerHTML='<div class="surface-placeholder" style="min-height:120px"><div><span class="spin"></span>Loading artifact inventory…</div></div>';
+  try{
+    const [artifacts, gitActivity]=await Promise.all([api("/api/artifacts"), api("/api/git-activity")]);
+    D.artifacts=artifacts;
+    D.gitActivity=gitActivity;
+    lazyLoaded.artifacts=true;
+    $("b-art").textContent=artifacts.populated_sections||0;
+    renderArtifacts();
+    renderOverview();
+    renderContextBar();
+  }catch(e){
+    console.warn(e);
+    $("artifact-grid").innerHTML=`<div class="surface-placeholder"><div>Artifact inventory failed to load.<br><button class="btn btn-secondary" onclick="loadArtifactsView(true)">Retry</button></div></div>`;
+  }
+}
+
+async function loadRegistriesView(force=false){
+  if(lazyLoaded.registries && !force) return;
+  $("domain-body").innerHTML='<tr><td colspan="5" class="empty"><span class="spin"></span>Loading registries…</td></tr>';
+  try{
+    const [domain, templates, features]=await Promise.all([api("/api/domain-graph"), api("/api/templates"), api("/api/features")]);
+    D.domain=domain;
+    D.templates=templates;
+    D.features=features;
+    lazyLoaded.registries=true;
+    renderRegistries();
+    renderContextBar();
+  }catch(e){
+    console.warn(e);
+    $("domain-body").innerHTML='<tr><td colspan="5" class="empty">Registry surfaces failed to load.</td></tr>';
+  }
+}
+
+function renderContextBar(){
+  const proposal=$("op-proposal")?.value || D.proposals?.[0]?.filename || "No proposal";
+  const runId=$("op-run-id")?.value || selRun || D.runs?.[0]?.run_id || "No run";
+  const job=(D.jobs||[])[0];
+  $('contextbar').innerHTML=`
+    <div class="context-chip"><span class="k">Run</span><span class="sep">/</span><span class="v mono">${runId}</span></div>
+    <div class="context-chip"><span class="k">Proposal</span><span class="sep">/</span><span class="v">${proposal}</span></div>
+    <div class="context-chip"><span class="k">Job</span><span class="sep">/</span><span class="v">${job?job.label:'Idle'}</span></div>
+    <div class="context-chip"><span class="k">Artifacts</span><span class="sep">/</span><span class="v">${lazyLoaded.artifacts?'loaded':'standby'}</span></div>
+    <div class="context-chip"><span class="k">Registries</span><span class="sep">/</span><span class="v">${lazyLoaded.registries?'loaded':'standby'}</span></div>
+  `;
+}
 
 /* ─── Overview ───────────────────────────────────────────────────────────── */
 function renderOverview(){
   const o=D.overview;
+  $("ov-metrics").innerHTML="";
   [
     {l:"Discovery Runs",    v:fmtN(o.total_runs),              s:"Completed"},
     {l:"Hypotheses Tested", v:fmtN(o.total_hypotheses),        s:"Across all runs",accent:false},
@@ -784,6 +1775,76 @@ function renderOverview(){
     c.innerHTML=`<div class="ml">${m.l}</div><div class="mv">${m.v}</div><div class="ms">${m.s}</div>`;
     $("ov-metrics").appendChild(c);
   });
+
+  const latestRun=D.runs[0];
+  const latestJob=(D.jobs||[])[0];
+  const bestRun=D.runs.find(r=>(r.phase2_candidates_written||0)>0) || latestRun;
+  const nextMoves=[];
+  if(D.proposals.length && !D.runs.length){
+    nextMoves.push({
+      title:"Start first discovery run",
+      body:"A saved proposal exists but no discovery run has executed yet.",
+      action:`<button class="btn btn-primary" onclick="switchView('operator')">Open Operator</button>`
+    });
+  }
+  if(bestRun && (bestRun.phase2_candidates_written||0)>0){
+    nextMoves.push({
+      title:"Advance strongest discovery run",
+      body:`${bestRun.run_id} has ${bestRun.phase2_candidates_written} candidate${bestRun.phase2_candidates_written===1?"":"s"}. Validate, promote, or export from the operator surface.`,
+      action:`<button class="btn btn-primary" onclick="switchView('operator')">Advance Run</button>`
+    });
+  }else if(latestRun){
+    nextMoves.push({
+      title:"Inspect low-yield discovery output",
+      body:`Latest run ${latestRun.run_id} wrote ${latestRun.phase2_candidates_written||0} candidates. Use Artifacts or Events before rerunning.`,
+      action:`<button class="btn btn-secondary" onclick="switchView('artifacts')">Inspect Artifacts</button>`
+    });
+  }
+  if(!lazyLoaded.registries){
+    nextMoves.push({
+      title:"Load ontology surfaces on demand",
+      body:"Templates, features, and the domain graph are available when needed without slowing the main workspace.",
+      action:`<button class="btn btn-secondary" onclick="switchView('registries')">Open Registries</button>`
+    });
+  }
+  if(!nextMoves.length){
+    nextMoves.push({
+      title:"Workspace ready",
+      body:"The core platform is loaded. Branch into runs, operator, artifacts, registries, runtime, or proposals from here.",
+      action:`<button class="btn btn-secondary" onclick="switchView('runs')">Review Runs</button>`
+    });
+  }
+
+  $("ov-command").innerHTML=`<div class="workflow-grid">
+    ${nextMoves.map(move=>`<div class="workflow-card">
+      <div class="workflow-top"><div class="workflow-name">${move.title}</div>${chip("next","ac")}</div>
+      <div class="workflow-note">${move.body}</div>
+      <div class="inline-actions">${move.action}</div>
+    </div>`).join("")}
+  </div>`;
+
+  $("ov-context").innerHTML=`<div class="kv-stack">
+    <div class="kv"><span class="k">Selected run</span><span class="v mono">${selRun || latestRun?.run_id || "—"}</span></div>
+    <div class="kv"><span class="k">Selected artifact</span><span class="v">${selArtifactSection || "—"}</span></div>
+    <div class="kv"><span class="k">Proposal files</span><span class="v">${D.proposals.length}</span></div>
+    <div class="kv"><span class="k">Tracked jobs</span><span class="v">${D.jobs.length}</span></div>
+    <div class="kv"><span class="k">Artifacts</span><span class="v">${lazyLoaded.artifacts?"loaded":"standby"}</span></div>
+    <div class="kv"><span class="k">Registries</span><span class="v">${lazyLoaded.registries?"loaded":"standby"}</span></div>
+  </div>`;
+
+  $("ov-jobs").innerHTML=(D.jobs||[]).length
+    ? `<div class="hero-list">${D.jobs.slice(0,4).map(job=>`<div class="hero-item">
+        ${chip(job.status, job.status==="done"?"ok":job.status==="failed"?"fail":"warn")}
+        <div><strong>${job.label}</strong>${job.started_at||"—"}<br><span class="mono">${job.cmd}</span></div>
+      </div>`).join("")}</div>`
+    : '<div class="empty">No recent jobs. Use Operator to launch discover, validate, promote, deploy, ingest, or graph actions.</div>';
+
+  $("ov-commits").innerHTML=(D.gitActivity||[]).length
+    ? `<div class="hero-list">${D.gitActivity.slice(0,4).map(commit=>`<div class="hero-item">
+        ${chip(commit.hash,"neutral")}
+        <div><strong>${commit.subject||"—"}</strong>${commit.date||"—"}</div>
+      </div>`).join("")}</div>`
+    : '<div class="empty">No recent git activity available.</div>';
 
   // Funnel
   const f=o.funnel||{};
@@ -798,10 +1859,10 @@ function renderOverview(){
   $("ov-funnel-note").textContent=`${fmtN(steps[0].v)} → ${fmtN(steps[4].v)}`;
   $("ov-funnel").innerHTML=steps.map((s,i)=>{
     const pct=Math.max(3,Math.round(s.v/mx*100));
-    const alpha=0.18+0.48*(1-i/(steps.length-1));
+    const alpha=0.15+0.55*(1-i/(steps.length-1));
     return `<div class="funnel-row">
       <div class="funnel-lbl">${s.l}</div>
-      <div class="funnel-track"><div class="funnel-fill" style="width:${pct}%;background:rgba(173,77,25,${alpha})"></div></div>
+      <div class="funnel-track"><div class="funnel-fill" style="width:${pct}%;background:rgba(0,212,255,${alpha})"></div></div>
       <div class="funnel-num">${fmtN(s.v)}</div>
     </div>`;
   }).join("");
@@ -811,18 +1872,18 @@ function renderOverview(){
   const mx2=cats[0]?.[1]||1;
   $("ov-cats").innerHTML=cats.map(([c,n])=>`
     <div class="funnel-row">
-      <div class="funnel-lbl" style="font-size:10px;color:var(--ink)">${c.replace(/_/g," ")}</div>
-      <div class="funnel-track"><div class="funnel-fill" style="width:${Math.max(3,Math.round(n/mx2*100))}%;background:rgba(173,77,25,.28)"></div></div>
-      <div class="funnel-num" style="color:var(--muted)">${n}</div>
+      <div class="funnel-lbl" style="font-size:10px;color:var(--ink2)">${c.replace(/_/g," ")}</div>
+      <div class="funnel-track"><div class="funnel-fill" style="width:${Math.max(3,Math.round(n/mx2*100))}%;background:rgba(0,212,255,.18)"></div></div>
+      <div class="funnel-num" style="color:var(--ink3)">${n}</div>
     </div>`).join("");
 
   // Top signals table
   $("ov-top-body").innerHTML=(o.top_signals||[]).map((s,i)=>`
     <tr>
-      <td class="mono" style="color:var(--muted)">${i+1}</td>
+      <td class="mono" style="color:var(--ink3)">${i+1}</td>
       <td class="mono">${s.event}</td>
       <td>${chip(s.category.replace(/_/g," "),"neutral")}</td>
-      <td class="mono" style="color:var(--muted)">${s.run}</td>
+      <td class="mono" style="color:var(--ink3)">${s.run}</td>
       <td>${chip(s.best_sym||"—","ac")}</td>
       <td class="num">${fmtN(s.n_events)}</td>
       <td class="bps ${bpsClass(s.best_bps)}">${fmt(s.best_bps)}</td>
@@ -864,7 +1925,7 @@ function renderSignals(){
     <tr class="sig-row" data-id="${s.id}" style="cursor:pointer">
       <td class="mono">${s.event}</td>
       <td>${chip(s.category.replace(/_/g," "),"neutral")}</td>
-      <td class="mono" style="color:var(--muted)">${s.run}</td>
+      <td class="mono" style="color:var(--ink3)">${s.run}</td>
       <td class="num">${fmtN(s.n_events)}</td>
       <td class="bps ${bpsClass(s.best_bps)}">${fmt(s.best_bps)}</td>
       <td class="bps ${bpsClass(s.post_return_bps)}">${fmt(s.post_return_bps)}</td>
@@ -927,10 +1988,12 @@ function renderEvents(){
     html+=`<div class="hm-sym">${sym}</div>`;
     cats.forEach(cat=>{
       const best=Math.max(...(byCat[cat]||[]).map(e=>e.by_symbol?.[sym]?.best_bps??-Infinity));
-      if(!isFinite(best)){html+=`<div class="hm-cell" style="background:rgba(24,49,59,.04);color:rgba(24,49,59,.2)">—</div>`;return;}
+      if(!isFinite(best)){html+=`<div class="hm-cell" style="background:rgba(255,255,255,.03);color:rgba(255,255,255,.15)">—</div>`;return;}
       const t=Math.min(1,Math.max(0,best/15));
-      const r=Math.round(47+(173-47)*t),g=Math.round(111+(77-111)*t),b=Math.round(78+(25-78)*t);
-      html+=`<div class="hm-cell" style="background:rgba(${r},${g},${b},${0.1+t*.55});color:${t>.5?'#fff':bpsColor(best)}">${fmt(best)}</div>`;
+      const alpha=0.08+t*0.55;
+      const g=Math.round(212*t);
+      const b=Math.round(255*(1-t*0.4));
+      html+=`<div class="hm-cell" style="background:rgba(0,${g},${b},${alpha});color:${t>0.5?'#fff':bpsColor(best)}">${fmt(best)}</div>`;
     });
   });
   html+="</div></div>";
@@ -944,7 +2007,7 @@ function renderEvents(){
       <td class="num">${fmtN(e.n_events)}</td>
       <td class="bps ${bpsClass(e.best_bps)}">${fmt(e.best_bps)}</td>
       <td>${chip(e.best_sym||"—","ac")}</td>
-      <td class="mono" style="color:var(--muted)">${e.best_run}</td>
+      <td class="mono" style="color:var(--ink3)">${e.best_run}</td>
       <td class="num">${fmt(e.sign_consistency,3)}</td>
       <td class="bps ${bpsClass(e.post_return_bps)}">${fmt(e.post_return_bps)}</td>
       <td class="num">${e.run_count}</td>
@@ -957,7 +2020,6 @@ function renderPipeline(){
   const runs=D.runs;
   const totalCands=o.total_candidates_written||0;
 
-  // 4-stage visual
   const stages=[
     {num:"01",name:"Discover",cmd:"edge discover run --proposal spec/proposals/…yaml",
      desc:"Broad candidate generation. Event-anchored search across hypotheses, directions, and horizons.",
@@ -991,7 +2053,6 @@ function renderPipeline(){
       `).join("")}
     </div>`;
 
-  // Outcomes
   const withCands=runs.filter(r=>r.phase2_candidates_written>0).length;
   const zeroCands=runs.length-withCands;
   $("pipeline-outcomes").innerHTML=`
@@ -999,13 +2060,12 @@ function renderPipeline(){
       <div class="funnel-track"><div class="funnel-fill" style="width:${Math.round(withCands/Math.max(runs.length,1)*100)}%;background:var(--ok)"></div></div>
       <div class="funnel-num">${withCands}</div></div>
     <div class="funnel-row"><div class="funnel-lbl">Zero candidates</div>
-      <div class="funnel-track"><div class="funnel-fill" style="width:${Math.round(zeroCands/Math.max(runs.length,1)*100)}%;background:rgba(24,49,59,.22)"></div></div>
+      <div class="funnel-track"><div class="funnel-fill" style="width:${Math.round(zeroCands/Math.max(runs.length,1)*100)}%;background:rgba(255,255,255,.12)"></div></div>
       <div class="funnel-num">${zeroCands}</div></div>
-    <div style="margin-top:12px;font-size:11px;color:var(--muted)">
+    <div style="margin-top:10px;font-size:10.5px;color:var(--ink3)">
       Across ${runs.length} discovery runs. Best: ${o.best_signal_event||"—"} @ ${fmt(o.best_signal_bps)} bps.
     </div>`;
 
-  // Aggregated funnel
   const f=o.funnel||{};
   const fSteps=[
     {l:"Hypotheses",v:f.hypotheses||0},
@@ -1017,13 +2077,12 @@ function renderPipeline(){
   const mx=fSteps[0].v||1;
   $("pipeline-funnel").innerHTML=fSteps.map((s,i)=>{
     const pct=Math.max(3,Math.round(s.v/mx*100));
-    const alpha=0.18+0.48*(1-i/(fSteps.length-1));
+    const alpha=0.15+0.55*(1-i/(fSteps.length-1));
     return `<div class="funnel-row"><div class="funnel-lbl">${s.l}</div>
-      <div class="funnel-track"><div class="funnel-fill" style="width:${pct}%;background:rgba(173,77,25,${alpha})"></div></div>
+      <div class="funnel-track"><div class="funnel-fill" style="width:${pct}%;background:rgba(0,212,255,${alpha})"></div></div>
       <div class="funnel-num">${fmtN(s.v)}</div></div>`;
   }).join("");
 
-  // CLI reference
   const cmds=[
     {stage:"Discover",cmds:["edge discover plan --proposal <yaml>","edge discover run --proposal <yaml>","edge discover list-artifacts"]},
     {stage:"Validate",cmds:["edge validate run --run_id <id>","edge validate report --run_id <id>","edge validate diagnose --run_id <id>"]},
@@ -1032,10 +2091,10 @@ function renderPipeline(){
     {stage:"Ingest",  cmds:["edge ingest --run_id <id> --symbols BTCUSDT,ETHUSDT --start 2021-01-01 --end 2024-12-31"]},
     {stage:"Catalog", cmds:["edge catalog list --stage discover","edge catalog compare --run_id_a <a> --run_id_b <b>"]},
   ];
-  $("pipeline-cli").innerHTML=`<div style="display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(280px,1fr))">
+  $("pipeline-cli").innerHTML=`<div style="display:grid;gap:8px;grid-template-columns:repeat(auto-fit,minmax(270px,1fr))">
     ${cmds.map(c=>`<div class="sym-card">
       <div class="sc-t">${c.stage}</div>
-      ${c.cmds.map(cmd=>`<div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--muted);padding:3px 0;border-bottom:1px solid var(--line2)">${cmd}</div>`).join("")}
+      ${c.cmds.map(cmd=>`<div style="font-family:var(--mono);font-size:10px;color:var(--ink3);padding:3px 0;border-bottom:1px solid var(--line2)">${cmd}</div>`).join("")}
     </div>`).join("")}
   </div>`;
 }
@@ -1046,18 +2105,18 @@ function renderRunGrid(){
   const runs=D.runs.filter(r=>!q||r.run_id.toLowerCase().includes(q));
   const mx=Math.max(...D.runs.map(r=>r.hypotheses_generated||0),1);
   $("run-grid").innerHTML=runs.map(r=>{
-    const h1=Math.max(4,Math.round((r.hypotheses_generated/mx)*28));
+    const h1=Math.max(4,Math.round((r.hypotheses_generated/mx)*24));
     const h2=r.hypotheses_generated>0?Math.max(4,Math.round((r.feasible_hypotheses/r.hypotheses_generated)*h1)):4;
     const h3=r.feasible_hypotheses>0?Math.max(4,Math.round((r.metrics_emitted/r.feasible_hypotheses)*h2)):4;
     const h4=r.metrics_emitted>0?Math.max(4,Math.round((r.phase2_candidates_written/Math.max(r.metrics_emitted,1))*h3)):4;
     return `<div class="rc${r.run_id===selRun?" sel":""}" data-id="${r.run_id}">
       <div class="rc-name">${r.run_id}</div>
       <div class="rc-meta">${(r.symbols||[]).join(" · ")} · ${r.timeframe||"5m"}</div>
-      <div style="font-size:11px;display:flex;gap:10px"><span style="color:var(--muted)">${fmtN(r.hypotheses_generated)} hyp</span><span style="color:var(--accent);font-weight:700">${fmtN(r.phase2_candidates_written)} cands</span></div>
+      <div style="font-size:10.5px;display:flex;gap:10px"><span style="color:var(--ink3)">${fmtN(r.hypotheses_generated)} hyp</span><span style="color:var(--accent);font-weight:700">${fmtN(r.phase2_candidates_written)} cands</span></div>
       <div class="mini-funnel">
-        <div class="mfb" style="height:${h1}px;background:rgba(24,49,59,.18)"></div>
-        <div class="mfb" style="height:${h2}px;opacity:.5"></div>
-        <div class="mfb" style="height:${h3}px;opacity:.75"></div>
+        <div class="mfb" style="height:${h1}px;background:rgba(255,255,255,.1)"></div>
+        <div class="mfb" style="height:${h2}px;opacity:.6"></div>
+        <div class="mfb" style="height:${h3}px;opacity:.8"></div>
         <div class="mfb" style="height:${h4}px"></div>
       </div>
     </div>`;
@@ -1082,7 +2141,7 @@ function showRunDetail(r){
     return `<div class="fb-col"><div class="fb-val">${fmtN(s.v)}</div><div class="fb-bar" style="height:${h}px"></div><div class="fb-lbl">${s.l}</div></div>`;
   }).join("");
   const rej=Object.entries(r.rejection_reasons||{}).map(([k,v])=>
-    `<div class="kv"><span class="k">${k}</span><span class="v">${fmtN(v)}</span></div>`).join("")||'<span style="color:var(--muted);font-size:11px">None recorded</span>';
+    `<div class="kv"><span class="k">${k}</span><span class="v">${fmtN(v)}</span></div>`).join("")||'<span style="color:var(--ink3);font-size:11px">None recorded</span>';
   const fams=(r.event_families||[]).map(f=>chip(f,"neutral")).join(" ")||"—";
 
   $("run-detail").innerHTML=`
@@ -1108,10 +2167,197 @@ function showRunDetail(r){
             <div class="sc-t">Rejections</div>${rej}
           </div>
         </div>
-        ${fams!=="—"?`<div class="section-title">Event Families</div><div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">${fams}</div>`:""}
-        ${r.phase2_candidates_written>0?`<div style="padding:9px 12px;background:var(--ok-s);border-radius:9px;border:1px solid rgba(47,111,78,.15);font-size:12px;color:var(--ok);font-weight:600">✓ ${r.phase2_candidates_written} candidate${r.phase2_candidates_written>1?"s":""} written${r.multiplicity_discoveries>0?` · ${r.multiplicity_discoveries} multiplicity discoveries`:""}</div>`:""}
+        ${fams!=="—"?`<div class="section-title">Event Families</div><div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:12px">${fams}</div>`:""}
+        ${r.phase2_candidates_written>0?`<div style="padding:8px 12px;background:var(--ok-bg);border-radius:var(--rrr);border:1px solid var(--ok-bd);font-size:11.5px;color:var(--ok);font-weight:600">✓ ${r.phase2_candidates_written} candidate${r.phase2_candidates_written>1?"s":""}${r.multiplicity_discoveries>0?` · ${r.multiplicity_discoveries} multiplicity discoveries`:""}</div>`:""}
       </div>
     </div>`;
+}
+
+/* ─── Operator ───────────────────────────────────────────────────────────── */
+function renderOperator(){
+  const propSel=$("op-proposal");
+  const runSel=$("op-run-select");
+  const currentProposal=propSel?.value||"";
+  const currentRun=runSel?.value||selRun||"";
+
+  if(propSel){
+    propSel.innerHTML='<option value="">— select proposal —</option>'+D.proposals.map(p=>
+      `<option value="${p.path}" ${p.path===currentProposal?"selected":""}>${p.filename}</option>`
+    ).join("");
+  }
+  if(runSel){
+    runSel.innerHTML='<option value="">— select run —</option>'+D.runs.map(r=>
+      `<option value="${r.run_id}" ${r.run_id===currentRun?"selected":""}>${r.run_id}</option>`
+    ).join("");
+  }
+  if(!$("op-run-id").value && currentRun) $("op-run-id").value=currentRun;
+  const runId=$("op-run-id").value||currentRun||"";
+  const proposalPath=$("op-proposal").value||"";
+  const selectedRun=D.runs.find(r=>r.run_id===runId);
+  $("op-workflows").innerHTML=`
+    <div class="workflow-grid">
+      <div class="workflow-card">
+        <div class="workflow-top"><div class="workflow-name">Discover</div>${chip("research","ac")}</div>
+        <div class="workflow-note">Proposal-first execution for bounded hypothesis search. Full repo capability stays exposed, but the interaction starts with the cleanest path.</div>
+        <div class="workflow-list">
+          <div class="workflow-item"><span class="k">Plan</span><span class="v">Compile and preflight proposal</span></div>
+          <div class="workflow-item"><span class="k">Run</span><span class="v">Execute discovery</span></div>
+        </div>
+        <div class="inline-actions">
+          <button class="btn btn-secondary" onclick="runStage('discover','plan')">Plan</button>
+          <button class="btn btn-primary" onclick="runStage('discover','run')">Run</button>
+        </div>
+      </div>
+      <div class="workflow-card">
+        <div class="workflow-top"><div class="workflow-name">Validate + Promote</div>${chip("govern","warn")}</div>
+        <div class="workflow-note">Move from raw candidates to governed theses without leaving the operator workspace.</div>
+        <div class="workflow-list">
+          <div class="workflow-item"><span class="k">Validate</span><span class="v">Truth-test run output</span></div>
+          <div class="workflow-item"><span class="k">Promote</span><span class="v">Package approved theses</span></div>
+          <div class="workflow-item"><span class="k">Export</span><span class="v">Emit deployment bundle</span></div>
+        </div>
+        <div class="inline-actions">
+          <button class="btn btn-secondary" onclick="runStage('validate')">Validate</button>
+          <button class="btn btn-secondary" onclick="runStage('promote')">Promote</button>
+          <button class="btn btn-primary" onclick="runStage('export')">Export</button>
+        </div>
+      </div>
+      <div class="workflow-card">
+        <div class="workflow-top"><div class="workflow-name">Deploy + Infra</div>${chip("runtime","neutral")}</div>
+        <div class="workflow-note">Paper deployment, ingest refresh, and ontology rebuild remain available directly from the same surface.</div>
+        <div class="workflow-list">
+          <div class="workflow-item"><span class="k">Deploy paper</span><span class="v">Dry-run thesis activation</span></div>
+          <div class="workflow-item"><span class="k">Ingest</span><span class="v">Refresh market inputs</span></div>
+          <div class="workflow-item"><span class="k">Build graph</span><span class="v">Rebuild domain ontology</span></div>
+        </div>
+        <div class="inline-actions">
+          <button class="btn btn-secondary" onclick="runStage('deploy','paper')">Deploy Paper</button>
+          <button class="btn btn-secondary" onclick="runStage('ingest')">Ingest</button>
+          <button class="btn btn-primary" onclick="runStage('build-graph')">Build Graph</button>
+        </div>
+      </div>
+    </div>`;
+  $("op-preflight").innerHTML=`<div class="stack">
+    <div class="hero-item">${proposalPath?chip("ready","ok"):chip("missing","fail")}<div><strong>Proposal selection</strong>${proposalPath || "Select a proposal before running discover plan or discover run."}</div></div>
+    <div class="hero-item">${runId?chip("ready","ok"):chip("missing","fail")}<div><strong>Run context</strong>${runId || "Select or type a run ID before validate, promote, export, or deploy."}</div></div>
+    <div class="hero-item">${chip("sync","neutral")}<div><strong>Dashboard state</strong>Use <button class="btn btn-secondary" style="padding:3px 9px;margin-left:6px" onclick="reloadPlatform()">Reload All</button> after jobs finish to refresh cached summaries.</div></div>
+    <div class="helper-text">This is still the full project control plane. The refinement here is visual hierarchy and safer sequencing, not capability reduction.</div>
+  </div>`;
+  $("op-selection").innerHTML=`<div class="kv-stack">
+    <div class="kv"><span class="k">Proposal</span><span class="v mono">${proposalPath || "—"}</span></div>
+    <div class="kv"><span class="k">Run ID</span><span class="v mono">${runId || "—"}</span></div>
+    <div class="kv"><span class="k">Symbols</span><span class="v">${$("op-symbols").value || "—"}</span></div>
+    <div class="kv"><span class="k">Window</span><span class="v">${$("op-start").value} → ${$("op-end").value}</span></div>
+    <div class="kv"><span class="k">Ingest</span><span class="v">${$("op-exchange").value} · ${$("op-data-type").value} · ${$("op-timeframe").value}</span></div>
+    <div class="kv"><span class="k">Run status</span><span class="v">${selectedRun ? `${selectedRun.phase2_candidates_written||0} candidates` : "No matching run selected"}</span></div>
+  </div>`;
+  renderJobsPanel();
+  renderContextBar();
+}
+
+function syncOperatorRun(){
+  const runId=$("op-run-select").value||"";
+  $("op-run-id").value=runId;
+}
+
+function opArgsFor(stage, subcmd){
+  const proposal=$("op-proposal")?.value||"";
+  const runId=$("op-run-id")?.value||"";
+  const symbols=$("op-symbols")?.value||"BTCUSDT,ETHUSDT";
+  const start=$("op-start")?.value||"2021-01-01";
+  const end=$("op-end")?.value||"2024-12-31";
+  const timeframe=$("op-timeframe")?.value||"5m";
+  const exchange=$("op-exchange")?.value||"bybit";
+  const dataType=$("op-data-type")?.value||"ohlcv";
+
+  if(stage==="discover"){
+    return {proposal, run_id: runId};
+  }
+  if(stage==="validate"||stage==="export"){
+    return {run_id: runId};
+  }
+  if(stage==="promote"){
+    return {run_id: runId, symbols};
+  }
+  if(stage==="deploy"&&subcmd==="paper"){
+    return {run_id: runId};
+  }
+  if(stage==="ingest"){
+    return {run_id: runId, symbols, start, end, timeframe, exchange, data_type: dataType};
+  }
+  return {};
+}
+
+async function runStage(stage, subcmd="run"){
+  const args=opArgsFor(stage, subcmd);
+  if(stage==="discover" && !args.proposal){
+    $("op-msg").className="op-msg fail";$("op-msg").textContent="Select a proposal first.";return;
+  }
+  if(["validate","promote","export"].includes(stage) && !args.run_id){
+    $("op-msg").className="op-msg fail";$("op-msg").textContent="Select or enter a run ID first.";return;
+  }
+  if(stage==="deploy" && subcmd==="paper" && !args.run_id){
+    $("op-msg").className="op-msg fail";$("op-msg").textContent="Select or enter a run ID first.";return;
+  }
+
+  $("op-msg").className="op-msg";$("op-msg").innerHTML='<span class="spin"></span>Launching job…';
+  try{
+    const res=await post("/api/run",{stage,subcmd,args});
+    if(!res.ok) throw new Error(res.error||"Job launch failed");
+    selJob=res.job?.id||selJob;
+    $("op-msg").className="op-msg ok";$("op-msg").textContent=`Started ${res.job.label}`;
+    await refreshJobs(true);
+  }catch(e){
+    $("op-msg").className="op-msg fail";$("op-msg").textContent=e.message;
+  }
+}
+
+function renderJobsPanel(){
+  const jobs=[...(D.jobs||[])].sort((a,b)=>(b.started_at||"").localeCompare(a.started_at||""));
+  $("job-note").textContent=jobs.length?`${jobs.length} tracked job${jobs.length===1?"":"s"}`:"No background jobs";
+  if(!jobs.length){
+    $("job-list").innerHTML='<div class="empty">Launch a command to see job history here.</div>';
+    $("job-log").textContent='No job selected.';
+    $("job-log-note").textContent='Select a job';
+    return;
+  }
+  if(!selJob || !jobs.some(j=>j.id===selJob)) selJob=jobs[0].id;
+  $("job-list").innerHTML=jobs.map(job=>`
+    <div class="job-item${job.id===selJob?" sel":""}" data-id="${job.id}">
+      <div class="job-title">${chip(job.status, job.status==="done"?"ok":job.status==="failed"?"fail":"warn")}<span class="mono">${job.label}</span></div>
+      <div class="job-meta">${job.started_at||"—"}<br><span class="mono">${job.cmd}</span></div>
+    </div>
+  `).join("");
+  document.querySelectorAll(".job-item").forEach(item=>{
+    item.addEventListener("click",()=>{
+      selJob=item.dataset.id;
+      renderJobsPanel();
+      refreshJobLog(selJob);
+    });
+  });
+  refreshJobLog(selJob);
+}
+
+async function refreshJobs(preserveSelection=false){
+  try{
+    D.jobs=await api("/api/jobs");
+    if(!preserveSelection && selJob && !D.jobs.some(j=>j.id===selJob)) selJob=null;
+    renderJobsPanel();
+  }catch(e){
+    console.warn(e);
+  }
+}
+
+async function refreshJobLog(jobId){
+  if(!jobId){return;}
+  try{
+    const job=D.jobs.find(j=>j.id===jobId);
+    const data=await api(`/api/jobs/${jobId}/log?offset=0`);
+    $("job-log").textContent=data.text||"";
+    $("job-log-note").textContent=job?`${job.status} · ${job.label}`:"Job log";
+  }catch(e){
+    $("job-log").textContent=`Failed to load log: ${e.message}`;
+  }
 }
 
 /* ─── Campaigns ──────────────────────────────────────────────────────────── */
@@ -1144,10 +2390,106 @@ function renderCampaigns(){
         <div class="cmp-stats">${c.stats.map(s=>`<div class="cmp-stat"><div class="k">${s.label}</div><div class="v">${s.value}</div></div>`).join("")}</div>
         <div class="cmp-reason">${c.reason}</div>
         ${condHtml}
-        ${c.watchlist?`<div class="cmp-watch">Watch: ${c.watchlist}</div>`:""}
+        ${c.watchlist?`<div class="cmp-watch">Watch: ${c.watchlist}`:""}
       </div>
     </div>`;
   }).join("");
+}
+
+/* ─── Artifacts ──────────────────────────────────────────────────────────── */
+function renderArtifacts(){
+  if(!lazyLoaded.artifacts){
+    $("artifact-metrics").innerHTML="";
+    $("artifact-grid").innerHTML=`<div class="surface-placeholder"><div>Artifact inventory stays on standby until you need it.<br><button class="btn btn-primary" onclick="loadArtifactsView(true)">Load Artifacts</button></div></div>`;
+    $("artifact-detail").innerHTML='<div class="empty">Load artifact inventory to inspect previews.</div>';
+    $("artifact-detail-note").textContent='Standby';
+    $("git-body").innerHTML='<tr><td colspan="3" class="empty">Load artifacts to view research changelog context.</td></tr>';
+    return;
+  }
+  const inv=D.artifacts||{sections:[]};
+  $("artifact-metrics").innerHTML="";
+  [
+    {l:"Artifact Sections",v:fmtN(inv.total_sections||0),s:"Tracked inventory surfaces"},
+    {l:"Populated",v:fmtN(inv.populated_sections||0),s:"Non-empty sections",accent:true},
+    {l:"Files Indexed",v:fmtN(inv.total_files||0),s:"Across inventory"},
+    {l:"Recent Commits",v:fmtN((D.gitActivity||[]).length),s:"Git changelog rows"},
+  ].forEach(m=>{
+    const c=el("div","mc"+(m.accent?" accent":""));
+    c.innerHTML=`<div class="ml">${m.l}</div><div class="mv">${m.v}</div><div class="ms">${m.s}</div>`;
+    $("artifact-metrics").appendChild(c);
+  });
+
+  const sections=inv.sections||[];
+  if(!selArtifactSection && sections.length) selArtifactSection=sections[0].id;
+  $("artifact-grid").innerHTML=sections.map(section=>`
+    <div class="art-card clickable${section.id===selArtifactSection?" sel":""}" data-section="${section.id}">
+      <div class="art-title">${section.label} ${section.file_count>0?chip(`${section.file_count} files`,"ok"):chip("empty","warn")}</div>
+      <div class="art-note">${section.notes||"No notes."}</div>
+      <div class="kv-stack">
+        <div class="kv"><span class="k">Path</span><span class="v mono">${section.path||"—"}</span></div>
+        <div class="kv"><span class="k">Run dirs</span><span class="v">${fmtN(section.run_count)}</span></div>
+        ${section.nonempty_json_runs!==undefined?`<div class="kv"><span class="k">Non-empty JSON runs</span><span class="v">${fmtN(section.nonempty_json_runs)}</span></div>`:""}
+      </div>
+      ${section.sample_runs?.length?`<div class="art-note" style="margin-top:7px;margin-bottom:3px">Sample runs</div><div class="art-list">${section.sample_runs.map(run=>`<div>${run}</div>`).join("")}</div>`:""}
+      ${section.sample_files?.length?`<div class="art-note" style="margin-top:7px;margin-bottom:3px">Recent files</div><div class="art-list">${section.sample_files.map(file=>`<div>${file}</div>`).join("")}</div>`:""}
+    </div>
+  `).join("");
+  document.querySelectorAll("#artifact-grid .art-card.clickable").forEach(card=>{
+    card.addEventListener("click",()=>{
+      selArtifactSection=card.dataset.section;
+      renderArtifacts();
+      renderArtifactDetail();
+    });
+  });
+
+  $("git-body").innerHTML=(D.gitActivity||[]).map(commit=>`
+    <tr>
+      <td class="mono">${commit.date}</td>
+      <td class="mono">${commit.hash}</td>
+      <td>${commit.subject||"—"}</td>
+    </tr>
+  `).join("") || '<tr><td colspan="3" class="empty">No git activity available.</td></tr>';
+  renderArtifactDetail();
+}
+
+async function renderArtifactDetail(){
+  if(!selArtifactSection){
+    $("artifact-detail").innerHTML='<div class="empty">Select an artifact section to inspect recent file previews.</div>';
+    $("artifact-detail-note").textContent='Select a section';
+    return;
+  }
+  if(!D.artifactDetails[selArtifactSection]){
+    $("artifact-detail").innerHTML='<div class="empty"><span class="spin"></span>Loading artifact preview…</div>';
+    try{
+      D.artifactDetails[selArtifactSection]=await api(`/api/artifacts/detail?section=${encodeURIComponent(selArtifactSection)}`);
+    }catch(e){
+      $("artifact-detail").innerHTML=`<div class="empty">Failed to load detail: ${e.message}</div>`;
+      return;
+    }
+  }
+  const detail=D.artifactDetails[selArtifactSection];
+  const section=detail.section||{};
+  $("artifact-detail-note").textContent=section.label||selArtifactSection;
+  const previews=detail.previews||[];
+  $("artifact-detail").innerHTML=`
+    <div class="kv-stack" style="margin-bottom:10px">
+      <div class="kv"><span class="k">Path</span><span class="v mono">${section.path||"—"}</span></div>
+      <div class="kv"><span class="k">Files</span><span class="v">${fmtN(section.file_count||0)}</span></div>
+      <div class="kv"><span class="k">Run dirs</span><span class="v">${fmtN(section.run_count||0)}</span></div>
+    </div>
+    ${previews.map(preview=>`
+      <div class="art-card" style="margin-bottom:8px">
+        <div class="art-title">${preview.path} ${preview.error?chip("preview error","fail"):chip(preview.shape||preview.kind||"file","neutral")}</div>
+        ${preview.error?`<div class="art-note">${preview.error}</div>`:`
+          ${preview.keys?.length?`<div class="art-note">Keys: ${preview.keys.join(", ")}</div>`:""}
+          ${preview.columns?.length?`<div class="art-note">Columns: ${preview.columns.join(", ")}</div>`:""}
+          ${preview.rows!==undefined?`<div class="art-note">Rows: ${preview.rows}</div>`:""}
+          ${preview.sample?`<pre class="preview-code">${JSON.stringify(preview.sample,null,2)}</pre>`:""}
+          ${preview.sample_rows?.length?`<pre class="preview-code">${JSON.stringify(preview.sample_rows,null,2)}</pre>`:""}
+        `}
+      </div>
+    `).join("") || '<div class="empty">No previewable files in this section.</div>'}
+  `;
 }
 
 /* ─── Proposal Builder ────────────────────────────────────────────────────── */
@@ -1225,7 +2567,7 @@ function saveProposal(){
     .then(d=>{
       if(d.ok){
         $("pb-msg").className="pb-msg ok";$("pb-msg").textContent=`Saved → ${d.path}`;
-        renderProposals();
+        loadAll();
       }else{
         $("pb-msg").className="pb-msg fail";$("pb-msg").textContent=d.error||"Error";
       }
@@ -1238,20 +2580,19 @@ function resetProposal(){
 }
 
 function renderProposals(){
-  api("/api/proposals").then(proposals=>{
-    $("proposals-note").textContent=`${proposals.length} saved`;
-    if(!proposals.length){
-      $("proposals-list").innerHTML='<div class="empty">No proposals yet. Use the form above to create one.</div>';return;
-    }
-    $("proposals-list").innerHTML=`<div style="display:grid;gap:9px;grid-template-columns:repeat(auto-fill,minmax(260px,1fr))">
-      ${proposals.map(p=>`<div class="sym-card">
-        <div class="sc-t mono">${p.filename}</div>
-        <div class="kv"><span class="k">Run ID</span><span class="v">${p.content?.run_id||"—"}</span></div>
-        <div class="kv"><span class="k">Event</span><span class="v">${(p.content?.events?.[0]?.event_type||"—")}</span></div>
-        <div class="kv"><span class="k">Symbols</span><span class="v">${(p.content?.symbols||[]).join(", ")||"—"}</span></div>
-      </div>`).join("")}
-    </div>`;
-  }).catch(()=>{});
+  const proposals=D.proposals||[];
+  $("proposals-note").textContent=`${proposals.length} saved`;
+  if(!proposals.length){
+    $("proposals-list").innerHTML='<div class="empty">No proposals yet. Use the form above to create one.</div>';return;
+  }
+  $("proposals-list").innerHTML=`<div style="display:grid;gap:8px;grid-template-columns:repeat(auto-fill,minmax(250px,1fr))">
+    ${proposals.map(p=>`<div class="sym-card">
+      <div class="sc-t mono">${p.filename}</div>
+      <div class="kv"><span class="k">Run ID</span><span class="v">${p.content?.run_id||"—"}</span></div>
+      <div class="kv"><span class="k">Event</span><span class="v">${(p.content?.events?.[0]?.event_type||"—")}</span></div>
+      <div class="kv"><span class="k">Symbols</span><span class="v">${(p.content?.symbols||[]).join(", ")||"—"}</span></div>
+    </div>`).join("")}
+  </div>`;
 }
 
 /* ─── Event Registry ─────────────────────────────────────────────────────── */
@@ -1260,7 +2601,6 @@ function renderEventSpecs(){
   const regime=$("es-regime")?.value||"";
   const q=($("es-q")?.value||"").toLowerCase();
 
-  // Populate regime dropdown
   const regSel=$("es-regime");
   if(regSel&&regSel.options.length<=1){
     const regimes=[...new Set(D.eventSpecs.map(e=>e.canonical_regime).filter(Boolean))].sort();
@@ -1297,6 +2637,112 @@ function renderEventSpecs(){
   }).join("");
 }
 
+/* ─── Registries ─────────────────────────────────────────────────────────── */
+function renderRegistries(){
+  if(!lazyLoaded.registries){
+    $("registry-metrics").innerHTML="";
+    $("domain-note").textContent='Registry surfaces load on demand';
+    $("domain-body").innerHTML='<tr><td colspan="5" class="empty">Load registries to inspect domain graph, template families, and feature catalog.</td></tr>';
+    $("template-note").textContent='Standby';
+    $("template-grid").innerHTML=`<div class="surface-placeholder"><div>Registry surfaces are available on demand.<br><button class="btn btn-primary" onclick="loadRegistriesView(true)">Load Registries</button></div></div>`;
+    $("feature-note").textContent='Standby';
+    $("feature-grid").innerHTML='<div class="empty">Load registries to view the feature catalog.</div>';
+    return;
+  }
+  const domain=D.domain||{events:[],families:[],regimes:[]};
+  const templates=D.templates||{families:[]};
+  const features=D.features||[];
+  $("registry-metrics").innerHTML="";
+  [
+    {l:"Domain Events",v:fmtN(domain.events?.length||0),s:"In domain graph"},
+    {l:"Research Families",v:fmtN(domain.families?.length||0),s:"Unique families"},
+    {l:"Regimes",v:fmtN(domain.regimes?.length||0),s:"Canonical regimes"},
+    {l:"Template Families",v:fmtN(templates.families?.length||0),s:"Registry groups",accent:true},
+    {l:"Features",v:fmtN(features.length),s:"Config registry features"},
+  ].forEach(m=>{
+    const c=el("div","mc"+(m.accent?" accent":""));
+    c.innerHTML=`<div class="ml">${m.l}</div><div class="mv">${m.v}</div><div class="ms">${m.s}</div>`;
+    $("registry-metrics").appendChild(c);
+  });
+
+  $("domain-note").textContent=`${domain.events?.length||0} events · ${domain.families?.length||0} families · ${domain.regimes?.length||0} regimes`;
+  $("domain-body").innerHTML=(domain.events||[]).slice(0,24).map(event=>`
+    <tr>
+      <td class="mono">${event.name}</td>
+      <td>${event.research_family||"—"}</td>
+      <td>${event.canonical_regime||"—"}</td>
+      <td class="mono">${event.detector_name||"—"}</td>
+      <td>${chip(event.tier||"—",event.tier==="A"?"ok":event.tier==="B"?"ac":"neutral")}</td>
+    </tr>
+  `).join("");
+
+  $("template-note").textContent=`${templates.families?.length||0} families`;
+  $("template-grid").innerHTML=(templates.families||[]).map(family=>`
+    <div class="art-card">
+      <div class="art-title">${family.name} ${chip(`${family.templates?.length||0} templates`,"ac")}</div>
+      <div class="art-list">${(family.templates||[]).slice(0,6).map(t=>`<div>${t.name}</div>`).join("")}</div>
+    </div>
+  `).join("") || '<div class="empty">No template registry found.</div>';
+
+  $("feature-note").textContent=`${features.length} features`;
+  $("feature-grid").innerHTML=features.map(feature=>{
+    const meta=Object.entries(feature).filter(([k])=>k!=="name").slice(0,4);
+    return `<div class="art-card">
+      <div class="art-title">${feature.name}</div>
+      <div class="kv-stack">
+        ${meta.map(([k,v])=>`<div class="kv"><span class="k">${k}</span><span class="v">${Array.isArray(v)?v.join(", "):typeof v==="object"?Object.keys(v).join(", "):String(v)}</span></div>`).join("")}
+      </div>
+    </div>`;
+  }).join("") || '<div class="empty">No features registry loaded.</div>';
+}
+
+/* ─── Runtime ────────────────────────────────────────────────────────────── */
+function summarizeValue(v){
+  if(v===null||v===undefined||v==="") return "—";
+  if(Array.isArray(v)) return v.length?`${v.length} item${v.length===1?"":"s"}`:"0 items";
+  if(typeof v==="object") return `${Object.keys(v).length} fields`;
+  return String(v);
+}
+
+function renderRuntime(){
+  const live=D.liveState||{};
+  const recon=live.reconciliation||{};
+  const batch=live.batch_metadata||{};
+  const memories=live.campaign_memories||[];
+
+  const reconPairs=[
+    ["Safe to proceed", recon.safe_to_proceed===true?"yes":recon.safe_to_proceed===false?"no":"—"],
+    ["Current batch", recon.current_batch_id||"—"],
+    ["Previous batch", recon.previous_batch_id||"—"],
+    ["Added", summarizeValue(recon.added)],
+    ["Removed", summarizeValue(recon.removed)],
+    ["Superseded", summarizeValue(recon.superseded)],
+    ["Downgraded", summarizeValue(recon.downgraded)],
+    ["Unchanged", summarizeValue(recon.unchanged)],
+  ];
+  $("runtime-recon").innerHTML=`<div class="kv-stack">${reconPairs.map(([k,v])=>`<div class="kv"><span class="k">${k}</span><span class="v">${v}</span></div>`).join("")}</div>`;
+
+  const batchPairs=Object.entries(batch).slice(0,10);
+  $("runtime-batch").innerHTML=batchPairs.length
+    ? `<div class="kv-stack">${batchPairs.map(([k,v])=>`<div class="kv"><span class="k">${k}</span><span class="v">${summarizeValue(v)}</span></div>`).join("")}</div>`
+    : '<div class="empty">No batch metadata found.</div>';
+
+  $("memory-note").textContent=`${memories.length} campaign memory store${memories.length===1?"":"s"}`;
+  $("memory-grid").innerHTML=memories.map(memory=>`
+    <div class="art-card">
+      <div class="art-title">${memory.campaign}</div>
+      <div class="kv-stack">
+        <div class="kv"><span class="k">Current focus</span><span class="v">${memory.belief?.current_focus||"—"}</span></div>
+        <div class="kv"><span class="k">Promising regions</span><span class="v">${summarizeValue(memory.belief?.promising_regions)}</span></div>
+        <div class="kv"><span class="k">Avoid regions</span><span class="v">${summarizeValue(memory.belief?.avoid_regions)}</span></div>
+        <div class="kv"><span class="k">Open repairs</span><span class="v">${summarizeValue(memory.belief?.open_repairs)}</span></div>
+        <div class="kv"><span class="k">Explore adjacent</span><span class="v">${summarizeValue(memory.next_actions?.explore_adjacent)}</span></div>
+        <div class="kv"><span class="k">Exploit</span><span class="v">${summarizeValue(memory.next_actions?.exploit)}</span></div>
+      </div>
+    </div>
+  `).join("") || '<div class="empty">No campaign memory found.</div>';
+}
+
 /* ─── Theses ─────────────────────────────────────────────────────────────── */
 function renderTheses(){
   api("/api/theses").then(theses=>{
@@ -1308,17 +2754,17 @@ function renderTheses(){
             <div class="empty">No promoted theses found in data/live/theses/.<br>Run <span class="mono">edge promote export --run_id &lt;id&gt;</span> to populate.</div>
           </div>
         </div>
-        <div style="margin-top:14px">
+        <div style="margin-top:10px">
           <div class="card">
             <div class="card-head"><span class="ch-title">Deployment States</span><span class="ch-note">Thesis lifecycle</span></div>
             <div class="card-body">
-              <div style="display:flex;gap:10px;flex-wrap:wrap">
+              <div style="display:flex;gap:8px;flex-wrap:wrap">
                 ${[["monitor_only","neutral"],["paper_only","neutral"],["paper_enabled","warn"],
                    ["live_eligible","warn"],["live_enabled","ok"],["live_paused","warn"],
                    ["live_disabled","fail"],["retired","fail"]]
                   .map(([s,c])=>chip(s,c)).join("")}
               </div>
-              <div style="margin-top:12px;font-size:11.5px;color:var(--muted);line-height:1.7">
+              <div style="margin-top:10px;font-size:11px;color:var(--ink3);line-height:1.7">
                 Progression: <strong>monitor_only</strong> → <strong>paper_only</strong> → <strong>paper_enabled</strong> → <strong>live_eligible</strong> → <strong>live_enabled</strong><br>
                 Only <span style="color:var(--ok);font-weight:600">live_enabled</span> theses are tradeable in production.<br>
                 Requires explicit operator approval at each stage.
@@ -1341,7 +2787,7 @@ function renderTheses(){
             <td class="mono">${t.anchor_event_id||"—"}</td>
             <td>${chip(t.direction||"—","neutral")}</td>
             <td>${chip(t.governance?.deployment_state||"—","neutral")}</td>
-            <td class="mono" style="color:var(--muted)">${t._run_id||"—"}</td>
+            <td class="mono" style="color:var(--ink3)">${t._run_id||"—"}</td>
             <td class="num">${fmt(t.evidence?.net_expectancy_bps)}</td>
             <td class="num">${fmt(t.evidence?.q_value,4)}</td>
           </tr>`).join("")}
@@ -1357,14 +2803,14 @@ function renderTheses(){
 function renderLake(){
   const lake=D.lake;
   $("lake-cleaned").innerHTML=(lake.cleaned_symbols||[]).map(s=>`
-    <div class="sym-card" style="margin-bottom:8px">
+    <div class="sym-card" style="margin-bottom:7px">
       <div class="sc-t">${s.symbol}</div>
       <div class="kv"><span class="k">Parquet files</span><span class="v">${s.bars_files}</span></div>
       <div class="kv"><span class="k">Years</span><span class="v">${s.years.join(", ")||"—"}</span></div>
     </div>`).join("")||'<div class="empty">No data found.</div>';
 
   $("lake-features").innerHTML=(lake.feature_symbols||[]).map(s=>`
-    <div class="sym-card" style="margin-bottom:8px">
+    <div class="sym-card" style="margin-bottom:7px">
       <div class="sc-t">${s.symbol}</div>
       <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:5px">
         ${(s.feature_types||[]).map(f=>chip(f,"neutral")).join("")}
@@ -1382,6 +2828,7 @@ function renderLake(){
 /* ─── Clock ──────────────────────────────────────────────────────────────── */
 function tick(){$("t-time").textContent=new Date().toLocaleTimeString("en-US",{hour12:false})}
 setInterval(tick,1000);tick();
+setInterval(()=>{if((D.jobs||[]).length) refreshJobs(true);},5000);
 
 /* ─── Init ───────────────────────────────────────────────────────────────── */
 buildProposal();

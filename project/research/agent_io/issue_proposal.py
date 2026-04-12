@@ -10,6 +10,7 @@ from typing import Any, Dict, List
 import pandas as pd
 
 from project.core.config import get_data_root
+from project.io.utils import atomic_write_text
 from project.research.agent_io.execute_proposal import execute_proposal
 from project.research.agent_io.proposal_schema import load_operator_proposal
 from project.operator.bounded import validate_bounded_proposal
@@ -43,7 +44,7 @@ def _proposal_artifact_path(paths: Any, run_id: str, suffix: str) -> Path:
 
 def _write_proposal_copy(destination: Path, source_path: str | Path) -> None:
     text = Path(source_path).read_text(encoding="utf-8")
-    destination.write_text(text, encoding="utf-8")
+    atomic_write_text(destination, text)
 
 
 def _merge_proposal_rows(existing: pd.DataFrame, incoming: pd.DataFrame) -> pd.DataFrame:

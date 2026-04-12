@@ -26,6 +26,11 @@ def test_write_promotion_lineage_audit(tmp_path: Path) -> None:
             "contract_json_path": "/tmp/live/promoted_thesis_contracts.json",
             "contract_md_path": "/tmp/live/promoted_thesis_contracts.md",
         },
+        historical_trust={
+            "historical_trust_status": "trusted_under_current_rules",
+            "canonical_reuse_allowed": True,
+            "compat_reuse_allowed": True,
+        },
     )
     assert Path(out["json_path"]).exists()
     assert Path(out["md_path"]).exists()
@@ -33,3 +38,4 @@ def test_write_promotion_lineage_audit(tmp_path: Path) -> None:
     assert "camp_1" in markdown
     assert "promoted_thesis_contracts.json" in markdown
     assert "promoted_thesis_contracts.md" in markdown
+    assert "trusted_under_current_rules" in markdown

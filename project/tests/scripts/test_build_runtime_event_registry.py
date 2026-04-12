@@ -15,3 +15,6 @@ def test_runtime_payload_uses_compiled_event_metadata() -> None:
     assert depth_collapse["requires_features"] == []
     assert depth_collapse["sequence_eligible"] is True
     assert depth_collapse["tags"] == ["liquidity_stress"]
+
+    absorption_proxy = events["ABSORPTION_PROXY"]
+    assert absorption_proxy["detector"] == "AbsorptionProxyDetector"

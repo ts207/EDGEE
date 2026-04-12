@@ -15,6 +15,7 @@ import yaml
 from project.core.config import get_data_root
 from project.events.event_specs import EVENT_REGISTRY_SPECS
 from project.events.governance import event_matches_filters, get_event_governance_metadata
+from project.io.utils import atomic_write_text
 from project.research.agent_io.issue_proposal import generate_run_id, issue_proposal
 from project.research.agent_io.proposal_schema import load_operator_proposal
 from project.research.knowledge.memory import ensure_memory_store, read_memory_table
@@ -561,7 +562,7 @@ def run_campaign_planner_cycle(
 
     proposal_path = planner.paths.proposals_dir / "planned_proposal.yaml"
     proposal_path.parent.mkdir(parents=True, exist_ok=True)
-    proposal_path.write_text(yaml.safe_dump(top, sort_keys=False), encoding="utf-8")
+    atomic_write_text(proposal_path, yaml.safe_dump(top, sort_keys=False))
     proposal = load_operator_proposal(proposal_path)
     run_id = generate_run_id(program_id, proposal.to_dict())
     execution = issue_proposal(

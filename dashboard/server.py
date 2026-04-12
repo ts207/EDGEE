@@ -443,6 +443,308 @@ def load_domain_graph_summary() -> dict:
     return {"events": events, "families": families, "regimes": regimes}
 
 
+def _rel(path: pathlib.Path) -> str:
+    try:
+        return str(path.relative_to(ROOT))
+    except Exception:
+        return str(path)
+
+
+def _file_list(paths) -> list[pathlib.Path]:
+    return [p for p in paths if p.is_file() and not p.name.endswith(":Zone.Identifier")]
+
+
+def _recent_relative(paths, limit: int = 5) -> list[str]:
+    items = []
+    for p in paths:
+        try:
+            items.append((p.stat().st_mtime, _rel(p)))
+        except FileNotFoundError:
+            continue
+    items.sort(reverse=True)
+    return [rel for _, rel in items[:limit]]
+
+
+def _summarize_section(
+    *,
+    section_id: str,
+    label: str,
+    base_path: pathlib.Path,
+    run_dirs: list[pathlib.Path],
+    files: list[pathlib.Path],
+    notes: str = "",
+    extra: dict | None = None,
+) -> dict:
+    section = {
+        "id": section_id,
+        "label": label,
+        "path": _rel(base_path),
+        "run_count": len(run_dirs),
+        "file_count": len(files),
+        "sample_runs": [d.name for d in run_dirs[:6]],
+        "sample_files": _recent_relative(files),
+        "notes": notes,
+    }
+    if extra:
+        section.update(extra)
+    return section
+
+
+def _artifact_section_catalog() -> list[dict]:
+    sections: list[dict] = []
+
+    data_quality = REPORTS / "data_quality"
+    dq_runs = sorted(
+        d for d in data_quality.iterdir()
+        if d.is_dir() and (d / "validation").exists()
+    ) if data_quality.exists() else []
+    dq_files = _file_list(data_quality.rglob("validation/*.json")) if data_quality.exists() else []
+    sections.append(_summarize_section(
+        section_id="data_quality",
+        label="Data quality validation",
+        base_path=data_quality,
+        run_dirs=dq_runs,
+        files=dq_files,
+        notes="Coverage and integrity validators emitted under per-run validation folders.",
+    ))
+
+    feature_quality = REPORTS / "feature_quality"
+    fq_runs = sorted(
+        d for d in feature_quality.iterdir()
+        if d.is_dir() and (d / "validation").exists()
+    ) if feature_quality.exists() else []
+    fq_files = _file_list(feature_quality.rglob("validation/*")) if feature_quality.exists() else []
+    sections.append(_summarize_section(
+        section_id="feature_quality",
+        label="Feature quality validation",
+        base_path=feature_quality,
+        run_dirs=fq_runs,
+        files=fq_files,
+        notes="Feature-level validation and per-symbol quality artifacts.",
+    ))
+
+    context_quality = REPORTS / "context_quality"
+    cq_runs = sorted(d for d in context_quality.iterdir() if d.is_dir()) if context_quality.exists() else []
+    cq_files = _file_list(context_quality.rglob("*")) if context_quality.exists() else []
+    sections.append(_summarize_section(
+        section_id="context_quality",
+        label="Context quality reports",
+        base_path=context_quality,
+        run_dirs=cq_runs,
+        files=cq_files,
+        notes="Context scoring and regime-conditioning support outputs.",
+    ))
+
+    phase2 = REPORTS / "phase2"
+    p2_runs = sorted(
+        d for d in phase2.iterdir()
+        if d.is_dir() and (d / "phase2_candidates.parquet").exists()
+    ) if phase2.exists() else []
+    p2_files = _file_list(
+        p for d in p2_runs for p in d.glob("phase2_*")
+    )
+    sections.append(_summarize_section(
+        section_id="phase2",
+        label="Phase-2 candidates",
+        base_path=phase2,
+        run_dirs=p2_runs,
+        files=p2_files,
+        notes="Candidate tables, overlap metrics, fold metrics, and regime-conditionals.",
+    ))
+
+    edge_candidates = REPORTS / "edge_candidates"
+    ec_runs = sorted(
+        d for d in edge_candidates.iterdir()
+        if d.is_dir() and (d / "edge_candidates_normalized.json").exists()
+    ) if edge_candidates.exists() else []
+    ec_files = _file_list(edge_candidates.rglob("edge_candidates_normalized.*")) if edge_candidates.exists() else []
+    sections.append(_summarize_section(
+        section_id="edge_candidates",
+        label="Normalized edge candidates",
+        base_path=edge_candidates,
+        run_dirs=ec_runs,
+        files=ec_files,
+        notes="Pre-phase-2 normalized candidate exports in JSON and parquet.",
+    ))
+
+    strategy_builder = REPORTS / "strategy_builder"
+    sb_runs = sorted(
+        d for d in strategy_builder.iterdir()
+        if d.is_dir() and (d / "strategy_candidates.json").exists()
+    ) if strategy_builder.exists() else []
+    sb_files = _file_list(strategy_builder.rglob("strategy_candidates.*")) if strategy_builder.exists() else []
+    nonempty_strategy_json = 0
+    for run_dir in sb_runs:
+        data = _load_json(run_dir / "strategy_candidates.json")
+        if isinstance(data, list) and data:
+            nonempty_strategy_json += 1
+    sections.append(_summarize_section(
+        section_id="strategy_builder",
+        label="Strategy builder outputs",
+        base_path=strategy_builder,
+        run_dirs=sb_runs,
+        files=sb_files,
+        notes="JSON companions are mostly empty; parquet and CSV outputs exist for each run.",
+        extra={"nonempty_json_runs": nonempty_strategy_json},
+    ))
+
+    live_theses_runs = sorted(
+        d for d in LIVE_THESES.iterdir()
+        if d.is_dir() and (d / "promoted_theses.json").exists()
+    ) if LIVE_THESES.exists() else []
+    live_theses_files = _file_list(LIVE_THESES.rglob("promoted_theses.json")) if LIVE_THESES.exists() else []
+    sections.append(_summarize_section(
+        section_id="live_theses",
+        label="Exported theses",
+        base_path=LIVE_THESES,
+        run_dirs=live_theses_runs,
+        files=live_theses_files,
+        notes="Promotion export handoff into runtime thesis inventory.",
+    ))
+
+    runtime_files = _file_list(LIVE_PERSIST.rglob("*")) if LIVE_PERSIST.exists() else []
+    sections.append(_summarize_section(
+        section_id="runtime_persist",
+        label="Runtime persist state",
+        base_path=LIVE_PERSIST,
+        run_dirs=[],
+        files=runtime_files,
+        notes="Thin runtime reconciliation and thesis-batch metadata.",
+    ))
+
+    trigger_dir = ROOT / "data" / "trigger_proposals"
+    trigger_files = _file_list(trigger_dir.rglob("*")) if trigger_dir.exists() else []
+    sections.append(_summarize_section(
+        section_id="trigger_proposals",
+        label="Trigger proposals",
+        base_path=trigger_dir,
+        run_dirs=[],
+        files=trigger_files,
+        notes="Advanced trigger-discovery proposal outputs. Empty when the lane has not been exercised.",
+    ))
+
+    memory_runs = sorted(
+        d for d in ARTIFACTS_DIR.iterdir()
+        if d.is_dir() and (d / "memory").exists()
+    ) if ARTIFACTS_DIR.exists() else []
+    memory_files = _file_list(ARTIFACTS_DIR.rglob("memory/*")) if ARTIFACTS_DIR.exists() else []
+    sections.append(_summarize_section(
+        section_id="campaign_memory",
+        label="Campaign memory",
+        base_path=ARTIFACTS_DIR,
+        run_dirs=memory_runs,
+        files=memory_files,
+        notes="Belief state, next actions, reflections, evidence ledgers, and context statistics.",
+    ))
+
+    return sections
+
+
+def load_artifact_inventory() -> dict:
+    sections = _artifact_section_catalog()
+
+    populated = [section for section in sections if section["file_count"] > 0]
+    return {
+        "sections": sections,
+        "total_sections": len(sections),
+        "populated_sections": len(populated),
+        "total_files": sum(section["file_count"] for section in sections),
+    }
+
+
+def _safe_json_rows(rows: list[dict], limit: int = 3) -> list[dict]:
+    clean = []
+    for row in rows[:limit]:
+        clean.append({k: str(v)[:160] for k, v in row.items()})
+    return clean
+
+
+def _preview_file(path_str: str) -> dict:
+    path = ROOT / path_str
+    preview = {"path": path_str, "kind": path.suffix.lstrip("."), "exists": path.exists()}
+    if not path.exists() or path.name.endswith(":Zone.Identifier"):
+        preview["error"] = "missing"
+        return preview
+
+    try:
+        if path.suffix == ".json":
+            data = json.loads(path.read_text())
+            if isinstance(data, dict):
+                preview["shape"] = "dict"
+                preview["keys"] = list(data)[:20]
+                preview["sample"] = {k: str(data[k])[:160] for k in list(data)[:8]}
+            elif isinstance(data, list):
+                preview["shape"] = "list"
+                preview["rows"] = len(data)
+                if data and isinstance(data[0], dict):
+                    preview["columns"] = list(data[0])[:20]
+                    preview["sample_rows"] = _safe_json_rows(data)
+            else:
+                preview["shape"] = type(data).__name__
+        elif path.suffix in {".yaml", ".yml"} and HAS_YAML:
+            data = yaml.safe_load(path.read_text()) or {}
+            preview["shape"] = "dict" if isinstance(data, dict) else type(data).__name__
+            if isinstance(data, dict):
+                preview["keys"] = list(data)[:20]
+        elif path.suffix == ".csv":
+            import pandas as pd
+            df = pd.read_csv(path, nrows=3)
+            preview["shape"] = "table"
+            preview["columns"] = list(df.columns)[:20]
+            preview["sample_rows"] = _safe_json_rows(df.fillna("").to_dict(orient="records"))
+        elif path.suffix == ".parquet":
+            import pandas as pd
+            df = pd.read_parquet(path)
+            preview["shape"] = "table"
+            preview["rows"] = len(df)
+            preview["columns"] = list(df.columns)[:20]
+            preview["sample_rows"] = _safe_json_rows(df.head(3).fillna("").to_dict(orient="records"))
+        else:
+            preview["shape"] = "file"
+            preview["size_bytes"] = path.stat().st_size
+    except Exception as exc:
+        preview["error"] = str(exc)
+    return preview
+
+
+def load_artifact_detail(section_id: str) -> dict:
+    sections = {section["id"]: section for section in _artifact_section_catalog()}
+    section = sections.get(section_id)
+    if not section:
+        return {"error": f"unknown section: {section_id}"}
+
+    sample_files = section.get("sample_files", [])
+    previews = [_preview_file(path_str) for path_str in sample_files[:3]]
+    return {
+        "section": section,
+        "previews": previews,
+    }
+
+
+def load_git_activity(limit: int = 30) -> list[dict]:
+    try:
+        raw = subprocess.check_output(
+            [
+                "git", "log", f"-{limit}",
+                "--date=short",
+                "--pretty=format:%h%x09%ad%x09%s",
+            ],
+            cwd=str(ROOT),
+            text=True,
+        )
+    except Exception:
+        return []
+
+    commits = []
+    for line in raw.splitlines():
+        parts = line.split("\t", 2)
+        if len(parts) != 3:
+            continue
+        commit_hash, date, subject = parts
+        commits.append({"hash": commit_hash, "date": date, "subject": subject})
+    return commits
+
+
 CAMPAIGNS = [
     {
         "id": "liquidation_cascade_proxy",
@@ -635,6 +937,9 @@ class Handler(BaseHTTPRequestHandler):
             "/api/features":      lambda: load_features(),
             "/api/live-state":    lambda: load_live_state(),
             "/api/domain-graph":  lambda: load_domain_graph_summary(),
+            "/api/artifacts":     lambda: load_artifact_inventory(),
+            "/api/artifacts/detail": lambda: load_artifact_detail(qs.get("section", [""])[0]),
+            "/api/git-activity":  lambda: load_git_activity(),
         }
 
         handler = routes.get(path)
@@ -679,10 +984,13 @@ class Handler(BaseHTTPRequestHandler):
 
                 elif stage == "discover" and subcmd == "plan":
                     proposal = args.get("proposal", "")
+                    run_id   = args.get("run_id", "")
                     if not proposal:
                         self.send_json({"ok": False, "error": "proposal required"}, 400); return
                     cmd = ["python3", "-m", "project.cli", "discover", "plan",
                            "--proposal", proposal]
+                    if run_id:
+                        cmd += ["--run_id", run_id]
                     label = f"plan·{proposal}"
 
                 elif stage == "validate":
@@ -701,14 +1009,34 @@ class Handler(BaseHTTPRequestHandler):
                            "--run_id", run_id, "--symbols", symbols]
                     label = f"promote·{run_id}"
 
+                elif stage == "export":
+                    run_id = args.get("run_id", "")
+                    if not run_id:
+                        self.send_json({"ok": False, "error": "run_id required"}, 400); return
+                    cmd = ["python3", "-m", "project.cli", "promote", "export", "--run_id", run_id]
+                    label = f"export·{run_id}"
+
+                elif stage == "deploy" and subcmd == "paper":
+                    run_id = args.get("run_id", "")
+                    if not run_id:
+                        self.send_json({"ok": False, "error": "run_id required"}, 400); return
+                    cmd = ["python3", "-m", "project.cli", "deploy", "paper", "--run_id", run_id]
+                    label = f"deploy-paper·{run_id}"
+
                 elif stage == "ingest":
                     run_id  = args.get("run_id", "")
                     symbols = args.get("symbols", "BTCUSDT,ETHUSDT")
                     start   = args.get("start", "2021-01-01")
                     end     = args.get("end", "2024-12-31")
+                    timeframe = args.get("timeframe", "5m")
+                    exchange = args.get("exchange", "bybit")
+                    data_type = args.get("data_type", "ohlcv")
                     cmd = ["python3", "-m", "project.cli", "ingest",
                            "--run_id", run_id, "--symbols", symbols,
-                           "--start", start, "--end", end]
+                           "--start", start, "--end", end,
+                           "--timeframe", timeframe,
+                           "--exchange", exchange,
+                           "--data_type", data_type]
                     label = f"ingest·{run_id}"
 
                 elif stage == "build-graph":

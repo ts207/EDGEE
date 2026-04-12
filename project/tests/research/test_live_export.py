@@ -7,6 +7,7 @@ import pandas as pd
 import pytest
 
 from project.core.exceptions import DataIntegrityError
+from project.core.exceptions import SchemaMismatchError
 from project.live.contracts import PromotedThesis
 from project.live.deployment import check_thesis
 from project.research.live_export import export_promoted_theses_for_run
@@ -17,7 +18,10 @@ from project.research.validation.contracts import (
     ValidationDecision,
     ValidationMetrics,
 )
-from project.research.validation.result_writer import write_validation_bundle
+from project.research.validation.result_writer import (
+    write_promotion_ready_candidates,
+    write_validation_bundle,
+)
 
 
 def _bundle() -> dict:
@@ -64,7 +68,44 @@ def _bundle() -> dict:
     }
 
 
+def _write_validation_lineage(
+    root: Path,
+    *,
+    run_id: str,
+    candidate_id: str,
+    status: str = "validated",
+) -> None:
+    bundle = ValidationBundle(
+        run_id=run_id,
+        created_at="2026-01-01T00:00:00Z",
+        validated_candidates=(
+            [
+                ValidatedCandidateRecord(
+                    candidate_id=candidate_id,
+                    decision=ValidationDecision(
+                        status=status,
+                        candidate_id=candidate_id,
+                        run_id=run_id,
+                        reason_codes=["passed_validation"] if status == "validated" else [],
+                    ),
+                    metrics=ValidationMetrics(sample_count=120, stability_score=0.9),
+                )
+            ]
+            if status == "validated"
+            else []
+        ),
+        rejected_candidates=[],
+        inconclusive_candidates=[],
+        summary_stats={"total": 1, "validated": 1 if status == "validated" else 0},
+        effect_stability_report={},
+    )
+    base_dir = root / "reports" / "validation" / run_id
+    write_validation_bundle(bundle, base_dir=base_dir)
+    write_promotion_ready_candidates(bundle, base_dir=base_dir)
+
+
 def test_export_promoted_theses_pending_then_active_with_blueprint(tmp_path: Path) -> None:
+    _write_validation_lineage(tmp_path, run_id="run_1", candidate_id="cand_1")
     promoted_df = pd.DataFrame(
         [
             {
@@ -142,6 +183,7 @@ def test_export_promoted_theses_pending_then_active_with_blueprint(tmp_path: Pat
 
 
 def test_export_promoted_theses_fails_on_corrupted_existing_index(tmp_path: Path) -> None:
+    _write_validation_lineage(tmp_path, run_id="run_1", candidate_id="cand_1")
     promoted_df = pd.DataFrame(
         [
             {
@@ -165,6 +207,7 @@ def test_export_promoted_theses_fails_on_corrupted_existing_index(tmp_path: Path
 
 
 def test_export_promoted_theses_uses_authored_thesis_definition_from_lineage(tmp_path: Path) -> None:
+    _write_validation_lineage(tmp_path, run_id="run_1", candidate_id="cand_1")
     promoted_df = pd.DataFrame(
         [
             {
@@ -203,6 +246,7 @@ def test_export_promoted_theses_uses_authored_thesis_definition_from_lineage(tmp
 
 
 def test_export_promoted_theses_derives_multi_clause_requirements_from_metadata(tmp_path: Path) -> None:
+    _write_validation_lineage(tmp_path, run_id="run_1", candidate_id="cand_structural")
     promoted_df = pd.DataFrame(
         [
             {
@@ -245,6 +289,7 @@ def test_export_promoted_theses_derives_multi_clause_requirements_from_metadata(
 def test_export_promoted_theses_can_register_runtime_batch_and_override_deployment_state(
     tmp_path: Path,
 ) -> None:
+    _write_validation_lineage(tmp_path, run_id="run_1", candidate_id="cand_1")
     promoted_df = pd.DataFrame(
         [
             {
@@ -255,27 +300,21 @@ def test_export_promoted_theses_can_register_runtime_batch_and_override_deployme
         ]
     )
 
-    result = export_promoted_theses_for_run(
-        "run_1",
-        data_root=tmp_path,
-        bundles=[_bundle()],
-        promoted_df=promoted_df,
-        deployment_state_overrides={"cand_1": "live_enabled"},
-        register_runtime_name="paper_btc_runtime",
-    )
-
-    payload = json.loads(result.output_path.read_text(encoding="utf-8"))
-    index_payload = json.loads(result.index_path.read_text(encoding="utf-8"))
-    assert payload["theses"][0]["deployment_state"] == "live_enabled"
-    assert index_payload["runtime_registrations"]["paper_btc_runtime"]["run_id"] == "run_1"
-    assert index_payload["runtime_registrations"]["paper_btc_runtime"]["deployment_state_counts"] == {
-        "live_enabled": 1
-    }
+    with pytest.raises(RuntimeError, match="DeploymentGate blocked"):
+        export_promoted_theses_for_run(
+            "run_1",
+            data_root=tmp_path,
+            bundles=[_bundle()],
+            promoted_df=promoted_df,
+            deployment_state_overrides={"cand_1": "live_enabled"},
+            register_runtime_name="paper_btc_runtime",
+        )
 
 
 def test_export_promoted_theses_preserves_live_eligible_for_deployment_gate(
     tmp_path: Path,
 ) -> None:
+    _write_validation_lineage(tmp_path, run_id="run_1", candidate_id="cand_1")
     promoted_df = pd.DataFrame(
         [
             {
@@ -287,55 +326,44 @@ def test_export_promoted_theses_preserves_live_eligible_for_deployment_gate(
         ]
     )
 
-    result = export_promoted_theses_for_run(
-        "run_1",
-        data_root=tmp_path,
-        bundles=[_bundle()],
-        promoted_df=promoted_df,
-    )
-
-    payload = json.loads(result.output_path.read_text(encoding="utf-8"))
-    thesis = PromotedThesis.model_validate(payload["theses"][0])
-
-    assert thesis.deployment_state == "live_eligible"
-    assert check_thesis(thesis) == [
-        "live_approval.live_approval_status is '', expected 'approved'",
-        "live_approval.approved_by is empty",
-        "live_approval.approved_at is empty",
-        "live_approval.risk_profile_id is empty",
-    ]
+    with pytest.raises(RuntimeError, match="DeploymentGate blocked"):
+        export_promoted_theses_for_run(
+            "run_1",
+            data_root=tmp_path,
+            bundles=[_bundle()],
+            promoted_df=promoted_df,
+        )
 
 
 def test_export_promoted_theses_loads_validation_lineage_from_canonical_validation_root(
     tmp_path: Path,
 ) -> None:
     validation_dir = tmp_path / "reports" / "validation" / "run_1"
-    write_validation_bundle(
-        ValidationBundle(
-            run_id="run_1",
-            created_at="2026-01-01T00:00:00Z",
-            validated_candidates=[
-                ValidatedCandidateRecord(
+    bundle = ValidationBundle(
+        run_id="run_1",
+        created_at="2026-01-01T00:00:00Z",
+        validated_candidates=[
+            ValidatedCandidateRecord(
+                candidate_id="cand_1",
+                decision=ValidationDecision(
+                    status="validated",
                     candidate_id="cand_1",
-                    decision=ValidationDecision(
-                        status="validated",
-                        candidate_id="cand_1",
-                        run_id="run_1",
-                        reason_codes=["passed_validation"],
-                    ),
-                    metrics=ValidationMetrics(sample_count=120, stability_score=0.9),
-                    artifact_refs=[
-                        ValidationArtifactRef(
-                            artifact_type="validation_report",
-                            path="reports/validation/run_1/validation_report.json",
-                        )
-                    ],
-                )
-            ],
-            summary_stats={"total": 1, "validated": 1},
-        ),
-        base_dir=validation_dir,
+                    run_id="run_1",
+                    reason_codes=["passed_validation"],
+                ),
+                metrics=ValidationMetrics(sample_count=120, stability_score=0.9),
+                artifact_refs=[
+                    ValidationArtifactRef(
+                        artifact_type="validation_report",
+                        path="reports/validation/run_1/validation_report.json",
+                    )
+                ],
+            )
+        ],
+        summary_stats={"total": 1, "validated": 1},
     )
+    write_validation_bundle(bundle, base_dir=validation_dir)
+    write_promotion_ready_candidates(bundle, base_dir=validation_dir)
 
     promoted_df = pd.DataFrame(
         [
@@ -363,7 +391,7 @@ def test_export_promoted_theses_loads_validation_lineage_from_canonical_validati
     }
 
 
-def test_export_promoted_theses_tolerates_malformed_validation_bundle(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
+def test_export_promoted_theses_fails_closed_on_malformed_validation_bundle(tmp_path: Path) -> None:
     validation_dir = tmp_path / "reports" / "validation" / "run_1"
     validation_dir.mkdir(parents=True, exist_ok=True)
     (validation_dir / "validation_bundle.json").write_text(
@@ -397,22 +425,17 @@ def test_export_promoted_theses_tolerates_malformed_validation_bundle(tmp_path: 
         ]
     )
 
-    with caplog.at_level("WARNING"):
-        result = export_promoted_theses_for_run(
+    with pytest.raises((DataIntegrityError, SchemaMismatchError, ValueError)):
+        export_promoted_theses_for_run(
             "run_1",
             data_root=tmp_path,
             bundles=[_bundle()],
             promoted_df=promoted_df,
         )
 
-    thesis = json.loads(result.output_path.read_text(encoding="utf-8"))["theses"][0]
-    assert thesis["lineage"]["validation_run_id"] == ""
-    assert thesis["lineage"]["validation_status"] == ""
-    assert thesis["lineage"]["validation_reason_codes"] == []
-    assert any("Proceeding without validation metadata" in record.message for record in caplog.records)
-
 
 def test_export_promoted_theses_rejects_unknown_override_target(tmp_path: Path) -> None:
+    _write_validation_lineage(tmp_path, run_id="run_1", candidate_id="cand_1")
     promoted_df = pd.DataFrame(
         [
             {

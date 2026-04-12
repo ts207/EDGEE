@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import os
+import tempfile
 from pathlib import Path
-from typing import Iterable, List, Sequence, Tuple
+from typing import Any, Callable, Iterable, List, Sequence, Tuple
 
 import pandas as pd
 
@@ -23,6 +25,62 @@ def ensure_dir(path: Path) -> None:
     Ensure a directory exists.
     """
     path.mkdir(parents=True, exist_ok=True)
+
+
+def atomic_write_text(path: Path, text: str, *, encoding: str = "utf-8") -> Path:
+    """
+    Atomically replace ``path`` with ``text`` using a sibling temp file.
+
+    The final payload is deterministic and retry-safe for identical inputs.
+    """
+    ensure_dir(path.parent)
+    fd, temp_name = tempfile.mkstemp(
+        prefix=f".{path.name}.",
+        suffix=".tmp",
+        dir=str(path.parent),
+        text=True,
+    )
+    temp_path = Path(temp_name)
+    try:
+        with os.fdopen(fd, "w", encoding=encoding) as handle:
+            handle.write(text)
+            handle.flush()
+            os.fsync(handle.fileno())
+        temp_path.replace(path)
+    finally:
+        if temp_path.exists():
+            try:
+                temp_path.unlink()
+            except OSError:
+                pass
+    return path
+
+
+def atomic_write_json(
+    path: Path,
+    payload: Any,
+    *,
+    indent: int = 2,
+    sort_keys: bool = True,
+    default: Callable[[Any], Any] | None = None,
+    trailing_newline: bool = True,
+    validator: Callable[[Any], None] | None = None,
+) -> Path:
+    """
+    Serialize and atomically replace a JSON payload.
+
+    Optional ``validator`` runs before and after serialization so canonical
+    control-plane writers can fail closed on malformed payloads.
+    """
+    if validator is not None:
+        validator(payload)
+    serialized = json.dumps(payload, indent=indent, sort_keys=sort_keys, default=default)
+    if trailing_newline:
+        serialized += "\n"
+    target = atomic_write_text(path, serialized)
+    if validator is not None:
+        validator(json.loads(serialized))
+    return target
 
 
 def run_scoped_lake_path(data_root: Path, run_id: str, *parts: str) -> Path:
