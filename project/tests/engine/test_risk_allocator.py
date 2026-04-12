@@ -324,3 +324,35 @@ class TestRiskAllocator:
         assert scales["trend_b"].iloc[1] == pytest.approx(0.5)
         assert scales["meanrev"].iloc[1] == pytest.approx(1.0)
         assert stats["family_budget_hits"] == {"trend": 1}
+
+    def test_exclusive_overlap_mode(self):
+        """In exclusive mode, only the winner of the overlap group remains active."""
+        idx = _ts(1)
+        # Two strategies in the same group both active
+        pos = {
+            "s1": pd.Series([1.0], index=idx),
+            "s2": pd.Series([1.0], index=idx)
+        }
+        req = {
+            "s1": pd.Series([1.0], index=idx),
+            "s2": pd.Series([1.0], index=idx)
+        }
+        
+        limits = RiskLimits()
+        policy = AllocationPolicy(
+            overlap_mode="exclusive",
+            strategy_thesis_map={"s1": "T1", "s2": "T2"},
+            thesis_overlap_group_map={"T1": "G1", "T2": "G1"},
+            thesis_ranking_data={
+                "T1": {"support_score": 0.5, "sample_size": 100},
+                "T2": {"support_score": 0.6, "sample_size": 50}
+            }
+        )
+        contract = AllocationContract(limits=limits, policy=policy)
+        
+        scales, stats = allocate_position_scales(pos, req, limits, contract=contract)
+        
+        # s2 has higher support score (0.6 > 0.5), so it should win
+        assert scales["s1"].iloc[0] == 0.0
+        assert scales["s2"].iloc[0] == pytest.approx(1.0)
+        assert stats["overlap_exclusive_suppression"] == 1

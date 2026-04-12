@@ -86,6 +86,9 @@ class AllocationSpec(BaseModel):
         thesis_overlap_group_map = dict(constraints.get("thesis_overlap_group_map", {}))
         overlap_group_risk_budgets = dict(constraints.get("overlap_group_risk_budgets", {}))
         thesis_evidence_multipliers = dict(constraints.get("thesis_evidence_multipliers", {}))
+        overlap_mode = str(constraints.get("overlap_mode", "budgeted")).strip().lower()
+        thesis_ranking_data = dict(constraints.get("thesis_ranking_data", {}))
+        
         return {
             "allocator_mode": str(constraints.get("allocator_mode", "heuristic")).strip().lower(),
             "allocator_deterministic": bool(constraints.get("allocator_deterministic", True)),
@@ -97,6 +100,8 @@ class AllocationSpec(BaseModel):
             "thesis_overlap_group_map": thesis_overlap_group_map,
             "overlap_group_risk_budgets": overlap_group_risk_budgets,
             "thesis_evidence_multipliers": thesis_evidence_multipliers,
+            "overlap_mode": overlap_mode,
+            "thesis_ranking_data": thesis_ranking_data,
             "portfolio_max_exposure": float(self.risk_controls.per_position_notional_cap_usd),
             "max_portfolio_gross": float(self.sizing_policy.portfolio_risk_budget),
             "max_strategy_gross": float(self.sizing_policy.max_gross_leverage),

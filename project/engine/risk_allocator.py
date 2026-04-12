@@ -97,12 +97,19 @@ class AllocationPolicy:
     thesis_overlap_group_map: Dict[str, str] = field(default_factory=dict)
     overlap_group_risk_budgets: Dict[str, float] = field(default_factory=dict)
     thesis_evidence_multipliers: Dict[str, float] = field(default_factory=dict)
+    # NEW: Parity with live runtime
+    overlap_mode: str = "budgeted"  # "budgeted" | "exclusive"
+    thesis_ranking_data: Dict[str, Dict[str, float]] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if self.mode not in {"heuristic", "deterministic_optimizer"}:
             raise ValueError(
                 "allocator mode must be 'heuristic' or 'deterministic_optimizer', "
                 f"got {self.mode!r}"
+            )
+        if self.overlap_mode not in {"budgeted", "exclusive"}:
+            raise ValueError(
+                f"overlap_mode must be 'budgeted' or 'exclusive', got {self.overlap_mode!r}"
             )
         if self.turnover_penalty < 0.0:
             raise ValueError("turnover_penalty must be non-negative")
@@ -147,6 +154,8 @@ class AllocationContract:
                     str(key): float(value)
                     for key, value in sorted(self.policy.overlap_group_risk_budgets.items())
                 },
+                "overlap_mode": self.policy.overlap_mode,
+                "thesis_ranking_data": self.policy.thesis_ranking_data,
                 "thesis_evidence_multipliers": {
                     str(key): float(value)
                     for key, value in sorted(self.policy.thesis_evidence_multipliers.items())
@@ -378,15 +387,66 @@ def _apply_thesis_overlap_budget_caps(
 ) -> Dict[str, int]:
     overlap_hits: Dict[str, int] = {}
     members_by_group: Dict[str, list[str]] = {}
+    strategy_to_thesis: Dict[str, str] = {}
+    
     for key in ordered:
         thesis_id = str(contract.policy.strategy_thesis_map.get(key, "")).strip()
         if not thesis_id:
             continue
+        strategy_to_thesis[key] = thesis_id
         group = str(contract.policy.thesis_overlap_group_map.get(thesis_id, "")).strip()
         if not group:
             continue
         members_by_group.setdefault(group, []).append(key)
 
+    if contract.policy.overlap_mode == "exclusive":
+        # Parity with live: pick exactly one winner per group per timestamp
+        from project.live.portfolio_policy import PortfolioAdmissionPolicy
+        policy = PortfolioAdmissionPolicy()
+        
+        for group, members in members_by_group.items():
+            group_frame = pd.DataFrame({m: allocated[m] for m in members}, index=aligned_index)
+            # Find active members at each timestamp
+            active_mask = group_frame.abs() > 1e-12
+            
+            # If multiple members are active, we must pick one based on policy ranking
+            multi_active = active_mask.sum(axis=1) > 1
+            if not multi_active.any():
+                continue
+                
+            # For each timestamp with a conflict, pick the winner
+            for ts in aligned_index[multi_active]:
+                candidates = []
+                for m in members:
+                    if abs(allocated[m].loc[ts]) <= 1e-12:
+                        continue
+                    thesis_id = strategy_to_thesis[m]
+                    rank_info = contract.policy.thesis_ranking_data.get(thesis_id, {})
+                    candidates.append({
+                        "thesis_id": thesis_id,
+                        "strategy_key": m,
+                        "support_score": float(rank_info.get("support_score", 0.0)),
+                        "contradiction_penalty": float(rank_info.get("contradiction_penalty", 0.0)),
+                        "sample_size": int(rank_info.get("sample_size", 0)),
+                        "overlap_group_id": group
+                    })
+                
+                # Policy selects the winners (in our case, just one winner for the group)
+                winners = policy.resolve_overlap_winners(candidates, active_groups=set())
+                winner_keys = {w["strategy_key"] for w in winners}
+                
+                # Suppress losers
+                for m in members:
+                    if m not in winner_keys:
+                        allocated[m].loc[ts] = 0.0
+            
+            overlap_hits[group] = int(multi_active.sum())
+            flag(f"overlap_exclusive_suppression:{group}", multi_active)
+            flag("overlap_exclusive_suppression", multi_active)
+            
+        return overlap_hits
+
+    # Original "budgeted" mode (scaling)
     for group, members in members_by_group.items():
         budget = contract.policy.overlap_group_risk_budgets.get(group)
         if budget is None:
@@ -491,6 +551,26 @@ def allocate_position_details(
             requested[key] = requested[key] * float(policy_weights.get(key, 0.0))
     _apply_thesis_evidence_scaling(requested, ordered=ordered, contract=resolved_contract)
 
+    # NEW: Apply exclusive overlap suppression before correlation/scaling
+    # so winners get their intended full weight.
+    reason_flags: dict[str, pd.Series] = {}
+    aligned_index_non_null = aligned_index if aligned_index is not None else pd.Index([])
+
+    def _flag(name: str, mask: pd.Series) -> None:
+        nonlocal reason_flags
+        reason_flags[name] = reason_flags.get(
+            name, pd.Series(False, index=aligned_index_non_null)
+        ) | mask.reindex(aligned_index_non_null).fillna(False)
+
+    if resolved_contract.policy.overlap_mode == "exclusive":
+        _apply_thesis_overlap_budget_caps(
+            requested,
+            ordered=ordered,
+            aligned_index=aligned_index_non_null,
+            contract=resolved_contract,
+            flag=_flag,
+        )
+
     scale_by_strategy: Dict[str, pd.Series] = {}
     requested_gross = (
         pd.DataFrame(requested).abs().sum(axis=1)
@@ -536,14 +616,6 @@ def allocate_position_details(
 
     allocated = {key: s.copy() for key, s in requested.items()}
 
-    reason_flags: dict[str, pd.Series] = {}
-
-    def _flag(name: str, mask: pd.Series) -> None:
-        nonlocal reason_flags
-        reason_flags[name] = reason_flags.get(
-            name, pd.Series(False, index=aligned_index)
-        ) | mask.reindex(aligned_index).fillna(False)
-
     for key in ordered:
         max_s = float(max(0.0, limits.max_strategy_gross))
         gross = allocated[key].abs()
@@ -579,13 +651,24 @@ def allocate_position_details(
         contract=resolved_contract,
         flag=_flag,
     )
-    overlap_group_budget_hits = _apply_thesis_overlap_budget_caps(
-        allocated,
-        ordered=ordered,
-        aligned_index=aligned_index,
-        contract=resolved_contract,
-        flag=_flag,
-    )
+    # Only apply budgeted mode here if not already handled in exclusive mode
+    overlap_group_budget_hits = {}
+    if resolved_contract.policy.overlap_mode != "exclusive":
+        overlap_group_budget_hits = _apply_thesis_overlap_budget_caps(
+            allocated,
+            ordered=ordered,
+            aligned_index=aligned_index,
+            contract=resolved_contract,
+            flag=_flag,
+        )
+    else:
+        # In exclusive mode, we already flagged but didn't return hits count
+        # We can re-check requested vs allocated if needed, but for stats:
+        overlap_group_budget_hits = {
+            group: 1 for group in set(resolved_contract.policy.thesis_overlap_group_map.values())
+            if reason_flags.get(f"overlap_exclusive_suppression:{group}") is not None and 
+               reason_flags[f"overlap_exclusive_suppression:{group}"].any()
+        }
 
     if limits.max_correlated_gross is not None:
         corr_cap = float(max(0.0, limits.max_correlated_gross))
@@ -904,6 +987,11 @@ def allocate_position_details(
             "policy_weights": policy_weights,
             "family_budget_hits": family_budget_hits,
             "overlap_group_budget_hits": overlap_group_budget_hits,
+            "overlap_exclusive_suppression": int(
+                reason_flags["overlap_exclusive_suppression"].sum()
+                if "overlap_exclusive_suppression" in reason_flags
+                else 0
+            ),
         },
         contract=resolved_contract,
         policy_weights=policy_weights,

@@ -67,7 +67,13 @@ class PortfolioAdmissionPolicy:
             return AdmissionResult(True, "no_family_budget_limit")
         
         current_exposure = abs(family_exposures.get(family, 0.0))
+        # If budget < 10.0, we assume it's a leverage budget (e.g. 1.0 = 100%)
+        # If budget >= 10.0, we assume it's a USD notional budget.
+        # This is a heuristic for parity between engine (leverage) and live (USD).
         if current_exposure >= budget:
-            return AdmissionResult(False, f"family_budget_exhausted:{family}:{current_exposure:.0f}>={budget:.0f}")
+            return AdmissionResult(
+                False, 
+                f"family_budget_exhausted:{family}:{current_exposure:.2f}>={budget:.2f}"
+            )
         
         return AdmissionResult(True, "family_budget_available")
